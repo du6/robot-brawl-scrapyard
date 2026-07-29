@@ -1,0 +1,6 @@
+# build qa_r2_b10_hammer_front|mauler|Veteran|fire=True parts=13 policy=charge runs=4
+run 0: PlayerLoss at 90.0s  dealt 210 taken 251  pieces 12/13 vs 10/11  flipped 3.0s  | Judges' decision — damage 210 vs 251 (16.4% margin) · pieces 12/13 vs 10/11 — decided on damage
+run 1: PlayerWin at 90.0s  dealt 289 taken 216  pieces 12/13 vs 10/11  flipped 0.3s  | Judges' decision — damage 289 vs 216 (25.2% margin) · pieces 12/13 vs 10/11 — decided on damage
+run 2: PlayerLoss at 66.6s  dealt 424 taken 266  pieces 0/13 vs 11/11  flipped 6.3s  | KO — your core was destroyed
+run 3: PlayerWin at 90.3s  dealt 385 taken 99  pieces 12/13 vs 10/11  flipped 1.8s  | Judges' decision — damage 385 vs 99 (74.2% margin) · pieces 12/13 vs 10/11 — decided on damage
+qa_r2_b10_hammer_front|mauler|Veteran|fire=True|charge  n=4  W2/L2/D0  flips=2  len 66.6-90.3s spread=1.36x  worst single-step piece loss: player 8 enemy 1  [NOISY] (115s wall)

@@ -1,0 +1,6 @@
+# build qa_r2_b4_flipper_abs|tipper|Veteran|fire=True parts=13 policy=charge runs=4
+run 0: PlayerLoss at 84.6s  dealt 327 taken 319  pieces 2/13 vs 9/12  flipped 21.0s  | Counted out — every one of its 4 wheels had been torn off — nothing left to drive with
+run 1: PlayerLoss at 26.4s  dealt 99 taken 347  pieces 6/13 vs 12/12  flipped 0.0s  | Counted out — beached — 0 of 2 wheels touching the ground, so the drive had nothing to push on
+run 2: PlayerLoss at 90.0s  dealt 245 taken 310  pieces 9/13 vs 9/12  flipped 5.7s  | Judges' decision — damage 245 vs 310 (21.1% margin) · pieces 9/13 vs 9/12 — decided on damage
+run 3: PlayerLoss at 27.9s  dealt 152 taken 621  pieces 3/13 vs 12/12  flipped 10.8s  | Counted out — every one of its 4 wheels had been torn off — nothing left to drive with
+qa_r2_b4_flipper_abs|tipper|Veteran|fire=True|charge  n=4  W0/L4/D0  flips=0  len 26.4-90.0s spread=3.41x  worst single-step piece loss: player 2 enemy 1  [NOISY] (79s wall)

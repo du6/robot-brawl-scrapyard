@@ -1,0 +1,21 @@
+  WORLD builder_floor        size=(15.0,0.0,15.0) yTop=0.000
+  WORLD builder_floor        size=(15.0,0.0,15.0) yTop=0.000
+  WORLD builder_floor        size=(15.0,0.0,15.0) yTop=0.000
+  WORLD arena_floor          size=(14.0,0.0,14.0) yTop=0.000
+  WORLD builder_floor        size=(15.0,0.0,15.0) yTop=0.000
+  WORLD builder_floor        size=(15.0,0.0,15.0) yTop=0.000
+  WORLD arena_floor          size=(14.0,0.0,14.0) yTop=0.000
+  WORLD builder_floor        size=(15.0,0.0,15.0) yTop=0.000
+FLOOR top y = 0.000 (builder_floor)
+  PLAYER core_0         trig=False bottomY=0.040 clearance=0.040
+  PLAYER beam_1         trig=False bottomY=0.084 clearance=0.084
+  PLAYER beam_2         trig=False bottomY=0.084 clearance=0.084
+  PLAYER beam_3         trig=False bottomY=0.096 clearance=0.096
+  PLAYER beam_4         trig=False bottomY=0.090 clearance=0.090
+  PLAYER beam_5         trig=False bottomY=0.090 clearance=0.090
+  PLAYER beam_6         trig=False bottomY=0.078 clearance=0.078
+  PLAYER battery_7      trig=False bottomY=0.340 clearance=0.340
+  PLAYER beam_8         trig=False bottomY=0.100 clearance=0.100
+  PLAYER spindleZP_9    trig=False bottomY=0.022 clearance=0.022
+  PLAYER spinnerZP_10   trig=False bottomY=0.000 clearance=0.000
+  PLAYER spinnerZP_10   trig=True  bottomY=-0.051 clearance=-0.051

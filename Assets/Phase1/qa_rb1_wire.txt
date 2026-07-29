@@ -1,0 +1,79 @@
+# section=wire opponent=mauler seconds=25 speed=3 fire=True reps=1 builds=13
+# LIVE CONSTANTS  tipSpeedCap m/s: ABS=9.00 Aluminum=9.68 Steel=12.50 Titanium=14.79 CarbonFiber=13.11 Tungsten=13.69  | MotorKW 0/1/2/3 eng 1.0/2.5/4.0/5.5  | DRIVE_KW_PER_TONNE 1.25 | LIFT_EFFICIENCY 0.85 | REACTION_FRAC 0.60 | GROUND_CLEAR 0.020 | BITE_RATE_FRAC 0.45 | EXPOSED_MULT 1.75 | STEP_DISP_CAP 0.25
+# LIVE CONSTANTS (cycle) WIND_RELEASE_FRAC 0.995 | WIND_TIMEOUT_S 2.00 | BITE_TIP_SPEED_MS 4.00 | RECOVER_S 0.10 | PIVOT_RETURN_DPS 500 | MIN_BITE_E 40 | DRAIN_FRAC 0.40 | LIN_IMP_CAP 600 | EFFICIENCY 0.35 | RECUP_FRAC 0.90 | REACTION_STALL_MUL 3.0
+# LIVE CONSTANTS (damage/judging) DMG_K 0.045 | HP_K 6000 | SHOVE_CAP 500 | PART_IMMUNITY 0.50 | RAM_MIN_J 150 | RAM_J_CAP 900 | STRUCT_BAND 0.060 | MIN_STRUCT_PARTS 2.0 | DRAW_BAND_FRAC 0.080 | CONTROL_BAND 0.100 | MATCH_TIME 90 | CREDIT_BUDGET 4000
+# SOURCE REGIME b3f9659c (41 scripts, newest 2026-07-27 15:12:21Z)
+=== NOWEAP  parts=13 cost=688 validate=OK
+  BUILDER-WARN undrivenDiscs=0 of 0
+  arena mass=746.7 parts=9
+=== FIXSPIKE  parts=14 cost=734 validate=OK
+  BUILDER-WARN undrivenDiscs=0 of 0
+  arena mass=803.7 parts=10
+=== FIXDISC  parts=14 cost=724 validate=OK
+  disc spinner spindleDriven=False onSomeLimb=False
+  BUILDER-WARN undrivenDiscs=1 of 1
+  arena mass=792.1 parts=10
+  spin disc[spinnerZP] revs6s=0.0 axisAlignToOwnFace=-1.000 (1.0=clean spin, 0=tumble)
+=== DISC_Z  parts=15 cost=760 validate=OK
+  quote spindle  parts=1 I=0.433 tipR=0.170 kJ=3.34 blocked=- members=[spinner]
+  disc spinner spindleDriven=True onSomeLimb=True
+  BUILDER-WARN undrivenDiscs=0 of 1
+  arena mass=828.5 parts=11
+  arena spindleZP kind=Spindle axis=(0.00,0.00,1.00) limbN=1 I=0.433 tipR=0.170 maxRate=73.5 members=[spinnerZP]
+  spin disc[spinnerZP] revs6s=9.0 axisAlignToOwnFace=0.000 (1.0=clean spin, 0=tumble)
+=== SAW_Z  parts=15 cost=764 validate=OK
+  quote spindle  parts=1 I=0.870 tipR=0.230 kJ=3.67 blocked=- members=[spinnerSaw]
+  disc spinnerSaw spindleDriven=True onSomeLimb=True
+  BUILDER-WARN undrivenDiscs=0 of 1
+  arena mass=833.0 parts=11
+  arena spindleZP kind=Spindle axis=(0.00,0.00,1.00) limbN=1 I=0.870 tipR=0.230 maxRate=54.3 members=[spinnerSawZP]
+  spin disc[spinnerSawZP] revs6s=7.8 axisAlignToOwnFace=0.000 (1.0=clean spin, 0=tumble)
+=== COAX_V  parts=15 cost=760 validate=OK
+  quote spindle  parts=1 I=0.433 tipR=0.170 kJ=3.34 blocked=- members=[spinner]
+  disc spinner spindleDriven=True onSomeLimb=True
+  BUILDER-WARN undrivenDiscs=0 of 1
+  arena mass=828.5 parts=11
+  arena spindleYP kind=Spindle axis=(0.00,1.00,0.00) limbN=1 I=0.433 tipR=0.170 maxRate=73.5 members=[spinnerYP]
+  spin disc[spinnerYP] revs6s=9.0 axisAlignToOwnFace=1.000 (1.0=clean spin, 0=tumble)
+=== SAW_V  parts=15 cost=764 validate=OK
+  quote spindle  parts=1 I=0.870 tipR=0.230 kJ=3.67 blocked=- members=[spinnerSaw]
+  disc spinnerSaw spindleDriven=True onSomeLimb=True
+  BUILDER-WARN undrivenDiscs=0 of 1
+  arena mass=833.0 parts=11
+  arena spindleYP kind=Spindle axis=(0.00,1.00,0.00) limbN=1 I=0.870 tipR=0.230 maxRate=54.3 members=[spinnerSawYP]
+  spin disc[spinnerSawYP] revs6s=7.8 axisAlignToOwnFace=1.000 (1.0=clean spin, 0=tumble)
+=== FLAIL_V  parts=15 cost=760 validate=OK
+  quote spindle  parts=0 I=0.001 tipR=0.001 kJ=0.01 blocked=Spinner blade ↔ Beam members=[]
+  disc spinner spindleDriven=False onSomeLimb=False
+  BUILDER-WARN undrivenDiscs=1 of 1
+  arena mass=828.5 parts=11
+  arena spindleYP kind=Spindle axis=(0.00,1.00,0.00) limbN=0 I=0.001 tipR=0.001 maxRate=94.2 members=[]
+  spin disc[spinnerZP] revs6s=0.0 axisAlignToOwnFace=-1.000 (1.0=clean spin, 0=tumble)
+=== DRUM_V  parts=16 cost=798 validate=OK
+  quote spindle  parts=2 I=23.015 tipR=1.060 kJ=2.74 blocked=- members=[beam blade]
+  BUILDER-WARN undrivenDiscs=0 of 0
+  arena mass=859.7 parts=12
+  arena spindleYP kind=Spindle axis=(0.00,1.00,0.00) limbN=2 I=23.015 tipR=1.060 maxRate=9.1 members=[beam bladeZP]
+=== HAMMER  parts=16 cost=798 validate=OK
+  quote pivot    parts=2 I=23.015 tipR=1.060 kJ=2.74 blocked=- members=[beam blade]
+  BUILDER-WARN undrivenDiscs=0 of 0
+  arena mass=859.7 parts=12
+  arena pivotYP  kind=Pivot axis=(0.00,1.00,0.00) limbN=2 I=23.015 tipR=1.060 maxRate=9.1 members=[beam bladeZP]
+=== THRUSTER  parts=15 cost=770 validate=OK
+  quote ram      parts=1 I=56.991 tipR=0.150 kJ=1.00 blocked=- members=[spike]
+  BUILDER-WARN undrivenDiscs=0 of 0
+  arena mass=840.2 parts=11
+  arena ramZP    kind=Ram axis=(0.00,0.00,1.00) limbN=1 I=56.991 tipR=0.150 maxRate=3.5 members=[spikeZP]
+=== FLIPPER  parts=15 cost=730 validate=OK
+  quote pivot    parts=1 I=1.392 tipR=0.575 kJ=0.39 blocked=- members=[wedge]
+  BUILDER-WARN undrivenDiscs=0 of 0
+  arena mass=794.2 parts=11
+  arena pivotXP  kind=Pivot axis=(1.00,0.00,0.00) limbN=1 I=1.392 tipR=0.575 maxRate=14.0 members=[wedgeZP]
+=== DISCPIVOT  parts=16 cost=825 validate=OK
+  quote pivot    parts=2 I=44.518 tipR=0.970 kJ=6.34 blocked=- members=[beam spinner]
+  disc spinner spindleDriven=False onSomeLimb=True
+  BUILDER-WARN undrivenDiscs=1 of 1
+  arena mass=893.3 parts=12
+  arena pivotYP  kind=Pivot axis=(0.00,1.00,0.00) limbN=2 I=44.518 tipR=0.970 maxRate=10.0 members=[beam spinnerZP]
+  spin disc[spinnerZP] revs6s=2.4 axisAlignToOwnFace=1.000 (1.0=clean spin, 0=tumble)
+# done 13 builds

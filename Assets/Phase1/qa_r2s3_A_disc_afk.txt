@@ -1,0 +1,16 @@
+# build b5_discus_al parts=11 policy=afk runs=6
+# LIVE CONSTANTS  tipSpeedCap m/s: ABS=9.00 Aluminum=9.68 Steel=12.50 Titanium=14.79 CarbonFiber=13.11 Tungsten=13.69  | MotorKW 0/1/2/3 eng 1.0/2.5/4.0/5.5  | DRIVE_KW_PER_TONNE 1.25 | LIFT_EFFICIENCY 0.85 | REACTION_FRAC 0.60 | GROUND_CLEAR 0.020 | BITE_RATE_FRAC 0.45 | EXPOSED_MULT 1.75 | STEP_DISP_CAP 0.25
+# fixedDeltaTime 0.0200  timeScale 3.0  debugFire False
+run 0: PlayerWin at 90.3s  dealt 894 taken 98  pieces 10/11 vs 6/11  flipped self 1.5s enemy 1.2s  | Judges' decision — damage 894 vs 98 (89.1% margin) · pieces 10/11 vs 6/11 · on its back 2% vs 1% — decided on structure destroyed
+   src: ram 894/5 · limb 0/0 (max hit 0.0) · disc 0/0   packSeam 0.64
+run 1: PlayerWin at 90.0s  dealt 481 taken 235  pieces 7/11 vs 6/11  flipped self 0.0s enemy 1.2s  | Judges' decision — damage 481 vs 235 (51.1% margin) · pieces 7/11 vs 6/11 · on its back 0% vs 1% — structure even, decided on damage
+   src: ram 481/4 · limb 0/0 (max hit 0.0) · disc 0/0   packSeam 0.55
+run 2: PlayerWin at 85.8s  dealt 1051 taken 255  pieces 8/11 vs 0/11  flipped self 1.8s enemy 0.3s  | KO — enemy core destroyed
+   src: ram 1051/6 · limb 0/0 (max hit 0.0) · disc 0/0   packSeam 0.55
+run 3: PlayerLoss at 90.3s  dealt 0 taken 193  pieces 11/11 vs 10/11  flipped self 0.0s enemy 0.0s  | Judges' decision — damage 0 vs 193 (100.0% margin) · pieces 11/11 vs 10/11 · on its back 0% vs 0% — structure even, decided on damage
+   src: ram 0/0 · limb 0/0 (max hit 0.0) · disc 0/0   packSeam 0.44
+run 4: PlayerWin at 90.3s  dealt 537 taken 191  pieces 11/11 vs 7/11  flipped self 0.0s enemy 0.9s  | Judges' decision — damage 537 vs 191 (64.4% margin) · pieces 11/11 vs 7/11 · on its back 0% vs 1% — decided on structure destroyed
+   src: ram 537/4 · limb 0/0 (max hit 0.0) · disc 0/0   packSeam 0.97
+run 5: PlayerWin at 90.0s  dealt 804 taken 84  pieces 11/11 vs 6/11  flipped self 1.8s enemy 0.0s  | Judges' decision — damage 804 vs 84 (89.6% margin) · pieces 11/11 vs 6/11 · on its back 2% vs 0% — decided on structure destroyed
+   src: ram 804/5 · limb 0/0 (max hit 0.0) · disc 0/0   packSeam 0.47
+b5_discus_al|afk  n=6  W5/L1/D0  flips=1  len 85.8-90.3s spread=1.05x  worst single-step piece loss: player 1 enemy 4  [CONVERGED] (183s wall)

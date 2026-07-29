@@ -1,0 +1,12 @@
+# R4 build re-verification under POST-PATCH regime
+qa_r3_b1_hammer_ti: parts=12 wheels=4 mass=1735.6kg cost=1773 valid=OK
+   LIMB RobotBrawl.Phase0.BuilderManager+PlacedPart parts=2 blockedBy=null I=32.04 tipR=1.250 E=2243J kJ/swing=6.41
+qa_r3_b6_hammer_steel: parts=12 wheels=4 mass=1865.8kg cost=1490 valid=OK
+   LIMB RobotBrawl.Phase0.BuilderManager+PlacedPart parts=2 blockedBy=null I=55.76 tipR=1.250 E=2788J kJ/swing=7.97
+qa_r3_b2_rotor_cf: parts=13 wheels=4 mass=690.2kg cost=939 valid=OK
+   LIMB RobotBrawl.Phase0.BuilderManager+PlacedPart parts=3 blockedBy=null I=8.08 tipR=1.000 E=694J kJ/swing=1.98
+qa_r3_b3_spear_w: parts=12 wheels=4 mass=1034.3kg cost=1654 valid=OK
+   LIMB RobotBrawl.Phase0.BuilderManager+PlacedPart parts=2 blockedBy=null I=328.52 tipR=0.300 E=2012J kJ/swing=5.75
+qa_r3_b4_flipper_al: parts=12 wheels=4 mass=729.4kg cost=706 valid=OK
+   LIMB RobotBrawl.Phase0.BuilderManager+PlacedPart parts=2 blockedBy=null I=2.51 tipR=0.300 E=246J kJ/swing=0.70
+qa_r3_b5_disc_abs: parts=11 wheels=4 mass=371.6kg cost=265 valid=OK

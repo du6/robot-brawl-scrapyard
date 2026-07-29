@@ -1,0 +1,44 @@
+# USER-PATH TEST v2 - real ghost pipeline, hit-verified
+palette=19  budget=4000
+
+## 1. ATTACH each part onto each face of a bare core (hit-verified)
+beam        +X:ok -X:ok +Y:ok -Y:ok +Z:ok -Z:ok
+beamlong    +X:ok -X:ok +Y:ok -Y:ok +Z:ok -Z:ok
+bracket     +X:ok -X:ok +Y:ok -Y:ok +Z:ok -Z:ok
+chassis     +X:ok -X:ok +Y:ok -Y:ok +Z:ok -Z:ok
+plate       +X:X(This way up it has n) -X:X(This way up it has n) +Y:ok -Y:ok +Z:X(This way up it has n) -Z:X(This way up it has n)
+engine      +X:ok -X:ok +Y:ok -Y:ok +Z:ok -Z:ok
+battery     +X:ok -X:ok +Y:ok -Y:ok +Z:ok -Z:ok
+gyro        +X:ok -X:ok +Y:ok -Y:ok +Z:ok -Z:ok
+wheel       +X:ok -X:ok +Y:X(wheel-side-only) -Y:X(wheel-side-only) +Z:ok -Z:ok
+spinner     +X:ok -X:ok +Y:ok -Y:X(no-underside) +Z:ok -Z:ok
+spinnerSaw  +X:ok -X:ok +Y:ok -Y:X(no-underside) +Z:ok -Z:ok
+spike       +X:ok -X:ok +Y:ok -Y:ok +Z:ok -Z:ok
+pivot       +X:ok -X:ok +Y:ok -Y:ok +Z:ok -Z:ok
+spindle     +X:ok -X:ok +Y:ok -Y:ok +Z:ok -Z:ok
+ram         +X:ok -X:ok +Y:ok -Y:ok +Z:ok -Z:ok
+blade       +X:ok -X:ok +Y:ok -Y:ok +Z:ok -Z:ok
+wedge       +X:ok -X:ok +Y:ok -Y:ok +Z:ok -Z:ok
+hook        +X:ok -X:ok +Y:ok -Y:ok +Z:ok -Z:ok
+
+## 2. ROTATE - R must move the box AND the drawn mesh
+beam        yaw 0->90  mesh (0.218, 0.218, 0.618) -> (0.618, 0.218, 0.218)  ok
+beamlong    yaw 0->90  mesh (0.218, 0.218, 1.018) -> (1.018, 0.218, 0.218)  ok
+bracket     yaw 0->90  mesh (0.218, 0.218, 0.218) -> (0.218, 0.218, 0.218)  ok (square in XZ - nothing to see)
+chassis     yaw 0->90  mesh (0.418, 0.318, 0.518) -> (0.518, 0.318, 0.418)  ok
+plate       yaw 0->180  mesh (0.500, 0.083, 0.500) -> (0.500, 0.500, 0.083)  ok
+engine      yaw 0->90  mesh (0.368, 0.317, 0.468) -> (0.468, 0.317, 0.368)  ok
+battery     yaw 0->90  mesh (0.268, 0.281, 0.268) -> (0.268, 0.281, 0.268)  ok (square in XZ - nothing to see)
+gyro        yaw 0->90  mesh (0.258, 0.258, 0.258) -> (0.258, 0.258, 0.258)  ok (square in XZ - nothing to see)
+wheel       yaw 0->90  mesh (0.360, 0.360, 0.286) -> (0.360, 0.360, 0.286)  n/a - oriented by mount face, not by R
+spinner     yaw 0->90  mesh (0.338, 0.237, 0.348) -> (0.338, 0.237, 0.348)  n/a - oriented by mount face, not by R
+spinnerSaw  yaw 0->90  mesh (0.457, 0.276, 0.471) -> (0.457, 0.276, 0.471)  n/a - oriented by mount face, not by R
+spike       yaw 0->90  mesh (0.220, 0.303, 0.220) -> (0.220, 0.303, 0.220)  n/a - oriented by mount face, not by R
+pivot       yaw 0->90  mesh (0.318, 0.396, 0.318) -> (0.318, 0.396, 0.318)  ok (square in XZ - nothing to see)
+spindle     yaw 0->90  mesh (0.318, 0.396, 0.318) -> (0.318, 0.396, 0.318)  ok (square in XZ - nothing to see)
+ram         yaw 0->90  mesh (0.318, 0.483, 0.318) -> (0.318, 0.483, 0.318)  ok (square in XZ - nothing to see)
+blade       yaw 0->90  mesh (0.495, 0.051, 0.108) -> (0.108, 0.051, 0.495)  ok
+wedge       yaw 0->90  mesh (0.500, 0.413, 0.149) -> (0.350, 0.590, 0.149)  ok
+hook        yaw 0->90  mesh (0.112, 0.185, 0.309) -> (0.112, 0.165, 0.302)  ok
+
+## DONE checks=126 failures=0 offCamera=0

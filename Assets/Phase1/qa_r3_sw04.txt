@@ -1,0 +1,6 @@
+# build qa_r3_b2_whisk_cf parts=14 policy=charge runs=4
+run 0: PlayerWin at 90.3s  dealt 360 taken 115  pieces 14/14 vs 10/11  flipped 0.0s  | Judges' decision — damage 360 vs 115 (67.9% margin) · pieces 14/14 vs 10/11 — decided on damage
+run 1: PlayerWin at 90.0s  dealt 529 taken 128  pieces 14/14 vs 5/11  flipped 7.8s  | Judges' decision — damage 529 vs 128 (75.9% margin) · pieces 14/14 vs 5/11 — decided on damage
+run 2: PlayerWin at 76.2s  dealt 302 taken 68  pieces 14/14 vs 1/11  flipped 0.3s  | Enemy counted out — every one of its 4 wheels had been torn off — nothing left to drive with
+run 3: PlayerWin at 90.3s  dealt 526 taken 121  pieces 14/14 vs 5/11  flipped 7.2s  | Judges' decision — damage 526 vs 121 (76.9% margin) · pieces 14/14 vs 5/11 — decided on damage
+qa_r3_b2_whisk_cf|charge  n=4  W4/L0/D0  flips=0  len 76.2-90.3s spread=1.19x  worst single-step piece loss: player 0 enemy 2  [CONVERGED] (118s wall)

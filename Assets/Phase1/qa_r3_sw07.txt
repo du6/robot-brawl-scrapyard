@@ -1,0 +1,6 @@
+# build qa_r3_b4_lance_al parts=12 policy=charge runs=4
+run 0: PlayerWin at 78.9s  dealt 296 taken 236  pieces 11/12 vs 13/13  flipped 4.2s  | Enemy counted out — out of power — all 300 kJ spent in 69 s; carry more battery, or spend less on driving and spinning
+run 1: PlayerWin at 66.9s  dealt 399 taken 280  pieces 11/12 vs 11/13  flipped 6.0s  | Enemy counted out — out of power — all 300 kJ spent in 57 s; carry more battery, or spend less on driving and spinning
+run 2: PlayerWin at 72.9s  dealt 417 taken 83  pieces 11/12 vs 11/13  flipped 0.0s  | Enemy counted out — out of power — all 300 kJ spent in 63 s; carry more battery, or spend less on driving and spinning
+run 3: PlayerWin at 75.9s  dealt 340 taken 187  pieces 11/12 vs 11/13  flipped 8.7s  | Enemy counted out — out of power — all 300 kJ spent in 66 s; carry more battery, or spend less on driving and spinning
+qa_r3_b4_lance_al|charge  n=4  W4/L0/D0  flips=0  len 66.9-78.9s spread=1.18x  worst single-step piece loss: player 1 enemy 1  [CONVERGED] (101s wall)

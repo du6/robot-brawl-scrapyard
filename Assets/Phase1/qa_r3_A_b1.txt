@@ -1,0 +1,87 @@
+# build b1_hammer_ti parts=12 policy=charge runs=6
+# LIVE CONSTANTS  tipSpeedCap m/s: ABS=9.00 Aluminum=9.68 Steel=12.50 Titanium=14.79 CarbonFiber=13.11 Tungsten=13.69  | MotorKW 0/1/2/3 eng 1.0/2.5/4.0/5.5  | DRIVE_KW_PER_TONNE 1.25 | LIFT_EFFICIENCY 0.85 | REACTION_FRAC 0.60 | GROUND_CLEAR 0.020 | BITE_RATE_FRAC 0.45 | EXPOSED_MULT 1.75 | STEP_DISP_CAP 0.25
+# LIVE CONSTANTS (cycle) WIND_RELEASE_FRAC 0.995 | WIND_TIMEOUT_S 2.00 | BITE_TIP_SPEED_MS 4.00 | RECOVER_S 0.10 | PIVOT_RETURN_DPS 500 | MIN_BITE_E 40 | DRAIN_FRAC 0.40 | LIN_IMP_CAP 600 | EFFICIENCY 0.35 | RECUP_FRAC 0.90 | REACTION_STALL_MUL 3.0
+# LIVE CONSTANTS (damage/judging) DMG_K 0.045 | HP_K 6000 | SHOVE_CAP 500 | PART_IMMUNITY 0.50 | RAM_MIN_J 150 | RAM_J_CAP 900 | STRUCT_BAND 0.060 | MIN_STRUCT_PARTS 2.0 | DRAW_BAND_FRAC 0.080 | CONTROL_BAND 0.100 | MATCH_TIME 90 | CREDIT_BUDGET 4000
+# SOURCE REGIME 96ce6370 (22 scripts, newest 2026-07-27 01:35:15Z)
+# fixedDeltaTime 0.0200  timeScale 3.0  debugFire True
+run 0: PlayerWin at 5.8s  dealt 482 taken 67  pieces 11/12 vs 0/11  flipped self 0.0s enemy 0.0s  | KO — enemy core destroyed
+   src: ram 92/4 · limb 390/22 (max hit 29.3) · disc 0/0   packSeam 0.97
+   det MAULER|SEAM chassis_1↔spikeZP_6|SHEARED at 1400 vs eff 900|t 2070.4
+   det MAULER|SEAM core_0↔chassis_2|SHEARED at 1050 vs eff 900|t 2071.3
+   det PlayerBuild|bladeXP_7|HP-DESTROYED|hp 0/25 (0%)|t 2071.6
+   det MAULER|SEAM chassis_2↔gyro_5|SHEARED at 1050 vs eff 900|t 2071.7
+   det MAULER|spikeZP_6|STRUCTURAL-SHED|hp 6/87 (7%)|t 2071.7
+   det MAULER|battery_4|HP-DESTROYED|hp 0/56 (0%)|t 2072.8
+   det MAULER|gyro_5|HP-DESTROYED|hp 0/50 (0%)|t 2073.6
+   det MAULER|chassis_2|STRUCTURAL-SHED|hp 163/216 (75%)|t 2074.0
+   det MAULER|core_0|HP-DESTROYED|hp 0/97 (0%)|t 2075.1
+   det MAULER|chassis_1|STRUCTURAL-WRECK|hp 115/216 (53%)|t 2075.1
+   det MAULER|engine_3|STRUCTURAL-WRECK|hp 118/142 (83%)|t 2075.1
+run 1: PlayerWin at 30.2s  dealt 699 taken 118  pieces 11/12 vs 1/11  flipped self 0.0s enemy 0.0s  | Enemy counted out — every one of its 4 wheels had been torn off — nothing left to drive with
+   src: ram 208/8 · limb 491/12 (max hit 83.1) · disc 0/0   packSeam 0.97
+   det MAULER|SEAM chassis_1↔spikeZP_6|SHEARED at 1400 vs eff 900|t 2077.5
+   det MAULER|SEAM core_0↔chassis_2|SHEARED at 1050 vs eff 900|t 2078.4
+   det MAULER|SEAM chassis_2↔gyro_5|SHEARED at 1400 vs eff 900|t 2078.8
+   det MAULER|spikeZP_6|STRUCTURAL-SHED|hp 6/87 (7%)|t 2078.8
+   det MAULER|SEAM core_0↔gyro_5|SHEARED at 1400 vs eff 900|t 2079.1
+   det MAULER|battery_4|HP-DESTROYED|hp 0/56 (0%)|t 2079.4
+   det PlayerBuild|bladeXP_7|HP-DESTROYED|hp 0/25 (0%)|t 2079.6
+   det MAULER|chassis_2|STRUCTURAL-SHED|hp 137/216 (64%)|t 2080.7
+   det MAULER|gyro_5|STRUCTURAL-SHED|hp 2/50 (3%)|t 2080.7
+   det MAULER|SEAM core_0↔chassis_1|SHEARED at 1321 vs eff 900|t 2083.6
+   det MAULER|engine_3|HP-DESTROYED|hp 0/142 (0%)|t 2094.0
+   det MAULER|chassis_1|STRUCTURAL-SHED|hp 61/216 (28%)|t 2095.3
+run 2: PlayerWin at 6.3s  dealt 571 taken 67  pieces 11/12 vs 0/11  flipped self 0.0s enemy 0.0s  | KO — enemy core destroyed
+   src: ram 86/3 · limb 485/28 (max hit 33.4) · disc 0/0   packSeam 0.97
+   det MAULER|SEAM chassis_1↔spikeZP_6|SHEARED at 1400 vs eff 900|t 2109.1
+   det MAULER|SEAM core_0↔chassis_2|SHEARED at 1050 vs eff 900|t 2109.9
+   det PlayerBuild|bladeXP_7|HP-DESTROYED|hp 0/25 (0%)|t 2110.3
+   det MAULER|SEAM chassis_2↔gyro_5|SHEARED at 1050 vs eff 900|t 2110.3
+   det MAULER|spikeZP_6|STRUCTURAL-SHED|hp 6/87 (7%)|t 2110.4
+   det MAULER|battery_4|HP-DESTROYED|hp 0/56 (0%)|t 2113.7
+   det MAULER|core_0|HP-DESTROYED|hp 0/97 (0%)|t 2114.3
+   det MAULER|chassis_2|STRUCTURAL-WRECK|hp 146/216 (68%)|t 2114.3
+   det MAULER|gyro_5|STRUCTURAL-WRECK|hp 2/50 (4%)|t 2114.3
+   det MAULER|chassis_1|STRUCTURAL-WRECK|hp 70/216 (33%)|t 2114.3
+   det MAULER|engine_3|STRUCTURAL-WRECK|hp 88/142 (62%)|t 2114.3
+run 3: PlayerWin at 5.6s  dealt 462 taken 67  pieces 11/12 vs 0/11  flipped self 0.0s enemy 0.0s  | KO — enemy core destroyed
+   src: ram 86/4 · limb 376/19 (max hit 36.7) · disc 0/0   packSeam 0.97
+   det MAULER|SEAM chassis_1↔spikeZP_6|SHEARED at 1400 vs eff 900|t 2116.7
+   det MAULER|SEAM core_0↔chassis_2|SHEARED at 1050 vs eff 900|t 2117.5
+   det PlayerBuild|bladeXP_7|HP-DESTROYED|hp 0/25 (0%)|t 2117.9
+   det MAULER|SEAM chassis_2↔gyro_5|SHEARED at 1050 vs eff 900|t 2117.9
+   det MAULER|spikeZP_6|STRUCTURAL-SHED|hp 6/87 (7%)|t 2118.0
+   det MAULER|battery_4|HP-DESTROYED|hp 0/56 (0%)|t 2119.8
+   det MAULER|chassis_2|STRUCTURAL-SHED|hp 135/216 (62%)|t 2121.0
+   det MAULER|core_0|HP-DESTROYED|hp 0/97 (0%)|t 2121.3
+   det MAULER|gyro_5|STRUCTURAL-WRECK|hp 1/50 (1%)|t 2121.3
+   det MAULER|engine_3|STRUCTURAL-WRECK|hp 101/142 (71%)|t 2121.3
+   det MAULER|chassis_1|STRUCTURAL-WRECK|hp 175/216 (81%)|t 2121.3
+run 4: PlayerWin at 2.9s  dealt 445 taken 27  pieces 12/12 vs 0/11  flipped self 0.0s enemy 0.0s  | KO — enemy core destroyed
+   src: ram 150/3 · limb 295/6 (max hit 82.8) · disc 0/0   packSeam 0.97
+   det MAULER|SEAM chassis_1↔spikeZP_6|SHEARED at 1400 vs eff 900|t 2123.6
+   det MAULER|SEAM core_0↔chassis_2|SHEARED at 1050 vs eff 900|t 2124.5
+   det MAULER|SEAM chassis_2↔gyro_5|SHEARED at 1400 vs eff 900|t 2124.8
+   det MAULER|spikeZP_6|STRUCTURAL-SHED|hp 6/87 (7%)|t 2124.9
+   det MAULER|battery_4|HP-DESTROYED|hp 0/56 (0%)|t 2125.0
+   det MAULER|gyro_5|HP-DESTROYED|hp 0/50 (0%)|t 2125.5
+   det MAULER|core_0|HP-DESTROYED|hp 0/97 (0%)|t 2125.5
+   det MAULER|chassis_2|STRUCTURAL-WRECK|hp 135/216 (63%)|t 2125.5
+   det MAULER|chassis_1|STRUCTURAL-WRECK|hp 216/216 (100%)|t 2125.5
+   det MAULER|engine_3|STRUCTURAL-WRECK|hp 142/142 (100%)|t 2125.5
+run 5: PlayerWin at 7.6s  dealt 779 taken 108  pieces 11/12 vs 0/11  flipped self 0.0s enemy 0.9s  | KO — enemy core destroyed
+   src: ram 302/9 · limb 477/14 (max hit 64.5) · disc 0/0   packSeam 0.97
+   det MAULER|SEAM chassis_1↔spikeZP_6|SHEARED at 1400 vs eff 900|t 2127.8
+   det MAULER|SEAM core_0↔chassis_2|SHEARED at 1050 vs eff 900|t 2128.7
+   det PlayerBuild|bladeXP_7|HP-DESTROYED|hp 0/25 (0%)|t 2129.0
+   det MAULER|SEAM chassis_2↔gyro_5|SHEARED at 1065 vs eff 900|t 2129.0
+   det MAULER|spikeZP_6|STRUCTURAL-SHED|hp 6/87 (7%)|t 2129.1
+   det MAULER|SEAM core_0↔engine_3|SHEARED at 1400 vs eff 900|t 2130.0
+   det MAULER|engine_3|HP-DESTROYED|hp 0/142 (0%)|t 2131.8
+   det MAULER|SEAM core_0↔chassis_1|SHEARED at 1400 vs eff 900|t 2133.0
+   det MAULER|gyro_5|HP-DESTROYED|hp 0/50 (0%)|t 2133.0
+   det MAULER|battery_4|HP-DESTROYED|hp 0/56 (0%)|t 2133.0
+   det MAULER|chassis_1|STRUCTURAL-SHED|hp 81/216 (37%)|t 2134.3
+   det MAULER|chassis_2|STRUCTURAL-SHED|hp 99/216 (46%)|t 2134.3
+   det MAULER|core_0|HP-DESTROYED|hp 0/97 (0%)|t 2134.4
+b1_hammer_ti|charge  n=6  W6/L0/D0  flips=0  len 2.9-30.2s spread=10.29x  worst single-step piece loss: player 1 enemy 5  [NOISY] (22s wall)

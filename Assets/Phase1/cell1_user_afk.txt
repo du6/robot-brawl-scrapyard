@@ -1,0 +1,7 @@
+# build USER parts=11 policy=afk runs=5
+run 0: PlayerLoss at 90.0s  dealt 111 taken 119  pieces 9/11 vs 10/11  flipped 1.1s  | Judges' decision — damage 111 vs 119 (6.9% margin) · pieces 9/11 vs 10/11 — damage inside the draw band, decided on structure retained
+run 1: PlayerWin at 90.0s  dealt 425 taken 41  pieces 11/11 vs 7/11  flipped 0.0s  | Judges' decision — damage 425 vs 41 (90.4% margin) · pieces 11/11 vs 7/11 — decided on damage
+run 2: PlayerWin at 13.6s  dealt 320 taken 41  pieces 11/11 vs 0/11  flipped 0.0s  | KO — enemy core destroyed
+run 3: PlayerLoss at 34.7s  dealt 371 taken 115  pieces 10/11 vs 10/11  flipped 0.0s  | Counted out — out of power — 240 kJ of its 240 kJ pack was torn off the chassis, and what was left ran dry after 25 s
+run 4: PlayerWin at 90.0s  dealt 406 taken 91  pieces 8/11 vs 6/11  flipped 5.5s  | Judges' decision — damage 406 vs 91 (77.5% margin) · pieces 8/11 vs 6/11 — decided on damage
+USER|afk  n=5  W3/L2/D0  flips=2  len 13.6-90.0s spread=6.60x  worst single-step piece loss: player 1 enemy 6  [NOISY] (108s wall)

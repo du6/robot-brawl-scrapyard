@@ -1,0 +1,6 @@
+# build c1_lowflip_ti parts=13 policy=charge runs=4
+run 0: PlayerLoss at 90.0s  dealt 148 taken 230  pieces 13/13 vs 9/12  flipped 54.6s  | Judges' decision — damage 148 vs 230 (35.6% margin) · pieces 13/13 vs 9/12 — decided on damage
+run 1: PlayerLoss at 90.3s  dealt 263 taken 316  pieces 13/13 vs 9/12  flipped 46.5s  | Judges' decision — damage 263 vs 316 (16.7% margin) · pieces 13/13 vs 9/12 — decided on damage
+run 2: PlayerWin at 90.3s  dealt 227 taken 210  pieces 13/13 vs 9/12  flipped 41.1s  | Judges' decision — damage 227 vs 210 (7.5% margin) · pieces 13/13 vs 9/12 — damage inside the draw band, decided on structure retained
+run 3: PlayerLoss at 90.0s  dealt 15 taken 146  pieces 13/13 vs 10/12  flipped 42.6s  | Judges' decision — damage 15 vs 146 (90.0% margin) · pieces 13/13 vs 10/12 — decided on damage
+c1_lowflip_ti|charge  n=4  W1/L3/D0  flips=1  len 90.0-90.3s spread=1.00x  worst single-step piece loss: player 0 enemy 1  [CONVERGED] (123s wall)

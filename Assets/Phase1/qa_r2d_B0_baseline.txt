@@ -1,0 +1,5 @@
+# build R2D_B0_baseline_reac0.6 parts=13 policy=charge runs=3
+run 0: PlayerWin at 90.0s  dealt 265 taken 45  pieces 13/13 vs 9/12  flipped 54.4s  | Judges' decision — damage 265 vs 45 (82.9% margin) · pieces 13/13 vs 9/12 — decided on damage
+run 1: PlayerWin at 90.4s  dealt 371 taken 271  pieces 13/13 vs 8/12  flipped 57.2s  | Judges' decision — damage 371 vs 271 (27.0% margin) · pieces 13/13 vs 8/12 — decided on damage
+run 2: PlayerLoss at 90.4s  dealt 119 taken 192  pieces 13/13 vs 8/12  flipped 52.8s  | Judges' decision — damage 119 vs 192 (37.9% margin) · pieces 13/13 vs 8/12 — decided on damage
+R2D_B0_baseline_reac0.6|charge  n=3  W2/L1/D0  flips=1  len 90.0-90.4s spread=1.00x  worst single-step piece loss: player 0 enemy 1  [CONVERGED] (69s wall)

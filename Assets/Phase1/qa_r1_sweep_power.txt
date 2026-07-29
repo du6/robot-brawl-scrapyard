@@ -1,0 +1,10 @@
+# build B5_DISCUS_vs_SCOUT_CHAMPION parts=11 policy=charge runs=8
+run 0: PlayerWin at 90.0s  dealt 305 taken 13  pieces 11/11 vs 8/11  flipped 0.0s  | Judges' decision — damage 305 vs 13 (95.6% margin) · pieces 11/11 vs 8/11 — decided on damage
+run 1: PlayerWin at 26.4s  dealt 649 taken 91  pieces 11/11 vs 2/11  flipped 1.5s  | Enemy counted out — every one of its 4 wheels had been torn off — nothing left to drive with
+run 2: PlayerWin at 90.3s  dealt 253 taken 51  pieces 11/11 vs 8/11  flipped 0.0s  | Judges' decision — damage 253 vs 51 (80.0% margin) · pieces 11/11 vs 8/11 — decided on damage
+run 3: PlayerWin at 90.3s  dealt 179 taken 36  pieces 11/11 vs 8/11  flipped 0.0s  | Judges' decision — damage 179 vs 36 (79.8% margin) · pieces 11/11 vs 8/11 — decided on damage
+run 4: PlayerWin at 7.8s  dealt 267 taken 36  pieces 11/11 vs 0/11  flipped 0.0s  | KO — enemy core destroyed
+run 5: PlayerWin at 60.6s  dealt 238 taken 189  pieces 11/11 vs 6/11  flipped 0.0s  | Enemy counted out — beached — 0 of 2 wheels touching the ground, so the drive had nothing to push on
+run 6: PlayerWin at 90.3s  dealt 204 taken 36  pieces 11/11 vs 8/11  flipped 0.0s  | Judges' decision — damage 204 vs 36 (82.3% margin) · pieces 11/11 vs 8/11 — decided on damage
+run 7: PlayerWin at 90.3s  dealt 212 taken 36  pieces 11/11 vs 8/11  flipped 0.0s  | Judges' decision — damage 212 vs 36 (82.9% margin) · pieces 11/11 vs 8/11 — decided on damage
+B5_DISCUS_vs_SCOUT_CHAMPION|charge  n=8  W8/L0/D0  flips=0  len 7.8-90.3s spread=11.57x  worst single-step piece loss: player 0 enemy 7  [NOISY] (188s wall)

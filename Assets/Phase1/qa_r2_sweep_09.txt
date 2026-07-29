@@ -1,0 +1,6 @@
+# build qa_r2_b8_hammer_al|mauler|Veteran|fire=True parts=13 policy=charge runs=4
+run 0: PlayerWin at 90.3s  dealt 459 taken 18  pieces 12/13 vs 6/11  flipped 8.4s  | Judges' decision — damage 459 vs 18 (96.0% margin) · pieces 12/13 vs 6/11 — decided on damage
+run 1: PlayerLoss at 90.3s  dealt 254 taken 322  pieces 5/13 vs 10/11  flipped 15.6s  | Judges' decision — damage 254 vs 322 (21.2% margin) · pieces 5/13 vs 10/11 — decided on damage
+run 2: PlayerLoss at 90.3s  dealt 229 taken 351  pieces 5/13 vs 10/11  flipped 5.1s  | Judges' decision — damage 229 vs 351 (34.7% margin) · pieces 5/13 vs 10/11 — decided on damage
+run 3: PlayerLoss at 90.3s  dealt 167 taken 338  pieces 9/13 vs 10/11  flipped 1.2s  | Judges' decision — damage 167 vs 338 (50.7% margin) · pieces 9/13 vs 10/11 — decided on damage
+qa_r2_b8_hammer_al|mauler|Veteran|fire=True|charge  n=4  W1/L3/D0  flips=1  len 90.3-90.3s spread=1.00x  worst single-step piece loss: player 2 enemy 1  [CONVERGED] (123s wall)

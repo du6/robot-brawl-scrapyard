@@ -1,0 +1,30 @@
+# section=bite opponent=mauler seconds=24 speed=3 fire=True reps=4 builds=3
+# LIVE CONSTANTS  tipSpeedCap m/s: ABS=9.00 Aluminum=9.68 Steel=12.50 Titanium=14.79 CarbonFiber=13.11 Tungsten=13.69  | MotorKW 0/1/2/3 eng 1.0/2.5/4.0/5.5  | DRIVE_KW_PER_TONNE 1.25 | LIFT_EFFICIENCY 0.85 | REACTION_FRAC 0.60 | GROUND_CLEAR 0.020 | BITE_RATE_FRAC 0.45 | EXPOSED_MULT 1.75 | STEP_DISP_CAP 0.25
+# LIVE CONSTANTS (cycle) WIND_RELEASE_FRAC 0.995 | WIND_TIMEOUT_S 2.00 | BITE_TIP_SPEED_MS 4.00 | RECOVER_S 0.10 | PIVOT_RETURN_DPS 500 | MIN_BITE_E 40 | DRAIN_FRAC 0.40 | LIN_IMP_CAP 600 | EFFICIENCY 0.35 | RECUP_FRAC 0.90 | REACTION_STALL_MUL 3.0
+# LIVE CONSTANTS (damage/judging) DMG_K 0.045 | HP_K 6000 | SHOVE_CAP 500 | PART_IMMUNITY 0.50 | RAM_MIN_J 150 | RAM_J_CAP 900 | STRUCT_BAND 0.060 | MIN_STRUCT_PARTS 2.0 | DRAW_BAND_FRAC 0.080 | CONTROL_BAND 0.100 | MATCH_TIME 90 | CREDIT_BUDGET 4000
+# SOURCE REGIME 9394d36e (41 scripts, newest 2026-07-27 16:11:37Z)
+DISC_Z       r0 t=23s ended=TIMEBOX | dealt 80 taken 134 | ram 80/5 (16.0/bite) limb 0/0 (0.0/bite max 0) | pParts 13/15 eParts 11/11 | eDealt 134
+    funnel 22547 call | rejected: noRb 10547 ownRb 0 notRobot 0 noCombat 0 noIdx 0 | onTarget 0 -> gate 0 (bestFrac 0.00) energy 0 cool 0 APPLY 0 || immunity ate limb 0 ram 12, passed limb 0 ram 10 | noIdxWho 
+DISC_Z       r1 t=22s ended=TIMEBOX | dealt 118 taken 34 | ram 78/8 (9.8/bite) limb 40/1 (39.7/bite max 40) | pParts 15/15 eParts 11/11 | eDealt 34
+    funnel 9884 call | rejected: noRb 9866 ownRb 0 notRobot 0 noCombat 0 noIdx 0 | onTarget 18 -> gate 0 (bestFrac 0.00) energy 0 cool 17 APPLY 1 || immunity ate limb 0 ram 25, passed limb 1 ram 16 | noIdxWho 
+DISC_Z       r2 t=22s ended=TIMEBOX | dealt 92 taken 128 | ram 92/6 (15.3/bite) limb 0/0 (0.0/bite max 0) | pParts 13/15 eParts 11/11 | eDealt 128
+    funnel 10640 call | rejected: noRb 10577 ownRb 0 notRobot 63 noCombat 0 noIdx 0 | onTarget 0 -> gate 0 (bestFrac 0.00) energy 0 cool 0 APPLY 0 || immunity ate limb 0 ram 7, passed limb 0 ram 13 | noIdxWho 
+DISC_Z       r3 t=22s ended=TIMEBOX | dealt 11 taken 23 | ram 11/2 (5.5/bite) limb 0/0 (0.0/bite max 0) | pParts 15/15 eParts 11/11 | eDealt 23
+    funnel 10257 call | rejected: noRb 10257 ownRb 0 notRobot 0 noCombat 0 noIdx 0 | onTarget 0 -> gate 0 (bestFrac 0.00) energy 0 cool 0 APPLY 0 || immunity ate limb 0 ram 2, passed limb 0 ram 4 | noIdxWho 
+SAW_Z        r0 t=22s ended=TIMEBOX | dealt 40 taken 91 | ram 40/1 (40.0/bite) limb 0/0 (0.0/bite max 0) | pParts 13/15 eParts 10/11 | eDealt 91
+    funnel 12517 call | rejected: noRb 12517 ownRb 0 notRobot 0 noCombat 0 noIdx 0 | onTarget 0 -> gate 0 (bestFrac 0.00) energy 0 cool 0 APPLY 0 || immunity ate limb 0 ram 1, passed limb 0 ram 5 | noIdxWho 
+SAW_Z        r1 t=23s ended=TIMEBOX | dealt 66 taken 105 | ram 66/5 (13.2/bite) limb 0/0 (0.0/bite max 0) | pParts 15/15 eParts 11/11 | eDealt 105
+    funnel 12904 call | rejected: noRb 12904 ownRb 0 notRobot 0 noCombat 0 noIdx 0 | onTarget 0 -> gate 0 (bestFrac 0.00) energy 0 cool 0 APPLY 0 || immunity ate limb 0 ram 10, passed limb 0 ram 9 | noIdxWho 
+SAW_Z        r2 t=23s ended=TIMEBOX | dealt 122 taken 7 | ram 21/3 (6.9/bite) limb 102/2 (50.8/bite max 58) | pParts 15/15 eParts 10/11 | eDealt 7
+    funnel 15737 call | rejected: noRb 15679 ownRb 0 notRobot 48 noCombat 0 noIdx 0 | onTarget 10 -> gate 0 (bestFrac 0.00) energy 0 cool 8 APPLY 2 || immunity ate limb 0 ram 0, passed limb 2 ram 6 | noIdxWho 
+SAW_Z        r3 t=23s ended=TIMEBOX | dealt 154 taken 119 | ram 154/8 (19.2/bite) limb 0/0 (0.0/bite max 0) | pParts 13/15 eParts 10/11 | eDealt 119
+    funnel 12987 call | rejected: noRb 12987 ownRb 0 notRobot 0 noCombat 0 noIdx 0 | onTarget 0 -> gate 0 (bestFrac 0.00) energy 0 cool 0 APPLY 0 || immunity ate limb 0 ram 4, passed limb 0 ram 12 | noIdxWho 
+HAMMER       r0 t=22s ended=TIMEBOX | dealt 81 taken 85 | ram 81/3 (26.9/bite) limb 0/0 (0.0/bite max 0) | pParts 14/16 eParts 11/11 | eDealt 85
+    funnel 1425 call | rejected: noRb 1425 ownRb 0 notRobot 0 noCombat 0 noIdx 0 | onTarget 0 -> gate 0 (bestFrac 0.00) energy 0 cool 0 APPLY 0 || immunity ate limb 0 ram 14, passed limb 0 ram 6 | noIdxWho 
+HAMMER       r1 t=23s ended=TIMEBOX | dealt 38 taken 57 | ram 38/2 (19.2/bite) limb 0/0 (0.0/bite max 0) | pParts 16/16 eParts 11/11 | eDealt 57
+    funnel 580 call | rejected: noRb 580 ownRb 0 notRobot 0 noCombat 0 noIdx 0 | onTarget 0 -> gate 0 (bestFrac 0.00) energy 0 cool 0 APPLY 0 || immunity ate limb 0 ram 6, passed limb 0 ram 4 | noIdxWho 
+HAMMER       r2 t=23s ended=TIMEBOX | dealt 166 taken 86 | ram 41/2 (20.5/bite) limb 125/2 (62.4/bite max 64) | pParts 12/16 eParts 10/11 | eDealt 86
+    funnel 1937 call | rejected: noRb 1845 ownRb 0 notRobot 72 noCombat 0 noIdx 0 | onTarget 20 -> gate 8 (bestFrac 0.00) energy 0 cool 9 APPLY 3 || immunity ate limb 1 ram 3, passed limb 2 ram 4 | noIdxWho 
+HAMMER       r3 t=22s ended=TIMEBOX | dealt 184 taken 6 | ram 6/3 (1.9/bite) limb 178/3 (59.4/bite max 75) | pParts 16/16 eParts 10/11 | eDealt 6
+    funnel 2516 call | rejected: noRb 2415 ownRb 0 notRobot 90 noCombat 0 noIdx 0 | onTarget 11 -> gate 0 (bestFrac 0.00) energy 0 cool 8 APPLY 3 || immunity ate limb 0 ram 2, passed limb 3 ram 4 | noIdxWho 
+# done 3 builds

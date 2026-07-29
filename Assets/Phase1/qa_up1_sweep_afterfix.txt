@@ -1,0 +1,99 @@
+# UP1 SWEEP - pointer path beyond the bare core
+screen 2560x1440  palette=19
+
+## A. PART-ONTO-PART: attach each part to a BEAM that is itself on the core
+   fixture: core(0,.70,0) + beam(+X, centre .55) ; beam free faces +X +Y -Y +Z -Z
+beam         +X:ok  +Y:ok  -Y:ok  +Z:ok  -Z:ok
+beamlong     +X:ok  +Y:ok  -Y:ok  +Z:ok  -Z:ok
+bracket      +X:ok  +Y:ok  -Y:ok  +Z:ok  -Z:ok
+chassis      +X:ok  +Y:ok  -Y:ok  +Z:ok  -Z:ok
+plate        +X:X(no-socket)  +Y:ok  -Y:ok  +Z:X(no-socket)  -Z:X(no-socket)
+engine       +X:ok  +Y:ok  -Y:ok  +Z:ok  -Z:ok
+battery      +X:ok  +Y:ok  -Y:ok  +Z:ok  -Z:ok
+gyro         +X:ok  +Y:ok  -Y:ok  +Z:ok  -Z:ok
+wheel        +X:ok  +Y:X(wheel-side-only)  -Y:X(wheel-side-only)  +Z:ok  -Z:ok
+spinner      +X:ok  +Y:ok  -Y:X(no-underside)  +Z:ok  -Z:ok
+spinnerSaw   +X:ok  +Y:ok  -Y:X(no-underside)  +Z:ok  -Z:ok
+spike        +X:ok  +Y:ok  -Y:ok  +Z:ok  -Z:ok
+pivot        +X:ok  +Y:ok  -Y:ok  +Z:ok  -Z:ok
+spindle      +X:ok  +Y:ok  -Y:ok  +Z:ok  -Z:ok
+ram          +X:ok  +Y:ok  -Y:ok  +Z:ok  -Z:ok
+blade        +X:ok  +Y:ok  -Y:ok  +Z:ok  -Z:ok
+wedge        +X:ok  +Y:ok  -Y:ok  +Z:ok  -Z:ok
+hook         +X:ok  +Y:ok  -Y:ok  +Z:ok  -Z:ok
+
+## B. MULTI-PART STACK (4 deep), every step by pointer
+   ok    stack L1 chassis on core +Z -> (0.000, 0.700, 0.400) yaw0
+   ok    stack L2 bracket on chassis +Z -> (0.000, 0.700, 0.750) yaw0
+   ok    stack L3 beam on bracket +Z -> (0.000, 0.700, 1.150) yaw0
+   ok    stack L4 blade on beam +Z -> (0.000, 0.700, 1.510) yaw0
+   ok    stack blade recorded mount axis (0.00, 0.00, 1.00)
+   stack snapshot: core|0.000,0.700,0.000|0|0.00,0.00,0.00|Steel / chassis|0.000,0.700,0.400|0|0.00,0.00,0.00|Steel / bracket|0.000,0.700,0.750|0|0.00,0.00,0.00|Steel / beam|0.000,0.700,1.150|0|0.00,0.00,0.00|Steel / blade|0.000,0.700,1.510|0|0.00,0.00,1.00|Steel / 
+
+## C. ROTATE (R) THROUGH THE WHOLE CYCLE, and does the placed part keep it
+beam        R cycle: 0 90 180 270 90  (4 states) mesh (0.218, 0.218, 0.618) -> (0.618, 0.218, 0.218)   !!CYCLE-DOES-NOT-WRAP
+beamlong    R cycle: 90 180 270 90 180  (3 states) mesh (1.018, 0.218, 0.218) -> (0.218, 1.018, 0.218)   !!CYCLE-DOES-NOT-WRAP
+bracket     R cycle: 180 180 180 180 180  (1 states) mesh (0.218, 0.218, 0.218) -> (0.218, 0.218, 0.218)   !!STRUCTURAL-ONLY-1-STATES
+chassis     R cycle: 180 270 0 90 180  (4 states) mesh (0.418, 0.518, 0.318) -> (0.318, 0.418, 0.518)   ok  distinctMesh=4
+plate       R cycle: 180 270 0 180 270  (3 states) mesh (0.500, 0.500, 0.083) -> (0.083, 0.500, 0.500)   !!CYCLE-DOES-NOT-WRAP
+engine      R cycle: 270 0 90  (3 states) mesh (0.268, 0.426, 0.472) -> (0.368, 0.317, 0.468)   !!CYCLE-DOES-NOT-WRAP
+battery     R cycle: 90 0 90  (2 states) mesh (0.268, 0.281, 0.268) -> (0.268, 0.281, 0.268)   ok  distinctMesh=1
+gyro        R cycle: 90 0 90  (2 states) mesh (0.258, 0.258, 0.258) -> (0.258, 0.258, 0.258)   ok  distinctMesh=1
+wheel       R cycle: 90 0 90  (2 states) mesh (0.360, 0.360, 0.286) -> (0.360, 0.360, 0.286)   ok  distinctMesh=1
+spinner     R cycle: 90 0 90  (2 states) mesh (0.338, 0.237, 0.348) -> (0.338, 0.237, 0.348)   ok  distinctMesh=1
+spinnerSaw  R cycle: 90 0 90  (2 states) mesh (0.457, 0.276, 0.471) -> (0.457, 0.276, 0.471)   ok  distinctMesh=1
+spike       R cycle: 90 0 90  (2 states) mesh (0.220, 0.303, 0.220) -> (0.220, 0.303, 0.220)   ok  distinctMesh=1
+pivot       R cycle: 90 0 90  (2 states) mesh (0.396, 0.318, 0.318) -> (0.396, 0.318, 0.318)   ok  distinctMesh=1
+spindle     R cycle: 90 0 90  (2 states) mesh (0.396, 0.318, 0.318) -> (0.396, 0.318, 0.318)   ok  distinctMesh=1
+ram         R cycle: 90 0 90  (2 states) mesh (0.318, 0.318, 0.483) -> (0.318, 0.318, 0.483)   ok  distinctMesh=1
+blade       R cycle: 90 0 90  (2 states) mesh (0.119, 0.045, 0.510) -> (0.495, 0.045, 0.122)   ok  distinctMesh=2
+wedge       R cycle: 90 0 90  (2 states) mesh (0.350, 0.149, 0.590) -> (0.500, 0.149, 0.413)   ok  distinctMesh=2
+hook        R cycle: 90 0 90  (2 states) mesh (0.112, 0.302, 0.165) -> (0.112, 0.309, 0.185)   ok  distinctMesh=2
+
+## D. ESC / DESELECT
+   ok    Esc cleared the selection (was 1)
+   ok    Esc removed the ghost (shown before=True)
+   ok    click after Esc places nothing
+
+## E. MIS-CLICKS: panel, empty space, invalid ghost, right-click
+   ok    click over the palette panel places nothing
+   ok    ghost hidden while the pointer is over the panel
+   ok    click on empty space places nothing (ghost valid=False reason="Aim at the robot to attach")
+   ok    empty-space ghost is invalid and says: "Aim at the robot to attach"
+   note: Phase0Input exposes DebugClick for BUTTON 0 only - right-click (remove) and
+         middle-click (repaint) have NO synthetic seam, so the two destructive mouse
+         verbs in the builder remain untestable through the player path.
+   ok    click on an INVALID ghost (Wheels attach to side faces only) places nothing
+   ok    two clicks on one face stack two brackets (added=2) - legal, they snap onward
+
+## F. COMPLETE ROBOT BUILT START-TO-FINISH BY POINTER
+   ok    chassis fore -> (0.000, 0.700, 0.350)
+   ok    chassis aft -> (0.000, 0.700, -0.350)
+   ok    wheel -> (0.320, 0.700, 0.350)
+   ok    wheel -> (-0.320, 0.700, 0.350)
+   ok    wheel -> (0.320, 0.700, -0.350)
+   ok    wheel -> (-0.320, 0.700, -0.350)
+   ok    battery on core roof -> (0.000, 0.975, 0.000)
+   ok    engine on fore chassis roof -> (0.000, 0.975, 0.350)
+   ok    pivot on aft chassis roof -> (0.000, 1.000, -0.350)
+   ok    beam arm off the pivot -> (0.000, 1.000, -0.600)
+   ok    blade on the arm tip -> (0.000, 1.000, -0.950)
+   pointer placements: 11 ok, 0 failed, parts now 12
+   ok    Validate() == null : the pointer-built robot is LEGAL
+   limb pivot: parts=2 blockedBy=null inertia=7.516 tipR=0.850 rateMax=11.39 kJ/swing=1.39
+   ok    the pointer-built hammer is a REAL limb (unblocked, 2 parts)
+   snapshot written to Assets/Phase1/qa_up1_pointerbuilt.txt
+      core|0.000,0.700,0.000|0|0.00,0.00,0.00|Steel
+      chassis|0.000,0.700,0.350|90|0.00,0.00,0.00|Aluminum
+      chassis|0.000,0.700,-0.350|90|0.00,0.00,0.00|Aluminum
+      wheel|0.320,0.700,0.350|90|1.00,0.00,0.00|Rubber
+      wheel|-0.320,0.700,0.350|90|-1.00,0.00,0.00|Rubber
+      wheel|0.320,0.700,-0.350|90|1.00,0.00,0.00|Rubber
+      wheel|-0.320,0.700,-0.350|90|-1.00,0.00,0.00|Rubber
+      battery|0.000,0.975,0.000|90|0.00,0.00,0.00|Aluminum
+      engine|0.000,0.975,0.350|90|0.00,0.00,0.00|Aluminum
+      pivot|0.000,1.000,-0.350|90|0.00,1.00,0.00|Aluminum
+      beam|0.000,1.000,-0.600|90|0.00,0.00,0.00|Aluminum
+      blade|0.000,1.000,-0.950|90|0.00,0.00,-1.00|Aluminum
+
+## DONE checks=135 failures=5

@@ -1,0 +1,13 @@
+ROSTER mauler tier=Veteran parts=11 mass=694 cost=660
+ROSTER bulwark tier=Champion parts=13 mass=1889 cost=1516
+ROSTER scout tier=Rookie parts=11 mass=406 cost=341
+ROSTER tipper tier=Rookie parts=12 mass=775 cost=743
+ROSTER widowmaker tier=Champion parts=11 mass=587 cost=1827
+ROSTER ripper tier=Veteran parts=13 mass=750 cost=724
+qa_owen_build_SAFE: battery mat=Aluminum seams=3 totalSockets=3
+qa_c1_hammer_ti: battery mat=Aluminum seams=3 totalSockets=3
+qa_c1_hammer_ti: engine mat=Titanium seams=4 totalSockets=6
+qa_c6_hammer_abs: battery mat=Aluminum seams=3 totalSockets=3
+qa_c6_hammer_abs: engine mat=Aluminum seams=4 totalSockets=6
+qa_c3_lance_w: battery mat=Aluminum seams=3 totalSockets=3
+qa_c3_lance_w: engine mat=Aluminum seams=4 totalSockets=6

@@ -1,0 +1,40 @@
+# build b6_vs_WIDOWMAKER_champion parts=12 policy=charge runs=4
+# LIVE CONSTANTS  tipSpeedCap m/s: ABS=9.00 Aluminum=9.68 Steel=12.50 Titanium=14.79 CarbonFiber=13.11 Tungsten=13.69  | MotorKW 0/1/2/3 eng 1.0/2.5/4.0/5.5  | DRIVE_KW_PER_TONNE 1.25 | LIFT_EFFICIENCY 0.85 | REACTION_FRAC 0.60 | GROUND_CLEAR 0.020 | BITE_RATE_FRAC 0.45 | EXPOSED_MULT 1.75 | STEP_DISP_CAP 0.25
+# LIVE CONSTANTS (cycle) WIND_RELEASE_FRAC 0.995 | WIND_TIMEOUT_S 2.00 | BITE_TIP_SPEED_MS 4.00 | RECOVER_S 0.10 | PIVOT_RETURN_DPS 500 | MIN_BITE_E 40 | DRAIN_FRAC 0.40 | LIN_IMP_CAP 600 | EFFICIENCY 0.35 | RECUP_FRAC 0.90 | REACTION_STALL_MUL 3.0
+# LIVE CONSTANTS (damage/judging) DMG_K 0.045 | HP_K 6000 | SHOVE_CAP 500 | PART_IMMUNITY 0.50 | RAM_MIN_J 150 | RAM_J_CAP 900 | STRUCT_BAND 0.060 | MIN_STRUCT_PARTS 2.0 | DRAW_BAND_FRAC 0.080 | CONTROL_BAND 0.100 | MATCH_TIME 90 | CREDIT_BUDGET 4000
+# SOURCE REGIME 96ce6370 (22 scripts, newest 2026-07-27 01:35:15Z)
+# fixedDeltaTime 0.0200  timeScale 3.0  debugFire True
+run 0: PlayerWin at 42.2s  dealt 1040 taken 168  pieces 12/12 vs 7/11  flipped self 0.0s enemy 2.6s  | Enemy counted out — out of power — 300 kJ of its 300 kJ pack was torn off the chassis, and what was left ran dry after 32 s
+   src: ram 312/33 · limb 729/12 (max hit 95.1) · disc 0/0   packSeam 0.97
+   det WIDOWMAKER|spinnerZP_6|HP-DESTROYED|hp 0/83 (0%)|t 5292.9
+   det WIDOWMAKER|SEAM core_0↔engine_4|SHEARED at 1298 vs eff 900|t 5300.5
+   det WIDOWMAKER|SEAM chassis_1↔gyro_5|SHEARED at 1178 vs eff 900|t 5308.6
+   det WIDOWMAKER|gyro_5|HP-DESTROYED|hp 0/50 (0%)|t 5309.3
+   det WIDOWMAKER|engine_4|HP-DESTROYED|hp 0/142 (0%)|t 5316.0
+   det WIDOWMAKER|battery_3|HP-DESTROYED|hp 0/56 (0%)|t 5316.3
+run 1: PlayerWin at 62.3s  dealt 703 taken 266  pieces 12/12 vs 7/11  flipped self 0.0s enemy 6.3s  | Enemy counted out — out of power — 300 kJ of its 300 kJ pack was torn off the chassis, and what was left ran dry after 52 s
+   src: ram 352/37 · limb 351/4 (max hit 120.5) · disc 0/0   packSeam 0.97
+   det WIDOWMAKER|spinnerZP_6|HP-DESTROYED|hp 0/83 (0%)|t 5336.3
+   det WIDOWMAKER|SEAM chassis_1↔gyro_5|SHEARED at 937 vs eff 900|t 5336.5
+   det WIDOWMAKER|gyro_5|STRUCTURAL-SHED|hp 50/50 (100%)|t 5337.8
+   det WIDOWMAKER|battery_3|HP-DESTROYED|hp 0/56 (0%)|t 5364.4
+   det WIDOWMAKER|engine_4|HP-DESTROYED|hp 0/142 (0%)|t 5372.6
+run 2: PlayerWin at 63.8s  dealt 1106 taken 341  pieces 12/12 vs 4/11  flipped self 1.3s enemy 3.4s  | Enemy counted out — out of power — 300 kJ of its 300 kJ pack was torn off the chassis, and what was left ran dry after 54 s
+   src: ram 318/30 · limb 788/13 (max hit 131.2) · disc 0/0   packSeam 0.97
+   det WIDOWMAKER|spinnerZP_6|HP-DESTROYED|hp 0/83 (0%)|t 5400.0
+   det WIDOWMAKER|SEAM chassis_1↔gyro_5|SHEARED at 1165 vs eff 900|t 5403.6
+   det WIDOWMAKER|gyro_5|STRUCTURAL-SHED|hp 50/50 (100%)|t 5404.9
+   det WIDOWMAKER|battery_3|HP-DESTROYED|hp 0/56 (0%)|t 5422.4
+   det WIDOWMAKER|SEAM core_0↔engine_4|SHEARED at 1400 vs eff 900|t 5435.9
+   det WIDOWMAKER|engine_4|HP-DESTROYED|hp 0/142 (0%)|t 5442.9
+   det WIDOWMAKER|chassis_1|HP-DESTROYED|hp 0/396 (0%)|t 5448.6
+run 3: PlayerWin at 90.0s  dealt 885 taken 487  pieces 11/12 vs 8/11  flipped self 0.0s enemy 26.2s  | Judges' decision — damage 885 vs 487 (45.0% margin) · pieces 11/12 vs 8/11 · on its back 0% vs 29% — decided on structure destroyed
+   src: ram 432/33 · limb 453/8 (max hit 91.2) · disc 0/0   packSeam 0.97
+   det WIDOWMAKER|spinnerZP_6|HP-DESTROYED|hp 0/83 (0%)|t 5465.1
+   det WIDOWMAKER|SEAM chassis_1↔gyro_5|SHEARED at 973 vs eff 900|t 5488.2
+   det WIDOWMAKER|gyro_5|STRUCTURAL-SHED|hp 50/50 (100%)|t 5489.5
+   det PlayerBuild|bladeXP_7|HP-DESTROYED|hp 0/18 (0%)|t 5506.6
+   det WIDOWMAKER|SEAM core_0↔engine_4|SHEARED at 1400 vs eff 900|t 5509.7
+   det WIDOWMAKER|engine_4|HP-DESTROYED|hp 0/142 (0%)|t 5518.2
+   det WIDOWMAKER|SEAM chassis_2↔battery_3|SHEARED at 1400 vs eff 958|t 5519.7
+b6_vs_WIDOWMAKER_champion|charge  n=4  W4/L0/D0  flips=0  len 42.2-90.0s spread=2.13x  worst single-step piece loss: player 1 enemy 1  [NOISY] (88s wall)

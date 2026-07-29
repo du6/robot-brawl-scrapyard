@@ -1,0 +1,50 @@
+# build b3_spear_w|mauler/Vet|charge parts=12 policy=charge runs=4
+# LIVE CONSTANTS  tipSpeedCap m/s: ABS=9.00 Aluminum=9.68 Steel=12.50 Titanium=14.79 CarbonFiber=13.11 Tungsten=13.69  | MotorKW 0/1/2/3 eng 1.0/2.5/4.0/5.5  | DRIVE_KW_PER_TONNE 1.25 | LIFT_EFFICIENCY 0.85 | REACTION_FRAC 0.60 | GROUND_CLEAR 0.020 | BITE_RATE_FRAC 0.45 | EXPOSED_MULT 1.75 | STEP_DISP_CAP 0.25
+# LIVE CONSTANTS (cycle) WIND_RELEASE_FRAC 0.995 | WIND_TIMEOUT_S 2.00 | BITE_TIP_SPEED_MS 4.00 | RECOVER_S 0.10 | PIVOT_RETURN_DPS 500 | MIN_BITE_E 40 | DRAIN_FRAC 0.40 | LIN_IMP_CAP 600 | EFFICIENCY 0.35 | RECUP_FRAC 0.90 | REACTION_STALL_MUL 3.0
+# LIVE CONSTANTS (damage/judging) DMG_K 0.045 | HP_K 6000 | SHOVE_CAP 500 | PART_IMMUNITY 0.50 | RAM_MIN_J 150 | RAM_J_CAP 900 | STRUCT_BAND 0.060 | MIN_STRUCT_PARTS 2.0 | DRAW_BAND_FRAC 0.080 | CONTROL_BAND 0.100 | MATCH_TIME 90 | CREDIT_BUDGET 4000
+# SOURCE REGIME 76113c28 (23 scripts, newest 2026-07-27 03:18:17Z)
+# fixedDeltaTime 0.0200  timeScale 4.0  debugFire True
+run 0: Draw at 90.0s  dealt 380 taken 371  pieces 9/12 vs 7/11  flipped self 0.0s enemy 2.4s  | Judges' decision — damage 380 vs 371 (2.5% margin) · pieces 9/12 vs 7/11 · on its back 0% vs 3% — too close to call, scored a draw
+   src: ram 243/15 · limb 137/3 (max hit 72.2) · disc 0/0   packSeam 0.19
+   det MAULER|SEAM core_0↔chassis_2|SHEARED at 1879 vs eff 900|t 1982.9
+   det PlayerBuild|SEAM core_0↔chassis_2|SHEARED at 1879 vs eff 900|t 1982.9
+   det MAULER|SEAM chassis_2↔gyro_5|SHEARED at 1907 vs eff 900|t 1986.4
+   det MAULER|SEAM chassis_1↔spikeZP_6|SHEARED at 1570 vs eff 900|t 2005.8
+   det PlayerBuild|chassis_2|HP-DESTROYED|hp 0/216 (0%)|t 2005.8
+   det MAULER|spikeZP_6|STRUCTURAL-SHED|hp 87/87 (100%)|t 2007.0
+   det MAULER|SEAM core_0↔chassis_1|SHEARED at 1278 vs eff 900|t 2008.4
+   det PlayerBuild|SEAM core_0↔chassis_1|SHEARED at 1278 vs eff 900|t 2008.4
+   det PlayerBuild|SEAM core_0↔engine_4|SHEARED at 1164 vs eff 900|t 2013.4
+   det MAULER|chassis_2|HP-DESTROYED|hp 0/216 (0%)|t 2018.5
+run 1: PlayerLoss at 90.4s  dealt 319 taken 360  pieces 9/12 vs 7/11  flipped self 4.4s enemy 1.6s  | Judges' decision — damage 319 vs 360 (11.5% margin) · pieces 9/12 vs 7/11 · on its back 5% vs 2% — structure even, decided on damage
+   src: ram 245/17 · limb 74/2 (max hit 47.0) · disc 0/0   packSeam 0.72
+   det MAULER|SEAM core_0↔chassis_2|SHEARED at 1879 vs eff 900|t 2075.7
+   det PlayerBuild|SEAM core_0↔chassis_2|SHEARED at 1879 vs eff 900|t 2075.7
+   det MAULER|SEAM chassis_2↔gyro_5|SHEARED at 2002 vs eff 900|t 2079.2
+   det MAULER|chassis_2|HP-DESTROYED|hp 0/216 (0%)|t 2098.3
+   det PlayerBuild|chassis_2|HP-DESTROYED|hp 0/216 (0%)|t 2103.7
+   det MAULER|SEAM chassis_1↔spikeZP_6|SHEARED at 1037 vs eff 900|t 2115.8
+   det PlayerBuild|SEAM core_0↔chassis_1|SHEARED at 1037 vs eff 900|t 2115.8
+   det MAULER|spikeZP_6|STRUCTURAL-SHED|hp 80/87 (92%)|t 2117.1
+run 2: PlayerLoss at 90.0s  dealt 230 taken 397  pieces 11/12 vs 10/11  flipped self 6.0s enemy 0.4s  | Judges' decision — damage 230 vs 397 (42.0% margin) · pieces 11/12 vs 10/11 · on its back 7% vs 0% — structure even, decided on damage
+   src: ram 51/6 · limb 180/6 (max hit 72.5) · disc 0/0   packSeam 0.59
+   det MAULER|SEAM core_0↔chassis_2|SHEARED at 1879 vs eff 900|t 2168.9
+   det PlayerBuild|SEAM core_0↔chassis_2|SHEARED at 1879 vs eff 900|t 2168.9
+   det MAULER|SEAM chassis_2↔gyro_5|SHEARED at 1879 vs eff 900|t 2181.7
+   det PlayerBuild|SEAM core_0↔chassis_1|SHEARED at 1433 vs eff 900|t 2181.7
+   det PlayerBuild|SEAM chassis_1↔battery_3|SHEARED at 1700 vs eff 1440|t 2187.3
+   det MAULER|SEAM chassis_1↔spikeZP_6|SHEARED at 2025 vs eff 900|t 2196.4
+   det PlayerBuild|SEAM beam_6↔spikeZP_7|SHEARED at 2025 vs eff 1500|t 2196.4
+   det PlayerBuild|spikeZP_7|STRUCTURAL-SHED|hp 99/105 (95%)|t 2197.7
+   det MAULER|spikeZP_6|STRUCTURAL-SHED|hp 28/87 (32%)|t 2197.7
+   det MAULER|SEAM core_0↔chassis_1|SHEARED at 1042 vs eff 900|t 2212.7
+run 3: PlayerLoss at 77.2s  dealt 240 taken 339  pieces 12/12 vs 10/11  flipped self 0.0s enemy 0.0s  | Counted out — out of power — all 300 kJ spent in 67 s; carry more battery, or spend less on driving and spinning
+   src: ram 136/6 · limb 105/4 (max hit 37.0) · disc 0/0   packSeam 1.86
+   det MAULER|SEAM core_0↔chassis_2|SHEARED at 1879 vs eff 900|t 2261.7
+   det PlayerBuild|SEAM core_0↔chassis_2|SHEARED at 1879 vs eff 900|t 2261.7
+   det MAULER|SEAM chassis_2↔gyro_5|SHEARED at 1981 vs eff 900|t 2265.2
+   det MAULER|SEAM chassis_1↔spikeZP_6|SHEARED at 2679 vs eff 900|t 2292.2
+   det PlayerBuild|SEAM core_0↔chassis_1|SHEARED at 2679 vs eff 900|t 2292.2
+   det MAULER|spikeZP_6|STRUCTURAL-SHED|hp 9/87 (10%)|t 2293.5
+   det MAULER|SEAM core_0↔chassis_1|SHEARED at 1338 vs eff 900|t 2305.4
+b3_spear_w|mauler/Vet|charge|charge  n=4  W0/L3/D1  flips=1  len 77.2-90.4s spread=1.17x  worst single-step piece loss: player 1 enemy 1  [CONVERGED] (90s wall)

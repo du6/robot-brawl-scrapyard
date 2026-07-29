@@ -1,0 +1,22 @@
+# WORLD-Y BANDS. player DISC_Z vs enemy mauler, spawn pose.
+  PLAYER core_0         trig=False y=[0.039 .. 0.346]
+  PLAYER beam_1         trig=False y=[0.081 .. 0.294]
+  PLAYER beam_2         trig=False y=[0.085 .. 0.298]
+  PLAYER beam_3         trig=False y=[0.093 .. 0.301]
+  PLAYER beam_4         trig=False y=[0.085 .. 0.298]
+  PLAYER beam_5         trig=False y=[0.092 .. 0.305]
+  PLAYER beam_6         trig=False y=[0.078 .. 0.290]
+  PLAYER battery_7      trig=False y=[0.339 .. 0.596]
+  PLAYER beam_8         trig=False y=[0.098 .. 0.311]
+  PLAYER spindleZP_9    trig=False y=[0.022 .. 0.330]
+  PLAYER spinnerZP_10   trig=False y=[0.000 .. 0.344]
+  PLAYER spinnerZP_10   trig=True  y=[-0.051 .. 0.396]
+  ENEMY  core_0         y=[0.031 .. 0.358]
+  ENEMY  chassis_1      y=[0.046 .. 0.389]
+  ENEMY  chassis_2      y=[0.000 .. 0.343]
+  ENEMY  engine_3       y=[0.348 .. 0.636]
+  ENEMY  battery_4      y=[0.332 .. 0.605]
+  ENEMY  gyro_5         y=[0.318 .. 0.580]
+  ENEMY  spikeZP_6      y=[0.118 .. 0.363]
+WEAPON trigger y=[-0.051..0.396]  solid y=[0.000..0.344]  ENEMY solid y=[0.000..0.636]  vertical overlap = 0.396 m
+groundY assumed 0. weapon trigger dips below ground by 0.051

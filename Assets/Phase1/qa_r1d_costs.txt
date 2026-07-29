@@ -1,0 +1,8 @@
+qa_owen_build_SAFE: parts=16 mass=842 cost=750 valid=OK
+qa_c1_hammer_ti: parts=12 mass=1135 cost=3278 valid=OK
+qa_c2_rotor_cf: parts=14 mass=560 cost=1533 valid=OK
+qa_c3_lance_w: parts=12 mass=3904 cost=22386 valid=OK
+qa_c4_flipper_al: parts=13 mass=929 cost=1361 valid=OK
+qa_c5_discus_abs: parts=11 mass=464 cost=344 valid=OK
+qa_c6_hammer_abs: parts=12 mass=398 cost=279 valid=OK
+qa_hammer_test: parts=12 mass=1673 cost=1355 valid=OK

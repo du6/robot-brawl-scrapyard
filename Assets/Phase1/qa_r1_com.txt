@@ -1,0 +1,32 @@
+pivotYP_5 spec=(0.300, 0.300, 0.300) MESHbounds(local) ctr=(0.000, 0.000, 0.000) size=(0.390, 0.396, 0.390)
+beam_6 spec=(0.600, 0.200, 0.200) MESHbounds(local) ctr=(0.000, 0.000, 0.000) size=(0.740, 0.218, 0.564)
+bladeXP_7 spec=(0.500, 0.050, 0.120) MESHbounds(local) ctr=(0.036, 0.000, 0.000) size=(0.573, 0.053, 0.110)
+
+-- CoM vs limb travel (rb.centerOfMass is LOCAL, so a moving limb must move it) --
+  f=  0 travel=2.339 phase=Returning CoM=(0.06826, 0.10558, -0.01168) mass=1135
+  f= 40 travel=0.000 phase=Recovering CoM=(0.06826, 0.10558, -0.01168) mass=1135
+  f= 80 travel=2.618 phase=Returning CoM=(0.06826, 0.10558, -0.01168) mass=1135
+  f=120 travel=0.000 phase=Recovering CoM=(0.06826, 0.10558, -0.01168) mass=1135
+  f=160 travel=2.181 phase=Driving CoM=(0.06826, 0.10558, -0.01168) mass=1135
+  f=200 travel=0.105 phase=Returning CoM=(0.06826, 0.10558, -0.01168) mass=1135
+  f=240 travel=1.668 phase=Driving CoM=(0.06826, 0.10558, -0.01168) mass=1135
+  f=280 travel=0.384 phase=Returning CoM=(0.06826, 0.10558, -0.01168) mass=1135
+  f=320 travel=1.203 phase=Driving CoM=(0.06826, 0.10558, -0.01168) mass=1135
+  f=360 travel=0.663 phase=Returning CoM=(0.06826, 0.10558, -0.01168) mass=1135
+  f=400 travel=0.791 phase=Driving CoM=(0.06826, 0.10558, -0.01168) mass=1135
+  f=440 travel=0.942 phase=Returning CoM=(0.06826, 0.10558, -0.01168) mass=1135
+  f=480 travel=0.441 phase=Driving CoM=(0.06826, 0.10558, -0.01168) mass=1135
+  f=520 travel=1.222 phase=Returning CoM=(0.06826, 0.10558, -0.01168) mass=1135
+  f=560 travel=0.166 phase=Driving CoM=(0.06826, 0.10558, -0.01168) mass=1135
+  f=600 travel=1.501 phase=Returning CoM=(0.06826, 0.10558, -0.01168) mass=1135
+  f=640 travel=0.000 phase=Ready CoM=(0.06826, 0.10558, -0.01168) mass=1135
+  f=680 travel=1.780 phase=Returning CoM=(0.06826, 0.10558, -0.01168) mass=1135
+  f=720 travel=0.000 phase=Recovering CoM=(0.06826, 0.10558, -0.01168) mass=1135
+  f=760 travel=2.059 phase=Returning CoM=(0.06826, 0.10558, -0.01168) mass=1135
+  f=800 travel=0.000 phase=Recovering CoM=(0.06826, 0.10558, -0.01168) mass=1135
+  f=840 travel=2.339 phase=Returning CoM=(0.06826, 0.10558, -0.01168) mass=1135
+  f=880 travel=0.000 phase=Recovering CoM=(0.06826, 0.10558, -0.01168) mass=1135
+
+CoM at travel~0 : (0.06826, 0.10558, -0.01168)
+CoM at travel 2.618 : (0.06826, 0.10558, -0.01168)
+DELTA = 0.000000 m

@@ -1,0 +1,26 @@
+# RB2Probe cases=4 reps=5 seconds=24 toKO=True speed=3 fire=True
+# LIVE CONSTANTS  tipSpeedCap m/s: ABS=9.00 Aluminum=9.68 Steel=12.50 Titanium=14.79 CarbonFiber=13.11 Tungsten=13.69  | MotorKW 0/1/2/3 eng 1.0/2.5/4.0/5.5  | DRIVE_KW_PER_TONNE 1.25 | LIFT_EFFICIENCY 0.85 | REACTION_FRAC 0.60 | GROUND_CLEAR 0.020 | BITE_RATE_FRAC 0.45 | EXPOSED_MULT 1.75 | STEP_DISP_CAP 0.25
+# LIVE CONSTANTS (cycle) WIND_RELEASE_FRAC 0.995 | WIND_TIMEOUT_S 2.00 | BITE_TIP_SPEED_MS 4.00 | RECOVER_S 0.10 | PIVOT_RETURN_DPS 500 | MIN_BITE_E 40 | DRAIN_FRAC 0.40 | LIN_IMP_CAP 600 | EFFICIENCY 0.35 | RECUP_FRAC 0.90 | REACTION_STALL_MUL 3.0
+# LIVE CONSTANTS (damage/judging) DMG_K 0.045 | HP_K 6000 | SHOVE_CAP 500 | PART_IMMUNITY 0.50 | RAM_MIN_J 150 | RAM_J_CAP 900 | STRUCT_BAND 0.060 | MIN_STRUCT_PARTS 2.0 | DRAW_BAND_FRAC 0.080 | CONTROL_BAND 0.100 | MATCH_TIME 90 | CREDIT_BUDGET 4000
+# SOURCE REGIME 34ff221d (42 scripts, newest 2026-07-27 17:28:44Z)
+NOWEAP_afk       r0 tier=Veteran  pol=afk    t=90.0 PlayerLoss | pDealt     0 pTaken   197 | P[ram 0/0 limb 0/0] | E[ram 197/10 limb 0/0] | parts 13/13 vs 10/11 | dist 2.82 near 42.5s close 29.2s thr 0.84
+NOWEAP_afk       r1 tier=Veteran  pol=afk    t=90.3 PlayerLoss | pDealt     0 pTaken   306 | P[ram 0/0 limb 0/0] | E[ram 306/16 limb 0/0] | parts 11/13 vs 10/11 | dist 2.90 near 34.3s close 19.1s thr 0.83
+NOWEAP_afk       r2 tier=Veteran  pol=afk    t=90.0 PlayerLoss | pDealt     0 pTaken   178 | P[ram 0/0 limb 0/0] | E[ram 178/8 limb 0/0] | parts 13/13 vs 10/11 | dist 2.67 near 49.5s close 39.2s thr 0.81
+NOWEAP_afk       r3 tier=Veteran  pol=afk    t=90.0 PlayerLoss | pDealt     0 pTaken   244 | P[ram 0/0 limb 0/0] | E[ram 244/10 limb 0/0] | parts 9/13 vs 10/11 | dist 2.53 near 51.0s close 30.2s thr 0.85
+NOWEAP_afk       r4 tier=Veteran  pol=afk    t=90.0 PlayerLoss | pDealt     0 pTaken    69 | P[ram 0/0 limb 0/0] | E[ram 69/4 limb 0/0] | parts 13/13 vs 11/11 | dist 2.08 near 78.6s close 2.9s thr 0.97
+NOWEAP_charge    r0 tier=Veteran  pol=charge t=90.0 PlayerWin  | pDealt   125 pTaken    41 | P[ram 125/6 limb 0/0] | E[ram 41/4 limb 0/0] | parts 12/13 vs 10/11 | dist 1.40 near 82.5s close 79.7s thr 0.98
+NOWEAP_charge    r1 tier=Veteran  pol=charge t=90.0 PlayerLoss | pDealt   204 pTaken   292 | P[ram 204/19 limb 0/0] | E[ram 292/16 limb 0/0] | parts 8/13 vs 10/11 | dist 3.55 near 25.4s close 15.0s thr 0.85
+NOWEAP_charge    r2 tier=Veteran  pol=charge t=90.3 PlayerLoss | pDealt   137 pTaken   241 | P[ram 137/8 limb 0/0] | E[ram 241/11 limb 0/0] | parts 8/13 vs 11/11 | dist 2.25 near 55.7s close 34.1s thr 0.82
+NOWEAP_charge    r3 tier=Veteran  pol=charge t=90.0 PlayerLoss | pDealt   264 pTaken   270 | P[ram 264/14 limb 0/0] | E[ram 270/17 limb 0/0] | parts 9/13 vs 10/11 | dist 2.77 near 36.7s close 19.7s thr 0.85
+NOWEAP_charge    r4 tier=Veteran  pol=charge t=90.0 PlayerLoss | pDealt   180 pTaken   360 | P[ram 180/13 limb 0/0] | E[ram 360/13 limb 0/0] | parts 6/13 vs 10/11 | dist 3.26 near 25.0s close 13.9s thr 0.85
+SPINDLE_afk      r0 tier=Veteran  pol=afk    t=90.3 Draw       | pDealt   379 pTaken   350 | P[ram 0/0 limb 379/7] | E[ram 350/15 limb 0/0] | parts 9/17 vs 7/11 | dist 2.97 near 35.5s close 11.0s thr 0.90
+SPINDLE_afk      r1 tier=Veteran  pol=afk    t=90.3 PlayerWin  | pDealt   428 pTaken   174 | P[ram 0/0 limb 428/9] | E[ram 174/7 limb 0/0] | parts 17/17 vs 10/11 | dist 3.21 near 34.2s close 12.8s thr 0.88
+SPINDLE_afk      r2 tier=Veteran  pol=afk    t=90.0 Draw       | pDealt    72 pTaken    89 | P[ram 0/0 limb 72/1] | E[ram 89/2 limb 0/0] | parts 17/17 vs 10/11 | dist 4.75 near 6.8s close 5.0s thr 0.83
+SPINDLE_afk      r3 tier=Veteran  pol=afk    t=90.0 PlayerWin  | pDealt   308 pTaken   348 | P[ram 0/0 limb 308/6] | E[ram 348/17 limb 0/0] | parts 15/17 vs 7/11 | dist 3.62 near 29.0s close 16.6s thr 0.92
+SPINDLE_afk      r4 tier=Veteran  pol=afk    t=90.0 PlayerWin  | pDealt   250 pTaken   202 | P[ram 0/0 limb 250/5] | E[ram 202/18 limb 0/0] | parts 17/17 vs 7/11 | dist 3.40 near 36.5s close 23.3s thr 0.83
+SPINDLE_charge   r0 tier=Veteran  pol=charge t=90.0 PlayerLoss | pDealt   133 pTaken   315 | P[ram 133/15 limb 0/0] | E[ram 315/12 limb 0/0] | parts 12/17 vs 10/11 | dist 2.63 near 48.6s close 35.1s thr 0.86
+SPINDLE_charge   r1 tier=Veteran  pol=charge t=90.0 PlayerLoss | pDealt   166 pTaken   281 | P[ram 97/19 limb 69/1] | E[ram 281/21 limb 0/0] | parts 14/17 vs 10/11 | dist 2.00 near 57.2s close 40.3s thr 0.81
+SPINDLE_charge   r2 tier=Veteran  pol=charge t=71.1 PlayerWin  | pDealt   722 pTaken   385 | P[ram 127/22 limb 596/17] | E[gone] | parts 12/17 vs 0/11 | dist 2.80 near 36.5s close 24.4s thr 0.89
+SPINDLE_charge   r3 tier=Veteran  pol=charge t=90.0 PlayerLoss | pDealt   401 pTaken   331 | P[ram 210/20 limb 192/4] | E[ram 331/20 limb 0/0] | parts 12/17 vs 10/11 | dist 2.83 near 49.1s close 34.7s thr 0.84
+SPINDLE_charge   r4 tier=Veteran  pol=charge t=90.3 PlayerWin  | pDealt   495 pTaken   350 | P[ram 318/32 limb 177/4] | E[ram 350/26 limb 0/0] | parts 15/17 vs 10/11 | dist 2.06 near 66.3s close 43.4s thr 0.83
+# done 4 cases x 5

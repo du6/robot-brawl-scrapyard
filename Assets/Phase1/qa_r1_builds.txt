@@ -1,0 +1,12 @@
+### qa_r1_b1_maul_ti parts=12 mass=1135.2kg cost=3278 valid=OK
+    LIMB act=pivot parts=2 blockedBy=null I=54.680 tipR=1.25 rateMax=10.00 E=2734.0J kJ/swing=7.81
+### qa_r1_b2_vortex parts=14 mass=789.4kg cost=761 valid=OK
+    LIMB act=spindle parts=4 blockedBy=null I=54.129 tipR=1.25 rateMax=10.00 E=2706.4J kJ/swing=7.73
+### qa_r1_b3_lance parts=12 mass=841.2kg cost=1519 valid=OK
+    LIMB act=ram parts=2 blockedBy=null I=204.918 tipR=0.30 rateMax=3.50 E=1255.1J kJ/swing=3.59
+### qa_r1_b4_plough parts=13 mass=2124.9kg cost=1698 valid=OK
+    LIMB act=pivot parts=2 blockedBy=null I=115.971 tipR=1.18 rateMax=10.64 E=6562.4J kJ/swing=18.75
+### qa_r1_b5_discus parts=11 mass=1749.6kg cost=2126 valid=OK
+    (no actuators)
+### qa_r1_b6_maul_abs parts=12 mass=398.2kg cost=279 valid=OK
+    LIMB act=pivot parts=2 blockedBy=null I=7.459 tipR=1.25 rateMax=10.00 E=372.9J kJ/swing=1.07

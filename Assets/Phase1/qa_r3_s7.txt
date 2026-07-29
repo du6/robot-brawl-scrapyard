@@ -1,0 +1,8 @@
+# build b5_discus_steel|mauler/Vet|PARKED parts=11 policy=afk runs=4
+# LIVE CONSTANTS  tipSpeedCap m/s: ABS=9.00 Aluminum=9.68 Steel=12.50 Titanium=14.79 CarbonFiber=13.11 Tungsten=13.69  | MotorKW 0/1/2/3 eng 1.0/2.5/4.0/5.5  | DRIVE_KW_PER_TONNE 1.25 | LIFT_EFFICIENCY 0.85 | REACTION_FRAC 0.60 | GROUND_CLEAR 0.020 | BITE_RATE_FRAC 0.45 | EXPOSED_MULT 1.75 | STEP_DISP_CAP 0.25
+# fixedDeltaTime 0.0200  timeScale 4.0  debugFire False
+run 0: PlayerWin at 48.4s  dealt 552 taken 12  pieces 11/11 vs 3/11  flipped self 0.0s enemy 0.0s  | Enemy counted out — every one of its 4 wheels had been torn off — nothing left to drive with
+run 1: PlayerWin at 90.4s  dealt 532 taken 243  pieces 11/11 vs 6/11  flipped self 0.0s enemy 1.2s  | Judges' decision — damage 532 vs 243 (54.3% margin) · pieces 11/11 vs 6/11 · on its back 0% vs 1% — decided on structure destroyed
+run 2: PlayerWin at 90.4s  dealt 212 taken 244  pieces 11/11 vs 10/11  flipped self 0.0s enemy 0.4s  | Judges' decision — damage 212 vs 244 (13.1% margin) · pieces 11/11 vs 10/11 · on its back 0% vs 0% — decided on structure destroyed
+run 3: PlayerWin at 89.6s  dealt 908 taken 389  pieces 11/11 vs 3/11  flipped self 0.8s enemy 0.8s  | Enemy counted out — every one of its 4 wheels had been torn off — nothing left to drive with
+b5_discus_steel|mauler/Vet|PARKED|afk  n=4  W4/L0/D0  flips=0  len 48.4-90.4s spread=1.87x  worst single-step piece loss: player 0 enemy 1  [NOISY] (82s wall)

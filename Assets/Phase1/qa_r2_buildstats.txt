@@ -1,0 +1,12 @@
+qa_r2_b1_hammer_ti: parts=13 wheels=4 valid=OK mass=1924.0kg cost=1924 mats=[Steel,Rubber,Aluminum,Titanium]
+   LIMB act=pivot parts=2 blockedBy=null I=29.34 tipR=1.025 rateMax=12.20 E=2181J kJswing=6.23
+qa_r2_b2_rotor_cf: parts=13 wheels=4 valid=OK mass=705.1kg cost=889 mats=[Aluminum,Rubber,CarbonFiber]
+   LIMB act=spindle parts=3 blockedBy=null I=6.88 tipR=0.810 rateMax=15.43 E=820J kJswing=2.34
+qa_r2_b3_lance_w: parts=12 wheels=4 valid=OK mass=1994.2kg cost=2322 mats=[Steel,Rubber,Aluminum,Tungsten]
+   LIMB act=ram parts=2 blockedBy=null I=328.52 tipR=0.300 rateMax=3.50 E=2012J kJswing=5.75
+qa_r2_b4_flipper_abs: parts=13 wheels=4 valid=OK mass=449.7kg cost=305 mats=[ABS,Rubber,Aluminum]
+   LIMB act=pivot parts=3 blockedBy=null I=53.84 tipR=1.375 rateMax=9.09 E=2225J kJswing=6.36
+qa_r2_b5_discus_al: parts=11 wheels=4 valid=OK mass=706.7kg cost=663 mats=[Aluminum,Rubber,Steel]
+   LIMB none (no actuator)
+qa_r2_b6_hammer_w: parts=13 wheels=4 valid=OK mass=2500.8kg cost=5912 mats=[Steel,Rubber,Aluminum,Tungsten]
+   LIMB act=pivot parts=2 blockedBy=null I=125.54 tipR=1.025 rateMax=12.20 E=9335J kJswing=26.67

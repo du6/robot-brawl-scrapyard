@@ -1,0 +1,67 @@
+# UP3 DEV - AFTER the round-3 patch (same harness, same fixture)
+
+===== SECTION geom =====
+## BOX (Half*2 = collider + overlap + snap) vs MESH (real renderer bounds)
+   ORIENT = do the longest and shortest axes of box and mesh agree?
+   OVER   = worst (mesh-box)/2 in metres: how far solid-looking mesh
+            hangs outside the collider (+) on any one axis.
+
+  wedge    +X  box (0.350, 0.120, 0.500)  mesh (0.413, 0.149, 0.500)  ORIENT ok  OVER 0.032
+  wedge    -X  box (0.350, 0.120, 0.500)  mesh (0.413, 0.149, 0.500)  ORIENT ok  OVER 0.032
+  wedge    +Y  box (0.500, 0.350, 0.120)  mesh (0.500, 0.413, 0.149)  ORIENT ok  OVER 0.032
+  wedge    -Y  box (0.500, 0.350, 0.120)  mesh (0.500, 0.413, 0.149)  ORIENT ok  OVER 0.032
+  wedge    +Z  box (0.500, 0.120, 0.350)  mesh (0.500, 0.149, 0.413)  ORIENT ok  OVER 0.032
+  wedge    -Z  box (0.500, 0.120, 0.350)  mesh (0.500, 0.149, 0.413)  ORIENT ok  OVER 0.032
+
+  hook     +X  box (0.200, 0.300, 0.160)  mesh (0.185, 0.309, 0.112)  ORIENT ok  OVER 0.004
+  hook     -X  box (0.200, 0.300, 0.160)  mesh (0.185, 0.309, 0.112)  ORIENT ok  OVER 0.004
+  hook     +Y  box (0.160, 0.200, 0.300)  mesh (0.112, 0.185, 0.309)  ORIENT ok  OVER 0.004
+  hook     -Y  box (0.160, 0.200, 0.300)  mesh (0.112, 0.185, 0.309)  ORIENT ok  OVER 0.004
+  hook     +Z  box (0.160, 0.300, 0.200)  mesh (0.112, 0.309, 0.185)  ORIENT ok  OVER 0.004
+  hook     -Z  box (0.160, 0.300, 0.200)  mesh (0.112, 0.309, 0.185)  ORIENT ok  OVER 0.004
+
+  pivot    +X  box (0.300, 0.300, 0.300)  mesh (0.396, 0.318, 0.318)  ORIENT cube-n/a  OVER 0.048
+  pivot    -X  box (0.300, 0.300, 0.300)  mesh (0.396, 0.318, 0.318)  ORIENT cube-n/a  OVER 0.048
+  pivot    +Y  box (0.300, 0.300, 0.300)  mesh (0.318, 0.396, 0.318)  ORIENT cube-n/a  OVER 0.048
+  pivot    -Y  box (0.300, 0.300, 0.300)  mesh (0.318, 0.396, 0.318)  ORIENT cube-n/a  OVER 0.048
+  pivot    +Z  box (0.300, 0.300, 0.300)  mesh (0.318, 0.318, 0.396)  ORIENT cube-n/a  OVER 0.048
+  pivot    -Z  box (0.300, 0.300, 0.300)  mesh (0.318, 0.318, 0.396)  ORIENT cube-n/a  OVER 0.048
+
+  spindle  +X  box (0.300, 0.300, 0.300)  mesh (0.396, 0.318, 0.318)  ORIENT cube-n/a  OVER 0.048
+  spindle  -X  box (0.300, 0.300, 0.300)  mesh (0.396, 0.318, 0.318)  ORIENT cube-n/a  OVER 0.048
+  spindle  +Y  box (0.300, 0.300, 0.300)  mesh (0.318, 0.396, 0.318)  ORIENT cube-n/a  OVER 0.048
+  spindle  -Y  box (0.300, 0.300, 0.300)  mesh (0.318, 0.396, 0.318)  ORIENT cube-n/a  OVER 0.048
+  spindle  +Z  box (0.300, 0.300, 0.300)  mesh (0.318, 0.318, 0.396)  ORIENT cube-n/a  OVER 0.048
+  spindle  -Z  box (0.300, 0.300, 0.300)  mesh (0.318, 0.318, 0.396)  ORIENT cube-n/a  OVER 0.048
+
+  ram      +X  box (0.300, 0.300, 0.300)  mesh (0.483, 0.318, 0.318)  ORIENT cube-n/a  OVER 0.092
+  ram      -X  box (0.300, 0.300, 0.300)  mesh (0.483, 0.318, 0.318)  ORIENT cube-n/a  OVER 0.092
+  ram      +Y  box (0.300, 0.300, 0.300)  mesh (0.318, 0.483, 0.318)  ORIENT cube-n/a  OVER 0.092
+  ram      -Y  box (0.300, 0.300, 0.300)  mesh (0.318, 0.483, 0.318)  ORIENT cube-n/a  OVER 0.092
+  ram      +Z  box (0.300, 0.300, 0.300)  mesh (0.318, 0.318, 0.483)  ORIENT cube-n/a  OVER 0.092
+  ram      -Z  box (0.300, 0.300, 0.300)  mesh (0.318, 0.318, 0.483)  ORIENT cube-n/a  OVER 0.092
+
+  blade    +X  box (0.500, 0.050, 0.120)  mesh (0.510, 0.045, 0.119)  ORIENT ok  OVER 0.005
+  blade    -X  box (0.500, 0.050, 0.120)  mesh (0.510, 0.045, 0.119)  ORIENT ok  OVER 0.005
+  blade    +Y  box (0.500, 0.050, 0.120)  mesh (0.495, 0.051, 0.108)  ORIENT ok  OVER 0.000
+  blade    -Y  box (0.500, 0.050, 0.120)  mesh (0.495, 0.051, 0.108)  ORIENT ok  OVER 0.000
+  blade    +Z  box (0.500, 0.050, 0.120)  mesh (0.495, 0.045, 0.122)  ORIENT ok  OVER 0.001
+  blade    -Z  box (0.500, 0.050, 0.120)  mesh (0.495, 0.045, 0.122)  ORIENT ok  OVER 0.001
+
+  spike    +X  box (0.300, 0.220, 0.220)  mesh (0.303, 0.220, 0.220)  ORIENT ok  OVER 0.002
+  spike    -X  box (0.300, 0.220, 0.220)  mesh (0.303, 0.220, 0.220)  ORIENT ok  OVER 0.002
+  spike    +Y  box (0.220, 0.300, 0.220)  mesh (0.220, 0.303, 0.220)  ORIENT ok  OVER 0.001
+  spike    -Y  box (0.220, 0.300, 0.220)  mesh (0.220, 0.303, 0.220)  ORIENT ok  OVER 0.001
+  spike    +Z  box (0.220, 0.220, 0.300)  mesh (0.220, 0.220, 0.303)  ORIENT ok  OVER 0.001
+  spike    -Z  box (0.220, 0.220, 0.300)  mesh (0.220, 0.220, 0.303)  ORIENT ok  OVER 0.001
+## DONE checks=42 failures=0 offCam=0
+
+===== SECTION leak =====
+## CLICK LEAK: click over the PANEL, then move onto a valid face with NO new click.
+   CORRECT: nothing is ever placed. LEAKING: the panel click fires later.
+  rep 0: parts 1 -> after panel-click 1 -> after move 1   ok - click consumed where it happened
+  rep 1: parts 1 -> after panel-click 1 -> after move 1   ok - click consumed where it happened
+  rep 2: parts 1 -> after panel-click 1 -> after move 1   ok - click consumed where it happened
+  CONTROL click on the face: ok - still places
+  CROSS-MODE click posted in TEST, then back to Build: parts=1  ok - no cross-mode leak
+## DONE checks=5 failures=0 offCam=0

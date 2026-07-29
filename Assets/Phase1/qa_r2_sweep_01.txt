@@ -1,0 +1,6 @@
+# build qa_r2_b1_hammer_ti|mauler|Veteran|fire=True parts=13 policy=charge runs=4
+run 0: PlayerLoss at 90.3s  dealt 295 taken 364  pieces 13/13 vs 10/11  flipped 2.4s  | Judges' decision — damage 295 vs 364 (19.0% margin) · pieces 13/13 vs 10/11 — decided on damage
+run 1: PlayerWin at 90.0s  dealt 419 taken 429  pieces 13/13 vs 6/11  flipped 2.4s  | Judges' decision — damage 419 vs 429 (2.5% margin) · pieces 13/13 vs 6/11 — damage inside the draw band, decided on structure retained
+run 2: PlayerWin at 26.1s  dealt 381 taken 51  pieces 13/13 vs 0/11  flipped 0.0s  | KO — enemy core destroyed
+run 3: PlayerLoss at 75.9s  dealt 156 taken 281  pieces 12/13 vs 10/11  flipped 2.7s  | Counted out — out of power — all 300 kJ spent in 66 s; carry more battery, or spend less on driving and spinning
+qa_r2_b1_hammer_ti|mauler|Veteran|fire=True|charge  n=4  W2/L2/D0  flips=2  len 26.1-90.3s spread=3.46x  worst single-step piece loss: player 1 enemy 5  [NOISY] (97s wall)

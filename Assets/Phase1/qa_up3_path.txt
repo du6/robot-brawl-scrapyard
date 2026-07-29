@@ -1,0 +1,140 @@
+# UP3 CRITIC - pointer path sweep
+
+===== SECTION robot =====
+## A COMPLETE ROBOT, START TO FINISH, BY POINTER ALONE (no LoadSnapshot after the bare core)
+  chassis   on part 0 face (0.00, 0.00, 1.00) -> idx 1 at (0.000, 0.700, 0.400)
+  chassis   on part 0 face (0.00, 0.00, -1.00) -> idx 2 at (0.000, 0.700, -0.400)
+  wheel     on part 1 face (1.00, 0.00, 0.00) -> idx 3 at (0.270, 0.700, 0.400)
+  wheel     on part 1 face (-1.00, 0.00, 0.00) -> idx 4 at (-0.270, 0.700, 0.400)
+  wheel     on part 2 face (1.00, 0.00, 0.00) -> idx 5 at (0.270, 0.700, -0.400)
+  wheel     on part 2 face (-1.00, 0.00, 0.00) -> idx 6 at (-0.270, 0.700, -0.400)
+  battery   on part 0 face (0.00, 1.00, 0.00) -> idx 7 at (0.000, 0.975, 0.000)
+  engine    on part 2 face (0.00, 1.00, 0.00) -> idx 8 at (0.000, 0.975, -0.400)
+  gyro      on part 0 face (0.00, 1.00, 0.00)  FAILED: off-camera
+  spinner   on part 1 face (0.00, 0.00, 1.00) -> idx 9 at (0.000, 0.700, 0.700)
+  RESULT parts=10 wheels=4 cost=851 Validate=OK
+  LimbReport entries=0
+  snapshot written to qa_up3_pointerbot.txt (gate passed)
+## SECTION robot DONE checks=11 failures=1 offcam=1
+
+===== SECTION onto =====
+
+## ATTACH ONTO A CHASSIS (not a core) - the case no sweep has ever run
+  beam        +X:ok +Y:ok +Z:ok -Y:ok
+  beamlong    +X:ok +Y:ok +Z:ok -Y:ok
+  bracket     +X:ok +Y:ok +Z:ok -Y:ok
+  chassis     +X:ok +Y:ok +Z:ok -Y:ok
+  plate       +X:X(no-socket-self) +Y:ok +Z:X(no-socket-self) -Y:ok
+  engine      +X:ok +Y:ok +Z:ok -Y:ok
+  battery     +X:ok +Y:ok +Z:ok -Y:ok
+  gyro        +X:ok +Y:ok +Z:ok -Y:ok
+  wheel       +X:ok +Y:X(wheel-side-only) +Z:ok -Y:X(wheel-side-only)
+  spinner     +X:ok +Y:ok +Z:ok -Y:X(no-underside)
+  spinnerSaw  +X:ok +Y:ok +Z:ok -Y:X(no-underside)
+  spike       +X:ok +Y:ok +Z:ok -Y:ok
+  pivot       +X:ok +Y:ok +Z:ok -Y:ok
+  spindle     +X:ok +Y:ok +Z:ok -Y:ok
+  ram         +X:ok +Y:ok +Z:ok -Y:ok
+  blade       +X:ok +Y:ok +Z:ok -Y:ok
+  wedge       +X:ok +Y:ok +Z:ok -Y:ok
+  hook        +X:ok +Y:ok +Z:ok -Y:ok
+
+## ATTACH ONTO A BEAM (not a core) - the case no sweep has ever run
+  beam        +X:X(blocked) +Y:X(blocked) +Z:ok
+  beamlong    +X:X(blocked) +Y:X(blocked) +Z:ok
+  bracket     +X:ok +Y:ok +Z:ok
+  chassis     +X:ok +Y:ok +Z:ok
+  plate       +X:X(no-socket-self) +Y:ok +Z:X(no-socket-self)
+  engine      +X:ok +Y:ok +Z:ok
+  battery     +X:ok +Y:ok +Z:ok
+  gyro        +X:ok +Y:ok +Z:ok
+  wheel       +X:ok +Y:X(wheel-side-only) +Z:ok
+  spinner     +X:ok +Y:ok +Z:ok
+  spinnerSaw  +X:ok +Y:ok +Z:ok
+  spike       +X:ok +Y:ok +Z:ok
+  pivot       +X:ok +Y:ok +Z:ok
+  spindle     +X:ok +Y:ok +Z:ok
+  ram         +X:ok +Y:ok +Z:ok
+  blade       +X:ok +Y:ok +Z:ok
+  wedge       +X:ok +Y:ok +Z:ok
+  hook        +X:ok +Y:ok +Z:ok
+
+## ATTACH ONTO A PLATE (not a core) - the case no sweep has ever run
+  beam        +Y:ok +X:X(no-socket-target)
+  beamlong    +Y:ok +X:X(no-socket-target)
+  bracket     +Y:ok +X:X(no-socket-target)
+  chassis     +Y:ok +X:X(no-socket-target)
+  plate       +Y:ok +X:X(no-socket-target)
+  engine      +Y:ok +X:X(no-socket-target)
+  battery     +Y:ok +X:X(no-socket-target)
+  gyro        +Y:ok +X:X(no-socket-target)
+  wheel       +Y:X(wheel-side-only) +X:X(no-socket-target)
+  spinner     +Y:ok +X:X(no-socket-target)
+  spinnerSaw  +Y:ok +X:X(no-socket-target)
+  spike       +Y:ok +X:X(no-socket-target)
+  pivot       +Y:ok +X:X(no-socket-target)
+  spindle     +Y:ok +X:X(no-socket-target)
+  ram         +Y:ok +X:X(no-socket-target)
+  blade       +Y:ok +X:X(no-socket-target)
+  wedge       +Y:ok +X:X(no-socket-target)
+  hook        +Y:ok +X:X(no-socket-target)
+## SECTION onto DONE checks=162 failures=0 offcam=0
+
+===== SECTION stack =====
+## MULTI-PART STACKS - does the snap stay true four deep?
+  depth 1 beam at (0.000, 0.700, 0.450) gap-to-host=0.0000 (0 = flush)
+  depth 2 beam at (0.000, 0.700, 1.050) gap-to-host=0.0000 (0 = flush)
+  depth 3 beam at (0.000, 0.700, 1.650) gap-to-host=0.0000 (0 = flush)
+  depth 4 beam at (0.000, 0.700, 2.250) gap-to-host=0.0000 (0 = flush)
+  depth 5 beam at (0.000, 0.700, 2.850) gap-to-host=0.0000 (0 = flush)
+  stack result parts=6 cost=235 Validate=Needs at least 1 wheel.
+
+## MIXED STACK core->chassis->beam->bracket->blade, each onto the LAST one
+  chassis  onto idx 0 -> idx 1 at (0.000, 0.700, 0.400)
+  beam     onto idx 1 -> idx 2 at (0.000, 0.700, 0.950)
+  bracket  onto idx 2 -> idx 3 at (0.000, 0.700, 1.350)
+  blade    onto idx 3 -> idx 4 at (0.000, 0.700, 1.510)
+  chain Validate=Needs at least 1 wheel.
+## SECTION stack DONE checks=9 failures=0 offcam=0
+
+===== SECTION ryaw =====
+## R AT EVERY YAW: does the PLACED part match the GHOST the player was shown?
+  --- beam
+    R x0 ghost yaw=0 pos=(0.000, 0.950, 0.000) mesh=(0.218, 0.218, 0.618) | placed yaw=0 pos=(0.000, 0.950, 0.000) mesh=(0.218, 0.229, 0.618) 
+    R x1 ghost yaw=90 pos=(0.000, 0.950, 0.000) mesh=(0.618, 0.218, 0.218) | placed yaw=90 pos=(0.000, 0.950, 0.000) mesh=(0.618, 0.229, 0.218) 
+    R x2 ghost yaw=270 pos=(0.000, 0.950, 0.000) mesh=(0.218, 0.218, 0.618) | placed yaw=270 pos=(0.000, 0.950, 0.000) mesh=(0.218, 0.229, 0.618) 
+    R x3 ghost yaw=270 pos=(0.000, 0.950, 0.000) mesh=(0.218, 0.218, 0.618) | placed yaw=270 pos=(0.000, 0.950, 0.000) mesh=(0.218, 0.229, 0.618) 
+  --- beamlong
+    R x0 ghost yaw=0 pos=(0.000, 0.950, 0.000) mesh=(0.218, 0.218, 1.018) | placed yaw=0 pos=(0.000, 0.950, 0.000) mesh=(0.218, 0.229, 1.018) 
+    R x1 ghost yaw=90 pos=(0.000, 0.950, 0.000) mesh=(1.018, 0.218, 0.218) | placed yaw=90 pos=(0.000, 0.950, 0.000) mesh=(1.018, 0.229, 0.218) 
+    R x2 ghost yaw=270 pos=(0.000, 0.950, 0.000) mesh=(0.218, 0.218, 1.018) | placed yaw=270 pos=(0.000, 0.950, 0.000) mesh=(0.218, 0.229, 1.018) 
+    R x3 ghost yaw=270 pos=(0.000, 0.950, 0.000) mesh=(0.218, 0.218, 1.018) | placed yaw=270 pos=(0.000, 0.950, 0.000) mesh=(0.218, 0.229, 1.018) 
+  --- plate
+    R x0 ghost yaw=0 pos=(0.000, 0.880, 0.000) mesh=(0.500, 0.083, 0.500) | placed yaw=0 pos=(0.000, 0.880, 0.000) mesh=(0.500, 0.094, 0.500) 
+    R x1 yaw=180 ghost REFUSED: no-socket-self
+    R x2 ghost yaw=0 pos=(0.000, 0.880, 0.000) mesh=(0.500, 0.083, 0.500) | placed yaw=0 pos=(0.000, 0.880, 0.000) mesh=(0.500, 0.094, 0.500) 
+    R x3 ghost yaw=0 pos=(0.000, 0.880, 0.000) mesh=(0.500, 0.083, 0.500) | placed yaw=0 pos=(0.000, 0.880, 0.000) mesh=(0.500, 0.094, 0.500) 
+  --- chassis
+    R x0 ghost yaw=0 pos=(0.000, 1.000, 0.000) mesh=(0.418, 0.318, 0.518) | placed yaw=0 pos=(0.000, 1.000, 0.000) mesh=(0.418, 0.329, 0.518) 
+    R x1 ghost yaw=90 pos=(0.000, 1.000, 0.000) mesh=(0.518, 0.318, 0.418) | placed yaw=90 pos=(0.000, 1.000, 0.000) mesh=(0.518, 0.329, 0.418) 
+    R x2 ghost yaw=270 pos=(0.000, 1.050, 0.000) mesh=(0.318, 0.418, 0.518) | placed yaw=270 pos=(0.000, 1.050, 0.000) mesh=(0.318, 0.429, 0.518) 
+    R x3 ghost yaw=180 pos=(0.000, 1.100, 0.000) mesh=(0.418, 0.518, 0.318) | placed yaw=180 pos=(0.000, 1.100, 0.000) mesh=(0.418, 0.529, 0.318) 
+  --- bracket
+    R x0 ghost yaw=0 pos=(0.000, 0.950, 0.000) mesh=(0.218, 0.218, 0.218) | placed yaw=0 pos=(0.000, 0.950, 0.000) mesh=(0.218, 0.229, 0.218) 
+    R x1 ghost yaw=90 pos=(0.000, 0.950, 0.000) mesh=(0.218, 0.218, 0.218) | placed yaw=90 pos=(0.000, 0.950, 0.000) mesh=(0.218, 0.229, 0.218) 
+    R x2 ghost yaw=270 pos=(0.000, 0.950, 0.000) mesh=(0.218, 0.218, 0.218) | placed yaw=270 pos=(0.000, 0.950, 0.000) mesh=(0.218, 0.229, 0.218) 
+    R x3 ghost yaw=180 pos=(0.000, 0.950, 0.000) mesh=(0.218, 0.218, 0.218) | placed yaw=180 pos=(0.000, 0.950, 0.000) mesh=(0.218, 0.229, 0.218) 
+## SECTION ryaw DONE checks=20 failures=0 offcam=0
+
+===== SECTION misc =====
+## ESC / PANEL / EMPTY SPACE / RIGHT + MIDDLE CLICK
+  ESC: shownBefore=True -> selected=-1 shown=False  ok
+  PANEL: ghostHidden=True placed+0 ok
+  PANEL-LEAK: !! the click made over the panel fired later, over the model, with no new click
+  EMPTY: ghostValid=False target=none reason="Aim at the robot to attach" placed+0 ok
+  RCLICK core: off-cam
+  RCLICK leaf: off-cam
+  MCLICK: off-cam
+  REDCLICK: refused "Wheels attach to side faces only" ok
+  DOUBLE: added 2 part(s), no overlap, ok
+## SECTION misc DONE checks=6 failures=1 offcam=3

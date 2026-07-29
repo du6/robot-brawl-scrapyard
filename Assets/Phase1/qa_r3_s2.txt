@@ -1,0 +1,8 @@
+# build b2_vortex_cf|mauler/Vet|fire parts=13 policy=charge runs=4
+# LIVE CONSTANTS  tipSpeedCap m/s: ABS=9.00 Aluminum=9.68 Steel=12.50 Titanium=14.79 CarbonFiber=13.11 Tungsten=13.69  | MotorKW 0/1/2/3 eng 1.0/2.5/4.0/5.5  | DRIVE_KW_PER_TONNE 1.25 | LIFT_EFFICIENCY 0.85 | REACTION_FRAC 0.60 | GROUND_CLEAR 0.020 | BITE_RATE_FRAC 0.45 | EXPOSED_MULT 1.75 | STEP_DISP_CAP 0.25
+# fixedDeltaTime 0.0200  timeScale 4.0  debugFire True
+run 0: PlayerWin at 34.8s  dealt 346 taken 22  pieces 13/13 vs 5/11  flipped self 0.0s enemy 0.4s  | Enemy counted out — out of power — 300 kJ of its 300 kJ pack was torn off the chassis, and what was left ran dry after 25 s
+run 1: PlayerWin at 25.2s  dealt 311 taken 34  pieces 13/13 vs 5/11  flipped self 0.0s enemy 0.4s  | Enemy counted out — out of power — 300 kJ of its 300 kJ pack was torn off the chassis, and what was left ran dry after 16 s
+run 2: PlayerWin at 44.8s  dealt 325 taken 28  pieces 13/13 vs 5/11  flipped self 0.0s enemy 0.4s  | Enemy counted out — out of power — 300 kJ of its 300 kJ pack was torn off the chassis, and what was left ran dry after 35 s
+run 3: PlayerWin at 40.8s  dealt 506 taken 156  pieces 13/13 vs 4/11  flipped self 0.4s enemy 1.6s  | Enemy counted out — flipped onto its back — its gyro had already been sheared off, leaving only the slow emergency struts
+b2_vortex_cf|mauler/Vet|fire|charge  n=4  W4/L0/D0  flips=0  len 25.2-44.8s spread=1.78x  worst single-step piece loss: player 0 enemy 2  [NOISY] (39s wall)

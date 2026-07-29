@@ -1,0 +1,12 @@
+# LIVE CONSTANTS  tipSpeedCap m/s: ABS=9.00 Aluminum=9.68 Steel=12.50 Titanium=14.79 CarbonFiber=13.11 Tungsten=13.69  | MotorKW 0/1/2/3 eng 1.0/2.5/4.0/5.5  | DRIVE_KW_PER_TONNE 1.25 | LIFT_EFFICIENCY 0.85 | REACTION_FRAC 0.60 | GROUND_CLEAR 0.020 | BITE_RATE_FRAC 0.45 | EXPOSED_MULT 1.75 | STEP_DISP_CAP 0.25
+qa_r3_b1_sledge_w: parts=13 wheels=4 mass=2276.7kg cost=4385 valid=OK
+    LIMB pivot parts=2 blockedBy=null I=125.54 tipR=1.025 rateMax=13.36 E=11202J kJ/swing=32.01 cap=13.69
+qa_r3_b2_vortex_cf: parts=13 wheels=4 mass=543.4kg cost=1433 valid=OK
+    LIMB spindle parts=3 blockedBy=null I=8.08 tipR=1.000 rateMax=13.11 E=694J kJ/swing=1.98 cap=13.11
+qa_r3_b3_lance_ti: parts=12 wheels=4 mass=1114.6kg cost=3055 valid=OK
+    LIMB ram parts=2 blockedBy=null I=140.98 tipR=0.300 rateMax=3.50 E=864J kJ/swing=2.47 cap=14.79
+qa_r3_b4_skipper_abs: parts=13 wheels=4 mass=438.4kg cost=317 valid=OK
+    LIMB pivot parts=2 blockedBy=null I=1.13 tipR=0.531 rateMax=14.00 E=111J kJ/swing=0.32 cap=9.00
+qa_r3_b5_discus_steel: parts=11 wheels=4 mass=1666.5kg cost=1331 valid=OK
+qa_r3_b6_ripper_al: parts=13 wheels=4 mass=778.8kg cost=756 valid=Structure has floating parts.
+    LIMB pivot parts=0 blockedBy=null I=0.00 tipR=0.001 rateMax=14.00 E=0J kJ/swing=0.00 cap=12.50

@@ -1,0 +1,12 @@
+# build b5_discus_al_BEFORE parts=11 policy=charge runs=4
+# LIVE CONSTANTS  tipSpeedCap m/s: ABS=9.00 Aluminum=9.68 Steel=12.50 Titanium=14.79 CarbonFiber=13.11 Tungsten=13.69  | MotorKW 0/1/2/3 eng 1.0/2.5/4.0/5.5  | DRIVE_KW_PER_TONNE 1.25 | LIFT_EFFICIENCY 0.85 | REACTION_FRAC 0.60 | GROUND_CLEAR 0.020 | BITE_RATE_FRAC 0.45 | EXPOSED_MULT 1.75 | STEP_DISP_CAP 0.25
+# fixedDeltaTime 0.0200  timeScale 3.0  debugFire True
+run 0: PlayerWin at 90.0s  dealt 625 taken 257  pieces 9/11 vs 6/11  flipped self 0.0s enemy 1.8s  | Judges' decision — damage 625 vs 257 (58.9% margin) · pieces 9/11 vs 6/11 · on its back 0% vs 2% — decided on structure destroyed
+   src: ram 625/17 · limb 0/0 (max hit 0.0) · disc 0/0   packSeam 0.73
+run 1: PlayerWin at 25.8s  dealt 666 taken 3  pieces 10/11 vs 5/11  flipped self 3.3s enemy 1.8s  | Enemy counted out — beached — 0 of 2 wheels touching the ground, so the drive had nothing to push on
+   src: ram 666/8 · limb 0/0 (max hit 0.0) · disc 0/0   packSeam 0.97
+run 2: PlayerWin at 41.1s  dealt 496 taken 76  pieces 10/11 vs 0/11  flipped self 2.4s enemy 0.9s  | KO — enemy core destroyed
+   src: ram 496/10 · limb 0/0 (max hit 0.0) · disc 0/0   packSeam 0.97
+run 3: PlayerWin at 17.7s  dealt 1094 taken 41  pieces 10/11 vs 0/11  flipped self 0.6s enemy 1.2s  | KO — enemy core destroyed
+   src: ram 1094/16 · limb 0/0 (max hit 0.0) · disc 0/0   packSeam 0.97
+b5_discus_al_BEFORE|charge  n=4  W4/L0/D0  flips=0  len 17.7-90.0s spread=5.08x  worst single-step piece loss: player 1 enemy 5  [NOISY] (61s wall)

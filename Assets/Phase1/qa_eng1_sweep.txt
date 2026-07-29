@@ -1,0 +1,19 @@
+# build ENG1 parts=18 policy=charge runs=6
+# LIVE CONSTANTS  tipSpeedCap m/s: ABS=9.00 Aluminum=9.68 Steel=12.50 Titanium=14.79 CarbonFiber=13.11 Tungsten=13.69  | MotorKW 0/1/2/3 eng 1.0/2.5/4.0/5.5  | DRIVE_KW_PER_TONNE 1.25 | LIFT_EFFICIENCY 0.85 | REACTION_FRAC 0.60 | GROUND_CLEAR 0.020 | BITE_RATE_FRAC 0.45 | EXPOSED_MULT 1.75 | STEP_DISP_CAP 0.25
+# LIVE CONSTANTS (cycle) WIND_RELEASE_FRAC 0.995 | WIND_TIMEOUT_S 2.00 | BITE_TIP_SPEED_MS 4.00 | RECOVER_S 0.10 | PIVOT_RETURN_DPS 500 | MIN_BITE_E 40 | DRAIN_FRAC 0.40 | LIN_IMP_CAP 600 | EFFICIENCY 0.35 | RECUP_FRAC 0.90 | REACTION_STALL_MUL 3.0
+# LIVE CONSTANTS (damage/judging) DMG_K 0.045 | HP_K 6000 | SHOVE_CAP 500 | PART_IMMUNITY 0.50 | RAM_MIN_J 150 | RAM_J_CAP 900 | STRUCT_BAND 0.060 | MIN_STRUCT_PARTS 2.0 | DRAW_BAND_FRAC 0.080 | CONTROL_BAND 0.100 | MATCH_TIME 90 | CREDIT_BUDGET 4000
+# SOURCE REGIME 3259d148 (45 scripts, newest 2026-07-29 04:14:05Z)
+# fixedDeltaTime 0.0200  timeScale 3.0  debugFire True  (trigger HELD for the scripted player)
+run 0: PlayerWin at 2.1s  dealt 368 taken 0  pieces 18/18 vs 0/11  flipped self 0.0s enemy 0.0s  | KO — enemy core destroyed
+   src: ram 0/0 · limb 368/7 (max hit 79.1) · disc[retired] 0/0   packSeam 0.00
+run 1: PlayerWin at 2.6s  dealt 484 taken 0  pieces 18/18 vs 0/11  flipped self 0.0s enemy 0.0s  | KO — enemy core destroyed
+   src: ram 0/0 · limb 484/9 (max hit 79.1) · disc[retired] 0/0   packSeam 0.00
+run 2: PlayerWin at 2.1s  dealt 368 taken 0  pieces 18/18 vs 0/11  flipped self 0.0s enemy 0.0s  | KO — enemy core destroyed
+   src: ram 0/0 · limb 368/7 (max hit 79.1) · disc[retired] 0/0   packSeam 0.01
+run 3: PlayerWin at 2.6s  dealt 482 taken 0  pieces 18/18 vs 0/11  flipped self 0.0s enemy 0.0s  | KO — enemy core destroyed
+   src: ram 0/0 · limb 482/9 (max hit 79.1) · disc[retired] 0/0   packSeam 0.01
+run 4: PlayerWin at 90.0s  dealt 471 taken 203  pieces 16/18 vs 10/11  flipped self 4.7s enemy 0.0s  | Judges' decision — damage 471 vs 203 (56.9% margin your way) · pieces 16/18 vs 10/11 · on its back 5% vs 0% — structure even, decided on damage
+   src: ram 0/0 · limb 471/8 (max hit 93.2) · disc[retired] 0/0   packSeam 0.32
+run 5: PlayerWin at 90.0s  dealt 536 taken 97  pieces 16/18 vs 7/11  flipped self 0.0s enemy 0.2s  | Judges' decision — damage 536 vs 97 (81.9% margin your way) · pieces 16/18 vs 7/11 · on its back 0% vs 0% — decided on structure destroyed
+   src: ram 0/0 · limb 536/9 (max hit 93.2) · disc[retired] 0/0   packSeam 0.21
+ENG1|charge  n=6  W6/L0/D0  flips=0  len 2.1-90.0s spread=43.82x  worst single-step piece loss: player 1 enemy 7  [NOISY] (66s wall)

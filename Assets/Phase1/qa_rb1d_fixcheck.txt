@@ -1,0 +1,27 @@
+# RB1-DEV fix verification. OLD rule = driven only by a spindle (what shipped).
+# NEW rule = driven by ANY unblocked actuator. rotorDip = spindle rotor below deck, m.
+build         disc            OLDdriven NEWdriven | warnOLD warnNEW | rotorDip(m)
+  => NOWEAP      discs=0 warnOLD=0 warnNEW=0 rotorDip=0.000
+  => FIXSPIKE    discs=0 warnOLD=0 warnNEW=0 rotorDip=0.000
+FIXDISC       spinner         False     False    
+  => FIXDISC     discs=1 warnOLD=1 warnNEW=1 rotorDip=0.000
+DISC_Z        spinner         True      True     
+  => DISC_Z      discs=1 warnOLD=0 warnNEW=0 rotorDip=0.080
+SAW_Z         spinnerSaw      True      True     
+  => SAW_Z       discs=1 warnOLD=0 warnNEW=0 rotorDip=0.165
+COAX_V        spinner         True      True     
+  => COAX_V      discs=1 warnOLD=0 warnNEW=0 rotorDip=0.000
+SAW_V         spinnerSaw      True      True     
+  => SAW_V       discs=1 warnOLD=0 warnNEW=0 rotorDip=0.000
+FLAIL_V       spinner         False     False    
+  => FLAIL_V     discs=1 warnOLD=1 warnNEW=1 rotorDip=0.000
+  => DRUM_V      discs=0 warnOLD=0 warnNEW=0 rotorDip=0.000
+  => HAMMER      discs=0 warnOLD=0 warnNEW=0 rotorDip=0.000
+  => THRUSTER    discs=0 warnOLD=0 warnNEW=0 rotorDip=0.000
+  => FLIPPER     discs=0 warnOLD=0 warnNEW=0 rotorDip=0.000
+DISCPIVOT     spinner         False     True     
+  => DISCPIVOT   discs=1 warnOLD=1 warnNEW=0 rotorDip=0.000
+OWEN_SAFE     spinner         False     False    
+  => OWEN_SAFE   discs=1 warnOLD=1 warnNEW=1 rotorDip=0.000
+OWEN_SPINDLE  spinner         True      True     
+  => OWEN_SPINDLE discs=1 warnOLD=0 warnNEW=0 rotorDip=0.080

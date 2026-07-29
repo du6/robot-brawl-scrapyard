@@ -1,0 +1,30 @@
+=== ROSTER POWER SEAMS + ENERGY AFFORDABILITY ===
+  mauler.engine seams=4 sockets=6
+  mauler.battery seams=4 sockets=4
+  >> mauler 694kg 300kJ endurance=123s / 90s ok
+  bulwark.battery seams=5 sockets=5
+  bulwark.engine seams=2 sockets=2
+  >> bulwark 1889kg 300kJ endurance=45s / 90s *** CANNOT LAST THE MATCH ***
+  scout.battery seams=3 sockets=3
+  scout.engine seams=4 sockets=6
+  >> scout 406kg 300kJ endurance=211s / 90s ok
+  tipper.battery seams=1 sockets=1
+  tipper.engine seams=4 sockets=6
+  >> tipper 775kg 300kJ endurance=111s / 90s ok
+  widowmaker.battery seams=3 sockets=3
+  widowmaker.engine seams=4 sockets=6
+  >> widowmaker 587kg 300kJ endurance=146s / 90s ok
+
+=== PAIR_BAT2 player build: battery seams ===
+  battery z=0.00 seams=3
+  battery z=-0.40 seams=1
+  engine z=-0.88 seams=1
+  Validate=OK
+
+=== SPINNER BY MATERIAL ===
+  spinner/Aluminum mass=15.6 I=0.23 standing=0.11kW  90s=10kJ (of 240kJ battery = 4%)
+  spinner/Steel mass=45.4 I=0.66 standing=0.33kW  90s=30kJ (of 240kJ battery = 12%)
+  spinner/Tungsten mass=111.6 I=1.61 standing=0.82kW  90s=74kJ (of 240kJ battery = 31%)
+  spinnerSaw/Aluminum mass=17.1 I=0.45 standing=0.23kW  90s=21kJ (of 240kJ battery = 9%)
+  spinnerSaw/Steel mass=49.8 I=1.32 standing=0.67kW  90s=60kJ (of 240kJ battery = 25%)
+  spinnerSaw/Tungsten mass=122.5 I=3.24 standing=1.64kW  90s=148kJ (of 240kJ battery = 62%)

@@ -1,0 +1,32 @@
+[HAMMER pivot+beam+blade] mode=fire 9.0s samples=450 | disp=0.10m maxSpeed=0.01m/s yaw=0deg | cap=300kJ peak=22.0kW used=0.0kJ | minUp=1.00
+    act0 Pivot limb=2 motorKW=2.50 tipCap=9.7 inertia=23.015 tipR=1.060 -> maxRate=0.00 maxTravel=0.000 (limit 2.618) cycles=0 phase=Ready
+[HAMMER (playerControlled patched in by hand)] mode=fire 12.0s samples=600 | disp=0.01m maxSpeed=0.04m/s yaw=-31deg | cap=300kJ peak=22.0kW used=10.0kJ | minUp=1.00
+    act0 Pivot limb=2 motorKW=2.50 tipCap=9.7 inertia=23.015 tipR=1.060 -> maxRate=9.13 maxTravel=2.618 (limit 2.618) cycles=15 phase=Returning
+    phases: 0:Ready>Winding  0:Winding>Driving  0:Driving>Returning  0:Returning>Recovering  0:Recovering>Ready  0:Ready>Winding  0:Winding>Driving  0:Driving>Returning  0:Returning>Recovering  0:Recovering>Ready  0:Ready>Winding  0:Winding>Driving  0:Driving>Returning  0:Returning>Recovering  0:Recovering>Ready  0:Ready>Winding  0:Winding>Driving  0:Driving>Returning  0:Returning>Recovering  0:Recovering>Ready  0:Ready>Winding  0:Winding>Driving  0:Driving>Returning  0:Returning>Recovering  
+[DRUM spindle+beam+blade (flag patched)] mode=fire 12.0s samples=601 | disp=0.62m maxSpeed=0.10m/s yaw=-52deg | cap=300kJ peak=22.0kW used=4.0kJ | minUp=1.00
+    act0 Spindle limb=2 motorKW=2.50 tipCap=9.7 inertia=23.015 tipR=1.060 -> maxRate=9.13 maxTravel=108.703 (limit 2.618) cycles=1 phase=Driving
+    phases: 0:Ready>Driving  
+[RAMBOT ram+spike (flag patched)] mode=fire 12.0s samples=600 | disp=0.92m maxSpeed=0.17m/s yaw=0deg | cap=300kJ peak=22.0kW used=18.0kJ | minUp=1.00
+    act0 Ram limb=1 motorKW=2.50 tipCap=12.5 inertia=56.991 tipR=0.150 -> maxRate=3.50 maxTravel=0.280 (limit 0.450) cycles=18 phase=Returning
+    phases: 0:Ready>Winding  0:Winding>Driving  0:Driving>Returning  0:Returning>Recovering  0:Recovering>Ready  0:Ready>Winding  0:Winding>Driving  0:Driving>Returning  0:Returning>Recovering  0:Recovering>Ready  0:Ready>Winding  0:Winding>Driving  0:Driving>Returning  0:Returning>Recovering  0:Recovering>Ready  0:Ready>Winding  0:Winding>Driving  0:Driving>Returning  0:Returning>Recovering  0:Recovering>Ready  0:Ready>Winding  0:Winding>Driving  0:Driving>Returning  0:Returning>Recovering  
+[RAMBOT diagnostic RAM_STROKE_M=1.0] mode=fire 12.0s samples=600 | disp=0.95m maxSpeed=0.17m/s yaw=0deg | cap=300kJ peak=22.0kW used=18.0kJ | minUp=1.00
+    act0 Ram limb=1 motorKW=2.50 tipCap=12.5 inertia=56.991 tipR=0.150 -> maxRate=3.50 maxTravel=0.280 (limit 1.000) cycles=18 phase=Returning
+    phases: 0:Ready>Winding  0:Winding>Driving  0:Driving>Returning  0:Returning>Recovering  0:Recovering>Ready  0:Ready>Winding  0:Winding>Driving  0:Driving>Returning  0:Returning>Recovering  0:Recovering>Ready  0:Ready>Winding  0:Winding>Driving  0:Driving>Returning  0:Returning>Recovering  0:Recovering>Ready  0:Ready>Winding  0:Winding>Driving  0:Driving>Returning  0:Returning>Recovering  0:Recovering>Ready  0:Ready>Winding  0:Winding>Driving  0:Driving>Returning  0:Returning>Recovering  
+[RAM_HIGH ram+spike raised 0.45m on two brackets] mode=fire 12.0s samples=600 | disp=0.16m maxSpeed=0.12m/s yaw=0deg | cap=300kJ peak=22.0kW used=3.5kJ | minUp=1.00
+    act0 Ram limb=1 motorKW=2.50 tipCap=12.5 inertia=56.991 tipR=0.150 -> maxRate=3.50 maxTravel=0.450 (limit 0.450) cycles=14 phase=Returning
+    phases: 0:Ready>Winding  0:Winding>Driving  0:Driving>Returning  0:Returning>Recovering  0:Recovering>Ready  0:Ready>Winding  0:Winding>Driving  0:Driving>Returning  0:Returning>Recovering  0:Recovering>Ready  0:Ready>Winding  0:Winding>Driving  0:Driving>Returning  0:Returning>Recovering  0:Recovering>Ready  0:Ready>Winding  0:Winding>Driving  0:Driving>Returning  0:Returning>Recovering  0:Recovering>Ready  0:Ready>Winding  0:Winding>Driving  0:Driving>Returning  0:Returning>Recovering  
+[WHEEL DRIVE - pointer-built machine, full throttle] mode=drive 6.0s samples=300 | disp=10.08m maxSpeed=10.17m/s yaw=0deg | cap=300kJ peak=22.0kW used=6.3kJ | minUp=1.00
+    act0 Pivot limb=2 motorKW=2.50 tipCap=9.7 inertia=17.787 tipR=1.060 -> maxRate=0.00 maxTravel=0.000 (limit 2.618) cycles=0 phase=Ready
+[WHEEL DRIVE - SAME machine + one bracket on the core underside] mode=drive 6.0s samples=300 | disp=0.00m maxSpeed=0.00m/s yaw=0deg | cap=300kJ peak=22.0kW used=6.5kJ | minUp=1.00
+    act0 Pivot limb=2 motorKW=2.50 tipCap=9.7 inertia=17.787 tipR=1.060 -> maxRate=0.00 maxTravel=0.000 (limit 2.618) cycles=0 phase=Ready
+[WHEEL STEER - full throttle + full right steer] mode=steer 6.0s samples=300 | disp=11.38m maxSpeed=7.61m/s yaw=-54deg | cap=300kJ peak=22.0kW used=6.3kJ | minUp=0.99
+    act0 Pivot limb=2 motorKW=2.50 tipCap=9.7 inertia=17.787 tipR=1.060 -> maxRate=0.00 maxTravel=0.000 (limit 2.618) cycles=0 phase=Ready
+[GYRO CONTROL - flipped onto its back, NO gyro] mode=flip 10.0s samples=501 | disp=0.59m maxSpeed=2.03m/s yaw=-44deg | cap=300kJ peak=22.0kW used=0.0kJ | minUp=-1.00 recoverAt=1.72s gyros=0
+[GYRO TEST - same machine + 1 gyro, flipped onto its back] mode=flip 10.0s samples=500 | disp=0.32m maxSpeed=1.97m/s yaw=-10deg | cap=300kJ peak=22.0kW used=0.0kJ | minUp=-1.00 recoverAt=0.44s gyros=1
+[POWER: hammer with ZERO engines] mode=idle 2.0s samples=100 | disp=0.00m maxSpeed=0.00m/s yaw=0deg | cap=240kJ peak=8.0kW used=0.0kJ | minUp=1.00
+    act0 Pivot limb=2 motorKW=1.00 tipCap=9.7 inertia=23.015 tipR=1.060 -> maxRate=0.00 maxTravel=0.000 (limit 2.618) cycles=0 phase=Ready
+[POWER: hammer with TWO engines] mode=idle 2.0s samples=100 | disp=0.00m maxSpeed=0.00m/s yaw=0deg | cap=360kJ peak=36.0kW used=0.0kJ | minUp=1.00
+    act0 Pivot limb=2 motorKW=4.00 tipCap=9.7 inertia=23.015 tipR=1.060 -> maxRate=0.00 maxTravel=0.000 (limit 2.618) cycles=0 phase=Ready
+[POWER: skeleton with NO battery, full throttle 6s] mode=drive 6.0s samples=300 | disp=10.13m maxSpeed=10.17m/s yaw=0deg | cap=60kJ peak=14.0kW used=5.2kJ | minUp=1.00
+[SPINNER disc - spin-up] mode=idle 8.0s samples=400 | disp=0.00m maxSpeed=0.00m/s yaw=0deg | cap=300kJ peak=22.0kW used=9.2kJ | minUp=1.00 | discs=1 maxOmega=94.25rad/s
+[SPINNERSAW disc - spin-up] mode=idle 8.0s samples=400 | disp=0.00m maxSpeed=0.00m/s yaw=0deg | cap=300kJ peak=22.0kW used=18.8kJ | minUp=1.00 | discs=1 maxOmega=94.25rad/s

@@ -1,0 +1,65 @@
+# UP3 DEV - FUNCTION PROOF after the round-3 patch
+
+===== SECTION arm =====
+## ARMS on a ROOF pivot (horizontal sweep, full arc), n=3 each, 8 s of trigger
+   wedge is supposed to LIFT, hook is supposed to PULL - measured against the dummy
+  blade   n=3  dealt avg=    0.0 [0] [0] [0]  self=   0.0  lift=0.000  push=0.000  pull=0.006
+  wedge   n=3  dealt avg=   77.3 [77] [77] [77]  self=   0.0  lift=0.065  push=0.036  pull=0.008
+  hook    n=3  dealt avg=    0.0 [0] [0] [0]  self=   0.0  lift=0.000  push=0.000  pull=0.004
+  spike   n=3  dealt avg=    0.0 [0] [0] [0]  self=   0.0  lift=0.000  push=0.000  pull=0.004
+
+## RAM ATTACK: same four arms mounted RIGID on the nose, driven into the dummy at full throttle
+  blade   RAM: dealt=  139.1  self=   0.0  lift=0.012  pull=0.022
+  wedge   RAM: dealt=  144.5  self=   0.0  lift=0.050  pull=0.032
+  hook    RAM: dealt=  224.4  self=   0.0  lift=0.000  pull=0.022
+  spike   RAM: dealt=  143.6  self=   0.0  lift=0.005  pull=0.022
+## SECTION arm DONE
+
+===== SECTION act =====
+## ACTUATORS on a ROOF mount (hinge vertical, arm horizontal, floor cannot eat the arc)
+  pivot    kind=Pivot parts=1 blockedBy=null tipR=0.460 rateMax=14.00 arcFrac=1.00
+           IDLE(3s, no trigger): peakRate=0.000 peakTravel=0.000
+           FIRE(12s): peakRate=14.00 rad/s (MaxRate=14.00)  maxTravel=2.618 of 2.618 = 100%  minAfterPeak=0.000  cycles=19 sawReturn=True
+           phases: Wi>Dr>Re>Re>Re>Wi>Dr>Re>Re>Re>Wi>Dr>Re>Re>Re>Wi>Dr>Re>Re>Re>Wi>Dr>Re>Re>Re>Wi>Dr>Re>Re>Re>
+  spindle  kind=Spindle parts=1 blockedBy=null tipR=0.460 rateMax=27.17 arcFrac=1.00
+           IDLE(3s, no trigger): peakRate=0.000 peakTravel=0.000
+           FIRE(12s): peakRate=27.17 rad/s (MaxRate=27.17)  maxTravel=325.289  minAfterPeak=0.229  cycles=1 sawReturn=False
+           phases: Dr>
+  ram      kind=Ram parts=1 blockedBy=null tipR=0.250 rateMax=3.50 arcFrac=1.00
+           IDLE(3s, no trigger): peakRate=0.000 peakTravel=0.000
+           FIRE(12s): peakRate=3.50 rad/s (MaxRate=3.50)  maxTravel=0.450 of 0.450 = 100%  minAfterPeak=0.000  cycles=17 sawReturn=True
+           phases: Wi>Dr>Re>Re>Re>Wi>Dr>Re>Re>Re>Wi>Dr>Re>Re>Re>Wi>Dr>Re>Re>Re>Wi>Dr>Re>Re>Re>Wi>Dr>Re>Re>Re>
+## SECTION act DONE
+
+===== SECTION spin =====
+## SPINNERS: omega ramp with the trigger held, then bite against the dummy
+  spinner     idleOmega=94.25  omega @0.5/1/2/3/5/8s = 94.2/94.2/94.2/94.2/94.2/94.2 rad/s  (MaxOmega=94.2, E=2912 J, I=0.6556)
+           BITE 10s: dealt=0.0 selfDamage=0.0 omegaAfter=94.2 omegaLow=94.2
+  spinnerSaw  idleOmega=67.72  omega @0.5/1/2/3/5/8s = 72.6/76.9/84.7/91.6/94.2/94.2 rad/s  (MaxOmega=94.2, E=5854 J, I=1.3181)
+           BITE 10s: dealt=0.0 selfDamage=0.0 omegaAfter=94.2 omegaLow=94.2
+## SECTION spin DONE
+
+===== SECTION wheel =====
+## WHEEL: does it DRIVE and STEER? displacement/heading under throttle
+  4 wheels               idleDrift=0.000m  fwd4s=10.08m (9.49 m/s peak)  rev3s=12.19m  steer4s=107 deg
+  2 wheels (front only)  idleDrift=0.000m  fwd4s=0.03m (0.02 m/s peak)  rev3s=2.12m  steer4s=0 deg
+## SECTION wheel DONE
+
+===== SECTION power =====
+## ENGINE: does it raise PowerPlant.peakKW and Actuator.MotorKW?
+   static Actuator.MotorKW: 0eng=1.00 1eng=2.50 2eng=4.00 3eng=5.50 8eng=12.00 (cap 12.0)
+  1 battery, 0 engines   capacityKJ=  240.0 peakKW=  8.00 drawKW=  0.79 demandKW=  0.79 minFrac=0.87 flatAt=never in 40s
+  1 battery, 1 engine    capacityKJ=  300.0 peakKW= 22.00 drawKW=  1.18 demandKW=  1.18 minFrac=0.84 flatAt=never in 40s
+  1 battery, 2 engines   capacityKJ=  360.0 peakKW= 36.00 drawKW=  1.56 demandKW=  1.56 minFrac=0.83 flatAt=never in 40s
+  2 batteries, 1 engine  capacityKJ=  540.0 peakKW= 30.00 drawKW=  1.23 demandKW=  1.23 minFrac=0.91 flatAt=never in 40s
+## SECTION power DONE
+
+===== SECTION gyro =====
+## GYRO: does it RIGHT a flip? bot rolled 165 deg, timed to recovery (up.y > 0.7)
+  0 gyros   GyroStabilizer present=True liveGyros=0 active=False
+  0 gyros   [1.86s bestUp=0.74] [1.72s bestUp=0.79]
+  1 gyro    GyroStabilizer present=True liveGyros=1 active=False
+  1 gyro    [0.42s bestUp=0.76] [0.42s bestUp=0.76]
+  2 gyros   GyroStabilizer present=True liveGyros=2 active=False
+  2 gyros   [0.34s bestUp=0.74] [0.34s bestUp=0.74]
+## SECTION gyro DONE

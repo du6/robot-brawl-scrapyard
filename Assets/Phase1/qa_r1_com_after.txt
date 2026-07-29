@@ -1,0 +1,5 @@
+validate=OK parts=12
+limb act=RobotBrawl.Phase0.BuilderManager+PlacedPart parts=2 blockedBy=null I=54.68 tipR=1.25 E=2734J
+t=99.66 travel=2.1293 rate=0.000 phase=Returning com=(-0.03625,0.10558,-0.06523) mass=1135.2
+t=101.57 travel=1.2915 rate=0.000 phase=Returning com=(0.01886,0.10558,-0.07298) mass=1135.2
+REST t=104.57 travel=0.0000 phase=Ready com=(0.06841,0.10558,-0.00722) mass=1135.2

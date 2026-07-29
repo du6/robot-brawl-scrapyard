@@ -1,0 +1,23 @@
+# CASCADE REMOVAL - real right-click path
+# fixture parts=17  (independent oracle: flood fill from core)
+
+idx part          expected  actual   parts_before -> after   verdict
+  1 beam                 1       1      17 -> 16       PASS     
+  2 beam                 3       3      17 -> 14       PASS     
+  3 beam                 4       4      17 -> 13       PASS     
+  4 beam                 2       2      17 -> 15       PASS     
+  5 beam                 2       2      17 -> 15       PASS     
+  6 beam                 3       3      17 -> 14       PASS     
+  7 spindle              2       2      17 -> 15       PASS     
+  8 wheel                1       1      17 -> 16       PASS     
+  9 wheel                1       1      17 -> 16       PASS     
+ 10 battery              1       1      17 -> 16       PASS     (build rule: Needs an engine or battery.)
+ 11 beam                 3       3      17 -> 14       PASS     
+ 12 wheel                1       1      17 -> 16       PASS     
+ 13 wheel                1       1      17 -> 16       PASS     
+ 14 beam                 1       1      17 -> 16       PASS     
+ 15 beam                 1       1      17 -> 16       PASS     
+ 16 spinner              1       1      17 -> 16       PASS     
+
+UNDO: cut spindle (17 -> 15 parts), Z restored 17 parts, byte-identical=True  PASS
+# pass=17 fail=0

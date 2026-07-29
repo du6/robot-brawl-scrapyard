@@ -1,0 +1,45 @@
+# build b6_vs_BULWARK_champion parts=12 policy=charge runs=4
+# LIVE CONSTANTS  tipSpeedCap m/s: ABS=9.00 Aluminum=9.68 Steel=12.50 Titanium=14.79 CarbonFiber=13.11 Tungsten=13.69  | MotorKW 0/1/2/3 eng 1.0/2.5/4.0/5.5  | DRIVE_KW_PER_TONNE 1.25 | LIFT_EFFICIENCY 0.85 | REACTION_FRAC 0.60 | GROUND_CLEAR 0.020 | BITE_RATE_FRAC 0.45 | EXPOSED_MULT 1.75 | STEP_DISP_CAP 0.25
+# LIVE CONSTANTS (cycle) WIND_RELEASE_FRAC 0.995 | WIND_TIMEOUT_S 2.00 | BITE_TIP_SPEED_MS 4.00 | RECOVER_S 0.10 | PIVOT_RETURN_DPS 500 | MIN_BITE_E 40 | DRAIN_FRAC 0.40 | LIN_IMP_CAP 600 | EFFICIENCY 0.35 | RECUP_FRAC 0.90 | REACTION_STALL_MUL 3.0
+# LIVE CONSTANTS (damage/judging) DMG_K 0.045 | HP_K 6000 | SHOVE_CAP 500 | PART_IMMUNITY 0.50 | RAM_MIN_J 150 | RAM_J_CAP 900 | STRUCT_BAND 0.060 | MIN_STRUCT_PARTS 2.0 | DRAW_BAND_FRAC 0.080 | CONTROL_BAND 0.100 | MATCH_TIME 90 | CREDIT_BUDGET 4000
+# SOURCE REGIME 96ce6370 (22 scripts, newest 2026-07-27 01:35:15Z)
+# fixedDeltaTime 0.0200  timeScale 3.0  debugFire True
+run 0: PlayerWin at 36.1s  dealt 1183 taken 177  pieces 12/12 vs 5/13  flipped self 0.0s enemy 1.8s  | Enemy counted out — out of power — 300 kJ of its 300 kJ pack was torn off the chassis, and what was left ran dry after 26 s
+   src: ram 136/6 · limb 1047/15 (max hit 229.6) · disc 0/0   packSeam 0.97
+   det BULWARK|SEAM plate_3↔gyro_7|SHEARED at 1080 vs eff 900|t 5008.8
+   det BULWARK|gyro_7|STRUCTURAL-SHED|hp 20/50 (41%)|t 5010.0
+   det BULWARK|engine_6|HP-DESTROYED|hp 0/236 (0%)|t 5016.9
+   det BULWARK|plate_3|HP-DESTROYED|hp 0/90 (0%)|t 5020.3
+   det BULWARK|battery_5|HP-DESTROYED|hp 0/56 (0%)|t 5020.3
+   det BULWARK|spikeZP_8|HP-DESTROYED|hp 0/87 (0%)|t 5025.6
+   det BULWARK|chassis_1|HP-DESTROYED|hp 0/360 (0%)|t 5031.8
+run 1: PlayerWin at 90.0s  dealt 822 taken 191  pieces 11/12 vs 7/13  flipped self 0.0s enemy 0.0s  | Judges' decision — damage 822 vs 191 (76.8% margin) · pieces 11/12 vs 7/13 · on its back 0% vs 0% — decided on structure destroyed
+   src: ram 354/18 · limb 468/8 (max hit 77.2) · disc 0/0   packSeam 0.97
+   det BULWARK|SEAM plate_3↔gyro_7|SHEARED at 907 vs eff 900|t 5046.1
+   det PlayerBuild|bladeXP_7|HP-DESTROYED|hp 0/18 (0%)|t 5046.1
+   det BULWARK|gyro_7|STRUCTURAL-SHED|hp 9/50 (18%)|t 5047.4
+   det BULWARK|plate_3|HP-DESTROYED|hp 0/90 (0%)|t 5053.3
+   det BULWARK|spikeZP_8|HP-DESTROYED|hp 0/87 (0%)|t 5064.2
+   det BULWARK|chassis_1|HP-DESTROYED|hp 0/360 (0%)|t 5070.6
+run 2: PlayerWin at 43.1s  dealt 1839 taken 103  pieces 12/12 vs 1/13  flipped self 1.1s enemy 0.3s  | Enemy counted out — every one of its 4 wheels had been torn off — nothing left to drive with
+   src: ram 259/15 · limb 1580/25 (max hit 131.2) · disc 0/0   packSeam 0.97
+   det BULWARK|gyro_7|HP-DESTROYED|hp 0/50 (0%)|t 5139.0
+   det BULWARK|battery_5|HP-DESTROYED|hp 0/56 (0%)|t 5144.0
+   det BULWARK|plate_3|HP-DESTROYED|hp 0/90 (0%)|t 5147.8
+   det BULWARK|plate_4|HP-DESTROYED|hp 0/90 (0%)|t 5149.2
+   det BULWARK|spikeZP_8|HP-DESTROYED|hp 0/87 (0%)|t 5151.0
+   det BULWARK|chassis_1|HP-DESTROYED|hp 0/360 (0%)|t 5162.6
+   det BULWARK|engine_6|HP-DESTROYED|hp 0/236 (0%)|t 5163.7
+   det BULWARK|chassis_2|HP-DESTROYED|hp 0/360 (0%)|t 5165.9
+run 3: PlayerWin at 54.4s  dealt 958 taken 255  pieces 12/12 vs 0/13  flipped self 0.8s enemy 1.1s  | KO — enemy core destroyed
+   src: ram 218/17 · limb 740/8 (max hit 209.3) · disc 0/0   packSeam 0.97
+   det BULWARK|gyro_7|HP-DESTROYED|hp 0/50 (0%)|t 5181.8
+   det BULWARK|plate_3|HP-DESTROYED|hp 0/90 (0%)|t 5183.2
+   det BULWARK|plate_4|HP-DESTROYED|hp 0/90 (0%)|t 5209.2
+   det BULWARK|battery_5|HP-DESTROYED|hp 0/56 (0%)|t 5216.2
+   det BULWARK|core_0|HP-DESTROYED|hp 0/162 (0%)|t 5232.9
+   det BULWARK|chassis_1|STRUCTURAL-WRECK|hp 273/360 (76%)|t 5232.9
+   det BULWARK|chassis_2|STRUCTURAL-WRECK|hp 342/360 (95%)|t 5232.9
+   det BULWARK|engine_6|STRUCTURAL-WRECK|hp 116/236 (49%)|t 5232.9
+   det BULWARK|spikeZP_8|STRUCTURAL-WRECK|hp 6/87 (7%)|t 5232.9
+b6_vs_BULWARK_champion|charge  n=4  W4/L0/D0  flips=0  len 36.1-90.0s spread=2.49x  worst single-step piece loss: player 1 enemy 5  [NOISY] (76s wall)

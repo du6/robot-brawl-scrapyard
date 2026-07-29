@@ -1,0 +1,16 @@
+# build b5_discus_al parts=11 policy=charge runs=6
+# LIVE CONSTANTS  tipSpeedCap m/s: ABS=9.00 Aluminum=9.68 Steel=12.50 Titanium=14.79 CarbonFiber=13.11 Tungsten=13.69  | MotorKW 0/1/2/3 eng 1.0/2.5/4.0/5.5  | DRIVE_KW_PER_TONNE 1.25 | LIFT_EFFICIENCY 0.85 | REACTION_FRAC 0.60 | GROUND_CLEAR 0.020 | BITE_RATE_FRAC 0.45 | EXPOSED_MULT 1.75 | STEP_DISP_CAP 0.25
+# fixedDeltaTime 0.0200  timeScale 3.0  debugFire False
+run 0: PlayerWin at 9.9s  dealt 550 taken 7  pieces 10/11 vs 0/11  flipped self 0.0s enemy 0.0s  | KO — enemy core destroyed
+   src: ram 550/6 · limb 0/0 (max hit 0.0) · disc 0/0   packSeam 0.62
+run 1: Draw at 90.0s  dealt 234 taken 226  pieces 9/11 vs 10/11  flipped self 0.9s enemy 0.6s  | Judges' decision — damage 234 vs 226 (3.7% margin) · pieces 9/11 vs 10/11 · on its back 1% vs 1% — too close to call, scored a draw
+   src: ram 234/17 · limb 0/0 (max hit 0.0) · disc 0/0   packSeam 0.50
+run 2: PlayerWin at 14.4s  dealt 536 taken 0  pieces 10/11 vs 0/11  flipped self 0.0s enemy 0.0s  | KO — enemy core destroyed
+   src: ram 536/7 · limb 0/0 (max hit 0.0) · disc 0/0   packSeam 0.62
+run 3: PlayerWin at 90.3s  dealt 630 taken 190  pieces 10/11 vs 6/11  flipped self 5.1s enemy 15.0s  | Judges' decision — damage 630 vs 190 (69.8% margin) · pieces 10/11 vs 6/11 · on its back 6% vs 17% — decided on structure destroyed
+   src: ram 630/17 · limb 0/0 (max hit 0.0) · disc 0/0   packSeam 0.97
+run 4: PlayerWin at 45.6s  dealt 830 taken 80  pieces 9/11 vs 1/11  flipped self 0.0s enemy 0.6s  | Enemy counted out — every one of its 4 wheels had been torn off — nothing left to drive with
+   src: ram 830/18 · limb 0/0 (max hit 0.0) · disc 0/0   packSeam 0.97
+run 5: PlayerWin at 62.1s  dealt 755 taken 89  pieces 9/11 vs 3/11  flipped self 0.6s enemy 0.6s  | Enemy counted out — every one of its 4 wheels had been torn off — nothing left to drive with
+   src: ram 755/15 · limb 0/0 (max hit 0.0) · disc 0/0   packSeam 0.73
+b5_discus_al|charge  n=6  W5/L0/D1  flips=1  len 9.9-90.3s spread=9.12x  worst single-step piece loss: player 1 enemy 6  [NOISY] (108s wall)

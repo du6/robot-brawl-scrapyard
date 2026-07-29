@@ -1,0 +1,55 @@
+# RB2Dev cases=6 reps=2 interleave=True seconds=90 toKO=True speed=3 fire=True
+# LIVE CONSTANTS  tipSpeedCap m/s: ABS=9.00 Aluminum=9.68 Steel=12.50 Titanium=14.79 CarbonFiber=13.11 Tungsten=13.69  | MotorKW 0/1/2/3 eng 1.0/2.5/4.0/5.5  | DRIVE_KW_PER_TONNE 1.25 | LIFT_EFFICIENCY 0.85 | REACTION_FRAC 0.60 | GROUND_CLEAR 0.020 | BITE_RATE_FRAC 0.45 | EXPOSED_MULT 1.75 | STEP_DISP_CAP 0.25
+# LIVE CONSTANTS (cycle) WIND_RELEASE_FRAC 0.995 | WIND_TIMEOUT_S 2.00 | BITE_TIP_SPEED_MS 4.00 | RECOVER_S 0.10 | PIVOT_RETURN_DPS 500 | MIN_BITE_E 40 | DRAIN_FRAC 0.40 | LIN_IMP_CAP 600 | EFFICIENCY 0.35 | RECUP_FRAC 0.90 | REACTION_STALL_MUL 3.0
+# LIVE CONSTANTS (damage/judging) DMG_K 0.045 | HP_K 6000 | SHOVE_CAP 500 | PART_IMMUNITY 0.50 | RAM_MIN_J 150 | RAM_J_CAP 900 | STRUCT_BAND 0.060 | MIN_STRUCT_PARTS 2.0 | DRAW_BAND_FRAC 0.080 | CONTROL_BAND 0.100 | MATCH_TIME 90 | CREDIT_BUDGET 4000
+# SOURCE REGIME aba88391 (43 scripts, newest 2026-07-27 18:56:06Z)
+# SHIPPED AI KNOBS  THREAT_ARC_DOT 0.15 FLANK_OFFSET 2.60 REAR_BIAS 0.90 PARKED_TIME 5.00 CIRCLE_MAX_S 2.50
+scout            r0 tier=Rookie   pol=afk    t=90.3 PlayerLoss | pDealt    66 pTaken   208 | P[ram 0/0 limb 66/1] | E[ram 208/9 limb 0/0] | parts 15/17 vs 9/11 | dist 4.25 near 14.7s close 9.9s thr 0.80
+    funnel 68242 call | rej noRb 68235 ownRb 0 notRobot 0 noCombat 0 noIdx 0 | onTarget 7 -> gate 0 (bestFrac 0.00) energy 0 cool 6 APPLY 1 || imm ate limb 0 ram 1 passed limb 1 ram 9
+    rotor [spindleZP kind=Spindle edgeMean 12.44 edgeMax 12.50 aboveGate 90.2s tipR 0.170 maxRate 73.5] | supplyFracMin 1.00 storeFracMin 0.93 | weaponPartLostAt none
+    aiState charge 54% backoff 11% turn 12% extricate 9% unstick 14% | knob=SHIPPED avoid=0.00 ovr=-1.00
+tipper           r0 tier=Rookie   pol=afk    t=90.3 PlayerLoss | pDealt   109 pTaken   704 | P[ram 0/0 limb 109/2] | E[ram 119/7 limb 585/10] | parts 9/17 vs 13/13 | dist 3.88 near 24.3s close 8.3s thr 0.73
+    funnel 81121 call | rej noRb 80954 ownRb 0 notRobot 83 noCombat 0 noIdx 0 | onTarget 84 -> gate 0 (bestFrac 0.00) energy 0 cool 72 APPLY 12 || imm ate limb 0 ram 15 passed limb 12 ram 7
+    rotor [spindleZP kind=Spindle edgeMean 7.02 edgeMax 12.50 aboveGate 90.2s tipR 0.001 maxRate 94.2] | supplyFracMin 1.00 storeFracMin 0.97 | weaponPartLostAt 27.3s
+    aiState charge 37% backoff 11% turn 40% unstick 8% other 5% | knob=SHIPPED avoid=0.00 ovr=-1.00
+mauler           r0 tier=Veteran  pol=afk    t=90.0 PlayerWin  | pDealt   397 pTaken   189 | P[ram 0/0 limb 397/7] | E[ram 189/10 limb 0/0] | parts 17/17 vs 10/11 | dist 2.95 near 42.1s close 19.3s thr 0.85
+    funnel 68529 call | rej noRb 68415 ownRb 0 notRobot 0 noCombat 0 noIdx 0 | onTarget 114 -> gate 0 (bestFrac 0.00) energy 0 cool 107 APPLY 7 || imm ate limb 0 ram 13 passed limb 7 ram 10
+    rotor [spindleZP kind=Spindle edgeMean 12.39 edgeMax 12.50 aboveGate 89.9s tipR 0.170 maxRate 73.5] | supplyFracMin 1.00 storeFracMin 0.90 | weaponPartLostAt none
+    aiState charge 26% flank 10% circle 7% commit 3% desperate 9% backoff 4% turn 35% unstick 6% | knob=SHIPPED avoid=0.55 ovr=-1.00
+ripper           r0 tier=Veteran  pol=afk    t=78.0 PlayerLoss | pDealt    72 pTaken   657 | P[ram 0/0 limb 72/1] | E[ram 238/7 limb 419/13] | parts 11/17 vs 11/13 | dist 4.18 near 15.7s close 4.1s thr 0.89
+    funnel 60973 call | rej noRb 60715 ownRb 0 notRobot 124 noCombat 0 noIdx 0 | onTarget 134 -> gate 73 (bestFrac 0.97) energy 0 cool 46 APPLY 15 || imm ate limb 1 ram 8 passed limb 14 ram 7
+    rotor [spindleZP kind=Spindle edgeMean 11.11 edgeMax 12.50 aboveGate 77.9s tipR 0.001 maxRate 94.2] | supplyFracMin 0.00 storeFracMin 0.00 | weaponPartLostAt 65.4s
+    aiState charge 15% flank 14% circle 13% commit 10% backoff 15% turn 26% extricate 1% unstick 6% | knob=SHIPPED avoid=0.55 ovr=-1.00
+bulwark          r0 tier=Champion pol=afk    t=90.0 PlayerLoss | pDealt     0 pTaken   114 | P[ram 0/0 limb 0/0] | E[ram 114/4 limb 0/0] | parts 15/17 vs 13/13 | dist 4.60 near 8.5s close 1.8s thr 0.91
+    funnel 68370 call | rej noRb 68370 ownRb 0 notRobot 0 noCombat 0 noIdx 0 | onTarget 0 -> gate 0 (bestFrac 0.00) energy 0 cool 0 APPLY 0 || imm ate limb 0 ram 3 passed limb 0 ram 4
+    rotor [spindleZP kind=Spindle edgeMean 12.45 edgeMax 12.50 aboveGate 89.9s tipR 0.170 maxRate 73.5] | supplyFracMin 1.00 storeFracMin 0.94 | weaponPartLostAt none
+    aiState charge 6% flank 12% circle 13% commit 18% backoff 5% turn 20% extricate 11% unstick 14% | knob=SHIPPED avoid=1.00 ovr=-1.00
+widowmaker       r0 tier=Champion pol=afk    t=75.3 PlayerLoss | pDealt    72 pTaken  1079 | P[ram 0/0 limb 72/1] | E[ram 36/7 limb 1043/9] | parts 5/17 vs 12/12 | dist 2.92 near 32.4s close 10.3s thr 0.85
+    funnel 90239 call | rej noRb 90138 ownRb 0 notRobot 79 noCombat 0 noIdx 0 | onTarget 22 -> gate 0 (bestFrac 0.00) energy 0 cool 12 APPLY 10 || imm ate limb 0 ram 9 passed limb 10 ram 7
+    rotor [? kind=- edgeMean 9.63 edgeMax 12.50 aboveGate 63.2s tipR -1.000 maxRate -1.0] | supplyFracMin 1.00 storeFracMin 0.96 | weaponPartLostAt 40.5s
+    aiState charge 21% flank 5% circle 6% commit 2% backoff 18% turn 37% extricate 3% unstick 8% | knob=SHIPPED avoid=1.00 ovr=-1.00
+scout            r1 tier=Rookie   pol=afk    t=90.3 Draw       | pDealt   242 pTaken   223 | P[ram 0/0 limb 242/5] | E[ram 223/9 limb 0/0] | parts 15/17 vs 9/11 | dist 4.14 near 26.8s close 11.9s thr 0.74
+    funnel 68589 call | rej noRb 68535 ownRb 0 notRobot 0 noCombat 0 noIdx 0 | onTarget 54 -> gate 0 (bestFrac 0.00) energy 0 cool 49 APPLY 5 || imm ate limb 0 ram 3 passed limb 5 ram 9
+    rotor [spindleZP kind=Spindle edgeMean 12.40 edgeMax 12.50 aboveGate 90.2s tipR 0.170 maxRate 73.5] | supplyFracMin 1.00 storeFracMin 0.91 | weaponPartLostAt none
+    aiState charge 39% desperate 20% backoff 13% turn 25% unstick 3% | knob=SHIPPED avoid=0.00 ovr=-1.00
+tipper           r1 tier=Rookie   pol=afk    t=90.3 PlayerLoss | pDealt   240 pTaken   573 | P[ram 0/0 limb 240/4] | E[ram 143/11 limb 430/8] | parts 15/17 vs 12/13 | dist 3.34 near 33.1s close 21.1s thr 0.76
+    funnel 105184 call | rej noRb 104953 ownRb 0 notRobot 135 noCombat 0 noIdx 0 | onTarget 96 -> gate 0 (bestFrac 0.00) energy 0 cool 82 APPLY 14 || imm ate limb 2 ram 25 passed limb 12 ram 11
+    rotor [spindleZP kind=Spindle edgeMean 12.39 edgeMax 12.50 aboveGate 90.2s tipR 0.170 maxRate 73.5] | supplyFracMin 1.00 storeFracMin 0.92 | weaponPartLostAt none
+    aiState charge 40% backoff 16% turn 32% unstick 4% other 8% | knob=SHIPPED avoid=0.00 ovr=-1.00
+mauler           r1 tier=Veteran  pol=afk    t=90.3 PlayerWin  | pDealt   438 pTaken   132 | P[ram 0/0 limb 438/10] | E[ram 132/10 limb 0/0] | parts 17/17 vs 7/11 | dist 3.48 near 35.5s close 16.9s thr 0.94
+    funnel 68774 call | rej noRb 68565 ownRb 0 notRobot 6 noCombat 0 noIdx 0 | onTarget 203 -> gate 0 (bestFrac 0.00) energy 0 cool 193 APPLY 10 || imm ate limb 0 ram 17 passed limb 10 ram 10
+    rotor [spindleZP kind=Spindle edgeMean 12.37 edgeMax 12.50 aboveGate 90.2s tipR 0.170 maxRate 73.5] | supplyFracMin 1.00 storeFracMin 0.88 | weaponPartLostAt none
+    aiState charge 3% flank 10% circle 17% commit 12% desperate 21% backoff 10% turn 13% extricate 1% unstick 11% other 3% | knob=SHIPPED avoid=0.55 ovr=-1.00
+ripper           r1 tier=Veteran  pol=afk    t=40.5 PlayerLoss | pDealt     0 pTaken   296 | P[ram 0/0 limb 0/0] | E[ram 21/3 limb 275/6] | parts 15/17 vs 12/13 | dist 2.93 near 18.2s close 11.0s thr 0.89
+    funnel 49315 call | rej noRb 40075 ownRb 0 notRobot 81 noCombat 0 noIdx 0 | onTarget 47 -> gate 0 (bestFrac 0.00) energy 0 cool 41 APPLY 6 || imm ate limb 0 ram 3 passed limb 6 ram 3
+    rotor [spindleZP kind=Spindle edgeMean 11.97 edgeMax 12.50 aboveGate 40.4s tipR 0.170 maxRate 73.5] | supplyFracMin 0.00 storeFracMin 0.00 | weaponPartLostAt none
+    aiState charge 45% flank 9% circle 6% commit 6% backoff 4% turn 22% unstick 7% | knob=SHIPPED avoid=0.55 ovr=-1.00
+bulwark          r1 tier=Champion pol=afk    t=90.0 PlayerWin  | pDealt   339 pTaken   253 | P[ram 0/0 limb 339/6] | E[ram 253/10 limb 0/0] | parts 14/17 vs 11/13 | dist 2.90 near 43.6s close 33.9s thr 0.93
+    funnel 47023 call | rej noRb 46995 ownRb 0 notRobot 0 noCombat 0 noIdx 0 | onTarget 28 -> gate 0 (bestFrac 0.00) energy 0 cool 22 APPLY 6 || imm ate limb 0 ram 30 passed limb 6 ram 10
+    rotor [spindleZP kind=Spindle edgeMean 10.07 edgeMax 12.50 aboveGate 89.9s tipR 0.001 maxRate 94.2] | supplyFracMin 1.00 storeFracMin 0.93 | weaponPartLostAt 63.0s
+    aiState charge 15% flank 6% circle 12% commit 10% desperate 19% backoff 4% turn 16% extricate 6% unstick 12% | knob=SHIPPED avoid=1.00 ovr=-1.00
+widowmaker       r1 tier=Champion pol=afk    t=90.0 PlayerLoss | pDealt     0 pTaken   595 | P[ram 0/0 limb 0/0] | E[ram 26/3 limb 568/6] | parts 10/17 vs 12/12 | dist 2.64 near 39.1s close 20.9s thr 0.83
+    funnel 137852 call | rej noRb 137704 ownRb 0 notRobot 129 noCombat 0 noIdx 0 | onTarget 19 -> gate 0 (bestFrac 0.00) energy 0 cool 13 APPLY 6 || imm ate limb 0 ram 0 passed limb 6 ram 3
+    rotor [spindleZP kind=Spindle edgeMean 12.45 edgeMax 12.50 aboveGate 89.9s tipR 0.170 maxRate 73.5] | supplyFracMin 1.00 storeFracMin 0.94 | weaponPartLostAt none
+    aiState charge 37% flank 4% circle 0% commit 2% backoff 7% turn 42% extricate 1% unstick 8% | knob=SHIPPED avoid=1.00 ovr=-1.00
+# done 6 cases x 2

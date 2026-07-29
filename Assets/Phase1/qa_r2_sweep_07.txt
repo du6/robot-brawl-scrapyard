@@ -1,0 +1,6 @@
+# build qa_r2_b5_discus_al|mauler|Veteran|fire=True parts=11 policy=charge runs=4
+run 0: PlayerWin at 25.5s  dealt 707 taken 0  pieces 10/11 vs 0/11  flipped 0.0s  | KO — enemy core destroyed
+run 1: PlayerWin at 90.3s  dealt 299 taken 230  pieces 9/11 vs 5/11  flipped 1.2s  | Judges' decision — damage 299 vs 230 (23.3% margin) · pieces 9/11 vs 5/11 — decided on damage
+run 2: PlayerWin at 11.7s  dealt 632 taken 0  pieces 10/11 vs 0/11  flipped 0.0s  | KO — enemy core destroyed
+run 3: PlayerWin at 90.3s  dealt 548 taken 159  pieces 9/11 vs 6/11  flipped 0.0s  | Judges' decision — damage 548 vs 159 (71.0% margin) · pieces 9/11 vs 6/11 — decided on damage
+qa_r2_b5_discus_al|mauler|Veteran|fire=True|charge  n=4  W4/L0/D0  flips=0  len 11.7-90.3s spread=7.72x  worst single-step piece loss: player 1 enemy 5  [NOISY] (76s wall)

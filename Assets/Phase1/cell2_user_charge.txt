@@ -1,0 +1,7 @@
+# build USER parts=11 policy=charge runs=5
+run 0: PlayerLoss at 78.5s  dealt 41 taken 75  pieces 9/11 vs 10/11  flipped 52.8s  | Counted out — out of power — 240 kJ of its 240 kJ pack was torn off the chassis, and what was left ran dry after 69 s
+run 1: PlayerLoss at 39.4s  dealt 0 taken 43  pieces 9/11 vs 10/11  flipped 3.4s  | Counted out — out of power — 240 kJ of its 240 kJ pack was torn off the chassis, and what was left ran dry after 29 s
+run 2: PlayerLoss at 20.9s  dealt 0 taken 24  pieces 9/11 vs 10/11  flipped 17.1s  | Counted out — flipped onto its back — the emergency struts could not roll a hull this shape back over; a gyro rights you in under a second
+run 3: PlayerLoss at 24.0s  dealt 0 taken 41  pieces 9/11 vs 10/11  flipped 3.5s  | Counted out — out of power — 240 kJ of its 240 kJ pack was torn off the chassis, and what was left ran dry after 14 s
+run 4: PlayerLoss at 19.7s  dealt 56 taken 6  pieces 9/11 vs 10/11  flipped 3.5s  | Counted out — out of power — 240 kJ of its 240 kJ pack was torn off the chassis, and what was left ran dry after 10 s
+USER|charge  n=5  W0/L5/D0  flips=0  len 19.7-78.5s spread=3.98x  worst single-step piece loss: player 1 enemy 1  [NOISY] (63s wall)

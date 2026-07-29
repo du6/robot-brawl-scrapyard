@@ -1,0 +1,38 @@
+# UP1 DEV HARNESS  tag=AFTER
+screen 2560x1440
+
+## A. ACTUATOR UNDER THE PLAYER TRIGGER, TEST vs FIGHT
+   fixture: 1 pivot limb, parts=1 blockedBy=null tipR=0.460 rateCeiling=14.00
+   TEST  actuators=1 playerControlled=1/1  maxRate=14.00 rad/s  maxTravel=2.618  cycles=14
+   ok    weapon LIVE in TEST
+   FIGHT actuators=1 playerControlled=1/1  maxRate=14.00 rad/s  maxTravel=2.618  cycles=14
+   ok    weapon LIVE in FIGHT
+
+## B. POINTER AT THE CORE UNDERSIDE (30 mm of clearance under the belly)
+   baseline (no belly part): drove 10.11 m in 6 s at full throttle
+   ghost: target=core normal=(0.00, -1.00, 0.00) valid=False reason="Too low — would clip the floor" pos=(0.000, 0.450, 0.000) bottom=0.350 deck=0.520
+   ok    builder REFUSES it: "Too low — would clip the floor"
+
+## C. POSITIVE CONTROL - raised body, 230 mm of belly clearance
+   SKHI fixture parts=9 Validate=null (legal)
+   bracket under the raised chassis: pos=(0.000, 0.650, 0.400) bottom=0.550 deck=0.520 valid=True reason=""
+   ok    legal low placement still ALLOWED (clears the wheel line)
+   clicked; parts now 10
+   second bracket below it: bottom=0.350 valid=False reason="Too low — would clip the floor"
+   ok    below-the-wheel-line placement REFUSED
+
+## D. R CYCLE - distinct yaw states vs distinct DRAWN meshes
+   beam      yaw trail 0 -> 90 -> 180 -> 270 -> 90  distinct yaws=4  distinct meshes=3  !! DEAD PRESS
+   beamlong  yaw trail 180 -> 270 -> 90 -> 180 -> 270  distinct yaws=3  distinct meshes=3  ok - every press changes the drawing
+   plate     yaw trail 90 -> 180 -> 270 -> 0 -> 180  distinct yaws=4  distinct meshes=3  !! DEAD PRESS
+   chassis   yaw trail 270 -> 0 -> 90 -> 180 -> 270  distinct yaws=4  distinct meshes=4  ok - every press changes the drawing
+
+## E. RIGHT-CLICK REMOVE and MIDDLE-CLICK REPAINT through the pointer
+   middle-click on the aft chassis: material Aluminum -> Titanium (activeMat=Titanium)
+   ok    REPAINT works through the pointer
+   right-click on the engine: parts 9 -> 8
+   ok    REMOVE works through the pointer
+   right-click on the CORE: parts 8 -> 8
+   ok    core is protected from removal
+
+## DONE tag=AFTER checks=12 failures=2

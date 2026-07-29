@@ -1,0 +1,7 @@
+# build R2D_F_b8_hammer_al_REGRESSION parts=13 policy=charge runs=3
+# LIVE CONSTANTS  tipSpeedCap m/s: ABS=9.00 Aluminum=9.68 Steel=12.50 Titanium=14.79 CarbonFiber=13.11 Tungsten=13.69  | MotorKW 0/1/2/3 eng 1.0/2.5/4.0/5.5  | DRIVE_KW_PER_TONNE 1.25 | LIFT_EFFICIENCY 0.85 | REACTION_FRAC 0.60 | GROUND_CLEAR 0.020 | BITE_RATE_FRAC 0.45 | EXPOSED_MULT 1.75 | STEP_DISP_CAP 0.25
+# fixedDeltaTime 0.0200  timeScale 4.0  debugFire True
+run 0: PlayerLoss at 90.0s  dealt 280 taken 478  pieces 5/13 vs 10/11  flipped self 2.4s enemy 1.6s  | Judges' decision — damage 280 vs 478 (41.5% margin) · pieces 5/13 vs 10/11 · on its back 3% vs 2% — decided on structure destroyed
+run 1: PlayerWin at 90.4s  dealt 449 taken 353  pieces 12/13 vs 10/11  flipped self 1.2s enemy 0.8s  | Judges' decision — damage 449 vs 353 (21.5% margin) · pieces 12/13 vs 10/11 · on its back 1% vs 1% — structure even, decided on damage
+run 2: PlayerLoss at 90.4s  dealt 186 taken 244  pieces 12/13 vs 10/11  flipped self 1.2s enemy 0.8s  | Judges' decision — damage 186 vs 244 (23.8% margin) · pieces 12/13 vs 10/11 · on its back 1% vs 1% — structure even, decided on damage
+R2D_F_b8_hammer_al_REGRESSION|charge  n=3  W1/L2/D0  flips=1  len 90.0-90.4s spread=1.00x  worst single-step piece loss: player 2 enemy 1  [CONVERGED] (69s wall)

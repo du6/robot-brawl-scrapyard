@@ -1,0 +1,15 @@
+# build b5_discus_al_AFTER2 parts=11 policy=charge runs=4
+# LIVE CONSTANTS  tipSpeedCap m/s: ABS=9.00 Aluminum=9.68 Steel=12.50 Titanium=14.79 CarbonFiber=13.11 Tungsten=13.69  | MotorKW 0/1/2/3 eng 1.0/2.5/4.0/5.5  | DRIVE_KW_PER_TONNE 1.25 | LIFT_EFFICIENCY 0.85 | REACTION_FRAC 0.60 | GROUND_CLEAR 0.020 | BITE_RATE_FRAC 0.45 | EXPOSED_MULT 1.75 | STEP_DISP_CAP 0.25
+# LIVE CONSTANTS (cycle) WIND_RELEASE_FRAC 0.995 | WIND_TIMEOUT_S 2.00 | BITE_TIP_SPEED_MS 4.00 | RECOVER_S 0.10 | PIVOT_RETURN_DPS 500 | MIN_BITE_E 40 | DRAIN_FRAC 0.40 | LIN_IMP_CAP 600 | EFFICIENCY 0.35 | RECUP_FRAC 0.90 | REACTION_STALL_MUL 3.0
+# LIVE CONSTANTS (damage/judging) DMG_K 0.045 | HP_K 6000 | SHOVE_CAP 500 | PART_IMMUNITY 0.50 | RAM_MIN_J 150 | RAM_J_CAP 900 | STRUCT_BAND 0.060 | MIN_STRUCT_PARTS 2.0 | DRAW_BAND_FRAC 0.080 | CONTROL_BAND 0.100 | MATCH_TIME 90 | CREDIT_BUDGET 4000
+# SOURCE REGIME 96ce6370 (22 scripts, newest 2026-07-27 01:35:15Z)
+# fixedDeltaTime 0.0200  timeScale 3.0  debugFire True
+run 0: PlayerWin at 90.0s  dealt 415 taken 227  pieces 9/11 vs 9/11  flipped self 9.4s enemy 1.2s  | Judges' decision — damage 415 vs 227 (45.3% margin) · pieces 9/11 vs 9/11 · on its back 10% vs 1% — structure even, decided on damage
+   src: ram 173/13 · limb 0/0 (max hit 0.0) · disc 243/2   packSeam 0.42
+run 1: PlayerWin at 90.0s  dealt 185 taken 77  pieces 9/11 vs 10/11  flipped self 3.7s enemy 0.9s  | Judges' decision — damage 185 vs 77 (58.3% margin) · pieces 9/11 vs 10/11 · on its back 4% vs 1% — structure even, decided on damage
+   src: ram 136/12 · limb 0/0 (max hit 0.0) · disc 49/1   packSeam 0.97
+run 2: PlayerLoss at 90.0s  dealt 313 taken 331  pieces 6/11 vs 10/11  flipped self 7.6s enemy 0.7s  | Judges' decision — damage 313 vs 331 (5.6% margin) · pieces 6/11 vs 10/11 · on its back 8% vs 1% — decided on structure destroyed
+   src: ram 264/18 · limb 0/0 (max hit 0.0) · disc 49/1   packSeam 0.44
+run 3: PlayerWin at 90.0s  dealt 312 taken 258  pieces 9/11 vs 10/11  flipped self 4.5s enemy 2.1s  | Judges' decision — damage 312 vs 258 (17.2% margin) · pieces 9/11 vs 10/11 · on its back 5% vs 2% — structure even, decided on damage
+   src: ram 263/23 · limb 0/0 (max hit 0.0) · disc 49/1   packSeam 0.35
+b5_discus_al_AFTER2|charge  n=4  W3/L1/D0  flips=1  len 90.0-90.0s spread=1.00x  worst single-step piece loss: player 1 enemy 1  [CONVERGED] (122s wall)

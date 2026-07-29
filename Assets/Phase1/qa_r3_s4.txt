@@ -1,0 +1,8 @@
+# build b4_skipper_abs|tipper/Rookie|fire parts=13 policy=charge runs=4
+# LIVE CONSTANTS  tipSpeedCap m/s: ABS=9.00 Aluminum=9.68 Steel=12.50 Titanium=14.79 CarbonFiber=13.11 Tungsten=13.69  | MotorKW 0/1/2/3 eng 1.0/2.5/4.0/5.5  | DRIVE_KW_PER_TONNE 1.25 | LIFT_EFFICIENCY 0.85 | REACTION_FRAC 0.60 | GROUND_CLEAR 0.020 | BITE_RATE_FRAC 0.45 | EXPOSED_MULT 1.75 | STEP_DISP_CAP 0.25
+# fixedDeltaTime 0.0200  timeScale 4.0  debugFire True
+run 0: PlayerLoss at 26.4s  dealt 110 taken 613  pieces 0/13 vs 11/12  flipped self 6.8s enemy 0.4s  | KO — your core was destroyed
+run 1: PlayerLoss at 6.4s  dealt 0 taken 288  pieces 0/13 vs 12/12  flipped self 0.0s enemy 0.0s  | KO — your core was destroyed
+run 2: PlayerLoss at 90.0s  dealt 146 taken 397  pieces 6/13 vs 9/12  flipped self 22.0s enemy 10.0s  | Judges' decision — damage 146 vs 397 (63.2% margin) · pieces 6/13 vs 9/12 · on its back 24% vs 11% — decided on structure destroyed
+run 3: PlayerLoss at 26.4s  dealt 42 taken 486  pieces 0/13 vs 10/12  flipped self 2.8s enemy 6.4s  | KO — your core was destroyed
+b4_skipper_abs|tipper/Rookie|fire|charge  n=4  W0/L4/D0  flips=0  len 6.4-90.0s spread=14.06x  worst single-step piece loss: player 8 enemy 1  [NOISY] (40s wall)

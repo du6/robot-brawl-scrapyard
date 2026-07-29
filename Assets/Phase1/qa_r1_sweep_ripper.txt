@@ -1,0 +1,6 @@
+# build B5_DISCUS_vs_RIPPER parts=11 policy=charge runs=4
+run 0: PlayerLoss at 41.7s  dealt 441 taken 237  pieces 11/11 vs 7/13  flipped 11.4s  | Counted out — beached — 0 of 4 wheels touching the ground, so the drive had nothing to push on
+run 1: PlayerWin at 48.6s  dealt 840 taken 86  pieces 11/11 vs 0/13  flipped 1.8s  | KO — enemy core destroyed
+run 2: PlayerWin at 6.9s  dealt 582 taken 105  pieces 11/11 vs 0/13  flipped 0.0s  | KO — enemy core destroyed
+run 3: PlayerWin at 90.0s  dealt 542 taken 157  pieces 11/11 vs 6/13  flipped 0.0s  | Judges' decision — damage 542 vs 157 (71.1% margin) · pieces 11/11 vs 6/13 — decided on damage
+B5_DISCUS_vs_RIPPER|charge  n=4  W3/L1/D0  flips=1  len 6.9-90.0s spread=13.05x  worst single-step piece loss: player 0 enemy 6  [NOISY] (65s wall)

@@ -1,0 +1,6 @@
+# build qa_r2_b5_discus_al|widowmaker|Veteran|fire=True parts=11 policy=charge runs=4
+run 0: PlayerWin at 90.3s  dealt 1052 taken 481  pieces 9/11 vs 8/11  flipped 0.9s  | Judges' decision — damage 1052 vs 481 (54.2% margin) · pieces 9/11 vs 8/11 — decided on damage
+run 1: PlayerLoss at 90.3s  dealt 497 taken 722  pieces 6/11 vs 9/11  flipped 17.1s  | Judges' decision — damage 497 vs 722 (31.2% margin) · pieces 6/11 vs 9/11 — decided on damage
+run 2: PlayerLoss at 30.6s  dealt 683 taken 819  pieces 0/11 vs 7/11  flipped 0.0s  | KO — your core was destroyed
+run 3: PlayerLoss at 90.3s  dealt 426 taken 758  pieces 3/11 vs 9/11  flipped 10.2s  | Judges' decision — damage 426 vs 758 (43.8% margin) · pieces 3/11 vs 9/11 — decided on damage
+qa_r2_b5_discus_al|widowmaker|Veteran|fire=True|charge  n=4  W1/L3/D0  flips=1  len 30.6-90.3s spread=2.95x  worst single-step piece loss: player 3 enemy 1  [NOISY] (103s wall)

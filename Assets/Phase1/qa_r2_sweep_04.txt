@@ -1,0 +1,6 @@
+# build qa_r2_b3_lance_w|bulwark|Veteran|fire=True parts=12 policy=charge runs=4
+run 0: PlayerLoss at 58.5s  dealt 221 taken 486  pieces 12/12 vs 11/13  flipped 0.9s  | Counted out — out of power — all 300 kJ spent in 49 s; carry more battery, or spend less on driving and spinning
+run 1: PlayerWin at 74.4s  dealt 875 taken 352  pieces 12/12 vs 10/13  flipped 1.2s  | Enemy counted out — out of power — all 300 kJ spent in 64 s; carry more battery, or spend less on driving and spinning
+run 2: PlayerWin at 64.5s  dealt 341 taken 238  pieces 12/12 vs 11/13  flipped 0.0s  | Enemy counted out — out of power — 240 kJ of its 300 kJ pack was torn off the chassis, and what was left ran dry after 55 s
+run 3: PlayerLoss at 52.5s  dealt 281 taken 350  pieces 12/12 vs 12/13  flipped 1.2s  | Counted out — out of power — all 300 kJ spent in 43 s; carry more battery, or spend less on driving and spinning
+qa_r2_b3_lance_w|bulwark|Veteran|fire=True|charge  n=4  W2/L2/D0  flips=2  len 52.5-74.4s spread=1.42x  worst single-step piece loss: player 0 enemy 1  [NOISY] (86s wall)

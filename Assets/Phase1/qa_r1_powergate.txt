@@ -1,0 +1,6 @@
+CASE A start: player dealt=900 storedKJ forced to 0, parked.
+CASE A t=20.7 state=Ended outcome=PlayerLoss playerCountOut=-0.2 incapT=12.0 dealt=0/17 storedKJ=0.0 speed=0.00
+cause='Counted out — out of power — all 300 kJ spent in 11 s; carry more battery, or spend less on driving and spinning'
+CASE A2 armed at fight t=20.3 state=Fighting dealt=900 storedKJ=0.0
+CASE A2 t=90.2 state=Ended outcome=PlayerWin countOut=-1.0 incapT=0.0 dealt=1169/99 storedKJ=0.0 speed=0.00
+cause='Judges' decision — damage 1169 vs 99 (91.6% margin) · pieces 11/11 vs 6/11 — decided on damage'

@@ -1,0 +1,6 @@
+# build qa_r2_b5_discus_al parts=11 policy=charge runs=4
+run 0: PlayerWin at 90.3s  dealt 439 taken 269  pieces 9/11 vs 9/13  flipped 3.9s  | Judges' decision — damage 439 vs 269 (38.7% margin) · pieces 9/11 vs 9/13 — decided on damage
+run 1: PlayerWin at 90.0s  dealt 427 taken 268  pieces 9/11 vs 9/13  flipped 4.8s  | Judges' decision — damage 427 vs 268 (37.3% margin) · pieces 9/11 vs 9/13 — decided on damage
+run 2: PlayerLoss at 61.5s  dealt 298 taken 411  pieces 0/11 vs 9/13  flipped 0.0s  | KO — your core was destroyed
+run 3: PlayerWin at 90.2s  dealt 438 taken 362  pieces 9/11 vs 9/13  flipped 8.9s  | Judges' decision — damage 438 vs 362 (17.4% margin) · pieces 9/11 vs 9/13 — decided on damage
+qa_r2_b5_discus_al|charge  n=4  W3/L1/D0  flips=1  len 61.5-90.3s spread=1.47x  worst single-step piece loss: player 5 enemy 1  [CONVERGED] (114s wall)

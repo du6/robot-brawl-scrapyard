@@ -1,0 +1,6 @@
+# build qa_r3_b1_hook_w parts=12 policy=charge runs=4
+run 0: PlayerWin at 90.3s  dealt 423 taken 257  pieces 11/12 vs 6/11  flipped 0.0s  | Judges' decision — damage 423 vs 257 (39.2% margin) · pieces 11/12 vs 6/11 — decided on damage
+run 1: PlayerLoss at 33.3s  dealt 165 taken 210  pieces 11/12 vs 10/11  flipped 0.0s  | Counted out — out of power — all 300 kJ spent in 23 s; carry more battery, or spend less on driving and spinning
+run 2: PlayerWin at 90.3s  dealt 408 taken 338  pieces 12/12 vs 10/11  flipped 0.0s  | Judges' decision — damage 408 vs 338 (17.1% margin) · pieces 12/12 vs 10/11 — decided on damage
+run 3: PlayerLoss at 87.9s  dealt 367 taken 377  pieces 11/12 vs 6/11  flipped 0.0s  | Counted out — out of power — all 300 kJ spent in 78 s; carry more battery, or spend less on driving and spinning
+qa_r3_b1_hook_w|charge  n=4  W2/L2/D0  flips=2  len 33.3-90.3s spread=2.71x  worst single-step piece loss: player 1 enemy 1  [NOISY] (103s wall)

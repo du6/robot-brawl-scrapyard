@@ -1,0 +1,8 @@
+# build b1_sledge_w|tipper/Rookie|fire parts=13 policy=charge runs=4
+# LIVE CONSTANTS  tipSpeedCap m/s: ABS=9.00 Aluminum=9.68 Steel=12.50 Titanium=14.79 CarbonFiber=13.11 Tungsten=13.69  | MotorKW 0/1/2/3 eng 1.0/2.5/4.0/5.5  | DRIVE_KW_PER_TONNE 1.25 | LIFT_EFFICIENCY 0.85 | REACTION_FRAC 0.60 | GROUND_CLEAR 0.020 | BITE_RATE_FRAC 0.45 | EXPOSED_MULT 1.75 | STEP_DISP_CAP 0.25
+# fixedDeltaTime 0.0200  timeScale 4.0  debugFire True
+run 0: PlayerLoss at 71.6s  dealt 95 taken 614  pieces 12/13 vs 12/12  flipped self 2.4s enemy 0.0s  | Counted out — out of power — 240 kJ of its 300 kJ pack was torn off the chassis, and what was left ran dry after 62 s
+run 1: PlayerLoss at 51.2s  dealt 110 taken 719  pieces 12/13 vs 11/12  flipped self 0.4s enemy 5.6s  | Counted out — out of power — 240 kJ of its 300 kJ pack was torn off the chassis, and what was left ran dry after 42 s
+run 2: PlayerLoss at 59.6s  dealt 148 taken 952  pieces 0/13 vs 10/12  flipped self 20.8s enemy 5.6s  | KO — your core was destroyed
+run 3: PlayerLoss at 73.6s  dealt 0 taken 41  pieces 13/13 vs 10/12  flipped self 3.6s enemy 34.8s  | Counted out — out of power — all 300 kJ spent in 64 s; carry more battery, or spend less on driving and spinning
+b1_sledge_w|tipper/Rookie|fire|charge  n=4  W0/L4/D0  flips=0  len 51.2-73.6s spread=1.44x  worst single-step piece loss: player 3 enemy 1  [CONVERGED] (66s wall)

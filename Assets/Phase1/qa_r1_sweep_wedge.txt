@@ -1,0 +1,10 @@
+# build B4_PLOUGH_vs_MAULER parts=13 policy=charge runs=8
+run 0: PlayerLoss at 45.9s  dealt 113 taken 291  pieces 12/13 vs 10/11  flipped 3.6s  | Counted out — out of power — 240 kJ of its 300 kJ pack was torn off the chassis, and what was left ran dry after 36 s
+run 1: PlayerLoss at 49.8s  dealt 59 taken 80  pieces 13/13 vs 10/11  flipped 1.2s  | Counted out — out of power — all 300 kJ spent in 40 s; carry more battery, or spend less on driving and spinning
+run 2: PlayerLoss at 68.7s  dealt 0 taken 256  pieces 12/13 vs 10/11  flipped 0.0s  | Counted out — out of power — all 300 kJ spent in 59 s; carry more battery, or spend less on driving and spinning
+run 3: PlayerLoss at 67.0s  dealt 41 taken 243  pieces 12/13 vs 10/11  flipped 0.0s  | Counted out — out of power — 240 kJ of its 300 kJ pack was torn off the chassis, and what was left ran dry after 57 s
+run 4: PlayerLoss at 56.1s  dealt 82 taken 291  pieces 12/13 vs 10/11  flipped 3.0s  | Counted out — out of power — 240 kJ of its 300 kJ pack was torn off the chassis, and what was left ran dry after 46 s
+run 5: PlayerLoss at 47.4s  dealt 36 taken 96  pieces 12/13 vs 10/11  flipped 5.1s  | Counted out — out of power — 240 kJ of its 300 kJ pack was torn off the chassis, and what was left ran dry after 38 s
+run 6: PlayerLoss at 69.9s  dealt 101 taken 143  pieces 12/13 vs 10/11  flipped 1.8s  | Counted out — out of power — 240 kJ of its 300 kJ pack was torn off the chassis, and what was left ran dry after 60 s
+run 7: PlayerLoss at 56.7s  dealt 0 taken 268  pieces 12/13 vs 10/11  flipped 1.2s  | Counted out — out of power — 240 kJ of its 300 kJ pack was torn off the chassis, and what was left ran dry after 47 s
+B4_PLOUGH_vs_MAULER|charge  n=8  W0/L8/D0  flips=0  len 45.9-69.9s spread=1.52x  worst single-step piece loss: player 1 enemy 1  [CONVERGED] (160s wall)

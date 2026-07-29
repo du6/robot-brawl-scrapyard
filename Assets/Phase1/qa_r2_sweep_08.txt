@@ -1,0 +1,6 @@
+# build qa_r2_b5_discus_al|mauler|Veteran|fire=True parts=11 policy=afk runs=4
+run 0: PlayerWin at 42.6s  dealt 719 taken 71  pieces 11/11 vs 0/11  flipped 0.0s  | KO — enemy core destroyed
+run 1: PlayerWin at 90.0s  dealt 462 taken 407  pieces 10/11 vs 10/11  flipped 1.2s  | Judges' decision — damage 462 vs 407 (12.0% margin) · pieces 10/11 vs 10/11 — decided on damage
+run 2: PlayerLoss at 90.3s  dealt 0 taken 262  pieces 11/11 vs 10/11  flipped 0.0s  | Judges' decision — damage 0 vs 262 (100.0% margin) · pieces 11/11 vs 10/11 — decided on damage
+run 3: PlayerWin at 90.3s  dealt 499 taken 9  pieces 11/11 vs 7/11  flipped 0.0s  | Judges' decision — damage 499 vs 9 (98.2% margin) · pieces 11/11 vs 7/11 — decided on damage
+qa_r2_b5_discus_al|mauler|Veteran|fire=True|afk  n=4  W3/L1/D0  flips=1  len 42.6-90.3s spread=2.12x  worst single-step piece loss: player 1 enemy 6  [NOISY] (107s wall)

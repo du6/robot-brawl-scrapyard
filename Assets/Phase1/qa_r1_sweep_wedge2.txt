@@ -1,0 +1,8 @@
+# build B4B_FLIPPER_vs_MAULER parts=13 policy=charge runs=6
+run 0: PlayerWin at 90.0s  dealt 502 taken 313  pieces 12/13 vs 5/11  flipped 6.9s  | Judges' decision — damage 502 vs 313 (37.5% margin) · pieces 12/13 vs 5/11 — decided on damage
+run 1: Draw at 90.0s  dealt 165 taken 165  pieces 12/13 vs 10/11  flipped 2.4s  | Judges' decision — damage 165 vs 165 (0.2% margin) · pieces 12/13 vs 10/11 — too close to call, scored a draw
+run 2: PlayerWin at 90.0s  dealt 329 taken 244  pieces 12/13 vs 10/11  flipped 8.7s  | Judges' decision — damage 329 vs 244 (25.9% margin) · pieces 12/13 vs 10/11 — decided on damage
+run 3: PlayerLoss at 90.0s  dealt 126 taken 351  pieces 12/13 vs 10/11  flipped 17.2s  | Judges' decision — damage 126 vs 351 (64.0% margin) · pieces 12/13 vs 10/11 — decided on damage
+run 4: PlayerWin at 90.0s  dealt 488 taken 187  pieces 12/13 vs 6/11  flipped 1.2s  | Judges' decision — damage 488 vs 187 (61.6% margin) · pieces 12/13 vs 6/11 — decided on damage
+run 5: Draw at 90.3s  dealt 396 taken 383  pieces 12/13 vs 10/11  flipped 4.2s  | Judges' decision — damage 396 vs 383 (3.4% margin) · pieces 12/13 vs 10/11 — too close to call, scored a draw
+B4B_FLIPPER_vs_MAULER|charge  n=6  W3/L1/D2  flips=3  len 90.0-90.3s spread=1.00x  worst single-step piece loss: player 1 enemy 1  [NOISY] (185s wall)

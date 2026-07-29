@@ -1,0 +1,12 @@
+# RB2Probe cases=1 reps=6 seconds=24 toKO=True speed=3 fire=True
+# LIVE CONSTANTS  tipSpeedCap m/s: ABS=9.00 Aluminum=9.68 Steel=12.50 Titanium=14.79 CarbonFiber=13.11 Tungsten=13.69  | MotorKW 0/1/2/3 eng 1.0/2.5/4.0/5.5  | DRIVE_KW_PER_TONNE 1.25 | LIFT_EFFICIENCY 0.85 | REACTION_FRAC 0.60 | GROUND_CLEAR 0.020 | BITE_RATE_FRAC 0.45 | EXPOSED_MULT 1.75 | STEP_DISP_CAP 0.25
+# LIVE CONSTANTS (cycle) WIND_RELEASE_FRAC 0.995 | WIND_TIMEOUT_S 2.00 | BITE_TIP_SPEED_MS 4.00 | RECOVER_S 0.10 | PIVOT_RETURN_DPS 500 | MIN_BITE_E 40 | DRAIN_FRAC 0.40 | LIN_IMP_CAP 600 | EFFICIENCY 0.35 | RECUP_FRAC 0.90 | REACTION_STALL_MUL 3.0
+# LIVE CONSTANTS (damage/judging) DMG_K 0.045 | HP_K 6000 | SHOVE_CAP 500 | PART_IMMUNITY 0.50 | RAM_MIN_J 150 | RAM_J_CAP 900 | STRUCT_BAND 0.060 | MIN_STRUCT_PARTS 2.0 | DRAW_BAND_FRAC 0.080 | CONTROL_BAND 0.100 | MATCH_TIME 90 | CREDIT_BUDGET 4000
+# SOURCE REGIME 34ff221d (42 scripts, newest 2026-07-27 17:28:44Z)
+SPINDLE_afk      r0 tier=Veteran  pol=afk    t=90.0 PlayerLoss | pDealt     0 pTaken   373 | P[ram 0/0 limb 0/0] | E[ram 373/16 limb 0/0] | parts 10/17 vs 10/11 | dist 3.86 near 23.3s close 11.2s thr 0.87
+SPINDLE_afk      r1 tier=Veteran  pol=afk    t=90.0 PlayerLoss | pDealt     0 pTaken   293 | P[ram 0/0 limb 0/0] | E[ram 293/10 limb 0/0] | parts 14/17 vs 10/11 | dist 3.57 near 29.6s close 11.6s thr 0.86
+SPINDLE_afk      r2 tier=Veteran  pol=afk    t=90.0 PlayerLoss | pDealt     0 pTaken   299 | P[ram 0/0 limb 0/0] | E[ram 299/12 limb 0/0] | parts 13/17 vs 10/11 | dist 3.45 near 30.6s close 16.1s thr 0.84
+SPINDLE_afk      r3 tier=Veteran  pol=afk    t=90.3 PlayerLoss | pDealt     0 pTaken   196 | P[ram 0/0 limb 0/0] | E[ram 196/11 limb 0/0] | parts 13/17 vs 10/11 | dist 3.56 near 23.7s close 11.3s thr 0.83
+SPINDLE_afk      r4 tier=Veteran  pol=afk    t=90.0 PlayerLoss | pDealt    72 pTaken   328 | P[ram 0/0 limb 72/1] | E[ram 328/11 limb 0/0] | parts 13/17 vs 10/11 | dist 4.59 near 26.0s close 13.0s thr 0.96
+SPINDLE_afk      r5 tier=Veteran  pol=afk    t=55.5 PlayerWin  | pDealt   614 pTaken   146 | P[ram 0/0 limb 614/16] | E[gone] | parts 15/17 vs 0/11 | dist 3.14 near 25.5s close 7.1s thr 0.85
+# done 1 cases x 6

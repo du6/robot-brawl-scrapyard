@@ -1,0 +1,8 @@
+# build c4_flipper_al parts=13 policy=charge runs=4
+# LIVE CONSTANTS  tipSpeedCap m/s: ABS=9.00 Aluminum=9.68 Steel=12.50 Titanium=14.79 CarbonFiber=13.11 Tungsten=13.69  | MotorKW 0/1/2/3 eng 1.0/2.5/4.0/5.5  | DRIVE_KW_PER_TONNE 1.25 | LIFT_EFFICIENCY 0.85 | REACTION_FRAC 0.60 | GROUND_CLEAR 0.020 | BITE_RATE_FRAC 0.45 | EXPOSED_MULT 1.75 | STEP_DISP_CAP 0.25
+# fixedDeltaTime 0.0200  timeScale 3.0  debugFire True
+run 0: PlayerWin at 86.4s  dealt 517 taken 312  pieces 10/13 vs 0/12  flipped self 5.7s enemy 37.8s  | KO — enemy core destroyed
+run 1: PlayerWin at 90.0s  dealt 440 taken 354  pieces 10/13 vs 6/12  flipped self 0.9s enemy 26.4s  | Judges' decision — damage 440 vs 354 (19.6% margin) · pieces 10/13 vs 6/12 · on its back 1% vs 29% — decided on structure destroyed
+run 2: PlayerLoss at 90.0s  dealt 200 taken 590  pieces 13/13 vs 10/12  flipped self 13.8s enemy 0.0s  | Counted out — out of power — all 300 kJ spent in 80 s; carry more battery, or spend less on driving and spinning
+run 3: PlayerLoss at 90.0s  dealt 502 taken 790  pieces 6/13 vs 9/12  flipped self 16.2s enemy 15.0s  | Judges' decision — damage 502 vs 790 (36.5% margin) · pieces 6/13 vs 9/12 · on its back 18% vs 17% — decided on structure destroyed
+c4_flipper_al|charge  n=4  W2/L2/D0  flips=2  len 86.4-90.0s spread=1.04x  worst single-step piece loss: player 2 enemy 5  [NOISY] (122s wall)

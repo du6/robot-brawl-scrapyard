@@ -1,0 +1,111 @@
+# RB2Dev cases=4 reps=8 interleave=True seconds=90 toKO=True speed=4 fire=True
+# LIVE CONSTANTS  tipSpeedCap m/s: ABS=9.00 Aluminum=9.68 Steel=12.50 Titanium=14.79 CarbonFiber=13.11 Tungsten=13.69  | MotorKW 0/1/2/3 eng 1.0/2.5/4.0/5.5  | DRIVE_KW_PER_TONNE 1.25 | LIFT_EFFICIENCY 0.85 | REACTION_FRAC 0.60 | GROUND_CLEAR 0.020 | BITE_RATE_FRAC 0.45 | EXPOSED_MULT 1.75 | STEP_DISP_CAP 0.25
+# LIVE CONSTANTS (cycle) WIND_RELEASE_FRAC 0.995 | WIND_TIMEOUT_S 2.00 | BITE_TIP_SPEED_MS 4.00 | RECOVER_S 0.10 | PIVOT_RETURN_DPS 500 | MIN_BITE_E 40 | DRAIN_FRAC 0.40 | LIN_IMP_CAP 600 | EFFICIENCY 0.35 | RECUP_FRAC 0.90 | REACTION_STALL_MUL 3.0
+# LIVE CONSTANTS (damage/judging) DMG_K 0.045 | HP_K 6000 | SHOVE_CAP 500 | PART_IMMUNITY 0.50 | RAM_MIN_J 150 | RAM_J_CAP 900 | STRUCT_BAND 0.060 | MIN_STRUCT_PARTS 2.0 | DRAW_BAND_FRAC 0.080 | CONTROL_BAND 0.100 | MATCH_TIME 90 | CREDIT_BUDGET 4000
+# SOURCE REGIME 7d505d13 (43 scripts, newest 2026-07-27 22:26:27Z)
+# SHIPPED AI KNOBS  THREAT_ARC_DOT 0.15 FLANK_OFFSET 2.60 REAR_BIAS 0.90 PARKED_TIME 5.00 CIRCLE_MAX_S 2.50
+# SHIPPED DAMAGE  RAM_MIN_J 150 RAM_J_CAP 900 DMG_K 0.0450
+NOWEAP/ramJ150   r0 tier=Veteran  pol=charge+ram150 t=90.4 PlayerLoss | pDealt    91 pTaken   250 | P[ram 91/13 limb 0/0] | E[ram 250/14 limb 0/0] | parts 9/13 vs 10/11 | dist 2.15 near 57.5s close 44.5s thr 0.76
+    funnel 0 call | rej noRb 0 ownRb 0 notRobot 0 noCombat 0 noIdx 0 | onTarget 0 -> gate 0 (bestFrac 0.00) energy 0 cool 0 APPLY 0 || imm ate limb 0 ram 38 passed limb 0 ram 27
+    rotor | supplyFracMin 1.00 storeFracMin 0.75 | weaponPartLostAt none
+    aiState charge 10% flank 4% circle 4% commit 6% backoff 14% turn 58% unstick 4% | knob=ram150 avoid=0.55 ovr=-1.00 spdOvr=-1 dInt=0.20 openThr=0.55 steer=0.10
+ARMED/ramJ150    r0 tier=Veteran  pol=charge+ram150 t=61.6 PlayerWin  | pDealt   328 pTaken    95 | P[ram 328/29 limb 0/0] | E[gone] | parts 17/17 vs 0/11 | dist 1.75 near 46.2s close 37.8s thr 0.88
+    funnel 77682 call | rej noRb 77682 ownRb 0 notRobot 0 noCombat 0 noIdx 0 | onTarget 0 -> gate 0 (bestFrac 0.00) energy 0 cool 0 APPLY 0 || imm ate limb 0 ram 44 passed limb 0 ram 40
+    rotor [spindleZP kind=Spindle edgeMean 12.42 edgeMax 12.50 aboveGate 61.5s tipR 0.170 maxRate 73.5] | supplyFracMin 1.00 storeFracMin 0.76 | weaponPartLostAt none
+    aiState charge 17% flank 7% circle 3% desperate 1% backoff 25% turn 25% extricate 4% unstick 16% | knob=ram150 avoid=-1.00 ovr=-1.00 spdOvr=-1 dInt=0.20 openThr=0.55 steer=0.10
+NOWEAP/ramJ400   r0 tier=Veteran  pol=charge+ram400 t=90.4 PlayerLoss | pDealt   153 pTaken   180 | P[ram 153/5 limb 0/0] | E[ram 180/5 limb 0/0] | parts 11/13 vs 10/11 | dist 3.29 near 27.7s close 6.4s thr 0.91
+    funnel 0 call | rej noRb 0 ownRb 0 notRobot 0 noCombat 0 noIdx 0 | onTarget 0 -> gate 0 (bestFrac 0.00) energy 0 cool 0 APPLY 0 || imm ate limb 0 ram 12 passed limb 0 ram 10
+    rotor | supplyFracMin 1.00 storeFracMin 0.72 | weaponPartLostAt none
+    aiState charge 5% flank 10% circle 21% commit 21% backoff 10% turn 19% extricate 2% unstick 12% | knob=ram400 avoid=0.55 ovr=-1.00 spdOvr=-1 dInt=0.20 openThr=0.55 steer=0.10
+ARMED/ramJ400    r0 tier=Veteran  pol=charge+ram400 t=90.0 PlayerLoss | pDealt   264 pTaken   255 | P[ram 51/5 limb 213/4] | E[ram 255/10 limb 0/0] | parts 9/17 vs 10/11 | dist 2.51 near 47.8s close 31.0s thr 0.89
+    funnel 111326 call | rej noRb 111298 ownRb 0 notRobot 0 noCombat 0 noIdx 0 | onTarget 28 -> gate 0 (bestFrac 0.00) energy 0 cool 24 APPLY 4 || imm ate limb 0 ram 1 passed limb 4 ram 15
+    rotor [spindleZP kind=Spindle edgeMean 12.40 edgeMax 12.50 aboveGate 89.9s tipR 0.170 maxRate 73.5] | supplyFracMin 1.00 storeFracMin 0.67 | weaponPartLostAt none
+    aiState charge 30% flank 6% circle 4% commit 6% desperate 7% backoff 11% turn 26% unstick 10% other 0% | knob=ram400 avoid=0.55 ovr=-1.00 spdOvr=-1 dInt=0.20 openThr=0.55 steer=0.10
+NOWEAP/ramJ150   r1 tier=Veteran  pol=charge+ram150 t=90.0 Draw       | pDealt    44 pTaken    57 | P[ram 44/3 limb 0/0] | E[ram 57/2 limb 0/0] | parts 12/13 vs 10/11 | dist 2.49 near 61.4s close 0.0s thr 0.92
+    funnel 0 call | rej noRb 0 ownRb 0 notRobot 0 noCombat 0 noIdx 0 | onTarget 0 -> gate 0 (bestFrac 0.00) energy 0 cool 0 APPLY 0 || imm ate limb 0 ram 73 passed limb 0 ram 5
+    rotor | supplyFracMin 1.00 storeFracMin 0.67 | weaponPartLostAt none
+    aiState flank 5% circle 10% commit 30% backoff 1% turn 16% extricate 19% unstick 18% | knob=ram150 avoid=0.55 ovr=-1.00 spdOvr=-1 dInt=0.20 openThr=0.55 steer=0.10
+ARMED/ramJ150    r1 tier=Veteran  pol=charge+ram150 t=90.4 PlayerLoss | pDealt   107 pTaken   388 | P[ram 107/10 limb 0/0] | E[ram 388/10 limb 0/0] | parts 10/17 vs 10/11 | dist 3.71 near 21.8s close 7.1s thr 0.90
+    funnel 124917 call | rej noRb 124917 ownRb 0 notRobot 0 noCombat 0 noIdx 0 | onTarget 0 -> gate 0 (bestFrac 0.00) energy 0 cool 0 APPLY 0 || imm ate limb 0 ram 12 passed limb 0 ram 20
+    rotor [spindleZP kind=Spindle edgeMean 12.45 edgeMax 12.50 aboveGate 90.3s tipR 0.170 maxRate 73.5] | supplyFracMin 1.00 storeFracMin 0.65 | weaponPartLostAt none
+    aiState charge 32% flank 6% circle 7% commit 6% backoff 20% turn 21% extricate 1% unstick 7% | knob=ram150 avoid=0.55 ovr=-1.00 spdOvr=-1 dInt=0.20 openThr=0.55 steer=0.10
+NOWEAP/ramJ400   r1 tier=Veteran  pol=charge+ram400 t=90.4 PlayerLoss | pDealt    41 pTaken   170 | P[ram 41/3 limb 0/0] | E[ram 170/4 limb 0/0] | parts 7/13 vs 10/11 | dist 2.36 near 52.5s close 36.3s thr 0.84
+    funnel 0 call | rej noRb 0 ownRb 0 notRobot 0 noCombat 0 noIdx 0 | onTarget 0 -> gate 0 (bestFrac 0.00) energy 0 cool 0 APPLY 0 || imm ate limb 0 ram 6 passed limb 0 ram 7
+    rotor | supplyFracMin 1.00 storeFracMin 0.82 | weaponPartLostAt none
+    aiState charge 12% flank 9% circle 7% commit 16% backoff 7% turn 37% extricate 6% unstick 7% | knob=ram400 avoid=0.55 ovr=-1.00 spdOvr=-1 dInt=0.20 openThr=0.55 steer=0.10
+ARMED/ramJ400    r1 tier=Veteran  pol=charge+ram400 t=90.0 PlayerLoss | pDealt    35 pTaken   248 | P[ram 35/5 limb 0/0] | E[ram 248/9 limb 0/0] | parts 13/17 vs 10/11 | dist 3.28 near 37.8s close 19.0s thr 0.86
+    funnel 108237 call | rej noRb 108237 ownRb 0 notRobot 0 noCombat 0 noIdx 0 | onTarget 0 -> gate 0 (bestFrac 0.00) energy 0 cool 0 APPLY 0 || imm ate limb 0 ram 0 passed limb 0 ram 14
+    rotor [spindleZP kind=Spindle edgeMean 12.45 edgeMax 12.50 aboveGate 89.9s tipR 0.170 maxRate 73.5] | supplyFracMin 1.00 storeFracMin 0.63 | weaponPartLostAt none
+    aiState charge 19% flank 7% circle 9% commit 10% backoff 13% turn 32% extricate 1% unstick 10% | knob=ram400 avoid=0.55 ovr=-1.00 spdOvr=-1 dInt=0.20 openThr=0.55 steer=0.10
+NOWEAP/ramJ150   r2 tier=Veteran  pol=charge+ram150 t=90.0 PlayerLoss | pDealt   141 pTaken   301 | P[ram 141/8 limb 0/0] | E[ram 301/9 limb 0/0] | parts 9/13 vs 10/11 | dist 3.22 near 27.5s close 11.3s thr 0.90
+    funnel 0 call | rej noRb 0 ownRb 0 notRobot 0 noCombat 0 noIdx 0 | onTarget 0 -> gate 0 (bestFrac 0.00) energy 0 cool 0 APPLY 0 || imm ate limb 0 ram 15 passed limb 0 ram 17
+    rotor | supplyFracMin 1.00 storeFracMin 0.72 | weaponPartLostAt none
+    aiState charge 11% flank 8% circle 12% commit 17% backoff 19% turn 23% extricate 1% unstick 8% other 1% | knob=ram150 avoid=0.55 ovr=-1.00 spdOvr=-1 dInt=0.20 openThr=0.55 steer=0.10
+ARMED/ramJ150    r2 tier=Veteran  pol=charge+ram150 t=90.0 PlayerLoss | pDealt   404 pTaken   166 | P[ram 77/7 limb 327/7] | E[ram 166/7 limb 0/0] | parts 12/17 vs 10/11 | dist 3.71 near 39.1s close 10.1s thr 0.95
+    funnel 110645 call | rej noRb 110544 ownRb 0 notRobot 0 noCombat 0 noIdx 0 | onTarget 101 -> gate 0 (bestFrac 0.00) energy 0 cool 94 APPLY 7 || imm ate limb 0 ram 20 passed limb 7 ram 14
+    rotor [spindleZP kind=Spindle edgeMean 12.37 edgeMax 12.50 aboveGate 89.9s tipR 0.170 maxRate 73.5] | supplyFracMin 1.00 storeFracMin 0.65 | weaponPartLostAt none
+    aiState charge 13% flank 6% circle 12% commit 10% desperate 24% backoff 13% turn 10% unstick 12% | knob=ram150 avoid=0.55 ovr=-1.00 spdOvr=-1 dInt=0.20 openThr=0.55 steer=0.10
+NOWEAP/ramJ400   r2 tier=Veteran  pol=charge+ram400 t=90.0 PlayerLoss | pDealt   182 pTaken   200 | P[ram 182/8 limb 0/0] | E[ram 200/7 limb 0/0] | parts 9/13 vs 10/11 | dist 2.26 near 52.3s close 29.1s thr 0.80
+    funnel 0 call | rej noRb 0 ownRb 0 notRobot 0 noCombat 0 noIdx 0 | onTarget 0 -> gate 0 (bestFrac 0.00) energy 0 cool 0 APPLY 0 || imm ate limb 0 ram 4 passed limb 0 ram 15
+    rotor | supplyFracMin 1.00 storeFracMin 0.78 | weaponPartLostAt none
+    aiState charge 4% flank 14% circle 4% commit 1% desperate 11% backoff 13% turn 47% unstick 7% other 0% | knob=ram400 avoid=0.55 ovr=-1.00 spdOvr=-1 dInt=0.20 openThr=0.55 steer=0.10
+ARMED/ramJ400    r2 tier=Veteran  pol=charge+ram400 t=90.0 PlayerLoss | pDealt    29 pTaken    89 | P[ram 29/2 limb 0/0] | E[ram 89/3 limb 0/0] | parts 15/17 vs 10/11 | dist 3.56 near 12.5s close 8.4s thr 0.82
+    funnel 110262 call | rej noRb 110262 ownRb 0 notRobot 0 noCombat 0 noIdx 0 | onTarget 0 -> gate 0 (bestFrac 0.00) energy 0 cool 0 APPLY 0 || imm ate limb 0 ram 0 passed limb 0 ram 5
+    rotor [spindleZP kind=Spindle edgeMean 12.45 edgeMax 12.50 aboveGate 89.9s tipR 0.170 maxRate 73.5] | supplyFracMin 1.00 storeFracMin 0.68 | weaponPartLostAt none
+    aiState charge 12% flank 6% backoff 7% turn 42% extricate 17% unstick 17% | knob=ram400 avoid=0.55 ovr=-1.00 spdOvr=-1 dInt=0.20 openThr=0.55 steer=0.10
+NOWEAP/ramJ150   r3 tier=Veteran  pol=charge+ram150 t=72.4 PlayerLoss | pDealt   137 pTaken   394 | P[ram 137/14 limb 0/0] | E[ram 394/22 limb 0/0] | parts 5/13 vs 10/11 | dist 2.72 near 34.2s close 23.5s thr 0.90
+    funnel 0 call | rej noRb 0 ownRb 0 notRobot 0 noCombat 0 noIdx 0 | onTarget 0 -> gate 0 (bestFrac 0.00) energy 0 cool 0 APPLY 0 || imm ate limb 0 ram 30 passed limb 0 ram 36
+    rotor | supplyFracMin 1.00 storeFracMin 0.84 | weaponPartLostAt none
+    aiState charge 36% flank 10% circle 2% backoff 24% turn 23% unstick 5% other 0% | knob=ram150 avoid=0.55 ovr=-1.00 spdOvr=-1 dInt=0.20 openThr=0.55 steer=0.10
+ARMED/ramJ150    r3 tier=Veteran  pol=charge+ram150 t=90.4 PlayerWin  | pDealt   202 pTaken   159 | P[ram 202/36 limb 0/0] | E[ram 159/34 limb 0/0] | parts 17/17 vs 10/11 | dist 2.33 near 60.9s close 37.1s thr 0.93
+    funnel 116904 call | rej noRb 116904 ownRb 0 notRobot 0 noCombat 0 noIdx 0 | onTarget 0 -> gate 0 (bestFrac 0.00) energy 0 cool 0 APPLY 0 || imm ate limb 0 ram 108 passed limb 0 ram 70
+    rotor [spindleZP kind=Spindle edgeMean 12.45 edgeMax 12.50 aboveGate 90.3s tipR 0.170 maxRate 73.5] | supplyFracMin 1.00 storeFracMin 0.63 | weaponPartLostAt none
+    aiState charge 11% flank 6% circle 6% commit 5% desperate 18% backoff 15% turn 15% extricate 10% unstick 14% | knob=ram150 avoid=0.55 ovr=-1.00 spdOvr=-1 dInt=0.20 openThr=0.55 steer=0.10
+NOWEAP/ramJ400   r3 tier=Veteran  pol=charge+ram400 t=90.0 PlayerLoss | pDealt    93 pTaken    90 | P[ram 93/5 limb 0/0] | E[ram 90/6 limb 0/0] | parts 9/13 vs 11/11 | dist 1.80 near 59.5s close 49.4s thr 0.83
+    funnel 0 call | rej noRb 0 ownRb 0 notRobot 0 noCombat 0 noIdx 0 | onTarget 0 -> gate 0 (bestFrac 0.00) energy 0 cool 0 APPLY 0 || imm ate limb 0 ram 1 passed limb 0 ram 11
+    rotor | supplyFracMin 1.00 storeFracMin 0.80 | weaponPartLostAt none
+    aiState charge 15% flank 7% circle 7% commit 6% backoff 9% turn 39% extricate 7% unstick 10% other 0% | knob=ram400 avoid=0.55 ovr=-1.00 spdOvr=-1 dInt=0.20 openThr=0.55 steer=0.10
+ARMED/ramJ400    r3 tier=Veteran  pol=charge+ram400 t=90.4 PlayerLoss | pDealt    31 pTaken   208 | P[ram 31/7 limb 0/0] | E[ram 208/10 limb 0/0] | parts 13/17 vs 10/11 | dist 3.35 near 28.4s close 15.8s thr 0.93
+    funnel 107447 call | rej noRb 107447 ownRb 0 notRobot 0 noCombat 0 noIdx 0 | onTarget 0 -> gate 0 (bestFrac 0.00) energy 0 cool 0 APPLY 0 || imm ate limb 0 ram 1 passed limb 0 ram 17
+    rotor [spindleZP kind=Spindle edgeMean 12.45 edgeMax 12.50 aboveGate 90.3s tipR 0.170 maxRate 73.5] | supplyFracMin 1.00 storeFracMin 0.67 | weaponPartLostAt none
+    aiState charge 37% flank 11% circle 6% commit 5% backoff 14% turn 15% extricate 1% unstick 12% other 1% | knob=ram400 avoid=0.55 ovr=-1.00 spdOvr=-1 dInt=0.20 openThr=0.55 steer=0.10
+NOWEAP/ramJ150   r4 tier=Veteran  pol=charge+ram150 t=90.4 Draw       | pDealt     0 pTaken     0 | P[ram 0/0 limb 0/0] | E[ram 0/0 limb 0/0] | parts 13/13 vs 11/11 | dist 2.68 near 29.7s close 0.0s thr 0.97
+    funnel 0 call | rej noRb 0 ownRb 0 notRobot 0 noCombat 0 noIdx 0 | onTarget 0 -> gate 0 (bestFrac 0.00) energy 0 cool 0 APPLY 0 || imm ate limb 0 ram 0 passed limb 0 ram 0
+    rotor | supplyFracMin 1.00 storeFracMin 0.65 | weaponPartLostAt none
+    aiState flank 5% circle 28% commit 35% turn 5% extricate 8% unstick 18% | knob=ram150 avoid=0.55 ovr=-1.00 spdOvr=-1 dInt=0.20 openThr=0.55 steer=0.10
+ARMED/ramJ150    r4 tier=Veteran  pol=charge+ram150 t=90.0 Draw       | pDealt   291 pTaken   297 | P[ram 176/25 limb 115/2] | E[ram 297/21 limb 0/0] | parts 14/17 vs 10/11 | dist 2.69 near 52.5s close 38.7s thr 0.85
+    funnel 71801 call | rej noRb 71796 ownRb 0 notRobot 0 noCombat 0 noIdx 0 | onTarget 5 -> gate 0 (bestFrac 0.00) energy 0 cool 3 APPLY 2 || imm ate limb 0 ram 52 passed limb 2 ram 46
+    rotor [spindleZP kind=Spindle edgeMean 9.80 edgeMax 12.50 aboveGate 89.9s tipR 0.001 maxRate 94.2] | supplyFracMin 1.00 storeFracMin 0.65 | weaponPartLostAt 59.2s
+    aiState charge 9% flank 9% circle 1% backoff 25% turn 36% extricate 7% unstick 11% other 2% | knob=ram150 avoid=0.55 ovr=-1.00 spdOvr=-1 dInt=0.20 openThr=0.55 steer=0.10
+NOWEAP/ramJ400   r4 tier=Veteran  pol=charge+ram400 t=90.4 PlayerLoss | pDealt    58 pTaken    98 | P[ram 58/5 limb 0/0] | E[ram 98/6 limb 0/0] | parts 10/13 vs 11/11 | dist 2.45 near 53.4s close 27.4s thr 0.87
+    funnel 0 call | rej noRb 0 ownRb 0 notRobot 0 noCombat 0 noIdx 0 | onTarget 0 -> gate 0 (bestFrac 0.00) energy 0 cool 0 APPLY 0 || imm ate limb 0 ram 2 passed limb 0 ram 11
+    rotor | supplyFracMin 1.00 storeFracMin 0.78 | weaponPartLostAt none
+    aiState charge 36% flank 15% circle 2% backoff 9% turn 30% unstick 8% other 0% | knob=ram400 avoid=0.55 ovr=-1.00 spdOvr=-1 dInt=0.20 openThr=0.55 steer=0.10
+ARMED/ramJ400    r4 tier=Veteran  pol=charge+ram400 t=90.0 PlayerLoss | pDealt   115 pTaken   167 | P[ram 69/12 limb 46/1] | E[ram 167/9 limb 0/0] | parts 15/17 vs 10/11 | dist 2.33 near 56.2s close 32.1s thr 0.89
+    funnel 108766 call | rej noRb 108756 ownRb 0 notRobot 0 noCombat 0 noIdx 0 | onTarget 10 -> gate 0 (bestFrac 0.00) energy 0 cool 9 APPLY 1 || imm ate limb 0 ram 8 passed limb 1 ram 21
+    rotor [spindleZP kind=Spindle edgeMean 12.44 edgeMax 12.50 aboveGate 89.9s tipR 0.170 maxRate 73.5] | supplyFracMin 1.00 storeFracMin 0.59 | weaponPartLostAt none
+    aiState charge 3% flank 8% circle 9% commit 11% desperate 15% backoff 10% turn 25% extricate 7% unstick 13% | knob=ram400 avoid=0.55 ovr=-1.00 spdOvr=-1 dInt=0.20 openThr=0.55 steer=0.10
+NOWEAP/ramJ150   r5 tier=Veteran  pol=charge+ram150 t=90.4 PlayerLoss | pDealt   114 pTaken   154 | P[ram 114/6 limb 0/0] | E[ram 154/7 limb 0/0] | parts 11/13 vs 10/11 | dist 3.70 near 12.3s close 8.1s thr 0.93
+    funnel 0 call | rej noRb 0 ownRb 0 notRobot 0 noCombat 0 noIdx 0 | onTarget 0 -> gate 0 (bestFrac 0.00) energy 0 cool 0 APPLY 0 || imm ate limb 0 ram 19 passed limb 0 ram 13
+    rotor | supplyFracMin 1.00 storeFracMin 0.71 | weaponPartLostAt none
+    aiState charge 12% flank 14% circle 17% commit 16% backoff 11% turn 15% extricate 3% unstick 13% | knob=ram150 avoid=0.55 ovr=-1.00 spdOvr=-1 dInt=0.20 openThr=0.55 steer=0.10
+ARMED/ramJ150    r5 tier=Veteran  pol=charge+ram150 t=49.6 PlayerWin  | pDealt   403 pTaken   371 | P[ram 51/4 limb 352/11] | E[gone] | parts 13/17 vs 0/11 | dist 2.89 near 17.7s close 8.4s thr 0.89
+    funnel 63124 call | rej noRb 62909 ownRb 0 notRobot 68 noCombat 0 noIdx 0 | onTarget 147 -> gate 0 (bestFrac 0.00) energy 0 cool 136 APPLY 11 || imm ate limb 0 ram 21 passed limb 11 ram 16
+    rotor [spindleZP kind=Spindle edgeMean 12.20 edgeMax 12.50 aboveGate 49.5s tipR 0.170 maxRate 73.5] | supplyFracMin 1.00 storeFracMin 0.77 | weaponPartLostAt none
+    aiState charge 25% flank 13% backoff 32% turn 24% unstick 6% | knob=ram150 avoid=-1.00 ovr=-1.00 spdOvr=-1 dInt=0.20 openThr=0.55 steer=0.10
+NOWEAP/ramJ400   r5 tier=Veteran  pol=charge+ram400 t=90.0 PlayerLoss | pDealt   163 pTaken   190 | P[ram 163/6 limb 0/0] | E[ram 190/6 limb 0/0] | parts 10/13 vs 10/11 | dist 3.56 near 27.1s close 18.4s thr 0.84
+    funnel 0 call | rej noRb 0 ownRb 0 notRobot 0 noCombat 0 noIdx 0 | onTarget 0 -> gate 0 (bestFrac 0.00) energy 0 cool 0 APPLY 0 || imm ate limb 0 ram 3 passed limb 0 ram 12
+    rotor | supplyFracMin 1.00 storeFracMin 0.76 | weaponPartLostAt none
+    aiState charge 23% flank 13% circle 5% commit 3% backoff 14% turn 39% unstick 4% | knob=ram400 avoid=0.55 ovr=-1.00 spdOvr=-1 dInt=0.20 openThr=0.55 steer=0.10
+ARMED/ramJ400    r5 tier=Veteran  pol=charge+ram400 t=90.0 PlayerLoss | pDealt   418 pTaken   278 | P[ram 9/5 limb 409/10] | E[ram 278/9 limb 0/0] | parts 13/17 vs 10/11 | dist 2.61 near 42.7s close 26.0s thr 0.83
+    funnel 100112 call | rej noRb 99886 ownRb 0 notRobot 98 noCombat 0 noIdx 0 | onTarget 128 -> gate 0 (bestFrac 0.00) energy 0 cool 118 APPLY 10 || imm ate limb 0 ram 3 passed limb 10 ram 14
+    rotor [spindleZP kind=Spindle edgeMean 12.34 edgeMax 12.50 aboveGate 89.9s tipR 0.170 maxRate 73.5] | supplyFracMin 1.00 storeFracMin 0.65 | weaponPartLostAt none
+    aiState charge 18% flank 7% desperate 13% backoff 14% turn 39% extricate 4% unstick 6% | knob=ram400 avoid=0.55 ovr=-1.00 spdOvr=-1 dInt=0.20 openThr=0.55 steer=0.10
+NOWEAP/ramJ150   r6 tier=Veteran  pol=charge+ram150 t=86.0 PlayerLoss | pDealt   165 pTaken   423 | P[ram 165/11 limb 0/0] | E[ram 423/15 limb 0/0] | parts 3/13 vs 10/11 | dist 3.00 near 32.4s close 18.8s thr 0.87
+    funnel 0 call | rej noRb 0 ownRb 0 notRobot 0 noCombat 0 noIdx 0 | onTarget 0 -> gate 0 (bestFrac 0.00) energy 0 cool 0 APPLY 0 || imm ate limb 0 ram 18 passed limb 0 ram 26
+    rotor | supplyFracMin 1.00 storeFracMin 0.81 | weaponPartLostAt none
+    aiState charge 29% flank 8% circle 4% commit 2% backoff 23% turn 29% unstick 6% other 0% | knob=ram150 avoid=0.55 ovr=-1.00 spdOvr=-1 dInt=0.20 openThr=0.55 steer=0.10
+ARMED/ramJ150    r6 tier=Veteran  pol=charge+ram150 t=90.4 PlayerLoss | pDealt   512 pTaken   328 | P[ram 107/13 limb 405/8] | E[ram 328/20 limb 0/0] | parts 13/17 vs 10/11 | dist 3.22 near 40.5s close 23.8s thr 0.89
+    funnel 97723 call | rej noRb 97641 ownRb 0 notRobot 0 noCombat 0 noIdx 0 | onTarget 82 -> gate 0 (bestFrac 0.00) energy 0 cool 74 APPLY 8 || imm ate limb 0 ram 47 passed limb 8 ram 33
+    rotor [spindleZP kind=Spindle edgeMean 12.37 edgeMax 12.50 aboveGate 90.3s tipR 0.170 maxRate 73.5] | supplyFracMin 1.00 storeFracMin 0.64 | weaponPartLostAt none
+    aiState charge 31% flank 8% desperate 7% backoff 21% turn 26% unstick 7% other 0% | knob=ram150 avoid=0.55 ovr=-1.00 spdOvr=-1 dInt=0.20 openThr=0.55 steer=0.10

@@ -1,0 +1,6 @@
+# build c1_lowflip_ti_FIREOFF parts=13 policy=charge runs=4
+run 0: PlayerLoss at 90.3s  dealt 69 taken 220  pieces 12/13 vs 9/12  flipped 0.0s  | Judges' decision — damage 69 vs 220 (68.5% margin) · pieces 12/13 vs 9/12 — decided on damage
+run 1: PlayerLoss at 90.3s  dealt 185 taken 371  pieces 13/13 vs 10/12  flipped 0.0s  | Judges' decision — damage 185 vs 371 (50.0% margin) · pieces 13/13 vs 10/12 — decided on damage
+run 2: PlayerLoss at 44.4s  dealt 83 taken 1123  pieces 5/13 vs 9/12  flipped 0.0s  | Counted out — every one of its 4 wheels had been torn off — nothing left to drive with
+run 3: PlayerLoss at 90.0s  dealt 254 taken 690  pieces 9/13 vs 9/12  flipped 6.6s  | Judges' decision — damage 254 vs 690 (63.3% margin) · pieces 9/13 vs 9/12 — decided on damage
+c1_lowflip_ti_FIREOFF|charge  n=4  W0/L4/D0  flips=0  len 44.4-90.3s spread=2.03x  worst single-step piece loss: player 1 enemy 1  [NOISY] (108s wall)

@@ -1,0 +1,11 @@
+# section=bite opponent=tipper seconds=25 speed=3 fire=True reps=5 builds=1
+# LIVE CONSTANTS  tipSpeedCap m/s: ABS=9.00 Aluminum=9.68 Steel=12.50 Titanium=14.79 CarbonFiber=13.11 Tungsten=13.69  | MotorKW 0/1/2/3 eng 1.0/2.5/4.0/5.5  | DRIVE_KW_PER_TONNE 1.25 | LIFT_EFFICIENCY 0.85 | REACTION_FRAC 0.60 | GROUND_CLEAR 0.020 | BITE_RATE_FRAC 0.45 | EXPOSED_MULT 1.75 | STEP_DISP_CAP 0.25
+# LIVE CONSTANTS (cycle) WIND_RELEASE_FRAC 0.995 | WIND_TIMEOUT_S 2.00 | BITE_TIP_SPEED_MS 4.00 | RECOVER_S 0.10 | PIVOT_RETURN_DPS 500 | MIN_BITE_E 40 | DRAIN_FRAC 0.40 | LIN_IMP_CAP 600 | EFFICIENCY 0.35 | RECUP_FRAC 0.90 | REACTION_STALL_MUL 3.0
+# LIVE CONSTANTS (damage/judging) DMG_K 0.045 | HP_K 6000 | SHOVE_CAP 500 | PART_IMMUNITY 0.50 | RAM_MIN_J 150 | RAM_J_CAP 900 | STRUCT_BAND 0.060 | MIN_STRUCT_PARTS 2.0 | DRAW_BAND_FRAC 0.080 | CONTROL_BAND 0.100 | MATCH_TIME 90 | CREDIT_BUDGET 4000
+# SOURCE REGIME b3f9659c (41 scripts, newest 2026-07-27 15:12:21Z)
+NOWEAP       r0 t=24s ended=TIMEBOX | dealt 3 taken 80 | ram 3/3 (1.1/bite) limb 0/0 (0.0/bite max 0) | pParts 13/13 eParts 13/13 | eDealt 80
+NOWEAP       r1 t=24s ended=TIMEBOX | dealt 111 taken 242 | ram 111/9 (12.3/bite) limb 0/0 (0.0/bite max 0) | pParts 10/13 eParts 13/13 | eDealt 242
+NOWEAP       r2 t=24s ended=TIMEBOX | dealt 5 taken 201 | ram 5/4 (1.2/bite) limb 0/0 (0.0/bite max 0) | pParts 11/13 eParts 13/13 | eDealt 201
+NOWEAP       r3 t=24s ended=TIMEBOX | dealt 83 taken 186 | ram 83/5 (16.6/bite) limb 0/0 (0.0/bite max 0) | pParts 9/13 eParts 13/13 | eDealt 186
+NOWEAP       r4 t=24s ended=TIMEBOX | dealt 63 taken 3 | ram 63/8 (7.8/bite) limb 0/0 (0.0/bite max 0) | pParts 13/13 eParts 13/13 | eDealt 3
+# done 1 builds

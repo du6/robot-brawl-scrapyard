@@ -1,0 +1,5 @@
+# build R2D_B1_reactionOFF parts=13 policy=charge runs=3
+run 0: PlayerWin at 90.4s  dealt 254 taken 271  pieces 13/13 vs 8/12  flipped 53.6s  | Judges' decision — damage 254 vs 271 (6.5% margin) · pieces 13/13 vs 8/12 — damage inside the draw band, decided on structure retained
+run 1: PlayerWin at 19.2s  dealt 36 taken 119  pieces 13/13 vs 10/12  flipped 10.8s  | Enemy counted out — beached — 0 of 4 wheels touching the ground, so the drive had nothing to push on
+run 2: PlayerWin at 90.4s  dealt 324 taken 121  pieces 13/13 vs 8/12  flipped 46.3s  | Judges' decision — damage 324 vs 121 (62.8% margin) · pieces 13/13 vs 8/12 — decided on damage
+R2D_B1_reactionOFF|charge  n=3  W3/L0/D0  flips=0  len 19.2-90.4s spread=4.71x  worst single-step piece loss: player 0 enemy 1  [NOISY] (52s wall)

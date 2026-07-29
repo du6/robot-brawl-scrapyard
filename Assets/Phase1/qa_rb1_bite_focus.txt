@@ -1,0 +1,36 @@
+# section=bite opponent=mauler seconds=25 speed=3 fire=True reps=6 builds=5
+# LIVE CONSTANTS  tipSpeedCap m/s: ABS=9.00 Aluminum=9.68 Steel=12.50 Titanium=14.79 CarbonFiber=13.11 Tungsten=13.69  | MotorKW 0/1/2/3 eng 1.0/2.5/4.0/5.5  | DRIVE_KW_PER_TONNE 1.25 | LIFT_EFFICIENCY 0.85 | REACTION_FRAC 0.60 | GROUND_CLEAR 0.020 | BITE_RATE_FRAC 0.45 | EXPOSED_MULT 1.75 | STEP_DISP_CAP 0.25
+# LIVE CONSTANTS (cycle) WIND_RELEASE_FRAC 0.995 | WIND_TIMEOUT_S 2.00 | BITE_TIP_SPEED_MS 4.00 | RECOVER_S 0.10 | PIVOT_RETURN_DPS 500 | MIN_BITE_E 40 | DRAIN_FRAC 0.40 | LIN_IMP_CAP 600 | EFFICIENCY 0.35 | RECUP_FRAC 0.90 | REACTION_STALL_MUL 3.0
+# LIVE CONSTANTS (damage/judging) DMG_K 0.045 | HP_K 6000 | SHOVE_CAP 500 | PART_IMMUNITY 0.50 | RAM_MIN_J 150 | RAM_J_CAP 900 | STRUCT_BAND 0.060 | MIN_STRUCT_PARTS 2.0 | DRAW_BAND_FRAC 0.080 | CONTROL_BAND 0.100 | MATCH_TIME 90 | CREDIT_BUDGET 4000
+# SOURCE REGIME b3f9659c (41 scripts, newest 2026-07-27 15:12:21Z)
+NOWEAP       r0 t=24s ended=TIMEBOX | dealt 53 taken 44 | ram 53/4 (13.4/bite) limb 0/0 (0.0/bite max 0) | pParts 11/13 eParts 11/11 | eDealt 44
+NOWEAP       r1 t=24s ended=TIMEBOX | dealt 68 taken 57 | ram 68/5 (13.7/bite) limb 0/0 (0.0/bite max 0) | pParts 13/13 eParts 11/11 | eDealt 57
+NOWEAP       r2 t=24s ended=TIMEBOX | dealt 114 taken 70 | ram 114/13 (8.8/bite) limb 0/0 (0.0/bite max 0) | pParts 13/13 eParts 10/11 | eDealt 70
+NOWEAP       r3 t=24s ended=TIMEBOX | dealt 75 taken 73 | ram 75/5 (15.1/bite) limb 0/0 (0.0/bite max 0) | pParts 11/13 eParts 11/11 | eDealt 73
+NOWEAP       r4 t=24s ended=TIMEBOX | dealt 80 taken 102 | ram 80/2 (40.0/bite) limb 0/0 (0.0/bite max 0) | pParts 8/13 eParts 11/11 | eDealt 102
+NOWEAP       r5 t=24s ended=TIMEBOX | dealt 121 taken 124 | ram 121/4 (30.2/bite) limb 0/0 (0.0/bite max 0) | pParts 9/13 eParts 11/11 | eDealt 124
+DISC_Z       r0 t=24s ended=TIMEBOX | dealt 101 taken 194 | ram 101/7 (14.4/bite) limb 0/0 (0.0/bite max 0) | pParts 12/15 eParts 10/11 | eDealt 194
+DISC_Z       r1 t=24s ended=TIMEBOX | dealt 43 taken 150 | ram 43/5 (8.7/bite) limb 0/0 (0.0/bite max 0) | pParts 13/15 eParts 10/11 | eDealt 150
+DISC_Z       r2 t=24s ended=TIMEBOX | dealt 299 taken 103 | ram 61/6 (10.2/bite) limb 238/5 (47.6/bite max 72) | pParts 13/15 eParts 10/11 | eDealt 103
+DISC_Z       r3 t=24s ended=TIMEBOX | dealt 94 taken 43 | ram 94/11 (8.6/bite) limb 0/0 (0.0/bite max 0) | pParts 15/15 eParts 11/11 | eDealt 43
+DISC_Z       r4 t=24s ended=TIMEBOX | dealt 108 taken 127 | ram 108/9 (12.0/bite) limb 0/0 (0.0/bite max 0) | pParts 13/15 eParts 10/11 | eDealt 127
+DISC_Z       r5 t=24s ended=TIMEBOX | dealt 41 taken 95 | ram 41/3 (13.5/bite) limb 0/0 (0.0/bite max 0) | pParts 13/15 eParts 10/11 | eDealt 95
+SAW_Z        r0 t=22s ended=PlayerWin | dealt 543 taken 96 | ram 115/5 (23.1/bite) limb 428/16 (26.7/bite max 44) | pParts 15/15 eParts 0/11 | enemyGone
+SAW_Z        r1 t=24s ended=TIMEBOX | dealt 45 taken 91 | ram 45/4 (11.2/bite) limb 0/0 (0.0/bite max 0) | pParts 13/15 eParts 10/11 | eDealt 91
+SAW_Z        r2 t=24s ended=TIMEBOX | dealt 51 taken 60 | ram 51/6 (8.5/bite) limb 0/0 (0.0/bite max 0) | pParts 15/15 eParts 11/11 | eDealt 60
+SAW_Z        r3 t=24s ended=TIMEBOX | dealt 156 taken 158 | ram 156/10 (15.6/bite) limb 0/0 (0.0/bite max 0) | pParts 13/15 eParts 11/11 | eDealt 158
+SAW_Z        r4 t=24s ended=TIMEBOX | dealt 275 taken 97 | ram 85/10 (8.5/bite) limb 190/3 (63.2/bite max 80) | pParts 15/15 eParts 10/11 | eDealt 97
+SAW_Z        r5 t=24s ended=TIMEBOX | dealt 86 taken 130 | ram 86/5 (17.2/bite) limb 0/0 (0.0/bite max 0) | pParts 13/15 eParts 10/11 | eDealt 130
+COAX_V       r0 t=24s ended=TIMEBOX | dealt 104 taken 81 | ram 104/4 (26.0/bite) limb 0/0 (0.0/bite max 0) | pParts 13/15 eParts 11/11 | eDealt 81
+COAX_V       r1 t=24s ended=TIMEBOX | dealt 59 taken 89 | ram 59/2 (29.6/bite) limb 0/0 (0.0/bite max 0) | pParts 13/15 eParts 10/11 | eDealt 89
+COAX_V       r2 t=24s ended=TIMEBOX | dealt 67 taken 89 | ram 67/2 (33.3/bite) limb 0/0 (0.0/bite max 0) | pParts 11/15 eParts 10/11 | eDealt 89
+COAX_V       r3 t=24s ended=TIMEBOX | dealt 198 taken 125 | ram 200/8 (25.0/bite) limb 0/0 (0.0/bite max 0) | pParts 15/15 eParts 11/11 | eDealt 125
+COAX_V       r4 t=24s ended=TIMEBOX | dealt 124 taken 41 | ram 124/5 (24.8/bite) limb 0/0 (0.0/bite max 0) | pParts 13/15 eParts 11/11 | eDealt 41
+COAX_V       r5 t=24s ended=TIMEBOX | dealt 140 taken 131 | ram 140/16 (8.7/bite) limb 0/0 (0.0/bite max 0) | pParts 15/15 eParts 11/11 | eDealt 131
+HAMMER       r0 t=24s ended=TIMEBOX | dealt 3 taken 91 | ram 3/3 (0.9/bite) limb 0/0 (0.0/bite max 0) | pParts 14/16 eParts 11/11 | eDealt 91
+HAMMER       r1 t=24s ended=TIMEBOX | dealt 96 taken 107 | ram 96/3 (32.1/bite) limb 0/0 (0.0/bite max 0) | pParts 14/16 eParts 11/11 | eDealt 107
+HAMMER       r2 t=24s ended=TIMEBOX | dealt 422 taken 84 | ram 67/6 (11.1/bite) limb 355/9 (39.5/bite max 68) | pParts 15/16 eParts 11/11 | eDealt 84
+HAMMER       r3 t=24s ended=TIMEBOX | dealt 43 taken 89 | ram 43/3 (14.2/bite) limb 0/0 (0.0/bite max 0) | pParts 14/16 eParts 11/11 | eDealt 89
+HAMMER       r4 t=24s ended=TIMEBOX | dealt 209 taken 176 | ram 167/5 (33.4/bite) limb 42/1 (42.4/bite max 42) | pParts 14/16 eParts 11/11 | eDealt 176
+HAMMER       r5 t=24s ended=TIMEBOX | dealt 152 taken 74 | ram 77/5 (15.4/bite) limb 75/1 (75.3/bite max 75) | pParts 16/16 eParts 11/11 | eDealt 74
+# done 5 builds

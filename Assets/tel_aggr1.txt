@@ -1,0 +1,65 @@
+[330.5] Settling t=90.0 P(hp=100.0% parts=21 dealt=0.0) E(hp=100.0% parts=5 dealt=0.0) cam=(6.20,9.05,0.00) vpP=(0.32,0.47,10.6) vpE=(0.68,0.47,10.7) ai=engage
+  LOG BELL — fight live. YOU parts 21 hp 100% · MAULER parts 5 hp 100%
+[331.5] BELL t=90.0 P(hp=100.0% parts=21 dealt=0.0) E(hp=100.0% parts=5 dealt=0.0) cam=(6.20,8.81,0.04) vpP=(0.32,0.48,10.6) vpE=(0.68,0.47,10.5) ai=engage
+[331.5] Fighting t=90.0 P(hp=100.0% parts=21 dealt=0.0) E(hp=100.0% parts=5 dealt=0.0) cam=(6.20,8.81,0.04) vpP=(0.32,0.48,10.6) vpE=(0.68,0.47,10.5) ai=engage
+[332.5] Fighting t=89.0 P(hp=100.0% parts=21 dealt=0.0) E(hp=100.0% parts=5 dealt=0.0) cam=(6.20,6.45,-0.35) vpP=(0.36,0.49,8.8) vpE=(0.63,0.45,8.4) ai=flank
+[333.6] Fighting t=87.9 P(hp=100.0% parts=21 dealt=0.0) E(hp=100.0% parts=5 dealt=0.0) cam=(5.84,4.17,-2.47) vpP=(0.68,0.51,6.8) vpE=(0.25,0.38,5.5) ai=turn
+[334.6] Fighting t=86.9 P(hp=100.0% parts=21 dealt=0.0) E(hp=100.0% parts=5 dealt=0.0) cam=(6.19,9.72,-1.35) vpP=(0.66,0.60,11.5) vpE=(0.35,0.35,9.8) ai=turn
+  LOG PlayerBuild: connection BROKE — beam_14↔spinnerZP_15  (stress 981 > 900 N·s)
+  LOG PlayerBuild: lost 1 part(s) — mass now 1340 kg, handling will change.
+[335.6] Fighting t=85.9 P(hp=96.0% parts=20 dealt=0.0) E(hp=100.0% parts=5 dealt=0.0) cam=(6.20,10.86,1.84) vpP=(0.63,0.57,12.4) vpE=(0.38,0.41,11.2) ai=charge
+[336.7] Fighting t=84.8 P(hp=96.0% parts=20 dealt=0.0) E(hp=100.0% parts=5 dealt=0.0) cam=(5.97,4.03,5.28) vpP=(0.50,0.54,7.0) vpE=(0.49,0.32,5.0) ai=charge
+[337.8] Fighting t=83.7 P(hp=96.0% parts=20 dealt=0.0) E(hp=100.0% parts=5 dealt=0.0) cam=(6.07,3.67,5.80) vpP=(0.51,0.53,6.9) vpE=(0.49,0.34,4.8) ai=charge co=(9.3,-1.0)
+[338.8] Fighting t=82.7 P(hp=96.0% parts=20 dealt=0.0) E(hp=100.0% parts=5 dealt=0.0) cam=(5.87,3.66,5.74) vpP=(0.52,0.52,6.7) vpE=(0.46,0.36,5.1) ai=turn co=(8.3,-1.0)
+[339.9] Fighting t=81.6 P(hp=96.0% parts=20 dealt=0.0) E(hp=100.0% parts=5 dealt=0.0) cam=(5.67,3.66,5.40) vpP=(0.53,0.51,6.5) vpE=(0.50,0.36,5.0) ai=charge co=(7.2,-1.0)
+[340.9] Fighting t=80.6 P(hp=96.0% parts=20 dealt=0.0) E(hp=100.0% parts=5 dealt=0.0) cam=(5.77,3.66,5.79) vpP=(0.51,0.51,6.6) vpE=(0.49,0.37,5.1) ai=charge co=(6.2,-1.0)
+[342.0] Fighting t=79.5 P(hp=96.0% parts=20 dealt=0.0) E(hp=100.0% parts=5 dealt=0.0) cam=(5.59,3.66,5.32) vpP=(0.56,0.50,6.4) vpE=(0.43,0.39,5.3) ai=charge co=(5.1,-1.0)
+[343.1] Fighting t=78.4 P(hp=96.0% parts=20 dealt=0.0) E(hp=100.0% parts=5 dealt=0.0) cam=(5.61,3.66,5.75) vpP=(0.51,0.51,6.5) vpE=(0.49,0.38,5.2) ai=charge co=(4.0,-1.0)
+[344.1] Fighting t=77.4 P(hp=96.0% parts=20 dealt=0.0) E(hp=100.0% parts=5 dealt=0.0) cam=(5.46,3.66,5.76) vpP=(0.52,0.49,6.4) vpE=(0.47,0.40,5.4) ai=turn co=(3.0,-1.0)
+  LOG Mauler: core_0 took 15.3 dmg (hp 81.9/97.2)
+  LOG PlayerBuild: plate_20 took 15.3 dmg (hp 38.7/54.0)
+[345.2] Fighting t=76.3 P(hp=95.1% parts=20 dealt=15.3) E(hp=96.9% parts=5 dealt=15.3) cam=(5.29,3.67,5.35) vpP=(0.55,0.48,6.2) vpE=(0.45,0.41,5.4) ai=backoff co=(1.9,-1.0)
+[346.2] Fighting t=75.3 P(hp=95.1% parts=20 dealt=15.3) E(hp=96.9% parts=5 dealt=15.3) cam=(5.28,3.67,5.32) vpP=(0.55,0.48,6.2) vpE=(0.45,0.40,5.4) ai=unstick co=(0.9,-1.0)
+  LOG MATCH OVER — PlayerLoss: Your bot was counted out — add a self-right mechanism or lower your center of mass
+[347.3] Ended t=74.3 P(hp=95.1% parts=20 dealt=15.3) E(hp=96.9% parts=5 dealt=15.3) cam=(3.64,8.13,2.07) vpP=(0.41,0.54,9.2) vpE=(0.60,0.41,8.4) ai=turn
+[348.4] Ended t=74.3 P(hp=95.1% parts=20 dealt=15.3) E(hp=96.9% parts=5 dealt=15.3) cam=(3.70,8.13,2.03) vpP=(0.41,0.56,9.2) vpE=(0.60,0.40,8.3) ai=turn
+[349.5] Ended t=74.3 P(hp=95.1% parts=20 dealt=15.3) E(hp=96.9% parts=5 dealt=15.3) cam=(3.72,8.13,2.02) vpP=(0.40,0.56,9.2) vpE=(0.61,0.40,8.3) ai=turn
+[350.6] Ended t=74.3 P(hp=95.1% parts=20 dealt=15.3) E(hp=96.9% parts=5 dealt=15.3) cam=(3.74,8.13,2.03) vpP=(0.40,0.56,9.2) vpE=(0.61,0.40,8.3) ai=turn
+[351.6] Ended t=74.3 P(hp=95.1% parts=20 dealt=15.3) E(hp=96.9% parts=5 dealt=15.3) cam=(3.75,8.13,2.04) vpP=(0.40,0.55,9.2) vpE=(0.61,0.40,8.3) ai=turn
+[352.7] Ended t=74.3 P(hp=95.1% parts=20 dealt=15.3) E(hp=96.9% parts=5 dealt=15.3) cam=(3.75,8.13,2.05) vpP=(0.40,0.55,9.2) vpE=(0.61,0.40,8.4) ai=turn
+[353.7] Ended t=74.3 P(hp=95.1% parts=20 dealt=15.3) E(hp=96.9% parts=5 dealt=15.3) cam=(3.76,8.13,2.05) vpP=(0.40,0.55,9.2) vpE=(0.61,0.40,8.4) ai=turn
+[354.8] Ended t=74.3 P(hp=95.1% parts=20 dealt=15.3) E(hp=96.9% parts=5 dealt=15.3) cam=(3.77,8.13,2.06) vpP=(0.39,0.55,9.2) vpE=(0.62,0.40,8.4) ai=turn
+[355.9] Ended t=74.3 P(hp=95.1% parts=20 dealt=15.3) E(hp=96.9% parts=5 dealt=15.3) cam=(3.78,8.13,2.06) vpP=(0.39,0.55,9.2) vpE=(0.62,0.41,8.4) ai=turn
+[357.0] Ended t=74.3 P(hp=95.1% parts=20 dealt=15.3) E(hp=96.9% parts=5 dealt=15.3) cam=(3.78,8.13,2.07) vpP=(0.39,0.55,9.2) vpE=(0.62,0.41,8.4) ai=turn
+[358.0] Ended t=74.3 P(hp=95.1% parts=20 dealt=15.3) E(hp=96.9% parts=5 dealt=15.3) cam=(3.79,8.13,2.07) vpP=(0.39,0.55,9.2) vpE=(0.62,0.41,8.4) ai=turn
+[359.0] Ended t=74.3 P(hp=95.1% parts=20 dealt=15.3) E(hp=96.9% parts=5 dealt=15.3) cam=(3.79,8.13,2.08) vpP=(0.39,0.55,9.2) vpE=(0.62,0.41,8.4) ai=turn
+[360.1] Ended t=74.3 P(hp=95.1% parts=20 dealt=15.3) E(hp=96.9% parts=5 dealt=15.3) cam=(3.79,8.13,2.08) vpP=(0.39,0.55,9.2) vpE=(0.62,0.41,8.4) ai=turn
+[361.1] Ended t=74.3 P(hp=95.1% parts=20 dealt=15.3) E(hp=96.9% parts=5 dealt=15.3) cam=(3.79,8.13,2.08) vpP=(0.39,0.55,9.2) vpE=(0.62,0.41,8.4) ai=turn
+[362.1] Ended t=74.3 P(hp=95.1% parts=20 dealt=15.3) E(hp=96.9% parts=5 dealt=15.3) cam=(3.79,8.13,2.08) vpP=(0.39,0.55,9.2) vpE=(0.62,0.41,8.4) ai=turn
+[363.2] Ended t=74.3 P(hp=95.1% parts=20 dealt=15.3) E(hp=96.9% parts=5 dealt=15.3) cam=(3.79,8.13,2.08) vpP=(0.39,0.55,9.2) vpE=(0.62,0.41,8.4) ai=turn
+[364.2] Ended t=74.3 P(hp=95.1% parts=20 dealt=15.3) E(hp=96.9% parts=5 dealt=15.3) cam=(3.79,8.13,2.08) vpP=(0.39,0.55,9.2) vpE=(0.62,0.41,8.4) ai=turn
+[365.3] Ended t=74.3 P(hp=95.1% parts=20 dealt=15.3) E(hp=96.9% parts=5 dealt=15.3) cam=(3.79,8.13,2.08) vpP=(0.39,0.55,9.2) vpE=(0.62,0.41,8.4) ai=turn
+[366.4] Ended t=74.3 P(hp=95.1% parts=20 dealt=15.3) E(hp=96.9% parts=5 dealt=15.3) cam=(3.79,8.13,2.08) vpP=(0.39,0.55,9.2) vpE=(0.62,0.41,8.4) ai=turn
+[367.4] Ended t=74.3 P(hp=95.1% parts=20 dealt=15.3) E(hp=96.9% parts=5 dealt=15.3) cam=(3.79,8.13,2.08) vpP=(0.39,0.55,9.2) vpE=(0.62,0.41,8.4) ai=turn
+[368.4] Ended t=74.3 P(hp=95.1% parts=20 dealt=15.3) E(hp=96.9% parts=5 dealt=15.3) cam=(3.79,8.13,2.08) vpP=(0.39,0.55,9.2) vpE=(0.62,0.41,8.4) ai=turn
+[369.4] Ended t=74.3 P(hp=95.1% parts=20 dealt=15.3) E(hp=96.9% parts=5 dealt=15.3) cam=(3.79,8.13,2.08) vpP=(0.39,0.55,9.2) vpE=(0.62,0.41,8.4) ai=turn
+[370.5] Ended t=74.3 P(hp=95.1% parts=20 dealt=15.3) E(hp=96.9% parts=5 dealt=15.3) cam=(3.79,8.13,2.08) vpP=(0.39,0.55,9.2) vpE=(0.62,0.41,8.4) ai=turn
+[371.6] Ended t=74.3 P(hp=95.1% parts=20 dealt=15.3) E(hp=96.9% parts=5 dealt=15.3) cam=(3.79,8.13,2.08) vpP=(0.39,0.55,9.2) vpE=(0.62,0.41,8.4) ai=turn
+[372.6] Ended t=74.3 P(hp=95.1% parts=20 dealt=15.3) E(hp=96.9% parts=5 dealt=15.3) cam=(3.79,8.13,2.08) vpP=(0.39,0.55,9.2) vpE=(0.62,0.41,8.4) ai=turn
+[373.7] Ended t=74.3 P(hp=95.1% parts=20 dealt=15.3) E(hp=96.9% parts=5 dealt=15.3) cam=(3.79,8.13,2.08) vpP=(0.39,0.55,9.2) vpE=(0.62,0.41,8.4) ai=turn
+[374.8] Ended t=74.3 P(hp=95.1% parts=20 dealt=15.3) E(hp=96.9% parts=5 dealt=15.3) cam=(3.79,8.13,2.08) vpP=(0.39,0.55,9.2) vpE=(0.62,0.41,8.4) ai=turn
+[375.8] Ended t=74.3 P(hp=95.1% parts=20 dealt=15.3) E(hp=96.9% parts=5 dealt=15.3) cam=(3.79,8.13,2.08) vpP=(0.39,0.55,9.2) vpE=(0.62,0.41,8.4) ai=turn
+[376.9] Ended t=74.3 P(hp=95.1% parts=20 dealt=15.3) E(hp=96.9% parts=5 dealt=15.3) cam=(3.79,8.13,2.08) vpP=(0.39,0.55,9.2) vpE=(0.62,0.41,8.4) ai=turn
+[377.9] Ended t=74.3 P(hp=95.1% parts=20 dealt=15.3) E(hp=96.9% parts=5 dealt=15.3) cam=(3.79,8.13,2.08) vpP=(0.39,0.55,9.2) vpE=(0.62,0.41,8.4) ai=turn
+[379.0] Ended t=74.3 P(hp=95.1% parts=20 dealt=15.3) E(hp=96.9% parts=5 dealt=15.3) cam=(3.79,8.13,2.08) vpP=(0.39,0.55,9.2) vpE=(0.62,0.41,8.4) ai=turn
+[380.0] Ended t=74.3 P(hp=95.1% parts=20 dealt=15.3) E(hp=96.9% parts=5 dealt=15.3) cam=(3.79,8.13,2.08) vpP=(0.39,0.55,9.2) vpE=(0.62,0.41,8.4) ai=turn
+[381.0] Ended t=74.3 P(hp=95.1% parts=20 dealt=15.3) E(hp=96.9% parts=5 dealt=15.3) cam=(3.79,8.13,2.08) vpP=(0.39,0.55,9.2) vpE=(0.62,0.41,8.4) ai=turn
+[382.0] Ended t=74.3 P(hp=95.1% parts=20 dealt=15.3) E(hp=96.9% parts=5 dealt=15.3) cam=(3.79,8.13,2.08) vpP=(0.39,0.55,9.2) vpE=(0.62,0.41,8.4) ai=turn
+[383.1] Ended t=74.3 P(hp=95.1% parts=20 dealt=15.3) E(hp=96.9% parts=5 dealt=15.3) cam=(3.79,8.13,2.08) vpP=(0.39,0.55,9.2) vpE=(0.62,0.41,8.4) ai=turn
+[384.2] Ended t=74.3 P(hp=95.1% parts=20 dealt=15.3) E(hp=96.9% parts=5 dealt=15.3) cam=(3.79,8.13,2.08) vpP=(0.39,0.55,9.2) vpE=(0.62,0.41,8.4) ai=turn
+[385.2] Ended t=74.3 P(hp=95.1% parts=20 dealt=15.3) E(hp=96.9% parts=5 dealt=15.3) cam=(3.79,8.13,2.08) vpP=(0.39,0.55,9.2) vpE=(0.62,0.41,8.4) ai=turn
+[386.2] Ended t=74.3 P(hp=95.1% parts=20 dealt=15.3) E(hp=96.9% parts=5 dealt=15.3) cam=(3.79,8.13,2.08) vpP=(0.39,0.55,9.2) vpE=(0.62,0.41,8.4) ai=turn
+[387.3] Ended t=74.3 P(hp=95.1% parts=20 dealt=15.3) E(hp=96.9% parts=5 dealt=15.3) cam=(3.79,8.13,2.08) vpP=(0.39,0.55,9.2) vpE=(0.62,0.41,8.4) ai=turn
+[388.3] Ended t=74.3 P(hp=95.1% parts=20 dealt=15.3) E(hp=96.9% parts=5 dealt=15.3) cam=(3.79,8.13,2.08) vpP=(0.39,0.55,9.2) vpE=(0.62,0.41,8.4) ai=turn
+[389.3] Ended t=74.3 P(hp=95.1% parts=20 dealt=15.3) E(hp=96.9% parts=5 dealt=15.3) cam=(3.79,8.13,2.08) vpP=(0.39,0.55,9.2) vpE=(0.62,0.41,8.4) ai=turn
+[390.4] Ended t=74.3 P(hp=95.1% parts=20 dealt=15.3) E(hp=96.9% parts=5 dealt=15.3) cam=(3.79,8.13,2.08) vpP=(0.39,0.55,9.2) vpE=(0.62,0.41,8.4) ai=turn

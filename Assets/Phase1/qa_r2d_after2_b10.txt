@@ -1,0 +1,14 @@
+# build b10_hammer_al_AFTER2 parts=13 policy=charge runs=4
+# LIVE CONSTANTS  tipSpeedCap m/s: ABS=9.00 Aluminum=9.68 Steel=12.50 Titanium=14.79 CarbonFiber=13.11 Tungsten=13.69  | MotorKW 0/1/2/3 eng 1.0/2.5/4.0/5.5  | DRIVE_KW_PER_TONNE 1.25 | LIFT_EFFICIENCY 0.85 | REACTION_FRAC 0.60 | GROUND_CLEAR 0.020 | BITE_RATE_FRAC 0.45 | EXPOSED_MULT 1.75 | STEP_DISP_CAP 0.25
+# LIVE CONSTANTS (cycle) WIND_RELEASE_FRAC 0.995 | WIND_TIMEOUT_S 2.00 | BITE_TIP_SPEED_MS 4.00 | RECOVER_S 0.10 | PIVOT_RETURN_DPS 500 | MIN_BITE_E 40 | DRAIN_FRAC 0.40 | LIN_IMP_CAP 600 | EFFICIENCY 0.35 | RECUP_FRAC 0.90 | REACTION_STALL_MUL 3.0
+# LIVE CONSTANTS (damage/judging) DMG_K 0.045 | HP_K 6000 | SHOVE_CAP 500 | PART_IMMUNITY 0.50 | RAM_MIN_J 150 | RAM_J_CAP 900 | STRUCT_BAND 0.060 | MIN_STRUCT_PARTS 2.0 | DRAW_BAND_FRAC 0.080 | CONTROL_BAND 0.100 | MATCH_TIME 90 | CREDIT_BUDGET 4000
+# SOURCE REGIME 96ce6370 (22 scripts, newest 2026-07-27 01:35:15Z)
+# fixedDeltaTime 0.0200  timeScale 3.0  debugFire True
+run 0: PlayerWin at 90.0s  dealt 572 taken 268  pieces 12/13 vs 5/11  flipped self 2.6s enemy 12.9s  | Judges' decision — damage 572 vs 268 (53.2% margin) · pieces 12/13 vs 5/11 · on its back 3% vs 14% — decided on structure destroyed
+   src: ram 252/22 · limb 320/8 (max hit 58.1) · disc 0/0   packSeam 0.97
+run 1: PlayerWin at 90.0s  dealt 464 taken 377  pieces 12/13 vs 6/11  flipped self 3.0s enemy 9.5s  | Judges' decision — damage 464 vs 377 (18.8% margin) · pieces 12/13 vs 6/11 · on its back 3% vs 11% — decided on structure destroyed
+   src: ram 145/22 · limb 319/11 (max hit 76.4) · disc 0/0   packSeam 0.33
+run 2: PlayerLoss at 77.3s  dealt 135 taken 270  pieces 0/13 vs 10/11  flipped self 0.3s enemy 0.2s  | KO — your core was destroyed
+run 3: PlayerWin at 90.0s  dealt 175 taken 137  pieces 12/13 vs 10/11  flipped self 1.8s enemy 0.0s  | Judges' decision — damage 175 vs 137 (21.6% margin) · pieces 12/13 vs 10/11 · on its back 2% vs 0% — structure even, decided on damage
+   src: ram 89/9 · limb 86/2 (max hit 49.6) · disc 0/0   packSeam 0.51
+b10_hammer_al_AFTER2|charge  n=4  W3/L1/D0  flips=1  len 77.3-90.0s spread=1.17x  worst single-step piece loss: player 8 enemy 1  [CONVERGED] (118s wall)

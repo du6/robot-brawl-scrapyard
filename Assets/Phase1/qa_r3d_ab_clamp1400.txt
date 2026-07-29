@@ -1,0 +1,44 @@
+# build b6_CLAMP1400 parts=12 policy=charge runs=4
+# LIVE CONSTANTS  tipSpeedCap m/s: ABS=9.00 Aluminum=9.68 Steel=12.50 Titanium=14.79 CarbonFiber=13.11 Tungsten=13.69  | MotorKW 0/1/2/3 eng 1.0/2.5/4.0/5.5  | DRIVE_KW_PER_TONNE 1.25 | LIFT_EFFICIENCY 0.85 | REACTION_FRAC 0.60 | GROUND_CLEAR 0.020 | BITE_RATE_FRAC 0.45 | EXPOSED_MULT 1.75 | STEP_DISP_CAP 0.25
+# LIVE CONSTANTS (cycle) WIND_RELEASE_FRAC 0.995 | WIND_TIMEOUT_S 2.00 | BITE_TIP_SPEED_MS 4.00 | RECOVER_S 0.10 | PIVOT_RETURN_DPS 500 | MIN_BITE_E 40 | DRAIN_FRAC 0.40 | LIN_IMP_CAP 600 | EFFICIENCY 0.35 | RECUP_FRAC 0.90 | REACTION_STALL_MUL 3.0
+# LIVE CONSTANTS (damage/judging) DMG_K 0.045 | HP_K 6000 | SHOVE_CAP 500 | PART_IMMUNITY 0.50 | RAM_MIN_J 150 | RAM_J_CAP 900 | STRUCT_BAND 0.060 | MIN_STRUCT_PARTS 2.0 | DRAW_BAND_FRAC 0.080 | CONTROL_BAND 0.100 | MATCH_TIME 45 | CREDIT_BUDGET 4000
+# SOURCE REGIME a8303d5b (23 scripts, newest 2026-07-27 02:51:48Z)
+# fixedDeltaTime 0.0200  timeScale 2.0  debugFire True
+run 0: PlayerWin at 15.4s  dealt 583 taken 23  pieces 12/12 vs 0/11  flipped self 0.0s enemy 6.4s  | KO — enemy core destroyed
+   src: ram 149/12 · limb 434/8 (max hit 83.2) · disc 0/0   packSeam 0.97
+   det MAULER|SEAM core_0↔chassis_1|SHEARED at 1400 vs eff 900|t 1157.7
+   det MAULER|SEAM chassis_1↔spikeZP_6|SHEARED at 1400 vs eff 900|t 1158.7
+   det MAULER|spikeZP_6|STRUCTURAL-SHED|hp 86/87 (99%)|t 1160.0
+   det MAULER|engine_3|HP-DESTROYED|hp 0/142 (0%)|t 1165.4
+   det MAULER|battery_4|HP-DESTROYED|hp 0/56 (0%)|t 1165.4
+   det MAULER|gyro_5|HP-DESTROYED|hp 0/50 (0%)|t 1165.5
+   det MAULER|chassis_1|STRUCTURAL-SHED|hp 52/216 (24%)|t 1166.7
+   det MAULER|core_0|HP-DESTROYED|hp 0/97 (0%)|t 1172.0
+   det MAULER|chassis_2|STRUCTURAL-WRECK|hp 179/216 (83%)|t 1172.0
+run 1: PlayerWin at 45.2s  dealt 437 taken 158  pieces 12/12 vs 6/11  flipped self 0.0s enemy 12.8s  | Judges' decision — damage 437 vs 158 (63.8% margin) · pieces 12/12 vs 6/11 · on its back 0% vs 28% — decided on structure destroyed
+   src: ram 139/10 · limb 298/3 (max hit 131.2) · disc 0/0   packSeam 1.33
+   det MAULER|SEAM core_0↔chassis_1|SHEARED at 1400 vs eff 900|t 1174.9
+   det MAULER|SEAM chassis_1↔spikeZP_6|SHEARED at 1400 vs eff 900|t 1175.9
+   det MAULER|gyro_5|HP-DESTROYED|hp 0/50 (0%)|t 1176.6
+   det MAULER|spikeZP_6|STRUCTURAL-SHED|hp 77/87 (89%)|t 1177.2
+   det MAULER|SEAM core_0↔engine_3|SHEARED at 1400 vs eff 900|t 1181.6
+   det PlayerBuild|SEAM chassis_2↔battery_3|SHEARED at 1400 vs eff 1051|t 1181.6
+   det MAULER|chassis_2|HP-DESTROYED|hp 0/216 (0%)|t 1183.5
+run 2: PlayerWin at 45.0s  dealt 406 taken 89  pieces 12/12 vs 7/11  flipped self 0.0s enemy 0.0s  | Judges' decision — damage 406 vs 89 (78.0% margin) · pieces 12/12 vs 7/11 · on its back 0% vs 0% — decided on structure destroyed
+   src: ram 293/18 · limb 112/1 (max hit 112.4) · disc 0/0   packSeam 0.97
+   det MAULER|SEAM core_0↔chassis_1|SHEARED at 1400 vs eff 900|t 1221.9
+   det MAULER|SEAM chassis_1↔spikeZP_6|SHEARED at 1400 vs eff 900|t 1222.9
+   det MAULER|spikeZP_6|STRUCTURAL-SHED|hp 86/87 (98%)|t 1224.2
+   det MAULER|SEAM core_0↔chassis_2|SHEARED at 922 vs eff 900|t 1229.0
+   det MAULER|SEAM chassis_2↔gyro_5|SHEARED at 986 vs eff 900|t 1230.8
+   det MAULER|chassis_1|HP-DESTROYED|hp 0/216 (0%)|t 1231.7
+run 3: PlayerWin at 35.2s  dealt 563 taken 22  pieces 12/12 vs 4/11  flipped self 0.0s enemy 1.2s  | Enemy counted out — out of power — 300 kJ of its 300 kJ pack was torn off the chassis, and what was left ran dry after 25 s
+   src: ram 86/5 · limb 478/4 (max hit 131.2) · disc 0/0   packSeam 0.97
+   det MAULER|SEAM core_0↔chassis_1|SHEARED at 1400 vs eff 900|t 1268.7
+   det MAULER|SEAM chassis_1↔spikeZP_6|SHEARED at 1400 vs eff 900|t 1269.7
+   det MAULER|spikeZP_6|STRUCTURAL-SHED|hp 82/87 (94%)|t 1271.0
+   det MAULER|engine_3|HP-DESTROYED|hp 0/142 (0%)|t 1272.8
+   det MAULER|gyro_5|HP-DESTROYED|hp 0/50 (0%)|t 1284.2
+   det MAULER|battery_4|HP-DESTROYED|hp 0/56 (0%)|t 1284.2
+   det MAULER|chassis_1|STRUCTURAL-SHED|hp 135/216 (63%)|t 1285.5
+b6_CLAMP1400|charge  n=4  W4/L0/D0  flips=0  len 15.4-45.2s spread=2.94x  worst single-step piece loss: player 0 enemy 2  [NOISY] (74s wall)

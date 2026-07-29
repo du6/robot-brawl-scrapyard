@@ -1,0 +1,13 @@
+# build owen_SPINDLE_vs_widow parts=17 policy=charge runs=4
+# LIVE CONSTANTS  tipSpeedCap m/s: ABS=9.00 Aluminum=9.68 Steel=12.50 Titanium=14.79 CarbonFiber=13.11 Tungsten=13.69  | MotorKW 0/1/2/3 eng 1.0/2.5/4.0/5.5  | DRIVE_KW_PER_TONNE 1.25 | LIFT_EFFICIENCY 0.85 | REACTION_FRAC 0.60 | GROUND_CLEAR 0.020 | BITE_RATE_FRAC 0.45 | EXPOSED_MULT 1.75 | STEP_DISP_CAP 0.25
+# LIVE CONSTANTS (cycle) WIND_RELEASE_FRAC 0.995 | WIND_TIMEOUT_S 2.00 | BITE_TIP_SPEED_MS 4.00 | RECOVER_S 0.10 | PIVOT_RETURN_DPS 500 | MIN_BITE_E 40 | DRAIN_FRAC 0.40 | LIN_IMP_CAP 600 | EFFICIENCY 0.35 | RECUP_FRAC 0.90 | REACTION_STALL_MUL 3.0
+# LIVE CONSTANTS (damage/judging) DMG_K 0.045 | HP_K 6000 | SHOVE_CAP 500 | PART_IMMUNITY 0.50 | RAM_MIN_J 150 | RAM_J_CAP 900 | STRUCT_BAND 0.060 | MIN_STRUCT_PARTS 2.0 | DRAW_BAND_FRAC 0.080 | CONTROL_BAND 0.100 | MATCH_TIME 90 | CREDIT_BUDGET 4000
+# SOURCE REGIME a125b8b9 (40 scripts, newest 2026-07-27 14:09:43Z)
+# fixedDeltaTime 0.0200  timeScale 4.0  debugFire True  (trigger HELD for the scripted player)
+run 0: PlayerLoss at 41.6s  dealt 64 taken 417  pieces 10/17 vs 12/12  flipped self 0.0s enemy 0.0s  | Counted out — every one of its 4 wheels had been torn off — nothing left to drive with
+   src: ram 64/4 · limb 0/0 (max hit 0.0) · disc 0/0   packSeam 0.83
+run 1: PlayerWin at 17.6s  dealt 716 taken 535  pieces 10/17 vs 0/12  flipped self 0.0s enemy 0.0s  | KO — enemy core destroyed
+   src: ram 42/4 · limb 674/28 (max hit 56.7) · disc 0/0   packSeam 0.34
+run 2: PlayerLoss at 44.4s  dealt 85 taken 1000  pieces 0/17 vs 12/12  flipped self 0.8s enemy 0.0s  | KO — your core was destroyed
+run 3: PlayerLoss at 32.0s  dealt 42 taken 465  pieces 0/17 vs 12/12  flipped self 0.0s enemy 0.0s  | KO — your core was destroyed
+owen_SPINDLE_vs_widow|charge  n=4  W1/L3/D0  flips=1  len 17.6-44.4s spread=2.52x  worst single-step piece loss: player 12 enemy 7  [NOISY] (36s wall)

@@ -1,0 +1,10 @@
+# build c1_lowflip_ti parts=13 policy=charge runs=3
+# LIVE CONSTANTS  tipSpeedCap m/s: ABS=9.00 Aluminum=9.68 Steel=12.50 Titanium=14.79 CarbonFiber=13.11 Tungsten=13.69  | MotorKW 0/1/2/3 eng 1.0/2.5/4.0/5.5  | DRIVE_KW_PER_TONNE 1.25 | LIFT_EFFICIENCY 0.85 | REACTION_FRAC 0.60 | GROUND_CLEAR 0.020 | BITE_RATE_FRAC 0.45 | EXPOSED_MULT 1.75 | STEP_DISP_CAP 0.25
+# fixedDeltaTime 0.0200  timeScale 3.0  debugFire True
+run 0: PlayerWin at 24.0s  dealt 206 taken 21  pieces 13/13 vs 11/12  flipped self 0.0s enemy 16.8s  | Enemy counted out — flipped onto its back — the emergency struts could not roll a hull this shape back over; a gyro rights you in under a second
+   src: ram 206/8 · limb 0/0 (max hit 0.0) · disc 0/0   packSeam 0.97
+run 1: PlayerLoss at 90.3s  dealt 417 taken 501  pieces 9/13 vs 11/12  flipped self 0.0s enemy 14.1s  | Judges' decision — damage 417 vs 501 (16.9% margin) · pieces 9/13 vs 11/12 · on its back 0% vs 16% — decided on structure destroyed
+   src: ram 281/15 · limb 135/4 (max hit 39.8) · disc 0/0   packSeam 0.44
+run 2: PlayerWin at 90.3s  dealt 354 taken 251  pieces 13/13 vs 11/12  flipped self 0.0s enemy 33.6s  | Judges' decision — damage 354 vs 251 (29.1% margin) · pieces 13/13 vs 11/12 · on its back 0% vs 37% — structure even, decided on damage
+   src: ram 241/10 · limb 113/4 (max hit 34.2) · disc 0/0   packSeam 0.97
+c1_lowflip_ti|charge  n=3  W2/L1/D0  flips=1  len 24.0-90.3s spread=3.76x  worst single-step piece loss: player 1 enemy 1  [NOISY] (70s wall)

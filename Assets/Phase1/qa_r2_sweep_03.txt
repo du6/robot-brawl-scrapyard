@@ -1,0 +1,6 @@
+# build qa_r2_b2_rotor_cf|scout|Veteran|fire=True parts=13 policy=charge runs=4
+run 0: PlayerLoss at 78.9s  dealt 135 taken 281  pieces 0/13 vs 6/11  flipped 1.5s  | KO — your core was destroyed
+run 1: PlayerLoss at 90.3s  dealt 91 taken 215  pieces 13/13 vs 5/11  flipped 3.3s  | Judges' decision — damage 91 vs 215 (57.7% margin) · pieces 13/13 vs 5/11 — decided on damage
+run 2: PlayerWin at 90.3s  dealt 330 taken 198  pieces 13/13 vs 5/11  flipped 0.9s  | Judges' decision — damage 330 vs 198 (40.2% margin) · pieces 13/13 vs 5/11 — decided on damage
+run 3: PlayerWin at 90.3s  dealt 213 taken 197  pieces 13/13 vs 6/11  flipped 2.4s  | Judges' decision — damage 213 vs 197 (7.5% margin) · pieces 13/13 vs 6/11 — damage inside the draw band, decided on structure retained
+qa_r2_b2_rotor_cf|scout|Veteran|fire=True|charge  n=4  W2/L2/D0  flips=2  len 78.9-90.3s spread=1.14x  worst single-step piece loss: player 9 enemy 1  [NOISY] (119s wall)

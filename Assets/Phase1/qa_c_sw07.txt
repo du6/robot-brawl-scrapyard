@@ -1,0 +1,8 @@
+# build c3_lance_w parts=12 policy=charge runs=4
+# LIVE CONSTANTS  tipSpeedCap m/s: ABS=9.00 Aluminum=9.68 Steel=12.50 Titanium=14.79 CarbonFiber=13.11 Tungsten=13.69  | MotorKW 0/1/2/3 eng 1.0/2.5/4.0/5.5  | DRIVE_KW_PER_TONNE 1.25 | LIFT_EFFICIENCY 0.85 | REACTION_FRAC 0.60 | GROUND_CLEAR 0.020 | BITE_RATE_FRAC 0.45 | EXPOSED_MULT 1.75 | STEP_DISP_CAP 0.25
+# fixedDeltaTime 0.0200  timeScale 3.0  debugFire True
+run 0: PlayerWin at 73.5s  dealt 807 taken 341  pieces 12/12 vs 9/13  flipped self 1.5s enemy 0.3s  | Enemy counted out — out of power — 240 kJ of its 300 kJ pack was torn off the chassis, and what was left ran dry after 64 s
+run 1: PlayerWin at 90.0s  dealt 659 taken 487  pieces 12/12 vs 10/13  flipped self 1.8s enemy 3.9s  | Judges' decision — damage 659 vs 487 (26.0% margin) · pieces 12/12 vs 10/13 · on its back 2% vs 4% — decided on structure destroyed
+run 2: PlayerWin at 68.1s  dealt 1038 taken 342  pieces 12/12 vs 0/13  flipped self 2.4s enemy 0.9s  | KO — enemy core destroyed
+run 3: PlayerWin at 66.6s  dealt 512 taken 275  pieces 12/12 vs 10/13  flipped self 3.3s enemy 2.7s  | Enemy counted out — out of power — 240 kJ of its 300 kJ pack was torn off the chassis, and what was left ran dry after 57 s
+c3_lance_w|charge  n=4  W4/L0/D0  flips=0  len 66.6-90.0s spread=1.35x  worst single-step piece loss: player 0 enemy 2  [CONVERGED] (102s wall)

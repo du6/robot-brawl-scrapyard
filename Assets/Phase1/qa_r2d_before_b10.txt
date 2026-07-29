@@ -1,0 +1,12 @@
+# build b10_hammer_al_BEFORE parts=13 policy=charge runs=4
+# LIVE CONSTANTS  tipSpeedCap m/s: ABS=9.00 Aluminum=9.68 Steel=12.50 Titanium=14.79 CarbonFiber=13.11 Tungsten=13.69  | MotorKW 0/1/2/3 eng 1.0/2.5/4.0/5.5  | DRIVE_KW_PER_TONNE 1.25 | LIFT_EFFICIENCY 0.85 | REACTION_FRAC 0.60 | GROUND_CLEAR 0.020 | BITE_RATE_FRAC 0.45 | EXPOSED_MULT 1.75 | STEP_DISP_CAP 0.25
+# fixedDeltaTime 0.0200  timeScale 3.0  debugFire True
+run 0: PlayerWin at 90.0s  dealt 665 taken 283  pieces 11/13 vs 5/11  flipped self 4.8s enemy 2.1s  | Judges' decision — damage 665 vs 283 (57.5% margin) · pieces 11/13 vs 5/11 · on its back 5% vs 2% — decided on structure destroyed
+   src: ram 237/37 · limb 428/24 (max hit 65.6) · disc 0/0   packSeam 0.97
+run 1: PlayerWin at 90.0s  dealt 294 taken 136  pieces 12/13 vs 9/11  flipped self 2.1s enemy 0.0s  | Judges' decision — damage 294 vs 136 (53.9% margin) · pieces 12/13 vs 9/11 · on its back 2% vs 0% — structure even, decided on damage
+   src: ram 74/15 · limb 220/11 (max hit 34.9) · disc 0/0   packSeam 0.73
+run 2: PlayerWin at 90.0s  dealt 485 taken 177  pieces 12/13 vs 6/11  flipped self 0.0s enemy 4.5s  | Judges' decision — damage 485 vs 177 (63.6% margin) · pieces 12/13 vs 6/11 · on its back 0% vs 5% — decided on structure destroyed
+   src: ram 259/32 · limb 226/8 (max hit 56.3) · disc 0/0   packSeam 0.74
+run 3: PlayerWin at 90.0s  dealt 562 taken 211  pieces 12/13 vs 9/11  flipped self 0.0s enemy 0.0s  | Judges' decision — damage 562 vs 211 (62.5% margin) · pieces 12/13 vs 9/11 · on its back 0% vs 0% — structure even, decided on damage
+   src: ram 156/16 · limb 406/18 (max hit 65.6) · disc 0/0   packSeam 0.32
+b10_hammer_al_BEFORE|charge  n=4  W4/L0/D0  flips=0  len 90.0-90.0s spread=1.00x  worst single-step piece loss: player 1 enemy 1  [CONVERGED] (123s wall)

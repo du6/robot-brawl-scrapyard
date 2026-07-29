@@ -1,0 +1,27 @@
+# UP2 CRITIC part function, pass 2 (fixtures assembled by pointer)
+
+## 1. ACTUATORS, pointer-assembled, trigger held 10 s in TEST DRIVE
+pivot: built by pointer: pivot@9 blade@10
+   playerControlled=True maxRate=14.00 cycles=36 phases[Winding,Driving,Returning,Recovering,Ready]  SWING arc 0.560 rad of 2.618 (21%)
+   limb parts=1 blockedBy=null tipR=0.250 rateMax=14.00 kJ/swing=0.068
+spindle: built by pointer: spindle@9 blade@10
+   playerControlled=True maxRate=50.00 cycles=1 phases[Driving]  SPIN 50.00 rad/s = 477 RPM, 79.3 revs in 10 s
+   limb parts=1 blockedBy=null tipR=0.250 rateMax=50.00 kJ/swing=0.867
+ram: built by pointer: ram@9 spike@10
+   playerControlled=True maxRate=3.50 cycles=13 phases[Winding,Driving,Returning,Recovering,Ready]  EXTEND 0.450/0.450 m = 100% of stroke
+   limb parts=1 blockedBy=null tipR=0.150 rateMax=3.50 kJ/swing=0.997
+
+## 2. WEAPON BITE - identical rig, dummy re-parked 1.15 m ahead every 2 s, 12 s of trigger
+   dealt = ram-dummy HP lost. lift = dummy y rise. push/pull = dummy motion along the attack axis.
+   selfMove = how far the ATTACKER moved, so pull can be told from the attacker closing.
+blade      (on pivot) dealt=    0.0  self=   0.0  lift=0.000  push=0.001  pull=0.000  selfMove=0.00  omega=0.0  limb=1/blocked=null
+wedge      (on pivot) dealt=    0.0  self=   0.0  lift=0.000  push=0.000  pull=0.004  selfMove=0.11  omega=0.0  limb=1/blocked=null
+hook       (on pivot) dealt=    0.0  self=   0.0  lift=0.000  push=0.000  pull=0.000  selfMove=0.00  omega=0.0  limb=1/blocked=null
+spike      (on pivot) dealt=    0.0  self=   0.0  lift=0.000  push=0.000  pull=0.001  selfMove=0.01  omega=0.0  limb=1/blocked=null
+spinner    (direct)  dealt=    0.0  self=   0.0  lift=0.000  push=0.001  pull=0.000  selfMove=0.00  omega=94.2  no actuator
+spinnerSaw (direct) arm NOT placed (Too low — would clip the floor)
+spike      (direct)  dealt=    0.0  self=   0.0  lift=0.000  push=0.001  pull=0.000  selfMove=0.00  omega=0.0  no actuator
+blade      (direct)  dealt=    0.0  self=   0.0  lift=0.000  push=0.001  pull=0.000  selfMove=0.00  omega=0.0  no actuator
+-          (direct)  dealt=    0.0  self=   0.0  lift=0.000  push=0.001  pull=0.000  selfMove=0.00  omega=0.0  no actuator
+
+## DONE

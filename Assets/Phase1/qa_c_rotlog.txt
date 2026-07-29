@@ -1,0 +1,6 @@
+rot0 t=9648.337 [Spindle travel=63.917 rate=10.00] dealt=128 pieces=14
+rot1 t=9648.356 [Spindle travel=64.117 rate=10.00] dealt=128 pieces=14
+rot2 t=9648.377 [Spindle travel=64.317 rate=10.00] dealt=128 pieces=14
+rot3 t=9648.396 [Spindle travel=64.517 rate=10.00] dealt=128 pieces=14
+rot4 t=9648.417 [Spindle travel=64.717 rate=10.00] dealt=128 pieces=14
+rot5 t=9648.437 [Spindle travel=64.917 rate=10.00] dealt=128 pieces=14

@@ -1,0 +1,8 @@
+# build c2_rotor_cf parts=14 policy=charge runs=4
+# LIVE CONSTANTS  tipSpeedCap m/s: ABS=9.00 Aluminum=9.68 Steel=12.50 Titanium=14.79 CarbonFiber=13.11 Tungsten=13.69  | MotorKW 0/1/2/3 eng 1.0/2.5/4.0/5.5  | DRIVE_KW_PER_TONNE 1.25 | LIFT_EFFICIENCY 0.85 | REACTION_FRAC 0.60 | GROUND_CLEAR 0.020 | BITE_RATE_FRAC 0.45 | EXPOSED_MULT 1.75 | STEP_DISP_CAP 0.25
+# fixedDeltaTime 0.0200  timeScale 3.0  debugFire True
+run 0: PlayerWin at 36.6s  dealt 505 taken 115  pieces 14/14 vs 8/11  flipped self 0.0s enemy 0.0s  | Enemy counted out — out of power — 300 kJ of its 300 kJ pack was torn off the chassis, and what was left ran dry after 27 s
+run 1: PlayerWin at 35.7s  dealt 682 taken 696  pieces 12/14 vs 8/11  flipped self 0.0s enemy 5.4s  | Enemy counted out — out of power — 300 kJ of its 300 kJ pack was torn off the chassis, and what was left ran dry after 26 s
+run 2: PlayerLoss at 90.3s  dealt 933 taken 1277  pieces 8/14 vs 7/11  flipped self 0.9s enemy 3.9s  | Judges' decision — damage 933 vs 1277 (27.0% margin) · pieces 8/14 vs 7/11 · on its back 1% vs 4% — decided on structure destroyed
+run 3: PlayerWin at 90.0s  dealt 385 taken 507  pieces 14/14 vs 8/11  flipped self 0.0s enemy 0.0s  | Judges' decision — damage 385 vs 507 (24.0% margin) · pieces 14/14 vs 8/11 · on its back 0% vs 0% — decided on structure destroyed
+c2_rotor_cf|charge  n=4  W3/L1/D0  flips=1  len 35.7-90.3s spread=2.53x  worst single-step piece loss: player 1 enemy 1  [NOISY] (87s wall)

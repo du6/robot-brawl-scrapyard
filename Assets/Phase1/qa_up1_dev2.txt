@@ -1,0 +1,45 @@
+# UP1 DEV PASS 2 - R metric redone + part FUNCTION in TEST DRIVE
+
+## R. DOES EVERY R PRESS CHANGE THE DRAWING? (per-press, normalised start)
+   beam      0>90>180>270>90>180>270  dead=0/6  ok
+   beamlong  270>90>180>270>90>180>270 dead=0/6  ok
+   plate     0>180>270>0>180>270>0    dead=0/6  ok
+   chassis   0>90>180>270>0>90>180    dead=0/6  ok
+   bracket   0>90>180>270>0>90>180    dead=6/6  (same shape at every yaw - nothing R can show)
+   engine    0>90>0>90>0>90>0         dead=0/6  ok
+   battery   0>90>0>90>0>90>0         dead=6/6  (same shape at every yaw - nothing R can show)
+
+## F1. PIVOT / SPINDLE / RAM under the player trigger, IN TEST DRIVE
+   pivot on the battery roof, blade arm     maxRate=14.00 rad/s maxTravel=2.618 cycles=19  arc limit 2.618 rad (150 deg)
+   ok    it MOVES under the player trigger in TEST DRIVE
+   spindle on the battery roof, blade arm   maxRate=27.17 rad/s maxTravel=322.572 cycles=1  total 322.6 rad = 51.3 revolutions in 12 s
+   ok    it MOVES under the player trigger in TEST DRIVE
+   ram LOW (belly clearance 0.030 m)        maxRate=3.50 rad/s maxTravel=0.450 cycles=16  stroke 0.450 / RAM_STROKE_M 0.450 = 100%
+   ok    it MOVES under the player trigger in TEST DRIVE
+   ram HIGH (belly clearance 0.230 m)       maxRate=3.50 rad/s maxTravel=0.450 cycles=16  stroke 0.450 / RAM_STROKE_M 0.450 = 100%
+   ok    it MOVES under the player trigger in TEST DRIVE
+
+## F2. SPINNER / SPINNERSAW - do they spin, and what do they cost?
+   spinner     maxOmega=94.25 rad/s (900 RPM)  storedE=2.9 kJ
+   ok    it SPINS
+   spinnerSaw  maxOmega=94.25 rad/s (900 RPM)  storedE=5.9 kJ
+   ok    it SPINS
+
+## F3. WHEEL - does it DRIVE and does it STEER?
+   straight: 10.11 m in 6 s, peak 10.40 m/s
+   ok    it DRIVES
+   full throttle + full steer: hull turned 0 deg over 11.64 m
+   FAIL  no yaw response
+
+## F4. GYRO - does it RIGHT a flip? Same flip, same machine, +/- one gyro.
+   no gyro  recovery=1.70 s  (upright dot ended at 1.00)
+   1 gyro   recovery=0.30 s  (upright dot ended at 0.98)
+   (compare the two numbers above - that difference IS the gyro)
+
+## F5. ENGINE and BATTERY - do they raise the numbers they claim to?
+   0 engine, 1 battery   peakKW=  8.0  capacityKJ= 240.0  storedKJ= 240.0  Actuator.MotorKW(0)=1.00
+   1 engine, 1 battery   peakKW= 22.0  capacityKJ= 300.0  storedKJ= 300.0  Actuator.MotorKW(1)=2.50
+   2 engine, 1 battery   peakKW= 36.0  capacityKJ= 360.0  storedKJ= 360.0  Actuator.MotorKW(2)=4.00
+   1 engine, 2 battery   peakKW= 30.0  capacityKJ= 540.0  storedKJ= 540.0  Actuator.MotorKW(1)=2.50
+
+## DONE checks=21 failures=1

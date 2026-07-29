@@ -1,0 +1,84 @@
+# ACTUATOR DRIVE-AXIS PROBE - the REAL R key path
+
+== spindle on the +X face, pressing R five times ==
+  press#0 ghostYaw=180 driveAxis=(0.00, 1.00, 0.00) 'Y (vertical)'  ghostMesh=(0.318,0.396,0.318) valid=True
+  press#1 ghostYaw=270 driveAxis=(0.00, 0.00, 1.00) 'Z (front-to-back)'  ghostMesh=(0.318,0.318,0.396) valid=True
+  press#2 ghostYaw=  0 driveAxis=(1.00, 0.00, 0.00) 'mount face'  ghostMesh=(0.396,0.318,0.318) valid=True
+  press#3 ghostYaw= 90 driveAxis=(1.00, 0.00, 0.00) 'X (side-to-side)'  ghostMesh=(0.396,0.318,0.318) valid=True
+  press#4 ghostYaw=180 driveAxis=(0.00, 1.00, 0.00) 'Y (vertical)'  ghostMesh=(0.318,0.396,0.318) valid=True
+  press#5 ghostYaw=270 driveAxis=(0.00, 0.00, 1.00) 'Z (front-to-back)'  ghostMesh=(0.318,0.318,0.396) valid=True
+  PLACED yaw=270 driveAxis=(0.00, 0.00, 1.00) 'Z (front-to-back)' specId=spindleZP
+
+== spindle on the +Y face, pressing R five times ==
+  press#0 ghostYaw=270 driveAxis=(0.00, 0.00, 1.00) 'Z (front-to-back)'  ghostMesh=(0.318,0.318,0.396) valid=True
+  press#1 ghostYaw=  0 driveAxis=(0.00, 1.00, 0.00) 'mount face'  ghostMesh=(0.318,0.396,0.318) valid=True
+  press#2 ghostYaw= 90 driveAxis=(1.00, 0.00, 0.00) 'X (side-to-side)'  ghostMesh=(0.396,0.318,0.318) valid=True
+  press#3 ghostYaw=180 driveAxis=(0.00, 1.00, 0.00) 'Y (vertical)'  ghostMesh=(0.318,0.396,0.318) valid=True
+  press#4 ghostYaw=270 driveAxis=(0.00, 0.00, 1.00) 'Z (front-to-back)'  ghostMesh=(0.318,0.318,0.396) valid=True
+  press#5 ghostYaw=  0 driveAxis=(0.00, 1.00, 0.00) 'mount face'  ghostMesh=(0.318,0.396,0.318) valid=True
+  PLACED yaw=0 driveAxis=(0.00, 1.00, 0.00) 'mount face' specId=spindleYP
+
+== spindle on the +Z face, pressing R five times ==
+  press#0 ghostYaw=  0 driveAxis=(0.00, 0.00, 1.00) 'mount face'  ghostMesh=(0.318,0.318,0.396) valid=True
+  press#1 ghostYaw= 90 driveAxis=(1.00, 0.00, 0.00) 'X (side-to-side)'  ghostMesh=(0.396,0.318,0.318) valid=True
+  press#2 ghostYaw=180 driveAxis=(0.00, 1.00, 0.00) 'Y (vertical)'  ghostMesh=(0.318,0.396,0.318) valid=True
+  press#3 ghostYaw=270 driveAxis=(0.00, 0.00, 1.00) 'Z (front-to-back)'  ghostMesh=(0.318,0.318,0.396) valid=True
+  press#4 ghostYaw=  0 driveAxis=(0.00, 0.00, 1.00) 'mount face'  ghostMesh=(0.318,0.318,0.396) valid=True
+  press#5 ghostYaw= 90 driveAxis=(1.00, 0.00, 0.00) 'X (side-to-side)'  ghostMesh=(0.396,0.318,0.318) valid=True
+  PLACED yaw=90 driveAxis=(1.00, 0.00, 0.00) 'X (side-to-side)' specId=spindleXP
+
+== pivot on the +X face, pressing R five times ==
+  press#0 ghostYaw=  0 driveAxis=(1.00, 0.00, 0.00) 'mount face'  ghostMesh=(0.396,0.318,0.318) valid=True
+  press#1 ghostYaw= 90 driveAxis=(1.00, 0.00, 0.00) 'X (side-to-side)'  ghostMesh=(0.396,0.318,0.318) valid=True
+  press#2 ghostYaw=180 driveAxis=(0.00, 1.00, 0.00) 'Y (vertical)'  ghostMesh=(0.318,0.396,0.318) valid=True
+  press#3 ghostYaw=270 driveAxis=(0.00, 0.00, 1.00) 'Z (front-to-back)'  ghostMesh=(0.318,0.318,0.396) valid=True
+  press#4 ghostYaw=  0 driveAxis=(1.00, 0.00, 0.00) 'mount face'  ghostMesh=(0.396,0.318,0.318) valid=True
+  press#5 ghostYaw= 90 driveAxis=(1.00, 0.00, 0.00) 'X (side-to-side)'  ghostMesh=(0.396,0.318,0.318) valid=True
+  PLACED yaw=90 driveAxis=(1.00, 0.00, 0.00) 'X (side-to-side)' specId=pivotXP
+
+== pivot on the +Y face, pressing R five times ==
+  press#0 ghostYaw= 90 driveAxis=(1.00, 0.00, 0.00) 'X (side-to-side)'  ghostMesh=(0.396,0.318,0.318) valid=True
+  press#1 ghostYaw=180 driveAxis=(0.00, 1.00, 0.00) 'Y (vertical)'  ghostMesh=(0.318,0.396,0.318) valid=True
+  press#2 ghostYaw=270 driveAxis=(0.00, 0.00, 1.00) 'Z (front-to-back)'  ghostMesh=(0.318,0.318,0.396) valid=True
+  press#3 ghostYaw=  0 driveAxis=(0.00, 1.00, 0.00) 'mount face'  ghostMesh=(0.318,0.396,0.318) valid=True
+  press#4 ghostYaw= 90 driveAxis=(1.00, 0.00, 0.00) 'X (side-to-side)'  ghostMesh=(0.396,0.318,0.318) valid=True
+  press#5 ghostYaw=180 driveAxis=(0.00, 1.00, 0.00) 'Y (vertical)'  ghostMesh=(0.318,0.396,0.318) valid=True
+  PLACED yaw=180 driveAxis=(0.00, 1.00, 0.00) 'Y (vertical)' specId=pivotYP
+
+== pivot on the +Z face, pressing R five times ==
+  press#0 ghostYaw=180 driveAxis=(0.00, 1.00, 0.00) 'Y (vertical)'  ghostMesh=(0.318,0.396,0.318) valid=True
+  press#1 ghostYaw=270 driveAxis=(0.00, 0.00, 1.00) 'Z (front-to-back)'  ghostMesh=(0.318,0.318,0.396) valid=True
+  press#2 ghostYaw=  0 driveAxis=(0.00, 0.00, 1.00) 'mount face'  ghostMesh=(0.318,0.318,0.396) valid=True
+  press#3 ghostYaw= 90 driveAxis=(1.00, 0.00, 0.00) 'X (side-to-side)'  ghostMesh=(0.396,0.318,0.318) valid=True
+  press#4 ghostYaw=180 driveAxis=(0.00, 1.00, 0.00) 'Y (vertical)'  ghostMesh=(0.318,0.396,0.318) valid=True
+  press#5 ghostYaw=270 driveAxis=(0.00, 0.00, 1.00) 'Z (front-to-back)'  ghostMesh=(0.318,0.318,0.396) valid=True
+  PLACED yaw=270 driveAxis=(0.00, 0.00, 1.00) 'Z (front-to-back)' specId=pivotZP
+
+== ram on the +X face, pressing R five times ==
+  press#0 ghostYaw=  0 driveAxis=(1.00, 0.00, 0.00) 'mount face'  ghostMesh=(0.483,0.318,0.318) valid=True
+  press#1 ghostYaw= 90 driveAxis=(1.00, 0.00, 0.00) 'X (side-to-side)'  ghostMesh=(0.483,0.318,0.318) valid=True
+  press#2 ghostYaw=180 driveAxis=(0.00, 1.00, 0.00) 'Y (vertical)'  ghostMesh=(0.318,0.483,0.318) valid=True
+  press#3 ghostYaw=270 driveAxis=(0.00, 0.00, 1.00) 'Z (front-to-back)'  ghostMesh=(0.318,0.318,0.483) valid=True
+  press#4 ghostYaw=  0 driveAxis=(1.00, 0.00, 0.00) 'mount face'  ghostMesh=(0.483,0.318,0.318) valid=True
+  press#5 ghostYaw= 90 driveAxis=(1.00, 0.00, 0.00) 'X (side-to-side)'  ghostMesh=(0.483,0.318,0.318) valid=True
+  PLACED yaw=90 driveAxis=(1.00, 0.00, 0.00) 'X (side-to-side)' specId=ramXP
+
+== ram on the +Y face, pressing R five times ==
+  press#0 ghostYaw= 90 driveAxis=(1.00, 0.00, 0.00) 'X (side-to-side)'  ghostMesh=(0.483,0.318,0.318) valid=True
+  press#1 ghostYaw=180 driveAxis=(0.00, 1.00, 0.00) 'Y (vertical)'  ghostMesh=(0.318,0.483,0.318) valid=True
+  press#2 ghostYaw=270 driveAxis=(0.00, 0.00, 1.00) 'Z (front-to-back)'  ghostMesh=(0.318,0.318,0.483) valid=True
+  press#3 ghostYaw=  0 driveAxis=(0.00, 1.00, 0.00) 'mount face'  ghostMesh=(0.318,0.483,0.318) valid=True
+  press#4 ghostYaw= 90 driveAxis=(1.00, 0.00, 0.00) 'X (side-to-side)'  ghostMesh=(0.483,0.318,0.318) valid=True
+  press#5 ghostYaw=180 driveAxis=(0.00, 1.00, 0.00) 'Y (vertical)'  ghostMesh=(0.318,0.483,0.318) valid=True
+  PLACED yaw=180 driveAxis=(0.00, 1.00, 0.00) 'Y (vertical)' specId=ramYP
+
+== ram on the +Z face, pressing R five times ==
+  press#0 ghostYaw=180 driveAxis=(0.00, 1.00, 0.00) 'Y (vertical)'  ghostMesh=(0.318,0.483,0.318) valid=True
+  press#1 ghostYaw=270 driveAxis=(0.00, 0.00, 1.00) 'Z (front-to-back)'  ghostMesh=(0.318,0.318,0.483) valid=True
+  press#2 ghostYaw=  0 driveAxis=(0.00, 0.00, 1.00) 'mount face'  ghostMesh=(0.318,0.318,0.483) valid=True
+  press#3 ghostYaw= 90 driveAxis=(1.00, 0.00, 0.00) 'X (side-to-side)'  ghostMesh=(0.483,0.318,0.318) valid=True
+  press#4 ghostYaw=180 driveAxis=(0.00, 1.00, 0.00) 'Y (vertical)'  ghostMesh=(0.318,0.483,0.318) valid=True
+  press#5 ghostYaw=270 driveAxis=(0.00, 0.00, 1.00) 'Z (front-to-back)'  ghostMesh=(0.318,0.318,0.483) valid=True
+  PLACED yaw=270 driveAxis=(0.00, 0.00, 1.00) 'Z (front-to-back)' specId=ramZP
+
+# done

@@ -1,0 +1,13 @@
+CREDIT_BUDGET=4000  VITAL_SEAM_MUL=1.6  MIN_STRUCT_PARTS=2
+qa_owen_build_SAFE: cost=750 Validate=OK
+qa_c1_hammer_ti: cost=3278 Validate=OK
+qa_c2_rotor_cf: cost=1533 Validate=OK
+qa_c3_lance_w: cost=22386 Validate=Over budget: 22386 cr of 4000. Cheaper materials, or fewer parts.
+qa_c4_flipper_al: cost=1361 Validate=OK
+qa_c5_discus_abs: cost=344 Validate=OK
+qa_c6_hammer_abs: cost=279 Validate=OK
+qa_hammer_test: cost=1355 Validate=OK
+STRUCT band on 11 parts = 0.136 (old 0.060); on 16 parts = 0.094
+  9/11 vs 10/11 diff 0.091 -> falls through to DAMAGE
+  5/11 vs  7/11 diff 0.182 -> STRUCTURE
+  2/11 vs 10/11 diff 0.727 -> STRUCTURE

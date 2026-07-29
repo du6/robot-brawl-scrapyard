@@ -1,0 +1,23 @@
+# UP2 CRITIC weapon bite, pass 3 (front-mounted, pointer-assembled)
+
+## WEAPON BITE, front-mounted, dummy re-parked 1.15 m ahead every 2 s, 12 s of trigger
+blade      (on pivot)  dealt=   77.3  self=   0.0  lift=0.101  push=0.085  pull=0.000  selfMove=2.00  omega=0.0  arc=2.618  builder said tipR=0.250 rateMax=14.00
+wedge      (on pivot)  dealt=  164.2  self=   0.0  lift=0.249  push=0.047  pull=0.399  selfMove=0.88  omega=0.0  arc=2.618  builder said tipR=0.250 rateMax=14.00
+hook       (on pivot)  dealt=   77.3  self=   0.0  lift=0.026  push=0.046  pull=0.039  selfMove=0.20  omega=0.0  arc=2.618  builder said tipR=0.150 rateMax=14.00
+spike      (on pivot)  dealt=  102.8  self=   0.0  lift=0.106  push=0.220  pull=0.040  selfMove=1.73  omega=0.0  arc=2.618  builder said tipR=0.150 rateMax=14.00
+blade      (on spindle) dealt=  292.0  self=   0.0  lift=0.068  push=0.200  pull=0.069  selfMove=0.31  omega=0.0  arc=594.404  builder said tipR=0.250 rateMax=50.00
+spinner    (direct)    dealt=    0.0  self=   0.0  lift=0.000  push=0.000  pull=0.007  selfMove=0.00  omega=94.2  arc=0.000  no actuator
+spike      (direct)    dealt=    0.0  self=   0.0  lift=0.000  push=0.025  pull=0.000  selfMove=0.58  omega=0.0  arc=0.000  no actuator
+wedge      (direct)    dealt=    0.0  self=   0.0  lift=0.000  push=0.000  pull=0.013  selfMove=0.02  omega=0.0  arc=0.000  no actuator
+-          (direct)    dealt=    0.0  self=   0.0  lift=0.000  push=0.000  pull=0.009  selfMove=0.00  omega=0.0  arc=0.000  no actuator
+
+## PIVOT ARC vs MOUNT FACE - the builder quotes the same limb for both
+front +Z (vertical face, horizontal hinge)
+   BUILDER PROMISES tipR=0.250 rateMax=14.00 kJ/swing=0.068 blockedBy=null
+   ARENA DELIVERS arc=0.560 of 2.618 = 21%  peakRate=14.00  cycles=36
+rear  -Z (vertical face, horizontal hinge)
+   BUILDER PROMISES tipR=0.250 rateMax=14.00 kJ/swing=0.068 blockedBy=null
+   ARENA DELIVERS arc=0.280 of 2.618 = 11%  peakRate=14.00  cycles=46
+roof  +Y (horizontal face, vertical hinge): actuator NOT placed (off-cam)
+
+## DONE

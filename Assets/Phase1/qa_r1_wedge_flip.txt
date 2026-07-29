@@ -1,0 +1,4 @@
+t=40.5 enemyUpDot=0.997 enemyFlippedTime=0.00s playerDealt=41 enemyDealt=162 enemyStruct=0.91 state=Fighting
+b4b validate=OK parts=13
+  limb parts=2 blockedBy=null I=87.27 tipR=1.18 kJ/swing=14.11
+B4B t=21.9 enemyUpDot=1.000 enemyFlipped=0.00s playerDealt=41 enemyDealt=40 enemyStruct=0.91

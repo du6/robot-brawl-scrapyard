@@ -1,0 +1,8 @@
+# build b5_discus_al parts=11 policy=afk runs=6
+run 0: PlayerLoss at 90.3s  dealt 0 taken 76  pieces 10/11 vs 10/11  flipped 0.0s  | Judges' decision — damage 0 vs 76 (100.0% margin) · pieces 10/11 vs 10/11 — decided on damage
+run 1: PlayerWin at 90.0s  dealt 424 taken 58  pieces 10/11 vs 7/11  flipped 0.0s  | Judges' decision — damage 424 vs 58 (86.2% margin) · pieces 10/11 vs 7/11 — decided on damage
+run 2: PlayerLoss at 90.0s  dealt 0 taken 124  pieces 11/11 vs 10/11  flipped 0.0s  | Judges' decision — damage 0 vs 124 (100.0% margin) · pieces 11/11 vs 10/11 — decided on damage
+run 3: PlayerWin at 90.3s  dealt 385 taken 248  pieces 10/11 vs 7/11  flipped 0.0s  | Judges' decision — damage 385 vs 248 (35.5% margin) · pieces 10/11 vs 7/11 — decided on damage
+run 4: PlayerLoss at 90.3s  dealt 0 taken 165  pieces 9/11 vs 10/11  flipped 0.6s  | Judges' decision — damage 0 vs 165 (100.0% margin) · pieces 9/11 vs 10/11 — decided on damage
+run 5: PlayerLoss at 90.0s  dealt 0 taken 209  pieces 10/11 vs 10/11  flipped 0.0s  | Judges' decision — damage 0 vs 209 (100.0% margin) · pieces 10/11 vs 10/11 — decided on damage
+b5_discus_al|afk  n=6  W2/L4/D0  flips=2  len 90.0-90.3s spread=1.00x  worst single-step piece loss: player 1 enemy 1  [NOISY] (185s wall)

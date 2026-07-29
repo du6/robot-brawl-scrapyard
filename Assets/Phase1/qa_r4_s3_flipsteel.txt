@@ -1,0 +1,6 @@
+# build S3_flipper_steel parts=13 policy=charge runs=4
+run 0: Draw at 57.6s  dealt 349 taken 338  pieces 12/13 vs 10/13  flipped 4.8s  | Double count-out — neither bot could continue
+run 1: PlayerLoss at 76.0s  dealt 400 taken 451  pieces 12/13 vs 11/13  flipped 1.6s  | Counted out — out of power — 240 kJ of its 300 kJ pack was torn off the chassis, and what was left ran dry after 66 s
+run 2: PlayerWin at 54.0s  dealt 332 taken 195  pieces 12/13 vs 10/13  flipped 0.4s  | Enemy counted out — out of power — 240 kJ of its 300 kJ pack was torn off the chassis, and what was left ran dry after 44 s
+run 3: PlayerLoss at 76.8s  dealt 254 taken 264  pieces 12/13 vs 12/13  flipped 0.0s  | Counted out — out of power — 240 kJ of its 300 kJ pack was torn off the chassis, and what was left ran dry after 67 s
+S3_flipper_steel|charge  n=4  W1/L2/D1  flips=2  len 54.0-76.8s spread=1.42x  worst single-step piece loss: player 1 enemy 1  [NOISY] (69s wall)

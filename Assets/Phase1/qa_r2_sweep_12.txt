@@ -1,0 +1,6 @@
+# build qa_r2_b9_flipper_al|tipper|Veteran|fire=True parts=13 policy=charge runs=4
+run 0: PlayerLoss at 12.6s  dealt 1 taken 446  pieces 0/13 vs 12/12  flipped 1.2s  | KO — your core was destroyed
+run 1: PlayerLoss at 90.0s  dealt 201 taken 480  pieces 9/13 vs 9/12  flipped 0.6s  | Judges' decision — damage 201 vs 480 (58.1% margin) · pieces 9/13 vs 9/12 — decided on damage
+run 2: PlayerLoss at 70.2s  dealt 77 taken 183  pieces 13/13 vs 10/12  flipped 11.4s  | Counted out — out of power — all 300 kJ spent in 60 s; carry more battery, or spend less on driving and spinning
+run 3: PlayerLoss at 90.3s  dealt 266 taken 417  pieces 9/13 vs 5/12  flipped 4.8s  | Judges' decision — damage 266 vs 417 (36.2% margin) · pieces 9/13 vs 5/12 — decided on damage
+qa_r2_b9_flipper_al|tipper|Veteran|fire=True|charge  n=4  W0/L4/D0  flips=0  len 12.6-90.3s spread=7.17x  worst single-step piece loss: player 8 enemy 1  [NOISY] (91s wall)

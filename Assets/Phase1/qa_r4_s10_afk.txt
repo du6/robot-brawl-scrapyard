@@ -1,0 +1,38 @@
+# build b1_hammer_ti|mauler/Vet|PARKED-afk-nofire parts=12 policy=afk runs=4
+# LIVE CONSTANTS  tipSpeedCap m/s: ABS=9.00 Aluminum=9.68 Steel=12.50 Titanium=14.79 CarbonFiber=13.11 Tungsten=13.69  | MotorKW 0/1/2/3 eng 1.0/2.5/4.0/5.5  | DRIVE_KW_PER_TONNE 1.25 | LIFT_EFFICIENCY 0.85 | REACTION_FRAC 0.60 | GROUND_CLEAR 0.020 | BITE_RATE_FRAC 0.45 | EXPOSED_MULT 1.75 | STEP_DISP_CAP 0.25
+# LIVE CONSTANTS (cycle) WIND_RELEASE_FRAC 0.995 | WIND_TIMEOUT_S 2.00 | BITE_TIP_SPEED_MS 4.00 | RECOVER_S 0.10 | PIVOT_RETURN_DPS 500 | MIN_BITE_E 40 | DRAIN_FRAC 0.40 | LIN_IMP_CAP 600 | EFFICIENCY 0.35 | RECUP_FRAC 0.90 | REACTION_STALL_MUL 3.0
+# LIVE CONSTANTS (damage/judging) DMG_K 0.045 | HP_K 6000 | SHOVE_CAP 500 | PART_IMMUNITY 0.50 | RAM_MIN_J 150 | RAM_J_CAP 900 | STRUCT_BAND 0.060 | MIN_STRUCT_PARTS 2.0 | DRAW_BAND_FRAC 0.080 | CONTROL_BAND 0.100 | MATCH_TIME 90 | CREDIT_BUDGET 4000
+# SOURCE REGIME 76113c28 (23 scripts, newest 2026-07-27 03:18:17Z)
+# fixedDeltaTime 0.0200  timeScale 4.0  debugFire False
+run 0: PlayerLoss at 90.4s  dealt 0 taken 203  pieces 12/12 vs 10/11  flipped self 0.0s enemy 0.0s  | Judges' decision — damage 0 vs 203 (100.0% margin) · pieces 12/12 vs 10/11 · on its back 0% vs 0% — structure even, decided on damage
+   src: ram 0/0 · limb 0/0 (max hit 0.0) · disc 0/0   packSeam 0.73
+   det MAULER|SEAM core_0↔gyro_5|SHEARED at 1950 vs eff 900|t 3481.9
+   det MAULER|SEAM core_0↔chassis_2|SHEARED at 1050 vs eff 900|t 3490.5
+   det PlayerBuild|SEAM chassis_1↔battery_3|SHEARED at 1633 vs eff 1440|t 3530.8
+   det MAULER|SEAM chassis_2↔gyro_5|SHEARED at 1950 vs eff 900|t 3530.8
+   det MAULER|SEAM chassis_1↔spikeZP_6|SHEARED at 1476 vs eff 900|t 3534.9
+   det MAULER|spikeZP_6|STRUCTURAL-SHED|hp 87/87 (100%)|t 3536.2
+   det MAULER|SEAM core_0↔engine_3|SHEARED at 1731 vs eff 900|t 3544.3
+run 1: PlayerLoss at 90.4s  dealt 0 taken 342  pieces 12/12 vs 10/11  flipped self 2.0s enemy 0.4s  | Judges' decision — damage 0 vs 342 (100.0% margin) · pieces 12/12 vs 10/11 · on its back 2% vs 0% — structure even, decided on damage
+   src: ram 0/0 · limb 0/0 (max hit 0.0) · disc 0/0   packSeam 0.48
+   det MAULER|SEAM core_0↔chassis_2|SHEARED at 1581 vs eff 900|t 3612.1
+   det PlayerBuild|SEAM chassis_2↔battery_3|SHEARED at 1581 vs eff 1440|t 3612.1
+   det MAULER|SEAM core_0↔engine_3|SHEARED at 2015 vs eff 900|t 3626.8
+   det MAULER|SEAM chassis_1↔spikeZP_6|SHEARED at 1025 vs eff 900|t 3630.2
+   det MAULER|spikeZP_6|STRUCTURAL-SHED|hp 87/87 (100%)|t 3631.5
+   det MAULER|SEAM chassis_2↔gyro_5|SHEARED at 1581 vs eff 900|t 3637.1
+   det PlayerBuild|SEAM chassis_1↔battery_3|SHEARED at 1982 vs eff 1440|t 3650.5
+run 2: PlayerLoss at 90.0s  dealt 0 taken 204  pieces 12/12 vs 10/11  flipped self 0.0s enemy 0.0s  | Judges' decision — damage 0 vs 204 (100.0% margin) · pieces 12/12 vs 10/11 · on its back 0% vs 0% — structure even, decided on damage
+   src: ram 0/0 · limb 0/0 (max hit 0.0) · disc 0/0   packSeam 0.59
+   det MAULER|SEAM core_0↔chassis_2|SHEARED at 1211 vs eff 900|t 3723.3
+   det MAULER|SEAM chassis_2↔gyro_5|SHEARED at 1211 vs eff 900|t 3727.0
+   det MAULER|SEAM chassis_1↔spikeZP_6|SHEARED at 1668 vs eff 900|t 3737.3
+   det PlayerBuild|SEAM chassis_1↔battery_3|SHEARED at 1668 vs eff 1440|t 3737.3
+   det MAULER|spikeZP_6|STRUCTURAL-SHED|hp 87/87 (100%)|t 3738.6
+run 3: PlayerLoss at 90.0s  dealt 0 taken 197  pieces 12/12 vs 11/11  flipped self 0.0s enemy 0.0s  | Judges' decision — damage 0 vs 197 (100.0% margin) · pieces 12/12 vs 11/11 · on its back 0% vs 0% — structure even, decided on damage
+   src: ram 0/0 · limb 0/0 (max hit 0.0) · disc 0/0   packSeam 0.39
+   det MAULER|SEAM core_0↔chassis_2|SHEARED at 1599 vs eff 900|t 3765.8
+   det PlayerBuild|SEAM chassis_2↔battery_3|SHEARED at 1599 vs eff 1440|t 3765.8
+   det MAULER|SEAM chassis_2↔gyro_5|SHEARED at 1599 vs eff 900|t 3820.4
+   det PlayerBuild|SEAM chassis_1↔battery_3|SHEARED at 1465 vs eff 1440|t 3826.5
+b1_hammer_ti|mauler/Vet|PARKED-afk-nofire|afk  n=4  W0/L4/D0  flips=0  len 90.0-90.4s spread=1.00x  worst single-step piece loss: player 0 enemy 1  [CONVERGED] (93s wall)

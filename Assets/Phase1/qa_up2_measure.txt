@@ -1,0 +1,150 @@
+# UP2 MEASUREMENT — BEFORE the round-2 patch
+
+==================== SECTION orient ====================
+part        face  drawnBounds(world)                 pos
+pivot       -Z  (0.396, 0.318, 0.318)   (0.000, 0.700, -0.300)
+pivot       +Y  (0.396, 0.318, 0.318)   (0.000, 1.000, 0.000)
+pivot       +X  (0.396, 0.318, 0.318)   (0.300, 0.700, 0.000)
+  ^^ pivot !!DRAWN IDENTICAL ON EVERY FACE (orientation ignored)
+spindle     -Z  (0.396, 0.318, 0.318)   (0.000, 0.700, -0.300)
+spindle     +Y  (0.396, 0.318, 0.318)   (0.000, 1.000, 0.000)
+spindle     +X  (0.396, 0.318, 0.318)   (0.300, 0.700, 0.000)
+  ^^ spindle !!DRAWN IDENTICAL ON EVERY FACE (orientation ignored)
+ram         -Z  (0.318, 0.318, 0.483)   (0.000, 0.700, -0.300)
+ram         +Y  (0.318, 0.318, 0.483)   (0.000, 1.000, 0.000)
+ram         +X  (0.318, 0.318, 0.483)   (0.300, 0.700, 0.000)
+  ^^ ram !!DRAWN IDENTICAL ON EVERY FACE (orientation ignored)
+blade       -Z  (0.495, 0.045, 0.122)   (0.000, 0.700, -0.210)
+blade       +Y  (0.495, 0.045, 0.122)   (0.000, 0.875, 0.000)
+blade       +X  (0.495, 0.045, 0.122)   (0.400, 0.700, 0.000)
+  ^^ blade !!DRAWN IDENTICAL ON EVERY FACE (orientation ignored)
+wedge       -Z  (0.500, 0.149, 0.413)   (0.000, 0.700, -0.325)
+wedge       +Y  (0.500, 0.149, 0.413)   (0.000, 0.910, 0.000)
+wedge       +X  (0.500, 0.149, 0.413)   (0.400, 0.700, 0.000)
+  ^^ wedge !!DRAWN IDENTICAL ON EVERY FACE (orientation ignored)
+hook        -Z  (0.112, 0.309, 0.185)   (0.000, 0.700, -0.250)
+hook        +Y  (0.112, 0.309, 0.185)   (0.000, 1.000, 0.000)
+hook        +X  (0.112, 0.309, 0.185)   (0.230, 0.700, 0.000)
+  ^^ hook !!DRAWN IDENTICAL ON EVERY FACE (orientation ignored)
+spike       -Z  (0.220, 0.220, 0.303)   (0.000, 0.700, -0.300)
+spike       +Y  (0.220, 0.303, 0.220)   (0.000, 1.000, 0.000)
+spike       +X  (0.303, 0.220, 0.220)   (0.300, 0.700, 0.000)
+  ^^ spike orientation follows the mount face: OK
+## SECTION orient DONE checks=7 failures=6
+
+==================== SECTION yawleak ====================
+beam reached=True startYaw=0
+beam after one R: yaw=90
+!!LEAK beamlong first yaw=90 (expected 0)
+!!LEAK engine first yaw=90 (expected 0)
+## SECTION yawleak DONE checks=2 failures=2
+
+==================== SECTION plateR ====================
+plate R-cycle on every face of a bare core (hit-verified)
++X  yaw90:X(No socket on this face) yaw180:X(No socket on this face) yaw270:OK yaw0:X(No socket on this face)
+-X  yaw180:X(No socket on this face) yaw270:OK yaw0:X(No socket on this face) yaw180:X(No socket on this face)
++Y  yaw270:X(No socket on this face) yaw0:OK yaw180:X(No socket on this face) yaw270:X(No socket on this face)
+-Y  yaw0:OK yaw180:X(No socket on this face) yaw270:X(No socket on this face) yaw0:OK
++Z  yaw180:OK yaw270:X(No socket on this face) yaw0:X(No socket on this face) yaw180:OK
+-Z  yaw270:X(No socket on this face) yaw0:X(No socket on this face) yaw180:OK yaw270:X(No socket on this face)
+## SECTION plateR DONE checks=24 failures=0
+
+==================== SECTION budget ====================
+budget=4000  stacking Tungsten plates on +Y by pointer
+  step 0: cost 170 -> would be 1907, ghost valid=True 
+  step 1: cost 1907 -> would be 3644, ghost valid=True 
+  step 2: cost 3644 -> would be 5381, ghost valid=True 
+  step 3: cost 5381 -> would be 7118, ghost valid=True 
+  step 4: cost 7118 -> would be 8855, ghost valid=True 
+  step 5: cost 8855 -> would be 10592, ghost valid=True 
+  step 6: cost 10592 -> would be 12329, ghost valid=True 
+  step 7: cost 12329 -> would be 14066, ghost valid=True 
+  step 8: cost 14066 -> would be 15803, ghost valid=True 
+  step 9: cost 15803 -> would be 17540, ghost valid=True 
+  step 10: cost 17540 -> would be 19277, ghost valid=True 
+  step 11: cost 19277 -> would be 21014, ghost valid=True 
+placed 12 plates, final cost 21014 cr vs budget 4000 (5.25x)
+!!POINTER PATH ALLOWED AN OVER-BUDGET BUILD
+Validate() = Needs at least 1 wheel.
+## SECTION budget DONE checks=1 failures=1
+
+
+#########################################################
+# UP2 MEASUREMENT — AFTER the round-2 patch
+#########################################################
+
+==================== SECTION orient ====================
+part        face  drawnBounds(world)                 pos
+pivot       -Z  (0.318, 0.318, 0.396)   (0.000, 0.700, -0.300)
+pivot       +Y  (0.318, 0.396, 0.318)   (0.000, 1.000, 0.000)
+pivot       +X  (0.396, 0.318, 0.318)   (0.300, 0.700, 0.000)
+  ^^ pivot orientation follows the mount face: OK
+spindle     -Z  (0.318, 0.318, 0.396)   (0.000, 0.700, -0.300)
+spindle     +Y  (0.318, 0.396, 0.318)   (0.000, 1.000, 0.000)
+spindle     +X  (0.396, 0.318, 0.318)   (0.300, 0.700, 0.000)
+  ^^ spindle orientation follows the mount face: OK
+ram         -Z  (0.318, 0.318, 0.483)   (0.000, 0.700, -0.300)
+ram         +Y  (0.318, 0.483, 0.318)   (0.000, 1.000, 0.000)
+ram         +X  (0.483, 0.318, 0.318)   (0.300, 0.700, 0.000)
+  ^^ ram orientation follows the mount face: OK
+blade       -Z  (0.495, 0.045, 0.122)   (0.000, 0.700, -0.210)
+blade       +Y  (0.495, 0.051, 0.108)   (0.000, 0.875, 0.000)
+blade       +X  (0.510, 0.045, 0.119)   (0.400, 0.700, 0.000)
+  ^^ blade orientation follows the mount face: OK
+wedge       -Z  (0.500, 0.149, 0.413)   (0.000, 0.700, -0.325)
+wedge       +Y  (0.500, 0.413, 0.149)   (0.000, 0.910, 0.000)
+wedge       +X  (0.413, 0.149, 0.500)   (0.400, 0.700, 0.000)
+  ^^ wedge orientation follows the mount face: OK
+hook        -Z  (0.112, 0.309, 0.185)   (0.000, 0.700, -0.250)
+hook        +Y  (0.112, 0.185, 0.309)   (0.000, 1.000, 0.000)
+hook        +X  (0.185, 0.309, 0.112)   (0.230, 0.700, 0.000)
+  ^^ hook orientation follows the mount face: OK
+spike       -Z  (0.220, 0.220, 0.303)   (0.000, 0.700, -0.300)
+spike       +Y  (0.220, 0.303, 0.220)   (0.000, 1.000, 0.000)
+spike       +X  (0.303, 0.220, 0.220)   (0.300, 0.700, 0.000)
+  ^^ spike orientation follows the mount face: OK
+## SECTION orient DONE checks=7 failures=0
+
+==================== SECTION yawleak ====================
+beam reached=True startYaw=0
+beam after one R: yaw=90
+beamlong first yaw=0 OK
+engine first yaw=0 OK
+## SECTION yawleak DONE checks=2 failures=0
+
+==================== SECTION budget ====================
+budget=4000  stacking Tungsten plates on +Y by pointer
+  step 0: cost 170 -> would be 1907, ghost valid=True 
+  step 1: cost 1907 -> would be 3644, ghost valid=True 
+  step 2: cost 3644 -> would be 5381, ghost valid=False Over budget — 3644 cr of 4000 spent, this costs 1737
+placed 2 plates, final cost 3644 cr vs budget 4000 (0.91x)
+pointer path refused at the budget: OK (first refusal at step 2, cost was 3644)
+Validate() = Needs at least 1 wheel.
+## SECTION budget DONE checks=1 failures=0
+
+==================== SECTION plateR ====================
+plate R-cycle on every face of a bare core (hit-verified)
++X  yaw0:X(This way up it has no socket to mate with — press R, or aim at a side face) yaw180:X(This way up it has no socket to mate with — press R, or aim at a side face) yaw270:OK yaw0:X(This way up it has no socket to mate with — press R, or aim at a side face)
+-X  yaw180:X(This way up it has no socket to mate with — press R, or aim at a side face) yaw270:OK yaw0:X(This way up it has no socket to mate with — press R, or aim at a side face) yaw180:X(This way up it has no socket to mate with — press R, or aim at a side face)
++Y  yaw270:X(This way up it has no socket to mate with — press R, or aim at a side face) yaw0:OK yaw180:X(This way up it has no socket to mate with — press R, or aim at a side face) yaw270:X(This way up it has no socket to mate with — press R, or aim at a side face)
+-Y  yaw0:OK yaw180:X(This way up it has no socket to mate with — press R, or aim at a side face) yaw270:X(This way up it has no socket to mate with — press R, or aim at a side face) yaw0:OK
++Z  yaw180:OK yaw270:X(This way up it has no socket to mate with — press R, or aim at a side face) yaw0:X(This way up it has no socket to mate with — press R, or aim at a side face) yaw180:OK
+-Z  yaw270:X(This way up it has no socket to mate with — press R, or aim at a side face) yaw0:X(This way up it has no socket to mate with — press R, or aim at a side face) yaw180:OK yaw270:X(This way up it has no socket to mate with — press R, or aim at a side face)
+## SECTION plateR DONE checks=24 failures=0
+
+==================== SECTION arc ====================
+
+--- rig: pivot on the VERTICAL front face of the front chassis, blade on the pivot ---
+  pivot placed by pointer at (0.000, 0.700, 0.800) mountNormal (0.00, 0.00, 1.00)
+  blade placed by pointer at (0.000, 0.875, 0.800)
+  parts=11  Validate()=OK  cost=909
+  BUILDER SAYS: pivot parts=1 blockedBy=null tipR=0.425 rateMax=14.00  arcFree=1.091 of 2.618 = 42%
+  ARENA DELIVERS (vertical): maxTravel 0.840 rad of 2.618 = 32%  maxRate 14.00  cycles 25
+
+--- rig: pivot on the ROOF (+Y) face of the front chassis, blade on the pivot ---
+  pivot placed by pointer at (0.000, 1.000, 0.400) mountNormal (0.00, 1.00, 0.00)
+  blade placed by pointer at (0.000, 1.000, 0.610)
+  parts=11  Validate()=OK  cost=909
+  BUILDER SAYS: pivot parts=1 blockedBy=null tipR=0.460 rateMax=14.00  arcFree=2.618 of 2.618 = 100%
+  ARENA DELIVERS (roof): maxTravel 2.618 rad of 2.618 = 100%  maxRate 14.00  cycles 15
+## SECTION arc DONE checks=2 failures=0

@@ -1,0 +1,8 @@
+# build B4B_FLIPPER_CONTROL_oldwedge parts=13 policy=charge runs=6
+run 0: PlayerLoss at 87.6s  dealt 222 taken 304  pieces 12/13 vs 10/11  flipped 3.0s  | Counted out — out of power — all 300 kJ spent in 78 s; carry more battery, or spend less on driving and spinning
+run 1: PlayerLoss at 90.3s  dealt 296 taken 356  pieces 12/13 vs 10/11  flipped 16.8s  | Judges' decision — damage 296 vs 356 (16.8% margin) · pieces 12/13 vs 10/11 — decided on damage
+run 2: PlayerLoss at 81.3s  dealt 133 taken 277  pieces 12/13 vs 10/11  flipped 7.2s  | Counted out — out of power — all 300 kJ spent in 71 s; carry more battery, or spend less on driving and spinning
+run 3: PlayerLoss at 90.3s  dealt 65 taken 326  pieces 13/13 vs 10/11  flipped 36.0s  | Judges' decision — damage 65 vs 326 (79.9% margin) · pieces 13/13 vs 10/11 — decided on damage
+run 4: PlayerLoss at 88.2s  dealt 162 taken 231  pieces 12/13 vs 10/11  flipped 1.5s  | Counted out — out of power — all 300 kJ spent in 78 s; carry more battery, or spend less on driving and spinning
+run 5: PlayerLoss at 90.0s  dealt 286 taken 407  pieces 12/13 vs 10/11  flipped 10.8s  | Judges' decision — damage 286 vs 407 (29.7% margin) · pieces 12/13 vs 10/11 — decided on damage
+B4B_FLIPPER_CONTROL_oldwedge|charge  n=6  W0/L6/D0  flips=0  len 81.3-90.3s spread=1.11x  worst single-step piece loss: player 1 enemy 1  [CONVERGED] (180s wall)

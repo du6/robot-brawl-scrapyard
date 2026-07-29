@@ -1,0 +1,92 @@
+# build b4_flipper_al|bulwark/Champ|charge parts=12 policy=charge runs=4
+# LIVE CONSTANTS  tipSpeedCap m/s: ABS=9.00 Aluminum=9.68 Steel=12.50 Titanium=14.79 CarbonFiber=13.11 Tungsten=13.69  | MotorKW 0/1/2/3 eng 1.0/2.5/4.0/5.5  | DRIVE_KW_PER_TONNE 1.25 | LIFT_EFFICIENCY 0.85 | REACTION_FRAC 0.60 | GROUND_CLEAR 0.020 | BITE_RATE_FRAC 0.45 | EXPOSED_MULT 1.75 | STEP_DISP_CAP 0.25
+# LIVE CONSTANTS (cycle) WIND_RELEASE_FRAC 0.995 | WIND_TIMEOUT_S 2.00 | BITE_TIP_SPEED_MS 4.00 | RECOVER_S 0.10 | PIVOT_RETURN_DPS 500 | MIN_BITE_E 40 | DRAIN_FRAC 0.40 | LIN_IMP_CAP 600 | EFFICIENCY 0.35 | RECUP_FRAC 0.90 | REACTION_STALL_MUL 3.0
+# LIVE CONSTANTS (damage/judging) DMG_K 0.045 | HP_K 6000 | SHOVE_CAP 500 | PART_IMMUNITY 0.50 | RAM_MIN_J 150 | RAM_J_CAP 900 | STRUCT_BAND 0.060 | MIN_STRUCT_PARTS 2.0 | DRAW_BAND_FRAC 0.080 | CONTROL_BAND 0.100 | MATCH_TIME 90 | CREDIT_BUDGET 4000
+# SOURCE REGIME 76113c28 (23 scripts, newest 2026-07-27 03:18:17Z)
+# fixedDeltaTime 0.0200  timeScale 4.0  debugFire True
+run 0: Draw at 90.4s  dealt 443 taken 445  pieces 8/12 vs 9/13  flipped self 7.2s enemy 0.4s  | Judges' decision — damage 443 vs 445 (0.7% margin) · pieces 8/12 vs 9/13 · on its back 8% vs 0% — too close to call, scored a draw
+   src: ram 424/44 · limb 18/2 (max hit 15.0) · disc 0/0   packSeam 0.59
+   det BULWARK|SEAM chassis_1↔spikeZP_8|SHEARED at 2987 vs eff 1500|t 2657.8
+   det PlayerBuild|SEAM beam_6↔wedge_7|SHEARED at 2987 vs eff 900|t 2657.8
+   det PlayerBuild|wedge_7|STRUCTURAL-SHED|hp 37/76 (49%)|t 2659.1
+   det BULWARK|spikeZP_8|STRUCTURAL-SHED|hp 22/87 (26%)|t 2659.1
+   det BULWARK|SEAM chassis_1↔battery_5|SHEARED at 1671 vs eff 1440|t 2665.9
+   det PlayerBuild|SEAM core_0↔chassis_2|SHEARED at 1671 vs eff 900|t 2665.9
+   det BULWARK|SEAM plate_3↔gyro_7|SHEARED at 1844 vs eff 900|t 2669.9
+   det BULWARK|gyro_7|STRUCTURAL-SHED|hp 50/50 (100%)|t 2671.1
+   det PlayerBuild|SEAM core_0↔chassis_1|SHEARED at 1032 vs eff 900|t 2675.4
+   det BULWARK|SEAM chassis_2↔engine_6|SHEARED at 1775 vs eff 1500|t 2676.4
+   det PlayerBuild|SEAM core_0↔engine_4|SHEARED at 1775 vs eff 900|t 2676.4
+   det BULWARK|SEAM plate_4↔engine_6|SHEARED at 1775 vs eff 1500|t 2683.2
+   det BULWARK|engine_6|STRUCTURAL-SHED|hp 180/236 (76%)|t 2684.5
+   det BULWARK|SEAM plate_3↔battery_5|SHEARED at 2199 vs eff 1440|t 2697.9
+   det BULWARK|SEAM chassis_2↔battery_5|SHEARED at 2003 vs eff 1440|t 2699.7
+   det BULWARK|SEAM plate_4↔battery_5|SHEARED at 2115 vs eff 1440|t 2702.3
+   det BULWARK|SEAM core_0↔chassis_2|SHEARED at 4200 vs eff 1500|t 2704.8
+   det PlayerBuild|SEAM chassis_2↔battery_3|SHEARED at 4200 vs eff 3168|t 2704.8
+   det PlayerBuild|chassis_2|STRUCTURAL-SHED|hp 65/216 (30%)|t 2706.1
+   det BULWARK|SEAM core_0↔plate_3|SHEARED at 2448 vs eff 1500|t 2711.8
+   det BULWARK|plate_3|HP-DESTROYED|hp 0/90 (0%)|t 2729.2
+run 1: PlayerWin at 76.4s  dealt 812 taken 385  pieces 11/12 vs 0/13  flipped self 2.8s enemy 1.2s  | KO — enemy core destroyed
+   src: ram 192/26 · limb 620/43 (max hit 53.2) · disc 0/0   packSeam 0.44
+   det PlayerBuild|SEAM beam_6↔wedge_7|SHEARED at 2988 vs eff 900|t 2750.6
+   det BULWARK|SEAM chassis_1↔spikeZP_8|SHEARED at 2988 vs eff 1500|t 2750.6
+   det PlayerBuild|wedge_7|STRUCTURAL-SHED|hp 37/76 (49%)|t 2751.9
+   det BULWARK|spikeZP_8|STRUCTURAL-SHED|hp 39/87 (45%)|t 2751.9
+   det PlayerBuild|SEAM core_0↔chassis_2|SHEARED at 1341 vs eff 900|t 2758.0
+   det PlayerBuild|SEAM core_0↔engine_4|SHEARED at 939 vs eff 900|t 2760.3
+   det BULWARK|SEAM plate_3↔gyro_7|SHEARED at 939 vs eff 900|t 2760.3
+   det BULWARK|gyro_7|STRUCTURAL-SHED|hp 50/50 (100%)|t 2761.5
+   det PlayerBuild|SEAM core_0↔chassis_1|SHEARED at 939 vs eff 900|t 2782.5
+   det BULWARK|SEAM chassis_1↔battery_5|SHEARED at 1764 vs eff 1440|t 2786.6
+   det BULWARK|SEAM core_0↔chassis_1|SHEARED at 1963 vs eff 1500|t 2802.5
+   det BULWARK|SEAM chassis_2↔engine_6|SHEARED at 2437 vs eff 1500|t 2810.5
+   det BULWARK|SEAM plate_3↔battery_5|SHEARED at 1782 vs eff 1440|t 2811.1
+   det BULWARK|plate_4|HP-DESTROYED|hp 0/90 (0%)|t 2819.4
+   det BULWARK|engine_6|STRUCTURAL-SHED|hp 148/236 (63%)|t 2820.6
+   det BULWARK|battery_5|HP-DESTROYED|hp 0/56 (0%)|t 2821.5
+   det BULWARK|core_0|HP-DESTROYED|hp 0/162 (0%)|t 2825.8
+   det BULWARK|chassis_2|STRUCTURAL-WRECK|hp 220/360 (61%)|t 2825.8
+   det BULWARK|chassis_1|STRUCTURAL-WRECK|hp 216/360 (60%)|t 2825.8
+   det BULWARK|plate_3|STRUCTURAL-WRECK|hp 52/90 (57%)|t 2825.8
+run 2: PlayerWin at 90.1s  dealt 584 taken 355  pieces 11/12 vs 7/13  flipped self 0.8s enemy 4.8s  | Judges' decision — damage 584 vs 355 (39.3% margin) · pieces 11/12 vs 7/13 · on its back 1% vs 5% — decided on structure destroyed
+   src: ram 406/42 · limb 178/10 (max hit 53.2) · disc 0/0   packSeam 0.64
+   det BULWARK|SEAM chassis_1↔battery_5|SHEARED at 3018 vs eff 1440|t 2829.4
+   det PlayerBuild|SEAM beam_6↔wedge_7|SHEARED at 3018 vs eff 900|t 2829.4
+   det PlayerBuild|wedge_7|STRUCTURAL-SHED|hp 43/76 (57%)|t 2830.7
+   det PlayerBuild|SEAM core_0↔chassis_1|SHEARED at 1353 vs eff 900|t 2837.5
+   det BULWARK|SEAM plate_3↔gyro_7|SHEARED at 2013 vs eff 900|t 2841.4
+   det PlayerBuild|SEAM core_0↔chassis_2|SHEARED at 2013 vs eff 900|t 2841.4
+   det BULWARK|gyro_7|STRUCTURAL-SHED|hp 50/50 (100%)|t 2842.7
+   det BULWARK|SEAM core_0↔chassis_1|SHEARED at 3018 vs eff 1500|t 2866.6
+   det BULWARK|plate_3|HP-DESTROYED|hp 0/90 (0%)|t 2866.7
+   det BULWARK|SEAM chassis_1↔spikeZP_8|SHEARED at 3018 vs eff 851|t 2867.4
+   det BULWARK|spikeZP_8|HP-DESTROYED|hp 0/87 (0%)|t 2867.5
+   det BULWARK|chassis_1|STRUCTURAL-SHED|hp 209/360 (58%)|t 2867.9
+   det BULWARK|SEAM core_0↔battery_5|SHEARED at 1618 vs eff 1440|t 2880.6
+   det PlayerBuild|SEAM chassis_1↔battery_3|SHEARED at 1618 vs eff 1440|t 2880.6
+   det BULWARK|SEAM core_0↔chassis_2|SHEARED at 1936 vs eff 1500|t 2893.5
+run 3: PlayerWin at 88.0s  dealt 906 taken 424  pieces 11/12 vs 0/13  flipped self 2.4s enemy 0.4s  | KO — enemy core destroyed
+   src: ram 249/31 · limb 657/96 (max hit 30.4) · disc 0/0   packSeam 0.58
+   det PlayerBuild|SEAM beam_6↔wedge_7|SHEARED at 2982 vs eff 900|t 2921.9
+   det BULWARK|SEAM chassis_1↔spikeZP_8|SHEARED at 2982 vs eff 1500|t 2921.9
+   det PlayerBuild|wedge_7|STRUCTURAL-SHED|hp 37/76 (49%)|t 2923.2
+   det BULWARK|spikeZP_8|STRUCTURAL-SHED|hp 33/87 (38%)|t 2923.2
+   det PlayerBuild|SEAM core_0↔chassis_2|SHEARED at 1841 vs eff 900|t 2937.8
+   det BULWARK|SEAM chassis_2↔engine_6|SHEARED at 1841 vs eff 1500|t 2937.8
+   det PlayerBuild|SEAM core_0↔chassis_1|SHEARED at 959 vs eff 900|t 2940.0
+   det BULWARK|SEAM plate_4↔engine_6|SHEARED at 3272 vs eff 1500|t 2940.0
+   det BULWARK|engine_6|STRUCTURAL-SHED|hp 219/236 (92%)|t 2941.3
+   det PlayerBuild|SEAM core_0↔engine_4|SHEARED at 1849 vs eff 900|t 2947.5
+   det BULWARK|SEAM chassis_1↔battery_5|SHEARED at 1849 vs eff 1440|t 2947.5
+   det BULWARK|SEAM plate_3↔gyro_7|SHEARED at 2297 vs eff 900|t 2950.8
+   det BULWARK|gyro_7|STRUCTURAL-SHED|hp 50/50 (100%)|t 2952.1
+   det BULWARK|SEAM chassis_2↔battery_5|SHEARED at 2065 vs eff 1440|t 2957.8
+   det BULWARK|plate_3|HP-DESTROYED|hp 0/90 (0%)|t 2968.0
+   det BULWARK|SEAM core_0↔battery_5|SHEARED at 2022 vs eff 1440|t 2991.0
+   det BULWARK|battery_5|HP-DESTROYED|hp 0/56 (0%)|t 2994.5
+   det BULWARK|core_0|HP-DESTROYED|hp 0/162 (0%)|t 3008.7
+   det BULWARK|chassis_1|STRUCTURAL-WRECK|hp 133/360 (37%)|t 3008.7
+   det BULWARK|chassis_2|STRUCTURAL-WRECK|hp 117/360 (33%)|t 3008.7
+   det BULWARK|plate_4|STRUCTURAL-WRECK|hp 58/90 (64%)|t 3008.7
+b4_flipper_al|bulwark/Champ|charge|charge  n=4  W3/L0/D1  flips=1  len 76.4-90.4s spread=1.18x  worst single-step piece loss: player 1 enemy 4  [CONVERGED] (89s wall)

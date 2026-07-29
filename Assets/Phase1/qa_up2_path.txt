@@ -1,0 +1,60 @@
+# UP2 CRITIC pointer sweep
+
+## A. ACTUATOR MOUNT AXIS RECORDED BY POINTER (fix from round 1)
+pivot    +Y: not placed (off-cam)
+  PASS  pivot    +Z: wheelAxis=(0.00, 0.00, 1.00)  limb parts=1 blockedBy=null tipR=0.250 rateMax=14.00
+pivot    -Z: not placed (off-cam)
+pivot    +X: not placed (off-cam)
+pivot    -X: not placed (off-cam)
+spindle  +Y: not placed (off-cam)
+  PASS  spindle  +Z: wheelAxis=(0.00, 0.00, 1.00)  limb parts=1 blockedBy=null tipR=0.250 rateMax=38.73
+spindle  -Z: not placed (off-cam)
+spindle  +X: not placed (off-cam)
+spindle  -X: not placed (off-cam)
+ram      +Y: not placed (off-cam)
+  PASS  ram      +Z: wheelAxis=(0.00, 0.00, 1.00)  limb parts=1 blockedBy=null tipR=0.250 rateMax=3.50
+ram      -Z: not placed (off-cam)
+ram      +X: not placed (off-cam)
+ram      -X: not placed (off-cam)
+
+## B. R FULL CYCLE BEFORE PLACING, AND DOES THE PLACED PART KEEP IT
+  PASS  beam      yaws[0 90 180 270 90 180 270 90] distinctMesh=3 placedYaw=180 box=(0.20, 0.60, 0.20)
+  PASS  beamlong  yaws[180 270 90 180 270 90 180 270] distinctMesh=3 placedYaw=90 box=(1.00, 0.20, 0.20)
+  !!FAIL plate     yaws[90 180 270 0 180 270 0 180] distinctMesh=3 placedYaw=n/a box=(0.00, 0.00, 0.00)
+  PASS  chassis   yaws[270 0 90 180 270 0 90 180] distinctMesh=4 placedYaw=270 box=(0.30, 0.40, 0.50)
+  PASS  bracket   yaws[270 0 90 180 270 0 90 180] distinctMesh=1 placedYaw=270 box=(0.20, 0.20, 0.20)
+  PASS  engine    yaws[270 0 90 0 90 0 90 0] distinctMesh=3 placedYaw=90 box=(0.45, 0.25, 0.35)
+  PASS  battery   yaws[90 0 90 0 90 0 90 0] distinctMesh=1 placedYaw=90 box=(0.25, 0.25, 0.25)
+  PASS  gyro      yaws[90 0 90 0 90 0 90 0] distinctMesh=1 placedYaw=90 box=(0.24, 0.24, 0.24)
+
+## C. CREDIT BUDGET IN THE POINTER PATH
+  cost 815 -> 815 cr (budget 4000); 0 tungsten plates clicked in; over-budget after never; ghost refusal='Blocked by another part'
+  Validate() after = null
+  PASS  ghost refuses placements that blow the credit budget
+
+## D. ESC / PANEL / EMPTY / INVALID / REMOVE / REPAINT
+  PASS  Esc clears selection and ghost (shown True -> False, selected=-1)
+  PASS  click inside the palette panel places nothing (9->9)
+  PASS  click on empty space places nothing (9->9)
+  PASS  right-click removes a leaf wheel (9->8)
+  !!FAIL right-click on the CORE is refused (8->7)
+  right-click the LOAD-BEARING fore chassis: parts 9->8, wheels 4->4, Validate()=null
+  PASS  removing an interior part never leaves an invalid/orphaned build
+  !!FAIL middle-click repaint aft chassis ? -> ?
+  PASS  pointer-placed part takes the active material (Tungsten)
+
+## E. FLOOR RULE (round-1 FIX B) - is it too strict?
+  wedge on fore chassis +Z: placed at y=0.700 bottom=0.640
+  PASS  a front wedge (the archetypal ground scraper) can be placed by pointer
+  plate under aft chassis: reached=True valid=False reason='Too low — would clip the floor' ghostBottom=0.490
+  PASS  a plate hung below the wheel line is refused
+  PASS  the underside of a part is reachable by the builder camera
+
+## F. COMPLETE WEAPONISED ROBOT, POINTER ONLY, FROM A BARE CORE
+  steps: chassis+Z=1 chassis-Z=2 wheels=4 battery=7 engine=8 pivot=9 blade=10
+  parts=11 cost=714 Validate=null limb: parts=1 blockedBy=null tipR=0.250 rateMax=14.00 kJ/swing=0.02
+  PASS  complete robot built by pointer alone is valid
+  PASS  its weapon limb is genuinely driven
+  saved -> Assets/Phase1/qa_up2_pointerbot.txt
+
+## DONE checks=25 failures=3

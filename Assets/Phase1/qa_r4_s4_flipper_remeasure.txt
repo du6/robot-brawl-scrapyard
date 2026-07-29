@@ -1,0 +1,6 @@
+# build S4_flipper_al_remeasure parts=13 policy=charge runs=4
+run 0: PlayerWin at 62.8s  dealt 470 taken 271  pieces 13/13 vs 5/11  flipped 4.4s  | Enemy counted out — out of power — 300 kJ of its 300 kJ pack was torn off the chassis, and what was left ran dry after 53 s
+run 1: PlayerWin at 90.4s  dealt 199 taken 171  pieces 13/13 vs 10/11  flipped 16.8s  | Judges' decision — damage 199 vs 171 (14.2% margin) · pieces 13/13 vs 10/11 — decided on damage
+run 2: PlayerLoss at 90.4s  dealt 276 taken 303  pieces 13/13 vs 5/11  flipped 16.8s  | Judges' decision — damage 276 vs 303 (9.0% margin) · pieces 13/13 vs 5/11 — decided on damage
+run 3: PlayerWin at 90.3s  dealt 263 taken 186  pieces 13/13 vs 6/11  flipped 36.5s  | Judges' decision — damage 263 vs 186 (29.1% margin) · pieces 13/13 vs 6/11 — decided on damage
+S4_flipper_al_remeasure|charge  n=4  W3/L1/D0  flips=1  len 62.8-90.4s spread=1.44x  worst single-step piece loss: player 0 enemy 2  [CONVERGED] (87s wall)

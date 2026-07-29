@@ -1,0 +1,12 @@
+# build b3_lance_w parts=12 policy=charge runs=4
+# LIVE CONSTANTS  tipSpeedCap m/s: ABS=9.00 Aluminum=9.68 Steel=12.50 Titanium=14.79 CarbonFiber=13.11 Tungsten=13.69  | MotorKW 0/1/2/3 eng 1.0/2.5/4.0/5.5  | DRIVE_KW_PER_TONNE 1.25 | LIFT_EFFICIENCY 0.85 | REACTION_FRAC 0.60 | GROUND_CLEAR 0.020 | BITE_RATE_FRAC 0.45 | EXPOSED_MULT 1.75 | STEP_DISP_CAP 0.25
+# fixedDeltaTime 0.0200  timeScale 3.0  debugFire True
+run 0: PlayerWin at 90.0s  dealt 510 taken 165  pieces 12/12 vs 6/11  flipped self 6.0s enemy 1.2s  | Judges' decision — damage 510 vs 165 (67.6% margin) · pieces 12/12 vs 6/11 · on its back 7% vs 1% — decided on structure destroyed
+   src: ram 467/69 · limb 43/4 (max hit 11.5) · disc 0/0   packSeam 0.97
+run 1: PlayerLoss at 88.2s  dealt 235 taken 949  pieces 3/12 vs 10/11  flipped self 12.0s enemy 0.0s  | Counted out — flipped onto its back — the emergency struts could not roll a hull this shape back over; a gyro rights you in under a second
+   src: ram 235/21 · limb 0/0 (max hit 0.0) · disc 0/0   packSeam 0.97
+run 2: PlayerLoss at 90.3s  dealt 289 taken 546  pieces 12/12 vs 10/11  flipped self 4.5s enemy 0.9s  | Judges' decision — damage 289 vs 546 (47.2% margin) · pieces 12/12 vs 10/11 · on its back 5% vs 1% — structure even, decided on damage
+   src: ram 234/25 · limb 54/5 (max hit 12.1) · disc 0/0   packSeam 0.97
+run 3: PlayerWin at 90.0s  dealt 405 taken 308  pieces 12/12 vs 7/11  flipped self 1.2s enemy 1.5s  | Judges' decision — damage 405 vs 308 (23.9% margin) · pieces 12/12 vs 7/11 · on its back 1% vs 2% — decided on structure destroyed
+   src: ram 405/21 · limb 0/0 (max hit 0.0) · disc 0/0   packSeam 0.97
+b3_lance_w|charge  n=4  W2/L2/D0  flips=2  len 88.2-90.3s spread=1.02x  worst single-step piece loss: player 2 enemy 1  [NOISY] (122s wall)

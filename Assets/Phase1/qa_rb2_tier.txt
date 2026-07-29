@@ -1,0 +1,42 @@
+# RB2Probe cases=6 reps=6 seconds=24 toKO=False speed=3 fire=True
+# LIVE CONSTANTS  tipSpeedCap m/s: ABS=9.00 Aluminum=9.68 Steel=12.50 Titanium=14.79 CarbonFiber=13.11 Tungsten=13.69  | MotorKW 0/1/2/3 eng 1.0/2.5/4.0/5.5  | DRIVE_KW_PER_TONNE 1.25 | LIFT_EFFICIENCY 0.85 | REACTION_FRAC 0.60 | GROUND_CLEAR 0.020 | BITE_RATE_FRAC 0.45 | EXPOSED_MULT 1.75 | STEP_DISP_CAP 0.25
+# LIVE CONSTANTS (cycle) WIND_RELEASE_FRAC 0.995 | WIND_TIMEOUT_S 2.00 | BITE_TIP_SPEED_MS 4.00 | RECOVER_S 0.10 | PIVOT_RETURN_DPS 500 | MIN_BITE_E 40 | DRAIN_FRAC 0.40 | LIN_IMP_CAP 600 | EFFICIENCY 0.35 | RECUP_FRAC 0.90 | REACTION_STALL_MUL 3.0
+# LIVE CONSTANTS (damage/judging) DMG_K 0.045 | HP_K 6000 | SHOVE_CAP 500 | PART_IMMUNITY 0.50 | RAM_MIN_J 150 | RAM_J_CAP 900 | STRUCT_BAND 0.060 | MIN_STRUCT_PARTS 2.0 | DRAW_BAND_FRAC 0.080 | CONTROL_BAND 0.100 | MATCH_TIME 90 | CREDIT_BUDGET 4000
+# SOURCE REGIME 34ff221d (42 scripts, newest 2026-07-27 17:28:44Z)
+MAULER_Roo       r0 tier=Rookie   pol=afk    t=22.5 TIMEBOX    | pDealt     0 pTaken    48 | P[ram 0/0 limb 0/0] | E[ram 48/4 limb 0/0] | parts 13/13 vs 11/11 | dist 2.82 near 9.0s close 2.9s thr 0.69
+MAULER_Roo       r1 tier=Rookie   pol=afk    t=22.5 TIMEBOX    | pDealt     0 pTaken    79 | P[ram 0/0 limb 0/0] | E[ram 79/2 limb 0/0] | parts 13/13 vs 10/11 | dist 2.70 near 8.1s close 2.6s thr 0.70
+MAULER_Roo       r2 tier=Rookie   pol=afk    t=22.5 TIMEBOX    | pDealt     0 pTaken    76 | P[ram 0/0 limb 0/0] | E[ram 76/4 limb 0/0] | parts 13/13 vs 11/11 | dist 2.37 near 11.7s close 6.2s thr 0.73
+MAULER_Roo       r3 tier=Rookie   pol=afk    t=22.5 TIMEBOX    | pDealt     0 pTaken    82 | P[ram 0/0 limb 0/0] | E[ram 82/3 limb 0/0] | parts 13/13 vs 10/11 | dist 2.61 near 11.0s close 4.5s thr 0.69
+MAULER_Roo       r4 tier=Rookie   pol=afk    t=22.5 TIMEBOX    | pDealt     0 pTaken    61 | P[ram 0/0 limb 0/0] | E[ram 61/3 limb 0/0] | parts 10/13 vs 10/11 | dist 3.49 near 8.0s close 2.6s thr 0.70
+MAULER_Roo       r5 tier=Rookie   pol=afk    t=22.5 TIMEBOX    | pDealt     0 pTaken    25 | P[ram 0/0 limb 0/0] | E[ram 25/1 limb 0/0] | parts 13/13 vs 11/11 | dist 2.43 near 10.4s close 5.0s thr 0.66
+MAULER_Vet       r0 tier=Veteran  pol=afk    t=22.5 TIMEBOX    | pDealt     0 pTaken   106 | P[ram 0/0 limb 0/0] | E[ram 106/4 limb 0/0] | parts 13/13 vs 11/11 | dist 3.14 near 10.1s close 5.1s thr 0.84
+MAULER_Vet       r1 tier=Veteran  pol=afk    t=22.5 TIMEBOX    | pDealt     0 pTaken    41 | P[ram 0/0 limb 0/0] | E[ram 41/1 limb 0/0] | parts 11/13 vs 11/11 | dist 3.67 near 2.9s close 1.0s thr 0.95
+MAULER_Vet       r2 tier=Veteran  pol=afk    t=22.8 TIMEBOX    | pDealt     0 pTaken    25 | P[ram 0/0 limb 0/0] | E[ram 25/2 limb 0/0] | parts 13/13 vs 11/11 | dist 4.15 near 5.8s close 2.4s thr 0.85
+MAULER_Vet       r3 tier=Veteran  pol=afk    t=22.5 TIMEBOX    | pDealt     0 pTaken    77 | P[ram 0/0 limb 0/0] | E[ram 77/4 limb 0/0] | parts 13/13 vs 11/11 | dist 2.72 near 12.1s close 6.1s thr 0.81
+MAULER_Vet       r4 tier=Veteran  pol=afk    t=22.5 TIMEBOX    | pDealt     0 pTaken    19 | P[ram 0/0 limb 0/0] | E[ram 19/2 limb 0/0] | parts 13/13 vs 11/11 | dist 4.71 near 4.8s close 2.0s thr 0.90
+MAULER_Vet       r5 tier=Veteran  pol=afk    t=22.5 TIMEBOX    | pDealt     0 pTaken    50 | P[ram 0/0 limb 0/0] | E[ram 50/4 limb 0/0] | parts 13/13 vs 11/11 | dist 3.43 near 8.6s close 4.1s thr 0.84
+MAULER_Cha       r0 tier=Champion pol=afk    t=22.5 TIMEBOX    | pDealt     0 pTaken    18 | P[ram 0/0 limb 0/0] | E[ram 18/2 limb 0/0] | parts 13/13 vs 11/11 | dist 3.04 near 8.1s close 1.5s thr 0.82
+MAULER_Cha       r1 tier=Champion pol=afk    t=22.5 TIMEBOX    | pDealt     0 pTaken     0 | P[ram 0/0 limb 0/0] | E[ram 0/0 limb 0/0] | parts 13/13 vs 11/11 | dist 5.09 near 0.0s close 0.0s thr 0.98
+MAULER_Cha       r2 tier=Champion pol=afk    t=22.5 TIMEBOX    | pDealt     0 pTaken     0 | P[ram 0/0 limb 0/0] | E[ram 0/0 limb 0/0] | parts 13/13 vs 11/11 | dist 5.04 near 0.0s close 0.0s thr 0.98
+MAULER_Cha       r3 tier=Champion pol=afk    t=22.5 TIMEBOX    | pDealt     0 pTaken     0 | P[ram 0/0 limb 0/0] | E[ram 0/0 limb 0/0] | parts 13/13 vs 11/11 | dist 3.50 near 1.0s close 0.0s thr 0.80
+MAULER_Cha       r4 tier=Champion pol=afk    t=22.5 TIMEBOX    | pDealt     0 pTaken     0 | P[ram 0/0 limb 0/0] | E[ram 0/0 limb 0/0] | parts 13/13 vs 11/11 | dist 5.24 near 0.0s close 0.0s thr 0.95
+MAULER_Cha       r5 tier=Champion pol=afk    t=22.5 TIMEBOX    | pDealt     0 pTaken    89 | P[ram 0/0 limb 0/0] | E[ram 89/2 limb 0/0] | parts 11/13 vs 10/11 | dist 3.86 near 5.8s close 3.5s thr 0.97
+WIDOWMAKER_Roo   r0 tier=Rookie   pol=afk    t=22.5 TIMEBOX    | pDealt     0 pTaken     2 | P[ram 0/0 limb 0/0] | E[ram 2/1 limb 0/0] | parts 13/13 vs 12/12 | dist 3.81 near 7.1s close 3.5s thr 0.65
+WIDOWMAKER_Roo   r1 tier=Rookie   pol=afk    t=22.5 TIMEBOX    | pDealt     0 pTaken     5 | P[ram 0/0 limb 0/0] | E[ram 5/2 limb 0/0] | parts 13/13 vs 12/12 | dist 3.68 near 7.5s close 1.6s thr 0.66
+WIDOWMAKER_Roo   r2 tier=Rookie   pol=afk    t=22.5 TIMEBOX    | pDealt     0 pTaken     0 | P[ram 0/0 limb 0/0] | E[ram 0/0 limb 0/0] | parts 13/13 vs 12/12 | dist 4.71 near 1.8s close 0.7s thr 0.69
+WIDOWMAKER_Roo   r3 tier=Rookie   pol=afk    t=22.5 TIMEBOX    | pDealt     0 pTaken   117 | P[ram 0/0 limb 0/0] | E[ram 14/4 limb 103/1] | parts 11/13 vs 12/12 | dist 3.40 near 9.9s close 6.2s thr 0.71
+WIDOWMAKER_Roo   r4 tier=Rookie   pol=afk    t=22.5 TIMEBOX    | pDealt     0 pTaken    11 | P[ram 0/0 limb 0/0] | E[ram 11/2 limb 0/0] | parts 13/13 vs 12/12 | dist 3.71 near 7.7s close 0.7s thr 0.67
+WIDOWMAKER_Roo   r5 tier=Rookie   pol=afk    t=22.5 TIMEBOX    | pDealt     0 pTaken     0 | P[ram 0/0 limb 0/0] | E[ram 0/0 limb 0/0] | parts 13/13 vs 12/12 | dist 4.70 near 1.6s close 0.0s thr 0.68
+WIDOWMAKER_Vet   r0 tier=Veteran  pol=afk    t=22.5 TIMEBOX    | pDealt     0 pTaken     0 | P[ram 0/0 limb 0/0] | E[ram 0/0 limb 0/0] | parts 13/13 vs 12/12 | dist 4.52 near 0.5s close 0.0s thr 0.81
+WIDOWMAKER_Vet   r1 tier=Veteran  pol=afk    t=22.5 TIMEBOX    | pDealt     0 pTaken    11 | P[ram 0/0 limb 0/0] | E[ram 11/1 limb 0/0] | parts 13/13 vs 12/12 | dist 3.29 near 7.5s close 5.6s thr 0.79
+WIDOWMAKER_Vet   r2 tier=Veteran  pol=afk    t=22.5 TIMEBOX    | pDealt     0 pTaken     3 | P[ram 0/0 limb 0/0] | E[ram 3/1 limb 0/0] | parts 13/13 vs 12/12 | dist 3.17 near 9.9s close 6.6s thr 0.76
+WIDOWMAKER_Vet   r3 tier=Veteran  pol=afk    t=22.5 TIMEBOX    | pDealt     0 pTaken     0 | P[ram 0/0 limb 0/0] | E[ram 0/0 limb 0/0] | parts 13/13 vs 12/12 | dist 5.01 near 0.0s close 0.0s thr 0.86
+WIDOWMAKER_Vet   r4 tier=Veteran  pol=afk    t=22.5 TIMEBOX    | pDealt     0 pTaken   611 | P[ram 0/0 limb 0/0] | E[ram 0/0 limb 611/6] | parts 8/13 vs 12/12 | dist 4.72 near 2.5s close 0.2s thr 0.96
+WIDOWMAKER_Vet   r5 tier=Veteran  pol=afk    t=22.5 TIMEBOX    | pDealt     0 pTaken     7 | P[ram 0/0 limb 0/0] | E[ram 7/1 limb 0/0] | parts 13/13 vs 12/12 | dist 3.73 near 4.8s close 2.1s thr 0.78
+WIDOWMAKER_Cha   r0 tier=Champion pol=afk    t=22.5 TIMEBOX    | pDealt     0 pTaken     1 | P[ram 0/0 limb 0/0] | E[ram 1/1 limb 0/0] | parts 13/13 vs 12/12 | dist 2.68 near 12.9s close 2.3s thr 0.76
+WIDOWMAKER_Cha   r1 tier=Champion pol=afk    t=22.5 TIMEBOX    | pDealt     0 pTaken   179 | P[ram 0/0 limb 0/0] | E[ram 0/0 limb 179/2] | parts 11/13 vs 12/12 | dist 4.91 near 0.5s close 0.0s thr 0.98
+WIDOWMAKER_Cha   r2 tier=Champion pol=afk    t=22.5 TIMEBOX    | pDealt     0 pTaken    17 | P[ram 0/0 limb 0/0] | E[ram 17/2 limb 0/0] | parts 13/13 vs 12/12 | dist 2.84 near 10.6s close 6.8s thr 0.83
+WIDOWMAKER_Cha   r3 tier=Champion pol=afk    t=22.5 TIMEBOX    | pDealt     0 pTaken     0 | P[ram 0/0 limb 0/0] | E[ram 0/0 limb 0/0] | parts 13/13 vs 12/12 | dist 2.85 near 12.8s close 6.8s thr 0.79
+WIDOWMAKER_Cha   r4 tier=Champion pol=afk    t=22.5 TIMEBOX    | pDealt     0 pTaken     0 | P[ram 0/0 limb 0/0] | E[ram 0/0 limb 0/0] | parts 13/13 vs 12/12 | dist 5.10 near 0.6s close 0.0s thr 0.95
+WIDOWMAKER_Cha   r5 tier=Champion pol=afk    t=22.5 TIMEBOX    | pDealt     0 pTaken     0 | P[ram 0/0 limb 0/0] | E[ram 0/0 limb 0/0] | parts 13/13 vs 12/12 | dist 3.08 near 6.7s close 3.5s thr 0.80
+# done 6 cases x 6

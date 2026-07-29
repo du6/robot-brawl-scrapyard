@@ -1,0 +1,36 @@
+# section=bite opponent=mauler seconds=24 speed=3 fire=True reps=3 builds=5
+# LIVE CONSTANTS  tipSpeedCap m/s: ABS=9.00 Aluminum=9.68 Steel=12.50 Titanium=14.79 CarbonFiber=13.11 Tungsten=13.69  | MotorKW 0/1/2/3 eng 1.0/2.5/4.0/5.5  | DRIVE_KW_PER_TONNE 1.25 | LIFT_EFFICIENCY 0.85 | REACTION_FRAC 0.60 | GROUND_CLEAR 0.020 | BITE_RATE_FRAC 0.45 | EXPOSED_MULT 1.75 | STEP_DISP_CAP 0.25
+# LIVE CONSTANTS (cycle) WIND_RELEASE_FRAC 0.995 | WIND_TIMEOUT_S 2.00 | BITE_TIP_SPEED_MS 4.00 | RECOVER_S 0.10 | PIVOT_RETURN_DPS 500 | MIN_BITE_E 40 | DRAIN_FRAC 0.40 | LIN_IMP_CAP 600 | EFFICIENCY 0.35 | RECUP_FRAC 0.90 | REACTION_STALL_MUL 3.0
+# LIVE CONSTANTS (damage/judging) DMG_K 0.045 | HP_K 6000 | SHOVE_CAP 500 | PART_IMMUNITY 0.50 | RAM_MIN_J 150 | RAM_J_CAP 900 | STRUCT_BAND 0.060 | MIN_STRUCT_PARTS 2.0 | DRAW_BAND_FRAC 0.080 | CONTROL_BAND 0.100 | MATCH_TIME 90 | CREDIT_BUDGET 4000
+# SOURCE REGIME 89d20372 (41 scripts, newest 2026-07-27 16:04:29Z)
+NOWEAP       r0 t=23s ended=TIMEBOX | dealt 127 taken 97 | ram 127/5 (25.4/bite) limb 0/0 (0.0/bite max 0) | pParts 10/13 eParts 11/11 | eDealt 97
+    funnel 0 call 0 onTarget -> gate 0 (bestFrac 0.00) energy 0 cool 0 APPLY 0 || immunity ate limb 0 ram 2, passed limb 0 ram 9
+NOWEAP       r1 t=22s ended=TIMEBOX | dealt 41 taken 39 | ram 41/2 (20.3/bite) limb 0/0 (0.0/bite max 0) | pParts 11/13 eParts 11/11 | eDealt 39
+    funnel 0 call 0 onTarget -> gate 0 (bestFrac 0.00) energy 0 cool 0 APPLY 0 || immunity ate limb 0 ram 2, passed limb 0 ram 3
+NOWEAP       r2 t=22s ended=TIMEBOX | dealt 40 taken 59 | ram 40/1 (39.9/bite) limb 0/0 (0.0/bite max 0) | pParts 10/13 eParts 11/11 | eDealt 59
+    funnel 0 call 0 onTarget -> gate 0 (bestFrac 0.00) energy 0 cool 0 APPLY 0 || immunity ate limb 0 ram 5, passed limb 0 ram 3
+DISC_Z       r0 t=23s ended=TIMEBOX | dealt 14 taken 9 | ram 18/7 (2.5/bite) limb 0/0 (0.0/bite max 0) | pParts 15/15 eParts 11/11 | eDealt 13
+    funnel 8619 call 0 onTarget -> gate 0 (bestFrac 0.00) energy 0 cool 0 APPLY 0 || immunity ate limb 0 ram 2, passed limb 0 ram 11
+DISC_Z       r1 t=22s ended=TIMEBOX | dealt 77 taken 180 | ram 77/10 (7.7/bite) limb 0/0 (0.0/bite max 0) | pParts 11/15 eParts 11/11 | eDealt 180
+    funnel 9239 call 0 onTarget -> gate 0 (bestFrac 0.00) energy 0 cool 0 APPLY 0 || immunity ate limb 0 ram 56, passed limb 0 ram 22
+DISC_Z       r2 t=23s ended=TIMEBOX | dealt 41 taken 64 | ram 41/4 (10.3/bite) limb 0/0 (0.0/bite max 0) | pParts 13/15 eParts 11/11 | eDealt 64
+    funnel 8411 call 0 onTarget -> gate 0 (bestFrac 0.00) energy 0 cool 0 APPLY 0 || immunity ate limb 0 ram 22, passed limb 0 ram 7
+SAW_Z        r0 t=23s ended=TIMEBOX | dealt 51 taken 67 | ram 51/5 (10.3/bite) limb 0/0 (0.0/bite max 0) | pParts 15/15 eParts 10/11 | eDealt 67
+    funnel 12315 call 0 onTarget -> gate 0 (bestFrac 0.00) energy 0 cool 0 APPLY 0 || immunity ate limb 0 ram 9, passed limb 0 ram 10
+SAW_Z        r1 t=22s ended=TIMEBOX | dealt 93 taken 133 | ram 93/5 (18.7/bite) limb 0/0 (0.0/bite max 0) | pParts 13/15 eParts 10/11 | eDealt 133
+    funnel 11760 call 0 onTarget -> gate 0 (bestFrac 0.00) energy 0 cool 0 APPLY 0 || immunity ate limb 0 ram 8, passed limb 0 ram 9
+SAW_Z        r2 t=23s ended=TIMEBOX | dealt 60 taken 73 | ram 60/6 (10.1/bite) limb 0/0 (0.0/bite max 0) | pParts 13/15 eParts 11/11 | eDealt 73
+    funnel 11824 call 0 onTarget -> gate 0 (bestFrac 0.00) energy 0 cool 0 APPLY 0 || immunity ate limb 0 ram 21, passed limb 0 ram 11
+COAX_V       r0 t=23s ended=TIMEBOX | dealt 5 taken 74 | ram 5/2 (2.4/bite) limb 0/0 (0.0/bite max 0) | pParts 15/15 eParts 11/11 | eDealt 74
+    funnel 3160 call 0 onTarget -> gate 0 (bestFrac 0.00) energy 0 cool 0 APPLY 0 || immunity ate limb 0 ram 4, passed limb 0 ram 6
+COAX_V       r1 t=23s ended=TIMEBOX | dealt 41 taken 81 | ram 41/3 (13.7/bite) limb 0/0 (0.0/bite max 0) | pParts 13/15 eParts 11/11 | eDealt 81
+    funnel 3065 call 0 onTarget -> gate 0 (bestFrac 0.00) energy 0 cool 0 APPLY 0 || immunity ate limb 0 ram 2, passed limb 0 ram 5
+COAX_V       r2 t=22s ended=TIMEBOX | dealt 78 taken 49 | ram 78/5 (15.6/bite) limb 0/0 (0.0/bite max 0) | pParts 13/15 eParts 11/11 | eDealt 49
+    funnel 3080 call 0 onTarget -> gate 0 (bestFrac 0.00) energy 0 cool 0 APPLY 0 || immunity ate limb 0 ram 20, passed limb 0 ram 9
+HAMMER       r0 t=22s ended=TIMEBOX | dealt 140 taken 192 | ram 45/5 (9.1/bite) limb 95/2 (47.4/bite max 54) | pParts 13/16 eParts 10/11 | eDealt 192
+    funnel 869 call 35 onTarget -> gate 26 (bestFrac 0.00) energy 0 cool 6 APPLY 3 || immunity ate limb 1 ram 11, passed limb 2 ram 14
+HAMMER       r1 t=22s ended=TIMEBOX | dealt 24 taken 74 | ram 24/2 (12.0/bite) limb 0/0 (0.0/bite max 0) | pParts 16/16 eParts 11/11 | eDealt 74
+    funnel 425 call 0 onTarget -> gate 0 (bestFrac 0.00) energy 0 cool 0 APPLY 0 || immunity ate limb 0 ram 2, passed limb 0 ram 6
+HAMMER       r2 t=23s ended=TIMEBOX | dealt 81 taken 83 | ram 81/4 (20.2/bite) limb 0/0 (0.0/bite max 0) | pParts 14/16 eParts 10/11 | eDealt 83
+    funnel 2822 call 0 onTarget -> gate 0 (bestFrac 0.00) energy 0 cool 0 APPLY 0 || immunity ate limb 0 ram 10, passed limb 0 ram 8
+# done 5 builds

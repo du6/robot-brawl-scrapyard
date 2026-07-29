@@ -1,0 +1,55 @@
+# UP2 CRITIC pointer sweep, pass 2
+
+## A2. ACTUATOR MOUNT AXIS BY POINTER, on an isolated chassis (5 free faces)
+   host = chassis at (0.35,0.70,0.00); -X is the seam to the core, the rest are free
+  PASS  pivot    +Y: wheelAxis=(0.00, 1.00, 0.00)  limb parts=1 blockedBy=null tipR=0.250 rateMax=14.00
+pivot    -Y: NOT PLACED (Too low — would clip the floor)
+  PASS  pivot    +Z: wheelAxis=(0.00, 0.00, 1.00)  limb parts=1 blockedBy=null tipR=0.250 rateMax=14.00
+  PASS  pivot    -Z: wheelAxis=(0.00, 0.00, -1.00)  limb parts=1 blockedBy=null tipR=0.250 rateMax=14.00
+  PASS  pivot    +X: wheelAxis=(1.00, 0.00, 0.00)  limb parts=1 blockedBy=null tipR=0.250 rateMax=14.00
+  PASS  spindle  +Y: wheelAxis=(0.00, 1.00, 0.00)  limb parts=1 blockedBy=null tipR=0.250 rateMax=38.73
+spindle  -Y: NOT PLACED (Too low — would clip the floor)
+  PASS  spindle  +Z: wheelAxis=(0.00, 0.00, 1.00)  limb parts=1 blockedBy=null tipR=0.250 rateMax=38.73
+  PASS  spindle  -Z: wheelAxis=(0.00, 0.00, -1.00)  limb parts=1 blockedBy=null tipR=0.250 rateMax=38.73
+  PASS  spindle  +X: wheelAxis=(1.00, 0.00, 0.00)  limb parts=1 blockedBy=null tipR=0.250 rateMax=38.73
+  PASS  ram      +Y: wheelAxis=(0.00, 1.00, 0.00)  limb parts=1 blockedBy=null tipR=0.250 rateMax=3.50
+ram      -Y: NOT PLACED (Too low — would clip the floor)
+  PASS  ram      +Z: wheelAxis=(0.00, 0.00, 1.00)  limb parts=1 blockedBy=null tipR=0.250 rateMax=3.50
+  PASS  ram      -Z: wheelAxis=(0.00, 0.00, -1.00)  limb parts=1 blockedBy=null tipR=0.250 rateMax=3.50
+  PASS  ram      +X: wheelAxis=(1.00, 0.00, 0.00)  limb parts=1 blockedBy=null tipR=0.250 rateMax=3.50
+
+## D2. RIGHT-CLICK / MIDDLE-CLICK, with the hit VERIFIED first
+  PASS  right-click on the CORE refused (verified target=core, parts 9->9)
+  PASS  right-click removes a leaf wheel (verified target=wheel, 9->8)
+  PASS  middle-click repaints the aft chassis (verified target=chassis): Aluminum -> Titanium
+
+## C2. CREDIT BUDGET IN THE GHOST - tungsten plates stacked up a bare core
+  12 tungsten plates clicked in, cost now 21014 cr of 4000; first over budget at plate 3; stopped by 'loop end'
+  Validate() = Needs at least 1 wheel.
+  !!FAIL the ghost refuses a click that puts the build over budget
+
+## B2. WHY A ROTATED PLATE WOULD NOT PLACE
+  yaw=  0 half=(0.250, 0.041, 0.250) valid=True reason=''
+  yaw=180 half=(0.250, 0.250, 0.042) valid=False reason='No socket on this face'
+  yaw=270 half=(0.042, 0.250, 0.250) valid=False reason='No socket on this face'
+  yaw=  0 half=(0.250, 0.041, 0.250) valid=True reason=''
+
+## G. WYSIWYG: does the arena draw a weapon the way the builder drew it?
+   builder box = PlacedPart.Half()*2; arena AABB = the spec SpawnBot sends.
+  PASS  blade      on (0, 0, -1): axis=(0, 0, -1) collisionBox=(0.500, 0.120, 0.050) drawnMesh=(0.495, 0.108, 0.051)
+blade      (1, 0, 0): not placed (off-cam)
+blade      (0, 1, 0): not placed (Blocked by another part)
+  !!FAIL wedge      on (0, 0, -1): axis=(0, 0, -1) collisionBox=(0.500, 0.350, 0.120) drawnMesh=(0.500, 0.149, 0.142)
+wedge      (1, 0, 0): not placed (off-cam)
+wedge      (0, 1, 0): not placed (Blocked by another part)
+  !!FAIL hook       on (0, 0, -1): axis=(0, 0, -1) collisionBox=(0.160, 0.200, 0.300) drawnMesh=(0.112, 0.246, 0.236)
+hook       (1, 0, 0): not placed (off-cam)
+  !!FAIL hook       on (0, 1, 0): axis=(0, 1, 0) collisionBox=(0.160, 0.200, 0.300) drawnMesh=(0.112, 0.246, 0.236)
+  PASS  spike      on (0, 0, -1): axis=(0, 0, -1) collisionBox=(0.220, 0.220, 0.300) drawnMesh=(0.220, 0.220, 0.303)
+spike      (1, 0, 0): not placed (off-cam)
+  PASS  spike      on (0, 1, 0): axis=(0, 1, 0) collisionBox=(0.220, 0.300, 0.220) drawnMesh=(0.220, 0.303, 0.220)
+  !!FAIL spinner    on (0, 0, -1): axis=(0, 0, -1) collisionBox=(0.340, 0.340, 0.100) drawnMesh=(0.338, 0.348, 0.237)
+spinner    (1, 0, 0): not placed (off-cam)
+  !!FAIL spinner    on (0, 1, 0): axis=(0, 1, 0) collisionBox=(0.340, 0.100, 0.340) drawnMesh=(0.338, 0.237, 0.348)
+
+## DONE checks=24 failures=6

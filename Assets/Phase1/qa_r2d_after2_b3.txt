@@ -1,0 +1,15 @@
+# build b3_lance_w_AFTER2 parts=12 policy=charge runs=4
+# LIVE CONSTANTS  tipSpeedCap m/s: ABS=9.00 Aluminum=9.68 Steel=12.50 Titanium=14.79 CarbonFiber=13.11 Tungsten=13.69  | MotorKW 0/1/2/3 eng 1.0/2.5/4.0/5.5  | DRIVE_KW_PER_TONNE 1.25 | LIFT_EFFICIENCY 0.85 | REACTION_FRAC 0.60 | GROUND_CLEAR 0.020 | BITE_RATE_FRAC 0.45 | EXPOSED_MULT 1.75 | STEP_DISP_CAP 0.25
+# LIVE CONSTANTS (cycle) WIND_RELEASE_FRAC 0.995 | WIND_TIMEOUT_S 2.00 | BITE_TIP_SPEED_MS 4.00 | RECOVER_S 0.10 | PIVOT_RETURN_DPS 500 | MIN_BITE_E 40 | DRAIN_FRAC 0.40 | LIN_IMP_CAP 600 | EFFICIENCY 0.35 | RECUP_FRAC 0.90 | REACTION_STALL_MUL 3.0
+# LIVE CONSTANTS (damage/judging) DMG_K 0.045 | HP_K 6000 | SHOVE_CAP 500 | PART_IMMUNITY 0.50 | RAM_MIN_J 150 | RAM_J_CAP 900 | STRUCT_BAND 0.060 | MIN_STRUCT_PARTS 2.0 | DRAW_BAND_FRAC 0.080 | CONTROL_BAND 0.100 | MATCH_TIME 90 | CREDIT_BUDGET 4000
+# SOURCE REGIME 96ce6370 (22 scripts, newest 2026-07-27 01:35:15Z)
+# fixedDeltaTime 0.0200  timeScale 3.0  debugFire True
+run 0: PlayerWin at 90.0s  dealt 505 taken 368  pieces 12/12 vs 7/11  flipped self 0.0s enemy 2.9s  | Judges' decision — damage 505 vs 368 (27.2% margin) · pieces 12/12 vs 7/11 · on its back 0% vs 3% — decided on structure destroyed
+   src: ram 127/4 · limb 378/11 (max hit 65.9) · disc 0/0   packSeam 0.97
+run 1: PlayerWin at 8.1s  dealt 629 taken 41  pieces 12/12 vs 0/11  flipped self 0.0s enemy 0.9s  | KO — enemy core destroyed
+   src: ram 94/5 · limb 535/13 (max hit 62.5) · disc 0/0   packSeam 0.91
+run 2: PlayerLoss at 90.0s  dealt 371 taken 434  pieces 12/12 vs 10/11  flipped self 0.0s enemy 0.0s  | Judges' decision — damage 371 vs 434 (14.6% margin) · pieces 12/12 vs 10/11 · on its back 0% vs 0% — structure even, decided on damage
+   src: ram 198/15 · limb 173/3 (max hit 65.9) · disc 0/0   packSeam 0.97
+run 3: PlayerWin at 90.0s  dealt 434 taken 309  pieces 12/12 vs 7/11  flipped self 0.0s enemy 6.0s  | Judges' decision — damage 434 vs 309 (28.7% margin) · pieces 12/12 vs 7/11 · on its back 0% vs 7% — decided on structure destroyed
+   src: ram 130/11 · limb 304/6 (max hit 65.9) · disc 0/0   packSeam 0.97
+b3_lance_w_AFTER2|charge  n=4  W3/L1/D0  flips=1  len 8.1-90.0s spread=11.11x  worst single-step piece loss: player 0 enemy 4  [NOISY] (94s wall)

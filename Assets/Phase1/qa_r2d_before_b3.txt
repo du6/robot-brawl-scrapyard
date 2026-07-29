@@ -1,0 +1,12 @@
+# build b3_lance_w_BEFORE parts=12 policy=charge runs=4
+# LIVE CONSTANTS  tipSpeedCap m/s: ABS=9.00 Aluminum=9.68 Steel=12.50 Titanium=14.79 CarbonFiber=13.11 Tungsten=13.69  | MotorKW 0/1/2/3 eng 1.0/2.5/4.0/5.5  | DRIVE_KW_PER_TONNE 1.25 | LIFT_EFFICIENCY 0.85 | REACTION_FRAC 0.60 | GROUND_CLEAR 0.020 | BITE_RATE_FRAC 0.45 | EXPOSED_MULT 1.75 | STEP_DISP_CAP 0.25
+# fixedDeltaTime 0.0200  timeScale 3.0  debugFire True
+run 0: Draw at 90.3s  dealt 350 taken 369  pieces 12/12 vs 10/11  flipped self 1.5s enemy 0.9s  | Judges' decision — damage 350 vs 369 (5.0% margin) · pieces 12/12 vs 10/11 · on its back 2% vs 1% — too close to call, scored a draw
+   src: ram 230/24 · limb 120/7 (max hit 24.0) · disc 0/0   packSeam 0.97
+run 1: PlayerWin at 90.0s  dealt 344 taken 427  pieces 12/12 vs 7/11  flipped self 0.0s enemy 1.5s  | Judges' decision — damage 344 vs 427 (19.3% margin) · pieces 12/12 vs 7/11 · on its back 0% vs 2% — decided on structure destroyed
+   src: ram 308/35 · limb 36/2 (max hit 18.4) · disc 0/0   packSeam 0.97
+run 2: PlayerWin at 90.0s  dealt 385 taken 338  pieces 12/12 vs 10/11  flipped self 3.9s enemy 0.3s  | Judges' decision — damage 385 vs 338 (12.0% margin) · pieces 12/12 vs 10/11 · on its back 4% vs 0% — structure even, decided on damage
+   src: ram 299/25 · limb 86/5 (max hit 24.0) · disc 0/0   packSeam 0.97
+run 3: PlayerLoss at 90.3s  dealt 363 taken 536  pieces 12/12 vs 10/11  flipped self 3.3s enemy 0.3s  | Judges' decision — damage 363 vs 536 (32.3% margin) · pieces 12/12 vs 10/11 · on its back 4% vs 0% — structure even, decided on damage
+   src: ram 238/41 · limb 125/7 (max hit 24.3) · disc 0/0   packSeam 1.00
+b3_lance_w_BEFORE|charge  n=4  W2/L1/D1  flips=2  len 90.0-90.3s spread=1.00x  worst single-step piece loss: player 0 enemy 1  [NOISY] (123s wall)

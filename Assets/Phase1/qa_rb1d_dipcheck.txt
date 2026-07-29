@@ -1,0 +1,5 @@
+# ARENA-SIDE dip: sweep the disc through a full turn about its OWN axle,
+# read the SOLID collider's world bounds.min.y at each phase. floor y=0, band=floor+GROUND_CLEAR(0.020).
+# arena solid colSize=(0.34,0.34,0.10)  builder Half() must match this permutation.
+ARENA worst bottom y = -0.044 at phase 225 deg -> dip below band = 0.064 m
+BUILDER predicted rotorDip for DISC_Z = 0.080 m (qa_rb1d_fixcheck.txt)

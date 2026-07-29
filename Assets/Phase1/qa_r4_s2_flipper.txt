@@ -1,0 +1,6 @@
+# build S2_flipper_al parts=13 policy=charge runs=4
+run 0: PlayerLoss at 72.4s  dealt 37 taken 138  pieces 13/13 vs 10/11  flipped 10.8s  | Counted out — out of power — all 300 kJ spent in 63 s; carry more battery, or spend less on driving and spinning
+run 1: PlayerLoss at 77.6s  dealt 98 taken 193  pieces 13/13 vs 10/11  flipped 7.2s  | Counted out — out of power — all 300 kJ spent in 68 s; carry more battery, or spend less on driving and spinning
+run 2: PlayerLoss at 64.4s  dealt 156 taken 361  pieces 13/13 vs 10/11  flipped 17.5s  | Counted out — out of power — all 300 kJ spent in 55 s; carry more battery, or spend less on driving and spinning
+run 3: PlayerWin at 90.0s  dealt 459 taken 256  pieces 13/13 vs 5/11  flipped 12.0s  | Judges' decision — damage 459 vs 256 (44.2% margin) · pieces 13/13 vs 5/11 — decided on damage
+S2_flipper_al|charge  n=4  W1/L3/D0  flips=1  len 64.4-90.0s spread=1.40x  worst single-step piece loss: player 0 enemy 2  [CONVERGED] (79s wall)

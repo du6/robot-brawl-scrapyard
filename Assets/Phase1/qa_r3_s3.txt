@@ -1,0 +1,8 @@
+# build b3_lance_ti|mauler/Vet|fire parts=12 policy=charge runs=4
+# LIVE CONSTANTS  tipSpeedCap m/s: ABS=9.00 Aluminum=9.68 Steel=12.50 Titanium=14.79 CarbonFiber=13.11 Tungsten=13.69  | MotorKW 0/1/2/3 eng 1.0/2.5/4.0/5.5  | DRIVE_KW_PER_TONNE 1.25 | LIFT_EFFICIENCY 0.85 | REACTION_FRAC 0.60 | GROUND_CLEAR 0.020 | BITE_RATE_FRAC 0.45 | EXPOSED_MULT 1.75 | STEP_DISP_CAP 0.25
+# fixedDeltaTime 0.0200  timeScale 4.0  debugFire True
+run 0: PlayerWin at 90.0s  dealt 177 taken 316  pieces 12/12 vs 10/11  flipped self 1.6s enemy 1.2s  | Judges' decision — damage 177 vs 316 (44.0% margin) · pieces 12/12 vs 10/11 · on its back 2% vs 1% — decided on structure destroyed
+run 1: PlayerWin at 90.4s  dealt 184 taken 466  pieces 12/12 vs 10/11  flipped self 1.6s enemy 2.0s  | Judges' decision — damage 184 vs 466 (60.6% margin) · pieces 12/12 vs 10/11 · on its back 2% vs 2% — decided on structure destroyed
+run 2: PlayerWin at 90.4s  dealt 390 taken 250  pieces 12/12 vs 9/11  flipped self 4.0s enemy 1.2s  | Judges' decision — damage 390 vs 250 (35.9% margin) · pieces 12/12 vs 9/11 · on its back 4% vs 1% — decided on structure destroyed
+run 3: PlayerLoss at 90.4s  dealt 147 taken 388  pieces 11/12 vs 10/11  flipped self 1.6s enemy 0.4s  | Judges' decision — damage 147 vs 388 (62.0% margin) · pieces 11/12 vs 10/11 · on its back 2% vs 0% — structure even, decided on damage
+b3_lance_ti|mauler/Vet|fire|charge  n=4  W3/L1/D0  flips=1  len 90.0-90.4s spread=1.00x  worst single-step piece loss: player 1 enemy 1  [CONVERGED] (93s wall)

@@ -1,0 +1,8 @@
+# build b5_discus_al parts=11 policy=charge runs=6
+run 0: PlayerWin at 90.0s  dealt 708 taken 50  pieces 9/11 vs 5/11  flipped 6.3s  | Judges' decision — damage 708 vs 50 (92.9% margin) · pieces 9/11 vs 5/11 — decided on damage
+run 1: PlayerWin at 77.4s  dealt 649 taken 27  pieces 9/11 vs 6/11  flipped 1.5s  | Enemy counted out — beached — 0 of 2 wheels touching the ground, so the drive had nothing to push on
+run 2: PlayerWin at 90.0s  dealt 632 taken 156  pieces 9/11 vs 6/11  flipped 1.5s  | Judges' decision — damage 632 vs 156 (75.3% margin) · pieces 9/11 vs 6/11 — decided on damage
+run 3: PlayerWin at 90.3s  dealt 833 taken 203  pieces 9/11 vs 6/11  flipped 5.7s  | Judges' decision — damage 833 vs 203 (75.6% margin) · pieces 9/11 vs 6/11 — decided on damage
+run 4: PlayerWin at 90.3s  dealt 522 taken 49  pieces 10/11 vs 7/11  flipped 0.0s  | Judges' decision — damage 522 vs 49 (90.7% margin) · pieces 10/11 vs 7/11 — decided on damage
+run 5: PlayerWin at 90.3s  dealt 374 taken 228  pieces 9/11 vs 6/11  flipped 0.0s  | Judges' decision — damage 374 vs 228 (39.0% margin) · pieces 9/11 vs 6/11 — decided on damage
+b5_discus_al|charge  n=6  W6/L0/D0  flips=0  len 77.4-90.3s spread=1.17x  worst single-step piece loss: player 1 enemy 2  [CONVERGED] (181s wall)

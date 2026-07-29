@@ -1,0 +1,18 @@
+# RB2Probe cases=3 reps=4 seconds=24 toKO=True speed=3 fire=True
+# LIVE CONSTANTS  tipSpeedCap m/s: ABS=9.00 Aluminum=9.68 Steel=12.50 Titanium=14.79 CarbonFiber=13.11 Tungsten=13.69  | MotorKW 0/1/2/3 eng 1.0/2.5/4.0/5.5  | DRIVE_KW_PER_TONNE 1.25 | LIFT_EFFICIENCY 0.85 | REACTION_FRAC 0.60 | GROUND_CLEAR 0.020 | BITE_RATE_FRAC 0.45 | EXPOSED_MULT 1.75 | STEP_DISP_CAP 0.25
+# LIVE CONSTANTS (cycle) WIND_RELEASE_FRAC 0.995 | WIND_TIMEOUT_S 2.00 | BITE_TIP_SPEED_MS 4.00 | RECOVER_S 0.10 | PIVOT_RETURN_DPS 500 | MIN_BITE_E 40 | DRAIN_FRAC 0.40 | LIN_IMP_CAP 600 | EFFICIENCY 0.35 | RECUP_FRAC 0.90 | REACTION_STALL_MUL 3.0
+# LIVE CONSTANTS (damage/judging) DMG_K 0.045 | HP_K 6000 | SHOVE_CAP 500 | PART_IMMUNITY 0.50 | RAM_MIN_J 150 | RAM_J_CAP 900 | STRUCT_BAND 0.060 | MIN_STRUCT_PARTS 2.0 | DRAW_BAND_FRAC 0.080 | CONTROL_BAND 0.100 | MATCH_TIME 90 | CREDIT_BUDGET 4000
+# SOURCE REGIME 34ff221d (42 scripts, newest 2026-07-27 17:28:44Z)
+SPINDLE_afk      r0 tier=Veteran  pol=afk    t=90.3 PlayerLoss | pDealt     0 pTaken   115 | P[ram 0/0 limb 0/0] | E[ram 115/7 limb 0/0] | parts 15/17 vs 10/11 | dist 3.08 near 29.1s close 9.8s thr 0.91
+SPINDLE_afk      r1 tier=Veteran  pol=afk    t=90.3 PlayerLoss | pDealt     0 pTaken   276 | P[ram 0/0 limb 0/0] | E[ram 276/11 limb 0/0] | parts 15/17 vs 10/11 | dist 3.52 near 24.2s close 9.9s thr 0.82
+SPINDLE_afk      r2 tier=Veteran  pol=afk    t=90.0 PlayerLoss | pDealt     0 pTaken   262 | P[ram 0/0 limb 0/0] | E[ram 262/13 limb 0/0] | parts 15/17 vs 10/11 | dist 3.28 near 36.0s close 21.7s thr 0.85
+SPINDLE_afk      r3 tier=Veteran  pol=afk    t=90.3 PlayerLoss | pDealt     0 pTaken   107 | P[ram 0/0 limb 0/0] | E[ram 107/6 limb 0/0] | parts 17/17 vs 11/11 | dist 3.78 near 8.5s close 3.9s thr 0.98
+SPINDLE_charge   r0 tier=Veteran  pol=charge t=90.0 PlayerLoss | pDealt   164 pTaken   248 | P[ram 164/24 limb 0/0] | E[ram 248/24 limb 0/0] | parts 17/17 vs 10/11 | dist 2.35 near 54.3s close 34.3s thr 0.88
+SPINDLE_charge   r1 tier=Veteran  pol=charge t=90.3 PlayerLoss | pDealt   202 pTaken   418 | P[ram 202/13 limb 0/0] | E[ram 418/19 limb 0/0] | parts 9/17 vs 10/11 | dist 2.39 near 51.2s close 30.2s thr 0.85
+SPINDLE_charge   r2 tier=Veteran  pol=charge t=33.3 PlayerWin  | pDealt   699 pTaken   118 | P[ram 150/21 limb 549/25] | E[gone] | parts 17/17 vs 0/11 | dist 2.22 near 22.6s close 12.3s thr 0.91
+SPINDLE_charge   r3 tier=Veteran  pol=charge t=21.9 PlayerWin  | pDealt   400 pTaken   170 | P[ram 91/3 limb 309/8] | E[gone] | parts 15/17 vs 0/11 | dist 3.08 near 8.3s close 3.0s thr 0.89
+SPINDLE_hitrun   r0 tier=Veteran  pol=hitrun t=90.3 PlayerWin  | pDealt   477 pTaken    65 | P[ram 91/8 limb 386/8] | E[ram 65/10 limb 0/0] | parts 15/17 vs 10/11 | dist 3.66 near 28.5s close 18.8s thr 0.82
+SPINDLE_hitrun   r1 tier=Veteran  pol=hitrun t=90.3 PlayerLoss | pDealt   266 pTaken   391 | P[ram 83/10 limb 183/3] | E[ram 391/15 limb 0/0] | parts 13/17 vs 10/11 | dist 3.46 near 36.5s close 13.6s thr 0.84
+SPINDLE_hitrun   r2 tier=Veteran  pol=hitrun t=90.0 PlayerLoss | pDealt   454 pTaken   271 | P[ram 170/11 limb 284/6] | E[ram 271/15 limb 0/0] | parts 10/17 vs 10/11 | dist 3.29 near 30.8s close 10.9s thr 0.85
+SPINDLE_hitrun   r3 tier=Veteran  pol=hitrun t=90.3 PlayerWin  | pDealt   376 pTaken   187 | P[ram 110/6 limb 266/5] | E[ram 187/12 limb 0/0] | parts 15/17 vs 7/11 | dist 3.33 near 39.9s close 18.8s thr 0.92
+# done 3 cases x 4

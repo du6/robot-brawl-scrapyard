@@ -1,0 +1,8 @@
+# build c5_discus_abs parts=11 policy=charge runs=4
+# LIVE CONSTANTS  tipSpeedCap m/s: ABS=9.00 Aluminum=9.68 Steel=12.50 Titanium=14.79 CarbonFiber=13.11 Tungsten=13.69  | MotorKW 0/1/2/3 eng 1.0/2.5/4.0/5.5  | DRIVE_KW_PER_TONNE 1.25 | LIFT_EFFICIENCY 0.85 | REACTION_FRAC 0.60 | GROUND_CLEAR 0.020 | BITE_RATE_FRAC 0.45 | EXPOSED_MULT 1.75 | STEP_DISP_CAP 0.25
+# fixedDeltaTime 0.0200  timeScale 3.0  debugFire True
+run 0: PlayerLoss at 73.5s  dealt 447 taken 302  pieces 0/11 vs 10/11  flipped self 6.6s enemy 0.3s  | KO — your core was destroyed
+run 1: PlayerLoss at 90.3s  dealt 271 taken 234  pieces 2/11 vs 10/11  flipped self 16.2s enemy 0.0s  | Judges' decision — damage 271 vs 234 (13.5% margin) · pieces 2/11 vs 10/11 · on its back 18% vs 0% — decided on structure destroyed
+run 2: PlayerLoss at 90.0s  dealt 295 taken 210  pieces 5/11 vs 7/11  flipped self 22.5s enemy 9.0s  | Judges' decision — damage 295 vs 210 (28.8% margin) · pieces 5/11 vs 7/11 · on its back 25% vs 10% — decided on structure destroyed
+run 3: PlayerWin at 90.0s  dealt 488 taken 50  pieces 10/11 vs 7/11  flipped self 0.0s enemy 0.0s  | Judges' decision — damage 488 vs 50 (89.8% margin) · pieces 10/11 vs 7/11 · on its back 0% vs 0% — decided on structure destroyed
+c5_discus_abs|charge  n=4  W1/L3/D0  flips=1  len 73.5-90.3s spread=1.23x  worst single-step piece loss: player 3 enemy 1  [CONVERGED] (117s wall)

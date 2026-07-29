@@ -1,0 +1,41 @@
+# UP2 CRITIC part-function proof
+
+## 1. ACTUATORS - rate / travel / cycles with the trigger held 10 s
+   !! fixture invalid: Structure has floating parts.
+pivot: no test robot
+   !! fixture invalid: Structure has floating parts.
+spindle: no test robot
+ram      playerControlled=True maxRate=3.50 maxTravel=0.450 cycles=13 phases[Winding,Driving,Returning,Recovering,Ready]  stroke 0.450/0.450 m = 100%  | builder parts=1 blockedBy=null tipR=0.150
+
+## 2. WEAPON BITE - identical rig, dummy parked ahead, 12 s of trigger
+   tip = the part on the pivot; direct = bolted to the chassis, no actuator
+   !! fixture invalid: Structure has floating parts.
+blade/pivot: no bodies
+wedge      (tip)   dealt=  147.8 hp  selfDmg=   0.0  maxLift=0.270 m  maxPull=0.734 m  limb 1 blocked=null
+   !! fixture invalid: Structure has floating parts.
+hook/pivot: no bodies
+spike      (tip)   dealt=  148.4 hp  selfDmg=   0.0  maxLift=0.595 m  maxPull=0.009 m  limb 1 blocked=null
+   !! fixture invalid: Structure has floating parts.
+spinner/-: no bodies
+   !! fixture invalid: Structure has floating parts.
+spinnerSaw/-: no bodies
+spike      (direct) dealt=    0.0 hp  selfDmg=   0.0  maxLift=0.001 m  maxPull=0.000 m  no-actuator
+none       (direct) dealt=    0.0 hp  selfDmg=   0.0  maxLift=0.000 m  maxPull=0.002 m  no-actuator
+
+## 3. WHEELS + GYRO
+wheel DRIVE: 10.11 m in 5 s, peak 10.40 m/s
+wheel STEER: cumulative yaw 234.1 deg, peak yaw rate 4.748 rad/s
+gyro RIGHTING withGyro=False: recovered at 1.78 s  (gyro comp present, active=False)
+gyro RIGHTING withGyro=True: recovered at 0.58 s  (gyro comp present, active=False)
+
+## 4. ENGINE + BATTERY
+Actuator.MotorKW(0/1/2/3) = 1.00 / 2.50 / 4.00 / 5.50 kW
+engines=0: peakKW=8.00 capacityKJ=240.0 storedKJ=240.0
+engines=1: peakKW=22.00 capacityKJ=300.0 storedKJ=300.0
+engines=2: peakKW=36.00 capacityKJ=360.0 storedKJ=360.0
+   !! fixture invalid: Structure has floating parts.
+batteries=1: no powerplant
+   !! fixture invalid: Structure has floating parts.
+batteries=2: no powerplant
+
+## FUNC DONE

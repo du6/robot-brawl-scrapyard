@@ -1,0 +1,7 @@
+# build R2D_C1_lowflip_EXPOSED1.0 parts=13 policy=charge runs=3
+# LIVE CONSTANTS  tipSpeedCap m/s: ABS=9.00 Aluminum=9.68 Steel=12.50 Titanium=14.79 CarbonFiber=13.11 Tungsten=13.69  | MotorKW 0/1/2/3 eng 1.0/2.5/4.0/5.5  | DRIVE_KW_PER_TONNE 1.25 | LIFT_EFFICIENCY 0.85 | REACTION_FRAC 0.60 | GROUND_CLEAR 0.020 | BITE_RATE_FRAC 0.45 | EXPOSED_MULT 1.00 | STEP_DISP_CAP 0.25
+# fixedDeltaTime 0.0200  timeScale 4.0  debugFire True
+run 0: PlayerLoss at 16.0s  dealt 107 taken 574  pieces 0/13 vs 11/12  flipped self 0.0s enemy 0.0s  | KO — your core was destroyed
+run 1: PlayerWin at 90.4s  dealt 201 taken 552  pieces 13/13 vs 8/12  flipped self 2.0s enemy 17.2s  | Judges' decision — damage 201 vs 552 (63.5% margin) · pieces 13/13 vs 8/12 · on its back 2% vs 19% — decided on structure destroyed
+run 2: PlayerLoss at 15.6s  dealt 51 taken 746  pieces 0/13 vs 11/12  flipped self 0.0s enemy 0.0s  | KO — your core was destroyed
+R2D_C1_lowflip_EXPOSED1.0|charge  n=3  W1/L2/D0  flips=1  len 15.6-90.4s spread=5.80x  worst single-step piece loss: player 8 enemy 1  [NOISY] (32s wall)

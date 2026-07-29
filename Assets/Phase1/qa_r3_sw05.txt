@@ -1,0 +1,6 @@
+# build qa_r3_b2_whisk_cf parts=14 policy=afk runs=4
+run 0: PlayerWin at 90.0s  dealt 330 taken 316  pieces 14/14 vs 5/11  flipped 0.0s  | Judges' decision — damage 330 vs 316 (4.2% margin) · pieces 14/14 vs 5/11 — damage inside the draw band, decided on structure retained
+run 1: PlayerLoss at 90.3s  dealt 80 taken 114  pieces 14/14 vs 10/11  flipped 0.0s  | Judges' decision — damage 80 vs 114 (30.0% margin) · pieces 14/14 vs 10/11 — decided on damage
+run 2: PlayerWin at 90.0s  dealt 158 taken 153  pieces 14/14 vs 6/11  flipped 0.0s  | Judges' decision — damage 158 vs 153 (3.3% margin) · pieces 14/14 vs 6/11 — damage inside the draw band, decided on structure retained
+run 3: PlayerWin at 90.0s  dealt 264 taken 220  pieces 14/14 vs 5/11  flipped 0.0s  | Judges' decision — damage 264 vs 220 (16.9% margin) · pieces 14/14 vs 5/11 — decided on damage
+qa_r3_b2_whisk_cf|afk  n=4  W3/L1/D0  flips=1  len 90.0-90.3s spread=1.00x  worst single-step piece loss: player 0 enemy 1  [CONVERGED] (123s wall)

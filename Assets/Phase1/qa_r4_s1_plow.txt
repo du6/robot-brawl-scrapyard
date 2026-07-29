@@ -1,0 +1,6 @@
+# build S1_plow_steel parts=10 policy=charge runs=4
+run 0: PlayerLoss at 90.0s  dealt 289 taken 350  pieces 8/10 vs 8/12  flipped 4.8s  | Judges' decision — damage 289 vs 350 (17.4% margin) · pieces 8/10 vs 8/12 — decided on damage
+run 1: PlayerLoss at 80.8s  dealt 98 taken 437  pieces 8/10 vs 9/12  flipped 14.4s  | Counted out — out of power — 240 kJ of its 300 kJ pack was torn off the chassis, and what was left ran dry after 71 s
+run 2: PlayerLoss at 90.4s  dealt 158 taken 844  pieces 9/10 vs 9/12  flipped 0.4s  | Judges' decision — damage 158 vs 844 (81.3% margin) · pieces 9/10 vs 9/12 — decided on damage
+run 3: PlayerLoss at 90.4s  dealt 21 taken 404  pieces 9/10 vs 9/12  flipped 1.6s  | Judges' decision — damage 21 vs 404 (94.8% margin) · pieces 9/10 vs 9/12 — decided on damage
+S1_plow_steel|charge  n=4  W0/L4/D0  flips=0  len 80.8-90.4s spread=1.12x  worst single-step piece loss: player 1 enemy 1  [CONVERGED] (90s wall)

@@ -1,0 +1,6 @@
+# build qa_r2_b6_hammer_w|mauler|Veteran|fire=True parts=13 policy=charge runs=4
+run 0: PlayerLoss at 55.8s  dealt 46 taken 221  pieces 13/13 vs 10/11  flipped 12.0s  | Counted out — out of power — all 300 kJ spent in 46 s; carry more battery, or spend less on driving and spinning
+run 1: PlayerLoss at 42.9s  dealt 12 taken 98  pieces 13/13 vs 10/11  flipped 3.9s  | Counted out — out of power — all 300 kJ spent in 33 s; carry more battery, or spend less on driving and spinning
+run 2: PlayerLoss at 44.7s  dealt 38 taken 169  pieces 12/13 vs 10/11  flipped 3.6s  | Counted out — out of power — all 300 kJ spent in 35 s; carry more battery, or spend less on driving and spinning
+run 3: PlayerLoss at 36.3s  dealt 21 taken 162  pieces 12/13 vs 10/11  flipped 3.0s  | Counted out — out of power — 240 kJ of its 300 kJ pack was torn off the chassis, and what was left ran dry after 26 s
+qa_r2_b6_hammer_w|mauler|Veteran|fire=True|charge  n=4  W0/L4/D0  flips=0  len 36.3-55.8s spread=1.54x  worst single-step piece loss: player 1 enemy 1  [CONVERGED] (63s wall)

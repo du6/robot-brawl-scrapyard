@@ -1,0 +1,8 @@
+# build b6_ripper_al|scout/Rookie|fire parts=13 policy=charge runs=4
+# LIVE CONSTANTS  tipSpeedCap m/s: ABS=9.00 Aluminum=9.68 Steel=12.50 Titanium=14.79 CarbonFiber=13.11 Tungsten=13.69  | MotorKW 0/1/2/3 eng 1.0/2.5/4.0/5.5  | DRIVE_KW_PER_TONNE 1.25 | LIFT_EFFICIENCY 0.85 | REACTION_FRAC 0.60 | GROUND_CLEAR 0.020 | BITE_RATE_FRAC 0.45 | EXPOSED_MULT 1.75 | STEP_DISP_CAP 0.25
+# fixedDeltaTime 0.0200  timeScale 4.0  debugFire True
+run 0: PlayerWin at 90.4s  dealt 72 taken 76  pieces 13/13 vs 10/11  flipped self 0.0s enemy 0.0s  | Judges' decision — damage 72 vs 76 (5.2% margin) · pieces 13/13 vs 10/11 · on its back 0% vs 0% — decided on structure destroyed
+run 1: PlayerWin at 90.0s  dealt 11 taken 69  pieces 13/13 vs 10/11  flipped self 0.0s enemy 0.8s  | Judges' decision — damage 11 vs 69 (83.7% margin) · pieces 13/13 vs 10/11 · on its back 0% vs 1% — decided on structure destroyed
+run 2: PlayerWin at 90.0s  dealt 198 taken 164  pieces 13/13 vs 9/11  flipped self 0.0s enemy 7.2s  | Judges' decision — damage 198 vs 164 (17.5% margin) · pieces 13/13 vs 9/11 · on its back 0% vs 8% — decided on structure destroyed
+run 3: PlayerWin at 90.4s  dealt 28 taken 247  pieces 12/13 vs 5/11  flipped self 0.0s enemy 4.8s  | Judges' decision — damage 28 vs 247 (88.8% margin) · pieces 12/13 vs 5/11 · on its back 0% vs 5% — decided on structure destroyed
+b6_ripper_al|scout/Rookie|fire|charge  n=4  W4/L0/D0  flips=0  len 90.0-90.4s spread=1.00x  worst single-step piece loss: player 1 enemy 1  [CONVERGED] (93s wall)

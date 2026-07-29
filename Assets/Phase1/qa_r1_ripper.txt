@@ -1,0 +1,8 @@
+enemy=RIPPER
+parts: core_0 chassis_1 chassis_2 battery_3 gyro_4 engine_5 pivotYP_6 beam_7 bladeZP_8 
+mass=750.2
+actuators=1
+  kind=Pivot limbParts=2 I=23.02 tipR=1.06 maxRate=11.79 E=0J playerControlled=False
+t=141.2 dist=3.38 aiState=charge aiFire=False phase=Ready travel=0.000 rate=0.00 E=0J dealt=0 taken=104
+t=151.4 dist=3.43 aiState=turn aiFire=False phase=Ready travel=0.000 rate=0.00 E=0J dealt=0 taken=104
+t=246.1 dist=0.63 state=turn aiFire=True phase=Returning travel=1.292 rate=0.00 E=0J dealt=74 taken=648

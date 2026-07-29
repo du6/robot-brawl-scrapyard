@@ -1,0 +1,103 @@
+# RB2Dev cases=6 reps=4 interleave=True seconds=45 toKO=False speed=4 fire=True
+# LIVE CONSTANTS  tipSpeedCap m/s: ABS=9.00 Aluminum=9.68 Steel=12.50 Titanium=14.79 CarbonFiber=13.11 Tungsten=13.69  | MotorKW 0/1/2/3 eng 1.0/2.5/4.0/5.5  | DRIVE_KW_PER_TONNE 1.25 | LIFT_EFFICIENCY 0.85 | REACTION_FRAC 0.60 | GROUND_CLEAR 0.020 | BITE_RATE_FRAC 0.45 | EXPOSED_MULT 1.75 | STEP_DISP_CAP 0.25
+# LIVE CONSTANTS (cycle) WIND_RELEASE_FRAC 0.995 | WIND_TIMEOUT_S 2.00 | BITE_TIP_SPEED_MS 4.00 | RECOVER_S 0.10 | PIVOT_RETURN_DPS 500 | MIN_BITE_E 40 | DRAIN_FRAC 0.40 | LIN_IMP_CAP 600 | EFFICIENCY 0.35 | RECUP_FRAC 0.90 | REACTION_STALL_MUL 3.0
+# LIVE CONSTANTS (damage/judging) DMG_K 0.045 | HP_K 6000 | SHOVE_CAP 500 | PART_IMMUNITY 0.50 | RAM_MIN_J 150 | RAM_J_CAP 900 | STRUCT_BAND 0.060 | MIN_STRUCT_PARTS 2.0 | DRAW_BAND_FRAC 0.080 | CONTROL_BAND 0.100 | MATCH_TIME 90 | CREDIT_BUDGET 4000
+# SOURCE REGIME c2dd1a40 (43 scripts, newest 2026-07-27 19:48:39Z)
+# SHIPPED AI KNOBS  THREAT_ARC_DOT 0.15 FLANK_OFFSET 2.60 REAR_BIAS 0.90 PARKED_TIME 5.00 CIRCLE_MAX_S 2.50
+SHIP_Rookie      r0 tier=Rookie   pol=charge t=43.6 TIMEBOX    | pDealt   425 pTaken   147 | P[ram 178/9 limb 247/6] | E[ram 147/9 limb 0/0] | parts 17/17 vs 10/11 | dist 2.95 near 16.8s close 10.7s thr 0.75
+    funnel 43084 call | rej noRb 43011 ownRb 0 notRobot 0 noCombat 0 noIdx 0 | onTarget 73 -> gate 0 (bestFrac 0.00) energy 0 cool 67 APPLY 6 || imm ate limb 0 ram 18 passed limb 6 ram 18
+    rotor [spindleZP kind=Spindle edgeMean 12.25 edgeMax 12.50 aboveGate 43.7s tipR 0.170 maxRate 73.5] | supplyFracMin 1.00 storeFracMin 0.78 | weaponPartLostAt none
+    aiState charge 40% backoff 27% turn 29% unstick 3% | knob=SHIPPED avoid=0.00 ovr=-1.00 spdOvr=-1 dInt=0.45 openThr=0.40
+FLAT_Rookie      r0 tier=Rookie   pol=charge+flatspeedV t=43.6 TIMEBOX    | pDealt    82 pTaken   161 | P[ram 10/4 limb 72/1] | E[ram 161/7 limb 0/0] | parts 15/17 vs 10/11 | dist 2.94 near 18.7s close 8.9s thr 0.95
+    funnel 40224 call | rej noRb 40219 ownRb 0 notRobot 0 noCombat 0 noIdx 0 | onTarget 5 -> gate 0 (bestFrac 0.00) energy 0 cool 4 APPLY 1 || imm ate limb 0 ram 23 passed limb 1 ram 11
+    rotor [spindleZP kind=Spindle edgeMean 12.37 edgeMax 12.50 aboveGate 43.7s tipR 0.170 maxRate 73.5] | supplyFracMin 1.00 storeFracMin 0.77 | weaponPartLostAt none
+    aiState charge 63% backoff 18% turn 6% extricate 2% unstick 11% | knob=flatspeedV avoid=0.00 ovr=-1.00 spdOvr=1 dInt=0.20 openThr=0.55
+SHIP_Veteran     r0 tier=Veteran  pol=charge t=43.6 TIMEBOX    | pDealt   339 pTaken   228 | P[ram 29/12 limb 310/5] | E[ram 228/13 limb 0/0] | parts 13/17 vs 10/11 | dist 2.19 near 24.9s close 16.9s thr 0.88
+    funnel 47906 call | rej noRb 10414 ownRb 0 notRobot 37 noCombat 0 noIdx 0 | onTarget 20 -> gate 0 (bestFrac 0.00) energy 0 cool 15 APPLY 5 || imm ate limb 0 ram 6 passed limb 5 ram 25
+    rotor [spindleZP kind=Spindle edgeMean 6.27 edgeMax 12.50 aboveGate 43.7s tipR 0.001 maxRate 94.2] | supplyFracMin 1.00 storeFracMin 0.82 | weaponPartLostAt 9.6s
+    aiState charge 21% flank 13% backoff 37% turn 24% unstick 5% other 1% | knob=SHIPPED avoid=0.55 ovr=-1.00 spdOvr=-1 dInt=0.20 openThr=0.55
+FLAT_Veteran     r0 tier=Veteran  pol=charge+flatspeedV t=43.6 TIMEBOX    | pDealt   108 pTaken    49 | P[ram 45/2 limb 64/2] | E[ram 49/1 limb 0/0] | parts 17/17 vs 10/11 | dist 1.74 near 39.0s close 0.0s thr 0.93
+    funnel 40965 call | rej noRb 40942 ownRb 0 notRobot 0 noCombat 0 noIdx 0 | onTarget 23 -> gate 0 (bestFrac 0.00) energy 0 cool 21 APPLY 2 || imm ate limb 0 ram 2 passed limb 2 ram 3
+    rotor [spindleZP kind=Spindle edgeMean 12.36 edgeMax 12.50 aboveGate 43.7s tipR 0.170 maxRate 73.5] | supplyFracMin 1.00 storeFracMin 0.75 | weaponPartLostAt none
+    aiState flank 21% commit 19% backoff 4% turn 12% extricate 24% unstick 21% | knob=flatspeedV avoid=0.55 ovr=-1.00 spdOvr=1 dInt=0.20 openThr=0.55
+SHIP_Champion    r0 tier=Champion pol=charge t=32.4 PlayerWin  | pDealt   417 pTaken    44 | P[ram 34/7 limb 382/23] | E[gone] | parts 17/17 vs 0/11 | dist 1.77 near 25.1s close 8.9s thr 0.97
+    funnel 31704 call | rej noRb 31277 ownRb 0 notRobot 22 noCombat 0 noIdx 0 | onTarget 405 -> gate 0 (bestFrac 0.00) energy 0 cool 382 APPLY 23 || imm ate limb 0 ram 99 passed limb 23 ram 16
+    rotor [spindleZP kind=Spindle edgeMean 11.80 edgeMax 12.50 aboveGate 32.3s tipR 0.170 maxRate 73.5] | supplyFracMin 1.00 storeFracMin 0.78 | weaponPartLostAt none
+    aiState flank 12% circle 13% commit 22% backoff 15% turn 4% extricate 15% unstick 19% | knob=SHIPPED avoid=-1.00 ovr=-1.00 spdOvr=-1 dInt=0.10 openThr=0.80
+FLAT_Champion    r0 tier=Champion pol=charge+flatspeedV t=43.6 TIMEBOX    | pDealt   257 pTaken   106 | P[ram 257/27 limb 0/0] | E[ram 106/17 limb 0/0] | parts 17/17 vs 10/11 | dist 1.75 near 31.1s close 27.0s thr 0.86
+    funnel 42603 call | rej noRb 42603 ownRb 0 notRobot 0 noCombat 0 noIdx 0 | onTarget 0 -> gate 0 (bestFrac 0.00) energy 0 cool 0 APPLY 0 || imm ate limb 0 ram 97 passed limb 0 ram 44
+    rotor [spindleZP kind=Spindle edgeMean 12.39 edgeMax 12.50 aboveGate 43.7s tipR 0.170 maxRate 73.5] | supplyFracMin 1.00 storeFracMin 0.83 | weaponPartLostAt none
+    aiState charge 17% flank 9% backoff 27% turn 30% extricate 6% unstick 11% | knob=flatspeedV avoid=1.00 ovr=-1.00 spdOvr=1 dInt=0.20 openThr=0.55
+SHIP_Rookie      r1 tier=Rookie   pol=charge t=43.6 TIMEBOX    | pDealt   477 pTaken   141 | P[ram 91/10 limb 385/12] | E[ram 141/8 limb 0/0] | parts 17/17 vs 6/11 | dist 2.89 near 23.0s close 16.9s thr 0.80
+    funnel 42919 call | rej noRb 42534 ownRb 0 notRobot 193 noCombat 0 noIdx 0 | onTarget 192 -> gate 0 (bestFrac 0.00) energy 0 cool 180 APPLY 12 || imm ate limb 0 ram 1 passed limb 12 ram 18
+    rotor [spindleZP kind=Spindle edgeMean 12.16 edgeMax 12.50 aboveGate 43.7s tipR 0.170 maxRate 73.5] | supplyFracMin 1.00 storeFracMin 0.72 | weaponPartLostAt none
+    aiState charge 35% backoff 29% turn 20% unstick 16% other 1% | knob=SHIPPED avoid=0.00 ovr=-1.00 spdOvr=-1 dInt=0.45 openThr=0.40
+FLAT_Rookie      r1 tier=Rookie   pol=charge+flatspeedV t=43.6 TIMEBOX    | pDealt    14 pTaken   158 | P[ram 14/5 limb 0/0] | E[ram 158/7 limb 0/0] | parts 15/17 vs 10/11 | dist 3.37 near 17.5s close 7.0s thr 0.91
+    funnel 42890 call | rej noRb 42890 ownRb 0 notRobot 0 noCombat 0 noIdx 0 | onTarget 0 -> gate 0 (bestFrac 0.00) energy 0 cool 0 APPLY 0 || imm ate limb 0 ram 3 passed limb 0 ram 12
+    rotor [spindleZP kind=Spindle edgeMean 12.39 edgeMax 12.50 aboveGate 43.7s tipR 0.170 maxRate 73.5] | supplyFracMin 1.00 storeFracMin 0.82 | weaponPartLostAt none
+    aiState charge 51% backoff 16% turn 16% extricate 6% unstick 9% other 1% | knob=flatspeedV avoid=0.00 ovr=-1.00 spdOvr=1 dInt=0.20 openThr=0.55
+SHIP_Veteran     r1 tier=Veteran  pol=charge t=43.6 TIMEBOX    | pDealt   670 pTaken   102 | P[ram 153/11 limb 547/12] | E[ram 102/7 limb 0/0] | parts 15/17 vs 4/11 | dist 2.40 near 23.1s close 16.0s thr 0.92
+    funnel 40414 call | rej noRb 40031 ownRb 0 notRobot 262 noCombat 0 noIdx 0 | onTarget 121 -> gate 0 (bestFrac 0.00) energy 0 cool 109 APPLY 12 || imm ate limb 0 ram 11 passed limb 12 ram 18
+    rotor [spindleZP kind=Spindle edgeMean 12.15 edgeMax 12.50 aboveGate 43.7s tipR 0.170 maxRate 73.5] | supplyFracMin 1.00 storeFracMin 0.74 | weaponPartLostAt none
+    aiState charge 12% flank 11% circle 9% commit 8% backoff 31% turn 14% unstick 15% | knob=SHIPPED avoid=0.55 ovr=-1.00 spdOvr=-1 dInt=0.20 openThr=0.55
+FLAT_Veteran     r1 tier=Veteran  pol=charge+flatspeedV t=43.6 TIMEBOX    | pDealt   131 pTaken    86 | P[ram 59/8 limb 72/1] | E[ram 86/7 limb 0/0] | parts 17/17 vs 10/11 | dist 2.81 near 19.0s close 9.0s thr 0.91
+    funnel 41504 call | rej noRb 41493 ownRb 0 notRobot 0 noCombat 0 noIdx 0 | onTarget 11 -> gate 0 (bestFrac 0.00) energy 0 cool 10 APPLY 1 || imm ate limb 0 ram 13 passed limb 1 ram 15
+    rotor [spindleZP kind=Spindle edgeMean 12.37 edgeMax 12.50 aboveGate 43.7s tipR 0.170 maxRate 73.5] | supplyFracMin 1.00 storeFracMin 0.78 | weaponPartLostAt none
+    aiState charge 7% flank 23% circle 12% commit 9% backoff 20% turn 17% unstick 11% | knob=flatspeedV avoid=0.55 ovr=-1.00 spdOvr=1 dInt=0.20 openThr=0.55
+SHIP_Champion    r1 tier=Champion pol=charge t=43.6 TIMEBOX    | pDealt     1 pTaken     6 | P[ram 1/2 limb 0/0] | E[ram 6/3 limb 0/0] | parts 17/17 vs 11/11 | dist 1.64 near 36.2s close 20.1s thr 0.96
+    funnel 43732 call | rej noRb 43732 ownRb 0 notRobot 0 noCombat 0 noIdx 0 | onTarget 0 -> gate 0 (bestFrac 0.00) energy 0 cool 0 APPLY 0 || imm ate limb 0 ram 3 passed limb 0 ram 5
+    rotor [spindleZP kind=Spindle edgeMean 12.39 edgeMax 12.50 aboveGate 43.7s tipR 0.170 maxRate 73.5] | supplyFracMin 1.00 storeFracMin 0.76 | weaponPartLostAt none
+    aiState flank 14% circle 15% commit 31% turn 7% extricate 17% unstick 16% | knob=SHIPPED avoid=1.00 ovr=-1.00 spdOvr=-1 dInt=0.10 openThr=0.80
+FLAT_Champion    r1 tier=Champion pol=charge+flatspeedV t=43.6 TIMEBOX    | pDealt   191 pTaken   230 | P[ram 191/14 limb 0/0] | E[ram 230/11 limb 0/0] | parts 14/17 vs 10/11 | dist 2.11 near 25.6s close 5.6s thr 0.91
+    funnel 42641 call | rej noRb 42641 ownRb 0 notRobot 0 noCombat 0 noIdx 0 | onTarget 0 -> gate 0 (bestFrac 0.00) energy 0 cool 0 APPLY 0 || imm ate limb 0 ram 22 passed limb 0 ram 25
+    rotor [spindleZP kind=Spindle edgeMean 12.39 edgeMax 12.50 aboveGate 43.7s tipR 0.170 maxRate 73.5] | supplyFracMin 1.00 storeFracMin 0.83 | weaponPartLostAt none
+    aiState charge 25% flank 9% backoff 32% turn 16% extricate 4% unstick 14% | knob=flatspeedV avoid=1.00 ovr=-1.00 spdOvr=1 dInt=0.20 openThr=0.55
+SHIP_Rookie      r2 tier=Rookie   pol=charge t=43.6 TIMEBOX    | pDealt   130 pTaken   210 | P[ram 130/17 limb 0/0] | E[ram 210/15 limb 0/0] | parts 13/17 vs 10/11 | dist 2.47 near 21.5s close 11.0s thr 0.79
+    funnel 43263 call | rej noRb 43263 ownRb 0 notRobot 0 noCombat 0 noIdx 0 | onTarget 0 -> gate 0 (bestFrac 0.00) energy 0 cool 0 APPLY 0 || imm ate limb 0 ram 126 passed limb 0 ram 32
+    rotor [spindleZP kind=Spindle edgeMean 12.39 edgeMax 12.50 aboveGate 43.7s tipR 0.170 maxRate 73.5] | supplyFracMin 1.00 storeFracMin 0.82 | weaponPartLostAt none
+    aiState charge 41% backoff 30% turn 19% unstick 9% | knob=SHIPPED avoid=0.00 ovr=-1.00 spdOvr=-1 dInt=0.45 openThr=0.40
+FLAT_Rookie      r2 tier=Rookie   pol=charge+flatspeedV t=43.6 TIMEBOX    | pDealt    45 pTaken    49 | P[ram 0/1 limb 45/1] | E[ram 49/1 limb 0/0] | parts 17/17 vs 10/11 | dist 3.81 near 3.4s close 0.4s thr 0.92
+    funnel 43147 call | rej noRb 43136 ownRb 0 notRobot 0 noCombat 0 noIdx 0 | onTarget 11 -> gate 0 (bestFrac 0.00) energy 0 cool 10 APPLY 1 || imm ate limb 0 ram 4 passed limb 1 ram 2
+    rotor [spindleZP kind=Spindle edgeMean 12.37 edgeMax 12.50 aboveGate 43.6s tipR 0.170 maxRate 73.5] | supplyFracMin 1.00 storeFracMin 0.77 | weaponPartLostAt none
+    aiState charge 63% backoff 9% turn 15% extricate 4% unstick 9% | knob=flatspeedV avoid=0.00 ovr=-1.00 spdOvr=1 dInt=0.20 openThr=0.55
+SHIP_Veteran     r2 tier=Veteran  pol=charge t=43.6 TIMEBOX    | pDealt    92 pTaken   101 | P[ram 92/7 limb 0/0] | E[ram 101/5 limb 0/0] | parts 17/17 vs 10/11 | dist 2.47 near 18.1s close 11.6s thr 0.89
+    funnel 41489 call | rej noRb 41489 ownRb 0 notRobot 0 noCombat 0 noIdx 0 | onTarget 0 -> gate 0 (bestFrac 0.00) energy 0 cool 0 APPLY 0 || imm ate limb 0 ram 20 passed limb 0 ram 12
+    rotor [spindleZP kind=Spindle edgeMean 12.39 edgeMax 12.50 aboveGate 43.7s tipR 0.170 maxRate 73.5] | supplyFracMin 1.00 storeFracMin 0.80 | weaponPartLostAt none
+    aiState charge 8% flank 15% circle 11% commit 9% backoff 23% turn 22% unstick 11% | knob=SHIPPED avoid=0.55 ovr=-1.00 spdOvr=-1 dInt=0.20 openThr=0.55
+FLAT_Veteran     r2 tier=Veteran  pol=charge+flatspeedV t=43.6 TIMEBOX    | pDealt   225 pTaken   244 | P[ram 72/9 limb 153/3] | E[ram 244/15 limb 0/0] | parts 13/17 vs 10/11 | dist 2.83 near 22.0s close 13.3s thr 0.92
+    funnel 40158 call | rej noRb 40048 ownRb 0 notRobot 62 noCombat 0 noIdx 0 | onTarget 48 -> gate 0 (bestFrac 0.00) energy 0 cool 45 APPLY 3 || imm ate limb 0 ram 35 passed limb 3 ram 24
+    rotor [spindleZP kind=Spindle edgeMean 12.32 edgeMax 12.50 aboveGate 43.7s tipR 0.170 maxRate 73.5] | supplyFracMin 1.00 storeFracMin 0.80 | weaponPartLostAt none
+    aiState charge 21% flank 11% circle 11% commit 3% backoff 27% turn 16% extricate 2% unstick 9% other 1% | knob=flatspeedV avoid=0.55 ovr=-1.00 spdOvr=1 dInt=0.20 openThr=0.55
+SHIP_Champion    r2 tier=Champion pol=charge t=43.6 TIMEBOX    | pDealt   109 pTaken    90 | P[ram 109/23 limb 0/0] | E[ram 90/11 limb 0/0] | parts 17/17 vs 10/11 | dist 1.95 near 31.0s close 24.2s thr 0.83
+    funnel 42677 call | rej noRb 42677 ownRb 0 notRobot 0 noCombat 0 noIdx 0 | onTarget 0 -> gate 0 (bestFrac 0.00) energy 0 cool 0 APPLY 0 || imm ate limb 0 ram 96 passed limb 0 ram 34
+    rotor [spindleZP kind=Spindle edgeMean 12.39 edgeMax 12.50 aboveGate 43.7s tipR 0.170 maxRate 73.5] | supplyFracMin 1.00 storeFracMin 0.83 | weaponPartLostAt none
+    aiState charge 20% flank 8% backoff 13% turn 40% extricate 6% unstick 14% | knob=SHIPPED avoid=1.00 ovr=-1.00 spdOvr=-1 dInt=0.10 openThr=0.80
+FLAT_Champion    r2 tier=Champion pol=charge+flatspeedV t=43.6 TIMEBOX    | pDealt   179 pTaken    70 | P[ram 131/12 limb 48/1] | E[ram 70/9 limb 0/0] | parts 17/17 vs 11/11 | dist 2.60 near 24.0s close 13.5s thr 0.84
+    funnel 41124 call | rej noRb 41119 ownRb 0 notRobot 0 noCombat 0 noIdx 0 | onTarget 5 -> gate 0 (bestFrac 0.00) energy 0 cool 4 APPLY 1 || imm ate limb 0 ram 14 passed limb 1 ram 21
+    rotor [spindleZP kind=Spindle edgeMean 12.37 edgeMax 12.50 aboveGate 43.7s tipR 0.170 maxRate 73.5] | supplyFracMin 1.00 storeFracMin 0.81 | weaponPartLostAt none
+    aiState charge 24% flank 10% backoff 23% turn 34% unstick 9% | knob=flatspeedV avoid=1.00 ovr=-1.00 spdOvr=1 dInt=0.20 openThr=0.55
+SHIP_Rookie      r3 tier=Rookie   pol=charge t=43.6 TIMEBOX    | pDealt   227 pTaken   248 | P[ram 103/10 limb 124/2] | E[ram 248/12 limb 0/0] | parts 17/17 vs 10/11 | dist 3.05 near 16.6s close 5.7s thr 0.80
+    funnel 44123 call | rej noRb 44094 ownRb 0 notRobot 0 noCombat 0 noIdx 0 | onTarget 29 -> gate 0 (bestFrac 0.00) energy 0 cool 27 APPLY 2 || imm ate limb 0 ram 35 passed limb 2 ram 22
+    rotor [spindleZP kind=Spindle edgeMean 12.35 edgeMax 12.50 aboveGate 43.7s tipR 0.170 maxRate 73.5] | supplyFracMin 1.00 storeFracMin 0.80 | weaponPartLostAt none
+    aiState charge 41% backoff 36% turn 17% unstick 6% | knob=SHIPPED avoid=0.00 ovr=-1.00 spdOvr=-1 dInt=0.45 openThr=0.40
+FLAT_Rookie      r3 tier=Rookie   pol=charge+flatspeedV t=43.6 TIMEBOX    | pDealt   108 pTaken    92 | P[ram 76/8 limb 32/1] | E[ram 92/5 limb 0/0] | parts 15/17 vs 10/11 | dist 3.65 near 11.7s close 3.2s thr 0.90
+    funnel 43079 call | rej noRb 42674 ownRb 0 notRobot 390 noCombat 0 noIdx 0 | onTarget 15 -> gate 0 (bestFrac 0.00) energy 0 cool 14 APPLY 1 || imm ate limb 0 ram 9 passed limb 1 ram 13
+    rotor [spindleZP kind=Spindle edgeMean 12.37 edgeMax 12.50 aboveGate 43.7s tipR 0.170 maxRate 73.5] | supplyFracMin 1.00 storeFracMin 0.79 | weaponPartLostAt none
+    aiState charge 53% backoff 16% turn 19% unstick 11% | knob=flatspeedV avoid=0.00 ovr=-1.00 spdOvr=1 dInt=0.20 openThr=0.55
+SHIP_Veteran     r3 tier=Veteran  pol=charge t=43.6 TIMEBOX    | pDealt    58 pTaken   130 | P[ram 58/2 limb 0/0] | E[ram 130/3 limb 0/0] | parts 13/17 vs 10/11 | dist 2.35 near 27.6s close 4.3s thr 0.82
+    funnel 42435 call | rej noRb 42435 ownRb 0 notRobot 0 noCombat 0 noIdx 0 | onTarget 0 -> gate 0 (bestFrac 0.00) energy 0 cool 0 APPLY 0 || imm ate limb 0 ram 12 passed limb 0 ram 5
+    rotor [spindleZP kind=Spindle edgeMean 12.39 edgeMax 12.50 aboveGate 43.7s tipR 0.170 maxRate 73.5] | supplyFracMin 1.00 storeFracMin 0.81 | weaponPartLostAt none
+    aiState charge 11% flank 12% backoff 13% turn 39% extricate 12% unstick 11% other 2% | knob=SHIPPED avoid=0.55 ovr=-1.00 spdOvr=-1 dInt=0.20 openThr=0.55
+FLAT_Veteran     r3 tier=Veteran  pol=charge+flatspeedV t=43.6 TIMEBOX    | pDealt   167 pTaken   182 | P[ram 15/7 limb 152/3] | E[ram 182/11 limb 0/0] | parts 15/17 vs 10/11 | dist 3.29 near 17.0s close 8.3s thr 0.90
+    funnel 43036 call | rej noRb 43021 ownRb 0 notRobot 0 noCombat 0 noIdx 0 | onTarget 15 -> gate 0 (bestFrac 0.00) energy 0 cool 12 APPLY 3 || imm ate limb 0 ram 5 passed limb 3 ram 18
+    rotor [spindleZP kind=Spindle edgeMean 12.32 edgeMax 12.50 aboveGate 43.6s tipR 0.170 maxRate 73.5] | supplyFracMin 1.00 storeFracMin 0.81 | weaponPartLostAt none
+    aiState charge 32% flank 16% backoff 31% turn 19% unstick 2% | knob=flatspeedV avoid=0.55 ovr=-1.00 spdOvr=1 dInt=0.20 openThr=0.55
+SHIP_Champion    r3 tier=Champion pol=charge t=43.6 TIMEBOX    | pDealt   297 pTaken    37 | P[ram 14/4 limb 283/10] | E[ram 37/4 limb 0/0] | parts 17/17 vs 7/11 | dist 1.94 near 35.7s close 2.4s thr 0.99
+    funnel 44557 call | rej noRb 44292 ownRb 0 notRobot 110 noCombat 0 noIdx 0 | onTarget 155 -> gate 0 (bestFrac 0.00) energy 0 cool 145 APPLY 10 || imm ate limb 0 ram 11 passed limb 10 ram 8
+    rotor [spindleZP kind=Spindle edgeMean 12.18 edgeMax 12.50 aboveGate 43.6s tipR 0.170 maxRate 73.5] | supplyFracMin 1.00 storeFracMin 0.72 | weaponPartLostAt none
+    aiState flank 13% circle 18% commit 16% backoff 12% extricate 23% unstick 18% | knob=SHIPPED avoid=1.00 ovr=-1.00 spdOvr=-1 dInt=0.10 openThr=0.80
+FLAT_Champion    r3 tier=Champion pol=charge+flatspeedV t=43.6 TIMEBOX    | pDealt    32 pTaken    61 | P[ram 32/9 limb 0/0] | E[ram 61/10 limb 0/0] | parts 17/17 vs 11/11 | dist 1.98 near 33.0s close 1.1s thr 0.85
+    funnel 42641 call | rej noRb 42641 ownRb 0 notRobot 0 noCombat 0 noIdx 0 | onTarget 0 -> gate 0 (bestFrac 0.00) energy 0 cool 0 APPLY 0 || imm ate limb 0 ram 40 passed limb 0 ram 19
+    rotor [spindleZP kind=Spindle edgeMean 12.39 edgeMax 12.50 aboveGate 43.7s tipR 0.170 maxRate 73.5] | supplyFracMin 1.00 storeFracMin 0.81 | weaponPartLostAt none
+    aiState charge 6% flank 9% circle 11% backoff 5% turn 32% extricate 18% unstick 19% | knob=flatspeedV avoid=1.00 ovr=-1.00 spdOvr=1 dInt=0.20 openThr=0.55
+# done 6 cases x 4

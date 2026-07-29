@@ -1,0 +1,15 @@
+# DISC_Z geometry, extent along player->enemy horizontal dir, metres from player COM
+# dist between COMs = 5.50
+  core_0         trigger=False fwdExtent=0.175
+  beam_1         trigger=False fwdExtent=0.321
+  beam_2         trigger=False fwdExtent=-0.047
+  beam_3         trigger=False fwdExtent=0.420
+  beam_4         trigger=False fwdExtent=0.672
+  beam_5         trigger=False fwdExtent=0.008
+  beam_6         trigger=False fwdExtent=-0.065
+  battery_7      trigger=False fwdExtent=0.135
+  beam_8         trigger=False fwdExtent=0.677
+  spindleZP_9    trigger=False fwdExtent=-0.433
+  spinnerZP_10   trigger=False fwdExtent=-0.620
+  spinnerZP_10   trigger=True  fwdExtent=-0.549
+SOLID front-most beam_8 at 0.677 | TRIGGER front-most spinnerZP_10 at -0.549 | trigger stands proud by -1.226 m

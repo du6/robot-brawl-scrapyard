@@ -1,0 +1,57 @@
+# build b1_AFK_nofire parts=12 policy=afk runs=6
+# LIVE CONSTANTS  tipSpeedCap m/s: ABS=9.00 Aluminum=9.68 Steel=12.50 Titanium=14.79 CarbonFiber=13.11 Tungsten=13.69  | MotorKW 0/1/2/3 eng 1.0/2.5/4.0/5.5  | DRIVE_KW_PER_TONNE 1.25 | LIFT_EFFICIENCY 0.85 | REACTION_FRAC 0.60 | GROUND_CLEAR 0.020 | BITE_RATE_FRAC 0.45 | EXPOSED_MULT 1.75 | STEP_DISP_CAP 0.25
+# LIVE CONSTANTS (cycle) WIND_RELEASE_FRAC 0.995 | WIND_TIMEOUT_S 2.00 | BITE_TIP_SPEED_MS 4.00 | RECOVER_S 0.10 | PIVOT_RETURN_DPS 500 | MIN_BITE_E 40 | DRAIN_FRAC 0.40 | LIN_IMP_CAP 600 | EFFICIENCY 0.35 | RECUP_FRAC 0.90 | REACTION_STALL_MUL 3.0
+# LIVE CONSTANTS (damage/judging) DMG_K 0.045 | HP_K 6000 | SHOVE_CAP 500 | PART_IMMUNITY 0.50 | RAM_MIN_J 150 | RAM_J_CAP 900 | STRUCT_BAND 0.060 | MIN_STRUCT_PARTS 2.0 | DRAW_BAND_FRAC 0.080 | CONTROL_BAND 0.100 | MATCH_TIME 90 | CREDIT_BUDGET 4000
+# SOURCE REGIME 96ce6370 (22 scripts, newest 2026-07-27 01:35:15Z)
+# fixedDeltaTime 0.0200  timeScale 3.0  debugFire False
+run 0: PlayerLoss at 90.0s  dealt 0 taken 271  pieces 11/12 vs 10/11  flipped self 0.0s enemy 0.0s  | Judges' decision — damage 0 vs 271 (100.0% margin) · pieces 11/12 vs 10/11 · on its back 0% vs 0% — structure even, decided on damage
+   src: ram 0/0 · limb 0/0 (max hit 0.0) · disc 0/0   packSeam 0.97
+   det MAULER|SEAM chassis_1↔spikeZP_6|SHEARED at 1050 vs eff 900|t 4393.0
+   det MAULER|spikeZP_6|STRUCTURAL-SHED|hp 87/87 (100%)|t 4394.2
+   det MAULER|SEAM core_0↔chassis_1|SHEARED at 1400 vs eff 900|t 4395.4
+   det MAULER|SEAM core_0↔chassis_2|SHEARED at 1050 vs eff 900|t 4397.1
+   det MAULER|SEAM chassis_2↔gyro_5|SHEARED at 1400 vs eff 900|t 4405.3
+   det MAULER|SEAM core_0↔engine_3|SHEARED at 1400 vs eff 900|t 4430.5
+   det PlayerBuild|bladeXP_7|HP-DESTROYED|hp 0/25 (0%)|t 4430.5
+run 1: PlayerLoss at 90.0s  dealt 0 taken 45  pieces 12/12 vs 10/11  flipped self 0.0s enemy 0.0s  | Judges' decision — damage 0 vs 45 (100.0% margin) · pieces 12/12 vs 10/11 · on its back 0% vs 0% — structure even, decided on damage
+   src: ram 0/0 · limb 0/0 (max hit 0.0) · disc 0/0   packSeam 0.97
+   det MAULER|SEAM chassis_1↔spikeZP_6|SHEARED at 1050 vs eff 900|t 4484.3
+   det MAULER|spikeZP_6|STRUCTURAL-SHED|hp 87/87 (100%)|t 4485.6
+   det MAULER|SEAM core_0↔chassis_1|SHEARED at 1163 vs eff 900|t 4486.7
+   det MAULER|SEAM core_0↔chassis_2|SHEARED at 1050 vs eff 900|t 4495.1
+   det MAULER|SEAM chassis_2↔gyro_5|SHEARED at 1050 vs eff 900|t 4500.5
+run 2: PlayerLoss at 90.0s  dealt 0 taken 614  pieces 11/12 vs 10/11  flipped self 6.5s enemy 0.0s  | Judges' decision — damage 0 vs 614 (100.0% margin) · pieces 11/12 vs 10/11 · on its back 7% vs 0% — structure even, decided on damage
+   src: ram 0/0 · limb 0/0 (max hit 0.0) · disc 0/0   packSeam 0.97
+   det MAULER|SEAM chassis_1↔spikeZP_6|SHEARED at 1050 vs eff 900|t 4575.6
+   det MAULER|spikeZP_6|STRUCTURAL-SHED|hp 87/87 (100%)|t 4576.9
+   det MAULER|SEAM core_0↔chassis_1|SHEARED at 1400 vs eff 900|t 4577.9
+   det MAULER|SEAM core_0↔chassis_2|SHEARED at 1050 vs eff 900|t 4579.8
+   det MAULER|SEAM core_0↔engine_3|SHEARED at 1400 vs eff 900|t 4598.8
+   det MAULER|SEAM chassis_2↔gyro_5|SHEARED at 1050 vs eff 900|t 4608.9
+   det PlayerBuild|engine_4|HP-DESTROYED|hp 0/236 (0%)|t 4618.3
+run 3: PlayerLoss at 90.0s  dealt 0 taken 444  pieces 11/12 vs 10/11  flipped self 4.8s enemy 0.5s  | Judges' decision — damage 0 vs 444 (100.0% margin) · pieces 11/12 vs 10/11 · on its back 5% vs 1% — structure even, decided on damage
+   src: ram 0/0 · limb 0/0 (max hit 0.0) · disc 0/0   packSeam 1.10
+   det MAULER|SEAM chassis_1↔spikeZP_6|SHEARED at 1050 vs eff 900|t 4666.8
+   det MAULER|spikeZP_6|STRUCTURAL-SHED|hp 87/87 (100%)|t 4668.1
+   det MAULER|SEAM core_0↔chassis_1|SHEARED at 1400 vs eff 900|t 4669.3
+   det MAULER|SEAM core_0↔chassis_2|SHEARED at 1050 vs eff 900|t 4671.0
+   det MAULER|SEAM chassis_2↔gyro_5|SHEARED at 1400 vs eff 900|t 4679.2
+   det PlayerBuild|bladeXP_7|HP-DESTROYED|hp 0/25 (0%)|t 4710.5
+   det MAULER|SEAM core_0↔engine_3|SHEARED at 1400 vs eff 900|t 4720.8
+   det PlayerBuild|SEAM chassis_1↔battery_3|SHEARED at 1400 vs eff 1268|t 4739.4
+run 4: PlayerLoss at 90.0s  dealt 0 taken 225  pieces 11/12 vs 10/11  flipped self 3.6s enemy 0.0s  | Judges' decision — damage 0 vs 225 (100.0% margin) · pieces 11/12 vs 10/11 · on its back 4% vs 0% — structure even, decided on damage
+   src: ram 0/0 · limb 0/0 (max hit 0.0) · disc 0/0   packSeam 0.97
+   det MAULER|SEAM chassis_1↔spikeZP_6|SHEARED at 1050 vs eff 900|t 4758.1
+   det MAULER|spikeZP_6|STRUCTURAL-SHED|hp 87/87 (100%)|t 4759.4
+   det MAULER|SEAM core_0↔chassis_1|SHEARED at 1191 vs eff 900|t 4760.5
+   det MAULER|SEAM core_0↔chassis_2|SHEARED at 1050 vs eff 900|t 4792.3
+   det MAULER|SEAM chassis_2↔gyro_5|SHEARED at 1050 vs eff 900|t 4795.7
+   det PlayerBuild|bladeXP_7|HP-DESTROYED|hp 0/25 (0%)|t 4825.6
+run 5: PlayerLoss at 90.0s  dealt 0 taken 102  pieces 12/12 vs 10/11  flipped self 0.0s enemy 0.0s  | Judges' decision — damage 0 vs 102 (100.0% margin) · pieces 12/12 vs 10/11 · on its back 0% vs 0% — structure even, decided on damage
+   src: ram 0/0 · limb 0/0 (max hit 0.0) · disc 0/0   packSeam 0.97
+   det MAULER|SEAM chassis_1↔spikeZP_6|SHEARED at 1050 vs eff 900|t 4849.4
+   det MAULER|spikeZP_6|STRUCTURAL-SHED|hp 87/87 (100%)|t 4850.7
+   det MAULER|SEAM core_0↔chassis_1|SHEARED at 1400 vs eff 900|t 4851.8
+   det MAULER|SEAM core_0↔chassis_2|SHEARED at 1050 vs eff 900|t 4853.5
+   det MAULER|SEAM chassis_2↔gyro_5|SHEARED at 1050 vs eff 900|t 4891.3
+b1_AFK_nofire|afk  n=6  W0/L6/D0  flips=0  len 90.0-90.0s spread=1.00x  worst single-step piece loss: player 1 enemy 1  [CONVERGED] (183s wall)

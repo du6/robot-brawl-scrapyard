@@ -1,0 +1,6 @@
+# build qa_r3_b3_plow_steel parts=10 policy=charge runs=4
+run 0: PlayerLoss at 76.2s  dealt 320 taken 488  pieces 10/10 vs 10/12  flipped 1.2s  | Counted out — out of power — all 300 kJ spent in 66 s; carry more battery, or spend less on driving and spinning
+run 1: PlayerWin at 69.3s  dealt 304 taken 197  pieces 10/10 vs 9/12  flipped 0.0s  | Enemy counted out — out of power — 240 kJ of its 300 kJ pack was torn off the chassis, and what was left ran dry after 59 s
+run 2: PlayerLoss at 70.8s  dealt 93 taken 279  pieces 10/10 vs 10/12  flipped 0.9s  | Counted out — out of power — all 300 kJ spent in 61 s; carry more battery, or spend less on driving and spinning
+run 3: PlayerLoss at 78.0s  dealt 47 taken 511  pieces 10/10 vs 10/12  flipped 2.1s  | Counted out — out of power — all 300 kJ spent in 68 s; carry more battery, or spend less on driving and spinning
+qa_r3_b3_plow_steel|charge  n=4  W1/L3/D0  flips=1  len 69.3-78.0s spread=1.13x  worst single-step piece loss: player 0 enemy 1  [CONVERGED] (101s wall)

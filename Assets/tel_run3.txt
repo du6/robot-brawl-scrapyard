@@ -1,0 +1,76 @@
+[120.2] Settling t=90.0 P(hp=100.0% parts=21 dealt=0.0) E(hp=100.0% parts=5 dealt=0.0) cam=(6.20,9.05,0.00) vpP=(0.32,0.47,10.7) vpE=(0.68,0.47,10.7) ai=engage
+  LOG BELL — fight live. YOU parts 21 hp 100% · MAULER parts 5 hp 100%
+[121.1] BELL t=90.0 P(hp=100.0% parts=21 dealt=0.0) E(hp=100.0% parts=5 dealt=0.0) cam=(6.20,8.81,0.04) vpP=(0.32,0.48,10.6) vpE=(0.68,0.47,10.5) ai=engage
+[121.2] Fighting t=89.9 P(hp=100.0% parts=21 dealt=0.0) E(hp=100.0% parts=5 dealt=0.0) cam=(6.20,8.78,0.04) vpP=(0.32,0.48,10.5) vpE=(0.68,0.48,10.4) ai=flank
+[122.3] Fighting t=88.8 P(hp=100.0% parts=21 dealt=0.0) E(hp=100.0% parts=5 dealt=0.0) cam=(6.20,6.22,-0.93) vpP=(0.36,0.50,8.8) vpE=(0.62,0.43,8.0) ai=flank
+[123.3] Fighting t=87.8 P(hp=100.0% parts=21 dealt=0.0) E(hp=100.0% parts=5 dealt=0.0) cam=(5.64,3.76,-4.06) vpP=(0.58,0.52,6.6) vpE=(0.40,0.35,4.9) ai=turn
+[124.4] Fighting t=86.7 P(hp=100.0% parts=21 dealt=0.0) E(hp=100.0% parts=5 dealt=0.0) cam=(5.84,3.65,-4.59) vpP=(0.56,0.52,6.8) vpE=(0.41,0.37,5.2) ai=charge
+[125.5] Fighting t=85.6 P(hp=100.0% parts=21 dealt=0.0) E(hp=100.0% parts=5 dealt=0.0) cam=(4.25,3.79,-5.20) vpP=(0.62,0.35,5.5) vpE=(0.42,0.54,7.8) ai=turn
+[126.5] Fighting t=84.6 P(hp=100.0% parts=21 dealt=0.0) E(hp=100.0% parts=5 dealt=0.0) cam=(4.51,4.96,-5.19) vpP=(0.60,0.30,6.4) vpE=(0.44,0.57,10.1) ai=turn
+[127.5] Fighting t=83.6 P(hp=100.0% parts=21 dealt=0.0) E(hp=100.0% parts=5 dealt=0.0) cam=(4.08,4.46,-5.01) vpP=(0.59,0.32,5.8) vpE=(0.44,0.55,8.4) ai=turn
+  LOG PlayerBuild: spikeZN_19 took 48.6 dmg (hp 38.5/87.1)
+  LOG Mauler: spikeZP_4 took 48.6 dmg (hp 38.5/87.1)
+  LOG PlayerBuild: connection BROKE — plate_17↔spikeZN_19  (stress 955 > 900 N·s)
+  LOG PlayerBuild: lost 1 part(s) — mass now 1329 kg, handling will change.
+[128.6] Fighting t=82.5 P(hp=95.0% parts=20 dealt=48.6) E(hp=90.3% parts=5 dealt=48.6) cam=(3.87,3.72,-4.82) vpP=(0.58,0.39,5.2) vpE=(0.45,0.48,5.9) ai=charge
+  LOG PlayerBuild: beam_9 took 0.1 dmg (hp 86.3/86.4)
+  LOG Mauler: engine_3 took 0.1 dmg (hp 141.7/141.8)
+[129.7] Fighting t=81.4 P(hp=95.0% parts=20 dealt=48.7) E(hp=90.2% parts=5 dealt=48.7) cam=(4.50,3.72,-4.17) vpP=(0.53,0.42,5.4) vpE=(0.50,0.49,6.4) ai=backoff
+[130.8] Fighting t=80.3 P(hp=95.0% parts=20 dealt=48.7) E(hp=90.2% parts=5 dealt=48.7) cam=(4.89,5.12,-2.32) vpP=(0.40,0.25,6.4) vpE=(0.57,0.60,11.9) ai=backoff
+[131.8] Fighting t=79.3 P(hp=95.0% parts=20 dealt=48.7) E(hp=90.2% parts=5 dealt=48.7) cam=(6.15,6.66,-1.38) vpP=(0.38,0.29,8.4) vpE=(0.58,0.59,13.5) ai=turn
+[132.8] Fighting t=78.3 P(hp=95.0% parts=20 dealt=48.7) E(hp=90.2% parts=5 dealt=48.7) cam=(5.91,6.36,-1.72) vpP=(0.41,0.29,8.1) vpE=(0.55,0.58,13.0) ai=flank
+[133.9] Fighting t=77.2 P(hp=95.0% parts=20 dealt=48.7) E(hp=90.2% parts=5 dealt=48.7) cam=(4.28,4.34,-2.49) vpP=(0.44,0.35,5.7) vpE=(0.52,0.50,7.0) ai=flank
+  LOG PlayerBuild: beam_9 took 7.8 dmg (hp 78.5/86.4)
+  LOG Mauler: spikeZP_4 took 6.5 dmg (hp 32.0/87.1)
+  LOG PlayerBuild: beam_7 took 22.0 dmg (hp 64.4/86.4)
+  LOG Mauler: core_0 took 22.0 dmg (hp 75.2/97.2)
+  LOG Mauler: engine_3 took 4.2 dmg (hp 137.5/141.8)
+[135.0] Fighting t=28.9 P(hp=93.3% parts=20 dealt=81.4) E(hp=83.7% parts=5 dealt=78.5) cam=(4.71,3.70,-4.11) vpP=(0.55,0.42,5.4) vpE=(0.45,0.51,6.5) ai=backoff
+[136.1] Fighting t=27.8 P(hp=93.3% parts=20 dealt=81.4) E(hp=83.7% parts=5 dealt=78.5) cam=(4.18,3.89,-4.81) vpP=(0.61,0.33,5.2) vpE=(0.42,0.54,7.3) ai=backoff
+[137.2] Fighting t=26.7 P(hp=93.3% parts=20 dealt=81.4) E(hp=83.7% parts=5 dealt=78.5) cam=(4.03,3.70,-4.61) vpP=(0.57,0.35,5.0) vpE=(0.46,0.52,6.6) ai=turn
+[138.3] Fighting t=25.6 P(hp=93.3% parts=20 dealt=81.4) E(hp=83.7% parts=5 dealt=78.5) cam=(4.01,3.65,-4.48) vpP=(0.59,0.33,4.9) vpE=(0.43,0.53,6.8) ai=flank
+[139.3] Fighting t=24.6 P(hp=93.3% parts=20 dealt=81.4) E(hp=83.7% parts=5 dealt=78.5) cam=(4.76,3.65,-4.94) vpP=(0.61,0.45,5.6) vpE=(0.36,0.40,5.0) ai=charge
+[140.4] Fighting t=23.5 P(hp=93.3% parts=20 dealt=81.4) E(hp=83.7% parts=5 dealt=78.5) cam=(6.16,6.56,-5.14) vpP=(0.58,0.66,8.4) vpE=(0.39,0.20,6.0) ai=turn
+[141.4] Fighting t=22.5 P(hp=93.3% parts=20 dealt=81.4) E(hp=83.7% parts=5 dealt=78.5) cam=(6.20,6.79,-5.03) vpP=(0.57,0.64,8.7) vpE=(0.41,0.27,6.6) ai=turn
+[142.5] Fighting t=21.4 P(hp=93.3% parts=20 dealt=81.4) E(hp=83.7% parts=5 dealt=78.5) cam=(6.20,4.04,-3.91) vpP=(0.46,0.57,7.0) vpE=(0.61,0.31,4.7) ai=charge
+[143.5] Fighting t=20.4 P(hp=93.3% parts=20 dealt=81.4) E(hp=83.7% parts=5 dealt=78.5) cam=(6.20,5.63,-1.47) vpP=(0.33,0.50,7.8) vpE=(0.70,0.44,7.2) ai=turn
+[144.6] Fighting t=19.3 P(hp=93.3% parts=20 dealt=81.4) E(hp=83.7% parts=5 dealt=78.5) cam=(6.20,8.63,-0.26) vpP=(0.33,0.49,10.2) vpE=(0.67,0.49,10.1) ai=circle
+[145.6] Fighting t=18.3 P(hp=93.3% parts=20 dealt=81.4) E(hp=83.7% parts=5 dealt=78.5) cam=(6.14,6.06,-1.16) vpP=(0.37,0.34,8.2) vpE=(0.58,0.58,12.1) ai=turn
+[146.6] Fighting t=17.3 P(hp=93.3% parts=20 dealt=81.4) E(hp=83.7% parts=5 dealt=78.5) cam=(5.79,6.40,-2.53) vpP=(0.44,0.27,8.0) vpE=(0.52,0.59,13.6) ai=circle
+[147.7] Fighting t=16.2 P(hp=93.3% parts=20 dealt=81.4) E(hp=83.7% parts=5 dealt=78.5) cam=(5.64,6.33,-4.55) vpP=(0.56,0.26,7.8) vpE=(0.47,0.60,13.3) ai=circle
+[148.8] Fighting t=15.1 P(hp=93.3% parts=20 dealt=81.4) E(hp=83.7% parts=5 dealt=78.5) cam=(5.51,6.11,-4.70) vpP=(0.56,0.27,7.5) vpE=(0.46,0.59,12.6) ai=circle
+[149.8] Fighting t=14.1 P(hp=93.3% parts=20 dealt=81.4) E(hp=83.7% parts=5 dealt=78.5) cam=(5.29,5.84,-4.64) vpP=(0.56,0.27,7.2) vpE=(0.47,0.59,12.0) ai=turn
+[150.9] Fighting t=13.0 P(hp=93.3% parts=20 dealt=81.4) E(hp=83.7% parts=5 dealt=78.5) cam=(4.40,4.78,-3.61) vpP=(0.48,0.28,5.9) vpE=(0.51,0.57,9.4) ai=circle
+[152.0] Fighting t=11.9 P(hp=93.3% parts=20 dealt=81.4) E(hp=83.7% parts=5 dealt=78.5) cam=(4.10,3.90,-4.59) vpP=(0.62,0.34,5.1) vpE=(0.39,0.51,6.6) ai=circle
+[153.0] Fighting t=10.9 P(hp=93.3% parts=20 dealt=81.4) E(hp=83.7% parts=5 dealt=78.5) cam=(5.69,3.87,-5.07) vpP=(0.60,0.56,6.5) vpE=(0.34,0.14,3.7) ai=turn
+[154.1] Fighting t=9.8 P(hp=93.3% parts=20 dealt=81.4) E(hp=83.7% parts=5 dealt=78.5) cam=(6.19,8.41,-4.96) vpP=(0.56,0.70,9.8) vpE=(0.43,0.22,7.7) ai=turn
+[155.2] Fighting t=8.7 P(hp=93.3% parts=20 dealt=81.4) E(hp=83.7% parts=5 dealt=78.5) cam=(6.20,7.80,-4.22) vpP=(0.49,0.69,9.3) vpE=(0.55,0.22,7.1) ai=charge
+[156.2] Fighting t=7.7 P(hp=93.3% parts=20 dealt=81.4) E(hp=83.7% parts=5 dealt=78.5) cam=(6.20,9.07,-1.34) vpP=(0.34,0.57,10.3) vpE=(0.70,0.41,9.3) ai=turn
+[157.3] Fighting t=6.6 P(hp=93.3% parts=20 dealt=81.4) E(hp=83.7% parts=5 dealt=78.5) cam=(6.20,12.18,0.73) vpP=(0.33,0.54,13.2) vpE=(0.69,0.43,12.4) ai=turn
+[158.4] Fighting t=5.5 P(hp=93.3% parts=20 dealt=81.4) E(hp=83.7% parts=5 dealt=78.5) cam=(6.20,11.78,0.49) vpP=(0.35,0.59,12.9) vpE=(0.65,0.37,11.6) ai=circle
+[159.4] Fighting t=4.5 P(hp=93.3% parts=20 dealt=81.4) E(hp=83.7% parts=5 dealt=78.5) cam=(6.20,8.61,-0.83) vpP=(0.39,0.57,10.3) vpE=(0.59,0.39,9.0) ai=circle
+[160.5] Fighting t=3.4 P(hp=93.3% parts=20 dealt=81.4) E(hp=83.7% parts=5 dealt=78.5) cam=(6.19,4.04,-4.22) vpP=(0.57,0.57,6.9) vpE=(0.41,0.26,4.4) ai=turn
+[161.6] Fighting t=2.3 P(hp=93.3% parts=20 dealt=81.4) E(hp=83.7% parts=5 dealt=78.5) cam=(6.20,3.77,-4.06) vpP=(0.52,0.54,6.9) vpE=(0.46,0.36,5.0) ai=charge
+  LOG PlayerBuild: plate_20 took 48.6 dmg (hp 5.4/54.0)
+  LOG Mauler: spikeZP_4 took 40.5 dmg (hp 0.0/87.1) — DESTROYED
+  LOG PlayerBuild: connection BROKE — beam_12↔plate_18  (stress 936 > 900 N·s)
+  LOG PlayerBuild: connection BROKE — beam_13↔plate_18  (stress 968 > 900 N·s)
+  LOG Mauler: spikeZP_4 DESTROYED — blown into shards.
+[162.6] Fighting t=1.3 P(hp=90.5% parts=20 dealt=121.9) E(hp=77.3% parts=4 dealt=127.1) cam=(6.09,3.77,-4.48) vpP=(0.58,0.54,6.9) vpE=(0.36,0.31,4.6) ai=backoff
+[163.7] Fighting t=0.2 P(hp=90.5% parts=20 dealt=121.9) E(hp=77.3% parts=4 dealt=127.1) cam=(6.20,4.19,-4.85) vpP=(0.58,0.55,7.3) vpE=(0.39,0.33,5.1) ai=backoff
+  LOG MATCH OVER — PlayerLoss: Judges' decision — you dealt 122 vs 127 damage
+[164.8] Ended t=0.0 P(hp=90.5% parts=20 dealt=121.9) E(hp=77.3% parts=4 dealt=127.1) cam=(3.31,8.13,-1.68) vpP=(0.58,0.45,8.6) vpE=(0.43,0.52,8.9) ai=backoff
+[165.9] Ended t=0.0 P(hp=90.5% parts=20 dealt=121.9) E(hp=77.3% parts=4 dealt=127.1) cam=(3.19,8.13,-1.62) vpP=(0.55,0.45,8.6) vpE=(0.45,0.52,8.9) ai=backoff
+[167.0] Ended t=0.0 P(hp=90.5% parts=20 dealt=121.9) E(hp=77.3% parts=4 dealt=127.1) cam=(3.09,8.13,-1.55) vpP=(0.54,0.45,8.6) vpE=(0.47,0.52,8.9) ai=backoff
+[168.1] Ended t=0.0 P(hp=90.5% parts=20 dealt=121.9) E(hp=77.3% parts=4 dealt=127.1) cam=(2.99,8.13,-1.47) vpP=(0.52,0.44,8.6) vpE=(0.48,0.52,9.0) ai=backoff
+[169.1] Ended t=0.0 P(hp=90.5% parts=20 dealt=121.9) E(hp=77.3% parts=4 dealt=127.1) cam=(2.91,8.13,-1.41) vpP=(0.50,0.44,8.6) vpE=(0.50,0.52,9.0) ai=backoff
+[170.2] Ended t=0.0 P(hp=90.5% parts=20 dealt=121.9) E(hp=77.3% parts=4 dealt=127.1) cam=(2.83,8.13,-1.35) vpP=(0.49,0.43,8.6) vpE=(0.51,0.53,9.1) ai=backoff
+[171.3] Ended t=0.0 P(hp=90.5% parts=20 dealt=121.9) E(hp=77.3% parts=4 dealt=127.1) cam=(2.76,8.13,-1.30) vpP=(0.48,0.42,8.6) vpE=(0.52,0.54,9.1) ai=backoff
+[172.3] Ended t=0.0 P(hp=90.5% parts=20 dealt=121.9) E(hp=77.3% parts=4 dealt=127.1) cam=(2.70,8.13,-1.25) vpP=(0.47,0.42,8.5) vpE=(0.53,0.54,9.2) ai=backoff
+[173.4] Ended t=0.0 P(hp=90.5% parts=20 dealt=121.9) E(hp=77.3% parts=4 dealt=127.1) cam=(2.63,8.13,-1.20) vpP=(0.46,0.41,8.5) vpE=(0.54,0.55,9.3) ai=backoff
+[174.4] Ended t=0.0 P(hp=90.5% parts=20 dealt=121.9) E(hp=77.3% parts=4 dealt=127.1) cam=(2.58,8.13,-1.16) vpP=(0.45,0.40,8.5) vpE=(0.55,0.56,9.4) ai=backoff
+[175.5] Ended t=0.0 P(hp=90.5% parts=20 dealt=121.9) E(hp=77.3% parts=4 dealt=127.1) cam=(2.52,8.13,-1.11) vpP=(0.44,0.39,8.4) vpE=(0.56,0.56,9.4) ai=backoff
+[176.6] Ended t=0.0 P(hp=90.5% parts=20 dealt=121.9) E(hp=77.3% parts=4 dealt=127.1) cam=(2.47,8.13,-1.08) vpP=(0.43,0.38,8.4) vpE=(0.56,0.57,9.5) ai=backoff
+[177.7] Ended t=0.0 P(hp=90.5% parts=20 dealt=121.9) E(hp=77.3% parts=4 dealt=127.1) cam=(2.43,8.13,-1.04) vpP=(0.42,0.37,8.4) vpE=(0.57,0.58,9.6) ai=backoff
+[178.8] Ended t=0.0 P(hp=90.5% parts=20 dealt=121.9) E(hp=77.3% parts=4 dealt=127.1) cam=(2.38,8.13,-1.01) vpP=(0.41,0.36,8.3) vpE=(0.57,0.58,9.7) ai=backoff
+[179.8] Ended t=0.0 P(hp=90.5% parts=20 dealt=121.9) E(hp=77.3% parts=4 dealt=127.1) cam=(2.35,8.13,-0.98) vpP=(0.41,0.35,8.3) vpE=(0.58,0.59,9.8) ai=backoff

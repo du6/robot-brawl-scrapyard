@@ -1,0 +1,14 @@
+# RB2 verification of round-1 dev FIX 1 (undriven-disc gate) and FIX 2 (rotor deck dip)
+NOWEAP     discs=0 undrivenWARN=0 maxRotorDip=0.000 m
+FIXSPIKE   discs=0 undrivenWARN=0 maxRotorDip=0.000 m
+FIXDISC    discs=1 undrivenWARN=1 maxRotorDip=0.000 m
+DISC_Z     discs=1 undrivenWARN=0 maxRotorDip=0.080 m
+SAW_Z      discs=1 undrivenWARN=0 maxRotorDip=0.165 m
+COAX_V     discs=1 undrivenWARN=0 maxRotorDip=0.000 m
+SAW_V      discs=1 undrivenWARN=0 maxRotorDip=0.000 m
+FLAIL_V    discs=1 undrivenWARN=1 maxRotorDip=0.000 m
+DRUM_V     discs=0 undrivenWARN=0 maxRotorDip=0.000 m
+HAMMER     discs=0 undrivenWARN=0 maxRotorDip=0.000 m
+THRUSTER   discs=0 undrivenWARN=0 maxRotorDip=0.000 m
+FLIPPER    discs=0 undrivenWARN=0 maxRotorDip=0.000 m
+DISCPIVOT  discs=1 undrivenWARN=0 maxRotorDip=0.000 m

@@ -1,0 +1,13 @@
+# LIVE CONSTANTS  tipSpeedCap m/s: ABS=9.00 Aluminum=9.68 Steel=12.50 Titanium=14.79 CarbonFiber=13.11 Tungsten=13.69  | MotorKW 0/1/2/3 eng 1.0/2.5/4.0/5.5  | DRIVE_KW_PER_TONNE 1.25 | LIFT_EFFICIENCY 0.85 | REACTION_FRAC 0.60 | GROUND_CLEAR 0.020 | BITE_RATE_FRAC 0.45 | EXPOSED_MULT 1.75 | STEP_DISP_CAP 0.25
+qa_c1_hammer_ti: parts=12 wheels=4 mass=1135.2kg cost=3278 valid=OK
+    LIMB pivot parts=2 blockedBy=null I=54.68 tipR=1.250 rateMax=10.95 E=3281J kJ/swing=9.37 cap=13.69
+qa_c2_rotor_cf: parts=14 wheels=4 mass=560.1kg cost=1533 valid=OK
+    LIMB spindle parts=4 blockedBy=null I=41.87 tipR=1.250 rateMax=10.00 E=2093J kJ/swing=5.98 cap=12.50
+qa_c3_lance_w: parts=12 wheels=4 mass=3903.9kg cost=22386 valid=OK
+    LIMB ram parts=2 blockedBy=null I=603.32 tipR=0.300 rateMax=3.50 E=3695J kJ/swing=10.56 cap=13.69
+qa_c4_flipper_al: parts=13 wheels=4 mass=928.8kg cost=1361 valid=OK
+    LIMB pivot parts=3 blockedBy=null I=221.18 tipR=1.375 rateMax=7.04 E=5484J kJ/swing=15.67 cap=9.68
+qa_c5_discus_abs: parts=11 wheels=4 mass=464.1kg cost=344 valid=OK
+    (no actuators)
+qa_c6_hammer_abs: parts=12 wheels=4 mass=398.2kg cost=279 valid=OK
+    LIMB pivot parts=2 blockedBy=null I=7.46 tipR=1.250 rateMax=7.20 E=193J kJ/swing=0.55 cap=9.00

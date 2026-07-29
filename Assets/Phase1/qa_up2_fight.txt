@@ -1,0 +1,21 @@
+# UP2 CRITIC fight pass
+build = the pointer-built robot; parts=11 cost=714 Validate=null
+limb: parts=1 blocked=null
+
+## ROSTER, trigger HELD (debugFire=true), 1 match each
+scout        fire=True  PlayerWin   90s  dealt=    81 taken=   162  parts 11/11 vs 9/11  hp 0.83/1.00  Judges' decision — damage 81 vs 162 (50.1% margin) · pieces 11/11 vs 9/11 · on its back 0% vs 4% — decided on structure destroyed
+tipper       fire=True  PlayerWin   90s  dealt=   203 taken=    77  parts 11/11 vs 11/12  hp 0.92/0.87  Judges' decision — damage 203 vs 77 (62.0% margin) · pieces 11/11 vs 11/12 · on its back 0% vs 5% — structure even, decided on damage
+mauler       fire=True  Draw        90s  dealt=    94 taken=    81  parts 11/11 vs 10/11  hp 0.91/0.98  Judges' decision — damage 94 vs 81 (14.1% margin) · pieces 11/11 vs 10/11 · on its back 0% vs 1% — too close to call, scored a draw
+ripper       fire=True  PlayerLoss  66s  dealt=   200 taken=   560  parts 1/11 vs 11/13  hp 0.75/0.80  Counted out — every one of its 4 wheels had been torn off — nothing left to drive with
+bulwark      fire=True  PlayerWin   90s  dealt=   385 taken=   109  parts 11/11 vs 10/13  hp 0.88/0.82  Judges' decision — damage 385 vs 109 (71.8% margin) · pieces 11/11 vs 10/13 · on its back 0% vs 3% — decided on structure destroyed
+widowmaker   fire=True  PlayerWin   90s  dealt=   182 taken=   206  parts 11/11 vs 9/11  hp 0.78/0.91  Judges' decision — damage 182 vs 206 (11.6% margin) · pieces 11/11 vs 9/11 · on its back 0% vs 9% — decided on structure destroyed
+
+## A/B THE TRIGGER vs MAULER - 3 held, 3 released
+mauler       fire=True  Draw        90s  dealt=   176 taken=   176  parts 11/11 vs 10/11  hp 0.81/0.88  Judges' decision — damage 176 vs 176 (0.1% margin) · pieces 11/11 vs 10/11 · on its back 0% vs 2% — too close to call, scored a draw
+mauler       fire=True  PlayerLoss  90s  dealt=    84 taken=   110  parts 11/11 vs 10/11  hp 0.88/1.00  Judges' decision — damage 84 vs 110 (23.2% margin) · pieces 11/11 vs 10/11 · on its back 4% vs 0% — structure even, decided on damage
+mauler       fire=True  PlayerWin   90s  dealt=   107 taken=    27  parts 11/11 vs 10/11  hp 0.97/0.97  Judges' decision — damage 107 vs 27 (75.0% margin) · pieces 11/11 vs 10/11 · on its back 0% vs 0% — structure even, decided on damage
+mauler       fire=False PlayerWin   90s  dealt=   108 taken=    27  parts 11/11 vs 10/11  hp 0.97/0.96  Judges' decision — damage 108 vs 27 (75.3% margin) · pieces 11/11 vs 10/11 · on its back 0% vs 0% — structure even, decided on damage
+mauler       fire=False PlayerWin   90s  dealt=   132 taken=    77  parts 11/11 vs 10/11  hp 0.92/0.93  Judges' decision — damage 132 vs 77 (41.4% margin) · pieces 11/11 vs 10/11 · on its back 0% vs 1% — structure even, decided on damage
+mauler       fire=False PlayerWin   90s  dealt=   369 taken=   279  parts 8/11 vs 7/11  hp 0.93/0.87  Judges' decision — damage 369 vs 279 (24.3% margin) · pieces 8/11 vs 7/11 · on its back 2% vs 2% — structure even, decided on damage
+
+## FIGHT DONE

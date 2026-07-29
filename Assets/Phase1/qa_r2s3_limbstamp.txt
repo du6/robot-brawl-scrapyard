@@ -1,0 +1,11 @@
+# SESSION3 LIVE-CODE RE-READ  2026-07-26T17:32:10
+# LIVE CONSTANTS  tipSpeedCap m/s: ABS=9.00 Aluminum=9.68 Steel=12.50 Titanium=14.79 CarbonFiber=13.11 Tungsten=13.69  | MotorKW 0/1/2/3 eng 1.0/2.5/4.0/5.5  | DRIVE_KW_PER_TONNE 1.25 | LIFT_EFFICIENCY 0.85 | REACTION_FRAC 0.60 | GROUND_CLEAR 0.020 | BITE_RATE_FRAC 0.45 | EXPOSED_MULT 1.75 | STEP_DISP_CAP 0.25
+qa_r2_b1_hammer_ti parts=13 valid=OK mass=1924.0 cost=1924  | limb0 act=RobotBrawl.Phase0.BuilderManager+PlacedPart parts=2 blockedBy=null I=29.34 tipR=1.025 E=2875J kJ/sw=8.21
+qa_r2_b6_hammer_w parts=13 valid=Over budget: 5912 cr of 4000. Cheaper materials, or fewer parts. mass=2500.8 cost=5912  | limb0 act=RobotBrawl.Phase0.BuilderManager+PlacedPart parts=2 blockedBy=null I=125.54 tipR=1.025 E=11202J kJ/sw=32.01
+qa_r2_b2_rotor_cf parts=13 valid=OK mass=705.1 cost=889  | limb0 act=RobotBrawl.Phase0.BuilderManager+PlacedPart parts=3 blockedBy=null I=6.88 tipR=0.810 E=902J kJ/sw=2.58
+qa_r2_b3_lance_w parts=12 valid=OK mass=1994.2 cost=2322  | limb0 act=RobotBrawl.Phase0.BuilderManager+PlacedPart parts=2 blockedBy=null I=328.52 tipR=0.300 E=2012J kJ/sw=5.75
+qa_r2_b4_flipper_abs parts=13 valid=OK mass=449.7 cost=305  | limb0 act=RobotBrawl.Phase0.BuilderManager+PlacedPart parts=3 blockedBy=null I=53.84 tipR=1.375 E=1153J kJ/sw=3.30
+qa_r2_b5_discus_al parts=11 valid=OK mass=706.7 cost=663  limbs=0
+qa_r2_b8_hammer_al parts=13 valid=OK mass=769.9 cost=747  | limb0 act=RobotBrawl.Phase0.BuilderManager+PlacedPart parts=2 blockedBy=null I=17.56 tipR=1.025 E=784J kJ/sw=2.24
+qa_r2_b10_hammer_front parts=13 valid=OK mass=777.7 cost=752  | limb0 act=RobotBrawl.Phase0.BuilderManager+PlacedPart parts=2 blockedBy=null I=22.36 tipR=1.025 E=998J kJ/sw=2.85
+qa_r2c_c1_lowflip_ti parts=13 valid=OK mass=828.0 cost=1188  | limb0 act=RobotBrawl.Phase0.BuilderManager+PlacedPart parts=3 blockedBy=null I=58.06 tipR=1.127 E=4999J kJ/sw=14.28
