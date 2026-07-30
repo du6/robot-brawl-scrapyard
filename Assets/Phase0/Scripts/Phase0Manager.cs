@@ -48,6 +48,7 @@ public class Phase0Manager : MonoBehaviour
     {
         var ground = GameObject.CreatePrimitive(PrimitiveType.Plane);
         ground.name = "arena_floor";
+        BuilderManager.FloorBoxCollider(ground);
         ground.transform.localScale = new Vector3(4f, 1f, 4f); // 40 m × 40 m
         ground.GetComponent<Renderer>().sharedMaterial =
             MatDB.MakeRenderMat(new Color(0.55f, 0.53f, 0.50f));

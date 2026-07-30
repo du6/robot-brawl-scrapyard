@@ -707,6 +707,10 @@ public class FightManager : MonoBehaviour
 
     void DrawHud()
     {
+        // Critic round 1 (mobile): no touch way to leave a running fight
+        // (B is a keyboard key). Small corner button, far from the pads.
+        if (MobileBuilderUI.Active && bm != null)
+            if (GUI.Button(new Rect(10f, 8f, 88f, 36f), "QUIT")) { bm.BackToBuild(); return; }
         float w = 620f;
         float x = (Screen.width / UIS - w) * 0.5f;
         GUI.Box(new Rect(x, 8, w, 120), "");

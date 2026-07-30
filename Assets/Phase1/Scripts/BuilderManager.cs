@@ -183,6 +183,7 @@ public class BuilderManager : MonoBehaviour
     GameObject ghost;                 // the REAL compound part model, mouse-following
     string ghostBuiltKey = "";        // partId_yaw the current ghost was built for
     readonly List<Material> ghostMats = new List<Material>();
+    readonly List<Color> ghostBaseCols = new List<Color>();   // original tints, for re-tinting
     bool ghostTintValid = true;
     bool ghostValid;
     string ghostReason = "";          // why the ghost is red (panel hint)
@@ -339,6 +340,7 @@ public class BuilderManager : MonoBehaviour
 
         var floor = GameObject.CreatePrimitive(PrimitiveType.Plane);
         floor.name = "builder_floor";
+        FloorBoxCollider(floor);
         floor.transform.SetParent(buildRoot.transform, false);
         floor.transform.localScale = new Vector3(1.5f, 1f, 1.5f);
         floor.GetComponent<Renderer>().sharedMaterial = PartVisualFactory.Mat(new Color(0.35f, 0.35f, 0.37f), 0.3f, 0.35f);
@@ -983,7 +985,7 @@ public class BuilderManager : MonoBehaviour
         UpdateGhost();
 
         Vector3 m = Phase0Input.MousePos();
-        bool overPanel = m.x < PANEL_W;
+        bool overPanel = uiPointerBlocked || (!MobileBuilderUI.Active && m.x < PANEL_W);   // Phase 5: also block under mobile UI
         // Hover readout: one raycast a frame answers "what is THAT part made
         // of" with no click, no mode change and no selection side effects.
         hoverPart = overPanel ? null : PartUnderMouse();
@@ -1652,6 +1654,7 @@ public class BuilderManager : MonoBehaviour
         if (ghost != null && ghostBuiltKey == key) return;
         if (ghost != null) Destroy(ghost);
         ghostMats.Clear();
+        ghostBaseCols.Clear();
 
         ghost = new GameObject("ghost");
         // ROUND-UP3 FIX A: the ghost probe carries the MOUNT AXIS. It did not
@@ -1680,12 +1683,17 @@ public class BuilderManager : MonoBehaviour
                 MatDB.Get(def.EffectiveMat(activeMat)).metallic,
                 MatDB.Get(def.EffectiveMat(activeMat)).smoothness);
 
+        // Ghost look v2 (owen): keep the REAL part appearance - per-renderer
+        // material instances - and blend a strong green/red tint over it in
+        // TintGhost, so the texture stays visible while validity is still
+        // unmissable on a phone (the original emission-only glow was not).
         foreach (var r in ghost.GetComponentsInChildren<Renderer>(true))
         {
             var inst = new Material(r.sharedMaterial);
             inst.EnableKeyword("_EMISSION");
             r.sharedMaterial = inst;
             ghostMats.Add(inst);
+            ghostBaseCols.Add(inst.color);
         }
         ghostBuiltKey = key;
         ghostTintValid = true;
@@ -1696,9 +1704,15 @@ public class BuilderManager : MonoBehaviour
     {
         if (ghostTintValid == valid) return;
         ghostTintValid = valid;
-        // Subtle green glow = will attach here; red glow = can't place.
-        Color e = valid ? new Color(0.04f, 0.45f, 0.10f) : new Color(0.55f, 0.05f, 0.03f);
-        foreach (var m in ghostMats) m.SetColor("_EmissionColor", e);
+        // Strong tint OVER the real material (owen): the part keeps its
+        // texture but reads clearly green (will attach) or red (can't place).
+        Color tint = valid ? new Color(0.20f, 1.00f, 0.30f) : new Color(1.00f, 0.15f, 0.10f);
+        for (int i = 0; i < ghostMats.Count; i++)
+        {
+            Color b = i < ghostBaseCols.Count ? ghostBaseCols[i] : Color.white;
+            ghostMats[i].color = Color.Lerp(b, tint, 0.45f);
+            ghostMats[i].SetColor("_EmissionColor", tint * 0.35f);
+        }
     }
 
     void UpdateGhost()
@@ -1708,7 +1722,7 @@ public class BuilderManager : MonoBehaviour
         bool isWheelSel = def.category == P1Category.Mobility;
 
         Vector3 m = Phase0Input.MousePos();
-        if (m.x < PANEL_W) { HideGhost(); return; }
+        if (uiPointerBlocked || (!MobileBuilderUI.Active && m.x < PANEL_W)) { HideGhost(); return; }   // Phase 5
         // The ghost must EXIST before the raycast (the free-follow branch below
         // draws it), so this first call uses the normal we are already standing
         // on. The authoritative rebuild happens once the face is resolved.
@@ -1754,7 +1768,42 @@ public class BuilderManager : MonoBehaviour
             if (found) { hit = near; onFace = true; grazed = true; }
         }
 
-        if (!onFace)
+        // 2026-07-30 (owen: end-to-end beams hard to aim): a ray aimed just
+        // past a beam's tip flies on and hits whatever sits BEHIND it - the
+        // ghost jumped to the core or the floor. Tip capture: if the ray
+        // passes within 10 cm of an elongated part's end-face centre, and
+        // that tip is no farther than what the ray actually hit, the end
+        // face wins. End faces are single-socket, so the snap self-centres.
+        PlacedPart capPart = null;
+        Vector3 capNormal = Vector3.zero;
+        {
+            float bestD = 0.10f;
+            foreach (var pp in placed)
+            {
+                Vector3 th2 = pp.Half();
+                int la2 = 0;
+                if (th2.y > th2[la2]) la2 = 1;
+                if (th2.z > th2[la2]) la2 = 2;
+                float other2 = Mathf.Max(th2[(la2 + 1) % 3], th2[(la2 + 2) % 3]);
+                if (th2[la2] < 2f * other2) continue;   // beams and long beams only
+                for (int sgn = -1; sgn <= 1; sgn += 2)
+                {
+                    Vector3 axisV = Vector3.zero;
+                    axisV[la2] = sgn;
+                    Vector3 e = pp.pos + axisV * th2[la2];
+                    float t = Vector3.Dot(e - ray.origin, ray.direction);
+                    if (t <= 0f) continue;
+                    float d = (ray.origin + ray.direction * t - e).magnitude;
+                    if (d >= bestD) continue;
+                    if (onFace && t > hit.distance + 0.05f) continue;   // tip is behind what we hit
+                    bestD = d;
+                    capPart = pp;
+                    capNormal = axisV;
+                }
+            }
+        }
+
+        if (!onFace && capPart == null)
         {
             // Free-follow: the real part model tracks the mouse across the
             // build plane until a snap face is hovered. Not placeable here.
@@ -1779,8 +1828,18 @@ public class BuilderManager : MonoBehaviour
             return;
         }
 
-        ghostTarget = byCollider[hit.collider];
-        ghostNormal = hit.normal;
+        if (onFace)
+        {
+            ghostTarget = byCollider[hit.collider];
+            ghostNormal = hit.normal;
+        }
+        if (capPart != null)
+        {
+            // Tip capture overrides: aim just past a beam tip = end-mount.
+            ghostTarget = capPart;
+            ghostNormal = capNormal;
+            grazed = false;
+        }
         if (grazed)
         {
             // A grazing sphere-cast reports edge/diagonal normals, which made
@@ -1790,12 +1849,24 @@ public class BuilderManager : MonoBehaviour
             // normalized by the part's half extents.
             Vector3 off = hit.point - ghostTarget.pos;
             Vector3 th = ghostTarget.Half();
+            // 2026-07-30 (owen: end-to-end beams hard to aim): the old pick
+            // used |off|/half per axis, which biased a BEAM's tip grazes 3:1
+            // toward its side faces - aiming just past the tip flipped the
+            // ghost sideways. Use OVERSHOOT (distance outside the box per
+            // axis, the true nearest-face metric), plus a tip-preference
+            // band on elongated parts: anything at or beyond the last 2 cm
+            // resolves to the END face.
             int ga = 0;
-            float gb = Mathf.Abs(off.x) / Mathf.Max(th.x, 0.01f);
-            float gy = Mathf.Abs(off.y) / Mathf.Max(th.y, 0.01f);
+            float gb = Mathf.Abs(off.x) - th.x;
+            float gy = Mathf.Abs(off.y) - th.y;
             if (gy > gb) { ga = 1; gb = gy; }
-            float gz = Mathf.Abs(off.z) / Mathf.Max(th.z, 0.01f);
+            float gz = Mathf.Abs(off.z) - th.z;
             if (gz > gb) ga = 2;
+            int la = 0;
+            if (th.y > th[la]) la = 1;
+            if (th.z > th[la]) la = 2;
+            float laOther = Mathf.Max(th[(la + 1) % 3], th[(la + 2) % 3]);
+            if (th[la] >= 2f * laOther && Mathf.Abs(off[la]) > th[la] - 0.02f) ga = la;
             Vector3 derived = Vector3.zero;
             derived[ga] = off[ga] >= 0f ? 1f : -1f;
             ghostNormal = derived;
@@ -2160,6 +2231,27 @@ public class BuilderManager : MonoBehaviour
     public int TestDoomCount { get { return doomCount; } }
     public float TestOrbitYaw { get { return orbitYaw; } set { orbitYaw = value; } }
     public float TestOrbitPitch { get { return orbitPitch; } set { orbitPitch = value; } }
+
+    // ---- Phase 5: public API for the touch-native builder (MobileBuilderUI) ----
+    /// <summary>Set true by the mobile UI when a touch is over one of its
+    /// panels, so the placement raycast doesn't fire under the UI (the phone
+    /// analogue of the old PANEL_W gate).</summary>
+    public static bool uiPointerBlocked;
+    public float TestOrbitDist { get { return orbitDist; } set { orbitDist = Mathf.Clamp(value, 2.2f, 9f); } }
+    public int PaletteCount { get { return palette != null ? palette.Length : 0; } }
+    public string PartLabel(int i) { return (i >= 0 && i < PaletteCount) ? palette[i].label : ""; }
+    public string PartCategory(int i) { return (i >= 0 && i < PaletteCount) ? palette[i].category.ToString() : ""; }
+    public bool PartIsActuator(int i) { return i >= 0 && i < PaletteCount && palette[i].actuator; }
+    public int PartCost(int i) { if (i < 0 || i >= PaletteCount) return 0; var d = palette[i]; return d.CostOf(d.EffectiveMat(activeMat)); }
+    public int PartMass(int i) { if (i < 0 || i >= PaletteCount) return 0; return Mathf.RoundToInt(palette[i].MassOf(activeMat)); }
+    public void SelectPart(int i) { selected = (selected == i) ? -1 : i; }
+    public int SelectedPart { get { return selected; } }
+    public bool HasSelection { get { return selected >= 0; } }
+    public string ActiveMatKey { get { return activeMat; } set { if (MatDB.Has(value)) activeMat = value; } }
+    public int BuildMassInt { get { int m = 0; foreach (var p in placed) m += Mathf.RoundToInt(p.Mass()); return m; } }
+    public int CreditBudgetNow { get { return CREDIT_BUDGET; } }
+    public int PlacedCount { get { return placed.Count; } }
+    public string LastMessage { get { return message; } }   // Phase 5: surfaced in the touch UI status bar
     /// <summary>Bounds of the ghost's rendered mesh, for checking that a rotate
     /// moves the DRAWING and not just the collision box. The blade bug was
     /// exactly this: box rotated, mesh did not.</summary>
@@ -2178,6 +2270,7 @@ public class BuilderManager : MonoBehaviour
         selected = -1;
         if (ghost != null) { Destroy(ghost); ghost = null; }
         ghostMats.Clear();
+        ghostBaseCols.Clear();
         ghostBuiltKey = "";
         ghostValid = false;
         ghostReason = "";
@@ -2476,7 +2569,7 @@ public class BuilderManager : MonoBehaviour
     ///
     /// Static rather than const so a tuning pass, a sweep or a future
     /// difficulty/campaign tier can move it without a recompile.</summary>
-    public static int CREDIT_BUDGET = 4000;
+    public static int CREDIT_BUDGET = 0;   // Phase 5: credit limit removed — 0 = unlimited (every guard tests > 0)
 
     /// <summary>Total credits this build spends. Same per-part Cost() the panel
     /// and the hover readout already show, so the three numbers can never
@@ -2561,6 +2654,7 @@ public class BuilderManager : MonoBehaviour
 
         testRobot = SpawnBot(placed, "PlayerBuild", new Vector3(0f, 0f, -4f),
                              Quaternion.identity, driveDir, out testDrive);
+        TouchControls.hasFire = testRobot != null && testRobot.GetComponentInChildren<Actuator>() != null;
         // Spawn protection (round-1 fix 1, test-drive parity): both bodies
         // settle onto their suspension for 1 s before damage/shear arms.
         combatArmAt = Time.time + 1.0f;
@@ -2606,12 +2700,51 @@ public class BuilderManager : MonoBehaviour
     /// FIGHT reuses the exact same 14x14 m box, walls, posts and markings.
     /// Also mounts the floating-damage-number spawner (subscribed to
     /// DamageResolver.OnHit) for the arena's lifetime.</summary>
+    /// <summary>iPad fix (2026-07-30): a Plane's zero-thickness MeshCollider
+    /// let heavy bodies tunnel straight through under device frame pacing -
+    /// robots fell out of the arena while the camera chased them down. Every
+    /// floor keeps its Plane visual but collides as a solid 1 m deep box.</summary>
+    public static void FloorBoxCollider(GameObject floor)
+    {
+        var mc = floor.GetComponent<MeshCollider>();
+        if (mc != null) Object.Destroy(mc);
+        var box = floor.AddComponent<BoxCollider>();
+        box.size = new Vector3(10f, 1f, 10f);    // plane footprint is 10x10 local
+        box.center = new Vector3(0f, -0.5f, 0f); // top flush with the surface
+    }
+
+    /// <summary>Last-ditch floor net (2026-07-30): if a machine still ends up
+    /// under the arena, lift it back and kill its velocity instead of letting
+    /// the chase camera follow it into the void.</summary>
+    static void FloorNet(CompoundRobot r)
+    {
+        if (r == null) return;
+        Transform t = r.transform;
+        Vector3 p = t.position;
+        float m = ARENA_HALF + 0.3f;
+        bool below = p.y < -3f;
+        bool outside = Mathf.Abs(p.x) > m || Mathf.Abs(p.z) > m;
+        if (!below && !outside) return;
+        Vector3 target = new Vector3(
+            Mathf.Clamp(p.x, -(ARENA_HALF - 1.2f), ARENA_HALF - 1.2f),
+            1.2f,
+            Mathf.Clamp(p.z, -(ARENA_HALF - 1.2f), ARENA_HALF - 1.2f));
+        t.position += target - p;
+        foreach (var rb in r.GetComponentsInChildren<Rigidbody>())
+        {
+            rb.linearVelocity = Vector3.zero;
+            rb.angularVelocity = Vector3.zero;
+        }
+        CompoundRobot.Log("FloorNet: machine returned to the arena");
+    }
+
     void BuildArena()
     {
         float HALF = ARENA_HALF;   // Phase 4: arena size is per-fight now
         sandboxRoot = new GameObject("sandbox");
         var floor = GameObject.CreatePrimitive(PrimitiveType.Plane);
         floor.name = "arena_floor";
+        FloorBoxCollider(floor);
         floor.transform.SetParent(sandboxRoot.transform, false);
         floor.transform.localScale = new Vector3(HALF / 5f, 1f, HALF / 5f);
         floor.GetComponent<Renderer>().sharedMaterial = PartVisualFactory.Mat(new Color(0.34f, 0.34f, 0.36f), 0.2f, 0.35f);
@@ -2624,6 +2757,16 @@ public class BuilderManager : MonoBehaviour
             wall.transform.position = alongX ? new Vector3(0f, 0.75f, sign * HALF) : new Vector3(sign * HALF, 0.75f, 0f);
             wall.transform.localScale = alongX ? new Vector3(2f * HALF + 0.5f, 1.5f, 0.5f) : new Vector3(0.5f, 1.5f, 2f * HALF + 0.5f);
             wall.GetComponent<Renderer>().sharedMaterial = PartVisualFactory.Mat(new Color(0.22f, 0.22f, 0.25f), 0.5f, 0.4f);
+
+            // iPad bug fix (2026-07-30): the 1.5 m visual wall was low enough
+            // to beach a rammed bot on its flat top or throw it clean out of
+            // the arena. Invisible barrier continues the wall up to 6 m.
+            var barrier = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            barrier.name = "wall_barrier_" + i;
+            barrier.transform.SetParent(sandboxRoot.transform, false);
+            barrier.transform.position = alongX ? new Vector3(0f, 3f, sign * HALF) : new Vector3(sign * HALF, 3f, 0f);
+            barrier.transform.localScale = alongX ? new Vector3(2f * HALF + 0.5f, 6f, 0.5f) : new Vector3(0.5f, 6f, 2f * HALF + 0.5f);
+            Object.Destroy(barrier.GetComponent<MeshRenderer>());
 
             // Hazard-striped wall tops (decorative, collider-free).
             for (int k = 0; k < 7; k++)
@@ -2988,6 +3131,10 @@ public class BuilderManager : MonoBehaviour
         string err = Validate();
         if (err != null) { message = err; return; }
 
+        // Phase 5 fix: a fight must never stack on top of a live test drive
+        // (the touch dock used to stay tappable during TEST DRIVE).
+        if (mode == Mode.Test) BackToBuild();
+
         // ---- Phase 4: fight context. A ladder fight (StartLadderFight) has
         // already set activeRungIndex; every other entry point is an
         // exhibition. The rung may shrink the arena — honest content variety:
@@ -3015,6 +3162,7 @@ public class BuilderManager : MonoBehaviour
         Vector3 axis = driveDir;
         testRobot = SpawnBot(placed, "PlayerBuild", -axis * 4f,
                              Quaternion.identity, driveDir, out testDrive);
+        TouchControls.hasFire = testRobot != null && testRobot.GetComponentInChildren<Actuator>() != null;
         hudWheelMassInt = WheelMassInt(placed);
         // Input isolation, same contract as RaycastWheelDrive.useAI: only the
         // player's actuators ever read Phase0Input. The AI's are driven by
@@ -3128,6 +3276,8 @@ public class BuilderManager : MonoBehaviour
 
     void UpdateFight()
     {
+        FloorNet(testRobot);
+        FloorNet(aiRobot);
         if (Phase0Input.BackDown()) { BackToBuild(); return; }
         // R = restart the fight (rematch), same builds — also the REMATCH
         // button on the results screen.
@@ -3206,6 +3356,8 @@ public class BuilderManager : MonoBehaviour
 
     void UpdateTest()
     {
+        FloorNet(testRobot);
+        FloorNet(dummyRobot);
         if (Phase0Input.BackDown()) { BackToBuild(); return; }
         // R = full arena reset (critic fix: no recovery after a wreck).
         // Reuses the two existing paths so there is exactly one lifecycle.
@@ -3504,7 +3656,7 @@ public class BuilderManager : MonoBehaviour
             done++;
             if (notes != null)
                 notes.Add(string.Format(
-                    "{0} moved {1:F2} m out and a spindle fitted behind it (+{2} cr)",
+                    "{0} moved {1:F2} m out and a spindle fitted behind it",
                     dDef.label, 2f * hs, spDef.CostOf(spDef.EffectiveMat(null))));
         }
         return done;
@@ -3627,8 +3779,42 @@ public class BuilderManager : MonoBehaviour
     /// is stated exactly one time instead of sixty times a second.</summary>
     bool warnedUnbuilt;
 
+    /// <summary>Minimal touch HUD for TEST DRIVE (Phase 5 fix): BACK / RESET
+    /// as tappable buttons plus the shear/wreck callouts. IMGUI on purpose -
+    /// it must draw while the uGUI builder canvas is hidden.</summary>
+    void MobileTestHud()
+    {
+        float s = Screen.dpi > 250f ? Mathf.Min(2.5f, Screen.dpi / 160f) : 1f;
+        Matrix4x4 saved = GUI.matrix;
+        GUI.matrix = Matrix4x4.Scale(new Vector3(s, s, 1f));
+        float w = Screen.width / s;
+        int fs = GUI.skin.button.fontSize;
+        GUI.skin.button.fontSize = 16;
+        bool back  = GUI.Button(new Rect(w - 96f, 10f, 86f, 40f), "BACK");
+        bool reset = GUI.Button(new Rect(w - 192f, 10f, 86f, 40f), "RESET");
+        GUI.skin.button.fontSize = fs;
+        if (shearTimer > 0f && !string.IsNullOrEmpty(shearText))
+        {
+            var st = new GUIStyle(GUI.skin.label);
+            st.fontSize = 20; st.fontStyle = FontStyle.Bold; st.alignment = TextAnchor.MiddleCenter;
+            st.normal.textColor = new Color(1f, 0.5f, 0.3f);
+            GUI.Label(new Rect(0f, 60f, w, 30f), shearText, st);
+        }
+        GUI.matrix = saved;
+        if (back) { BackToBuild(); return; }
+        if (reset) ResetTest();
+    }
+
     void OnGUI()
     {
+        if (MobileBuilderUI.Active)
+        {
+            // Phase 5 fix: the touch UI replaces the builder panel, but TEST
+            // DRIVE still needs a HUD - without these buttons a touch player
+            // has no way back (B and R are keyboard-only).
+            if (mode == Mode.Test) MobileTestHud();
+            return;
+        }
         // A BuilderManager that SURVIVES A DOMAIN RELOAD comes back with a null
         // palette - Unity re-creates the component but not the state Start()
         // built - and every line below dereferences it. The result was an NRE
@@ -3909,12 +4095,15 @@ public class BuilderManager : MonoBehaviour
         // decoration; the whole reason Tungsten read as strictly dominant is
         // that nothing on this panel ever pushed back on the price.
         Color oldC = GUI.color;
-        GUI.color = cost > BuilderManager.CREDIT_BUDGET ? new Color(1f, 0.42f, 0.30f)
-                  : cost > BuilderManager.CREDIT_BUDGET * 0.85f ? new Color(1f, 0.82f, 0.25f)
+        bool hasBudget = BuilderManager.CREDIT_BUDGET > 0;   // Phase 5: unlimited when <= 0
+        GUI.color = hasBudget && cost > BuilderManager.CREDIT_BUDGET ? new Color(1f, 0.42f, 0.30f)
+                  : hasBudget && cost > BuilderManager.CREDIT_BUDGET * 0.85f ? new Color(1f, 0.82f, 0.25f)
                   : Color.white;
-        GUILayout.Label(string.Format("Parts: {0}   Mass: {1} kg   Credits: {2} / {3}{4}",
-                        placed.Count, massInt, cost, BuilderManager.CREDIT_BUDGET,
-                        cost > BuilderManager.CREDIT_BUDGET ? "   ✗ OVER BUDGET" : ""), bodyStyle);
+        GUILayout.Label(hasBudget
+            ? string.Format("Parts: {0}   Mass: {1} kg   Credits: {2} / {3}{4}",
+                placed.Count, massInt, cost, BuilderManager.CREDIT_BUDGET,
+                cost > BuilderManager.CREDIT_BUDGET ? "   ✗ OVER BUDGET" : "")
+            : string.Format("Parts: {0}   Mass: {1} kg", placed.Count, massInt), bodyStyle);
         GUI.color = oldC;
         // ROUND-2-DEV (critic CRITICAL 1, "a dataset must announce its own
         // regime"). The build number is on the screen the player and the next
@@ -4320,24 +4509,22 @@ public class ModeSelect : MonoBehaviour
 {
     void OnGUI()
     {
-        float w = 320f, h = 174f;   // Phase 5: + perf-test entry
-        float x = (Screen.width - w) * 0.5f, y = (Screen.height - h) * 0.5f;
-        GUI.Box(new Rect(x, y, w, h), "ROBOT BRAWL — prototypes");
-        if (GUI.Button(new Rect(x + 20, y + 34, w - 40, 36), "PHASE 1 — Robot Builder"))
+        // Critic round 1 (mobile): raw pixels made these buttons thumbnail
+        // sized on a 264-dpi iPad. Same DPI scale as the rest of the HUD.
+        float s = Screen.dpi > 250f ? Mathf.Min(2.5f, Screen.dpi / 160f) : 1f;
+        GUI.matrix = Matrix4x4.Scale(new Vector3(s, s, 1f));
+        float w = 320f, h = 130f;
+        float x = (Screen.width / s - w) * 0.5f, y = (Screen.height / s - h) * 0.5f;
+        GUI.Box(new Rect(x, y, w, h), "ROBOT BRAWL");
+        if (GUI.Button(new Rect(x + 20, y + 34, w - 40, 36), "Desktop Version"))
         {
             new GameObject("BuilderManager").AddComponent<BuilderManager>();
             Destroy(gameObject);
         }
-        if (GUI.Button(new Rect(x + 20, y + 78, w - 40, 36), "PHASE 0 — Physics Sandbox"))
+        if (GUI.Button(new Rect(x + 20, y + 78, w - 40, 36), "Mobile Version"))
         {
-            new GameObject("Phase0Manager").AddComponent<Phase0Manager>();
-            Destroy(gameObject);
-        }
-        // Phase 5 (feasibility step 3): device performance answer — AI fight
-        // + fps HUD, no touch controls required. Meaningful on hardware.
-        if (GUI.Button(new Rect(x + 20, y + 122, w - 40, 36), "MOBILE PERF TEST — AI fight + fps HUD"))
-        {
-            new GameObject("perf_mode").AddComponent<PerfMode>();
+            MobileBuilderUI.forceMobileUI = true;
+            new GameObject("BuilderManager").AddComponent<BuilderManager>();
             Destroy(gameObject);
         }
     }

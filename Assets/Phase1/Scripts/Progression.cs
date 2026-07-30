@@ -138,9 +138,9 @@ public static class Progression
 
     public static bool MatUnlocked(string key)
     {
-        if (Data.devUnlockAll) return true;
-        string c = MatDB.Canon(key);
-        return c != null && Data.unlockedMats.Contains(c);
+        // All materials are available from the start (design decision 2026-07-30).
+        // Progression now gates opponents and challenges, not the shop shelf.
+        return MatDB.Canon(key) != null;
     }
 
     /// <summary>Scrap price to unlock a material EARLY, before its rung.
@@ -182,7 +182,7 @@ public static class Progression
 
     // ---- budget upgrades ---------------------------------------------------
     public static int BudgetFor()
-    { return 4000 + 500 * Mathf.Clamp(Data.budgetLevel, 0, 4); }
+    { return 0; }   // Phase 5: credit limit removed — builds are unconstrained
 
     public static int BudgetUpgradeCost()
     {
@@ -231,11 +231,7 @@ public static class Progression
         if (win && r != null && ri == Data.rung)
         {
             Data.rung++;
-            if (r.unlockMat != null && !Data.unlockedMats.Contains(r.unlockMat))
-            {
-                Data.unlockedMats.Add(r.unlockMat);
-                extra = " · UNLOCKED: " + MatDB.Get(r.unlockMat).name;
-            }
+            // Materials are all unlocked from the start; rung material grants retired.
             extra += Data.rung < Ladder.Length
                 ? string.Format(" · rung {0} of {1} awaits", Data.rung + 1, Ladder.Length)
                 : " · LADDER COMPLETE";
