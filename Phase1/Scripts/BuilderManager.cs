@@ -183,6 +183,7 @@ public class BuilderManager : MonoBehaviour
     GameObject ghost;                 // the REAL compound part model, mouse-following
     string ghostBuiltKey = "";        // partId_yaw the current ghost was built for
     readonly List<Material> ghostMats = new List<Material>();
+    readonly List<Color> ghostBaseCols = new List<Color>();   // original tints, for re-tinting
     bool ghostTintValid = true;
     bool ghostValid;
     string ghostReason = "";          // why the ghost is red (panel hint)
@@ -1653,6 +1654,7 @@ public class BuilderManager : MonoBehaviour
         if (ghost != null && ghostBuiltKey == key) return;
         if (ghost != null) Destroy(ghost);
         ghostMats.Clear();
+        ghostBaseCols.Clear();
 
         ghost = new GameObject("ghost");
         // ROUND-UP3 FIX A: the ghost probe carries the MOUNT AXIS. It did not
@@ -1681,12 +1683,17 @@ public class BuilderManager : MonoBehaviour
                 MatDB.Get(def.EffectiveMat(activeMat)).metallic,
                 MatDB.Get(def.EffectiveMat(activeMat)).smoothness);
 
+        // Ghost look v2 (owen): keep the REAL part appearance - per-renderer
+        // material instances - and blend a strong green/red tint over it in
+        // TintGhost, so the texture stays visible while validity is still
+        // unmissable on a phone (the original emission-only glow was not).
         foreach (var r in ghost.GetComponentsInChildren<Renderer>(true))
         {
             var inst = new Material(r.sharedMaterial);
             inst.EnableKeyword("_EMISSION");
             r.sharedMaterial = inst;
             ghostMats.Add(inst);
+            ghostBaseCols.Add(inst.color);
         }
         ghostBuiltKey = key;
         ghostTintValid = true;
@@ -1697,9 +1704,15 @@ public class BuilderManager : MonoBehaviour
     {
         if (ghostTintValid == valid) return;
         ghostTintValid = valid;
-        // Subtle green glow = will attach here; red glow = can't place.
-        Color e = valid ? new Color(0.04f, 0.45f, 0.10f) : new Color(0.55f, 0.05f, 0.03f);
-        foreach (var m in ghostMats) m.SetColor("_EmissionColor", e);
+        // Strong tint OVER the real material (owen): the part keeps its
+        // texture but reads clearly green (will attach) or red (can't place).
+        Color tint = valid ? new Color(0.20f, 1.00f, 0.30f) : new Color(1.00f, 0.15f, 0.10f);
+        for (int i = 0; i < ghostMats.Count; i++)
+        {
+            Color b = i < ghostBaseCols.Count ? ghostBaseCols[i] : Color.white;
+            ghostMats[i].color = Color.Lerp(b, tint, 0.45f);
+            ghostMats[i].SetColor("_EmissionColor", tint * 0.35f);
+        }
     }
 
     void UpdateGhost()
@@ -1755,7 +1768,42 @@ public class BuilderManager : MonoBehaviour
             if (found) { hit = near; onFace = true; grazed = true; }
         }
 
-        if (!onFace)
+        // 2026-07-30 (owen: end-to-end beams hard to aim): a ray aimed just
+        // past a beam's tip flies on and hits whatever sits BEHIND it - the
+        // ghost jumped to the core or the floor. Tip capture: if the ray
+        // passes within 10 cm of an elongated part's end-face centre, and
+        // that tip is no farther than what the ray actually hit, the end
+        // face wins. End faces are single-socket, so the snap self-centres.
+        PlacedPart capPart = null;
+        Vector3 capNormal = Vector3.zero;
+        {
+            float bestD = 0.10f;
+            foreach (var pp in placed)
+            {
+                Vector3 th2 = pp.Half();
+                int la2 = 0;
+                if (th2.y > th2[la2]) la2 = 1;
+                if (th2.z > th2[la2]) la2 = 2;
+                float other2 = Mathf.Max(th2[(la2 + 1) % 3], th2[(la2 + 2) % 3]);
+                if (th2[la2] < 2f * other2) continue;   // beams and long beams only
+                for (int sgn = -1; sgn <= 1; sgn += 2)
+                {
+                    Vector3 axisV = Vector3.zero;
+                    axisV[la2] = sgn;
+                    Vector3 e = pp.pos + axisV * th2[la2];
+                    float t = Vector3.Dot(e - ray.origin, ray.direction);
+                    if (t <= 0f) continue;
+                    float d = (ray.origin + ray.direction * t - e).magnitude;
+                    if (d >= bestD) continue;
+                    if (onFace && t > hit.distance + 0.05f) continue;   // tip is behind what we hit
+                    bestD = d;
+                    capPart = pp;
+                    capNormal = axisV;
+                }
+            }
+        }
+
+        if (!onFace && capPart == null)
         {
             // Free-follow: the real part model tracks the mouse across the
             // build plane until a snap face is hovered. Not placeable here.
@@ -1780,8 +1828,18 @@ public class BuilderManager : MonoBehaviour
             return;
         }
 
-        ghostTarget = byCollider[hit.collider];
-        ghostNormal = hit.normal;
+        if (onFace)
+        {
+            ghostTarget = byCollider[hit.collider];
+            ghostNormal = hit.normal;
+        }
+        if (capPart != null)
+        {
+            // Tip capture overrides: aim just past a beam tip = end-mount.
+            ghostTarget = capPart;
+            ghostNormal = capNormal;
+            grazed = false;
+        }
         if (grazed)
         {
             // A grazing sphere-cast reports edge/diagonal normals, which made
@@ -1791,12 +1849,24 @@ public class BuilderManager : MonoBehaviour
             // normalized by the part's half extents.
             Vector3 off = hit.point - ghostTarget.pos;
             Vector3 th = ghostTarget.Half();
+            // 2026-07-30 (owen: end-to-end beams hard to aim): the old pick
+            // used |off|/half per axis, which biased a BEAM's tip grazes 3:1
+            // toward its side faces - aiming just past the tip flipped the
+            // ghost sideways. Use OVERSHOOT (distance outside the box per
+            // axis, the true nearest-face metric), plus a tip-preference
+            // band on elongated parts: anything at or beyond the last 2 cm
+            // resolves to the END face.
             int ga = 0;
-            float gb = Mathf.Abs(off.x) / Mathf.Max(th.x, 0.01f);
-            float gy = Mathf.Abs(off.y) / Mathf.Max(th.y, 0.01f);
+            float gb = Mathf.Abs(off.x) - th.x;
+            float gy = Mathf.Abs(off.y) - th.y;
             if (gy > gb) { ga = 1; gb = gy; }
-            float gz = Mathf.Abs(off.z) / Mathf.Max(th.z, 0.01f);
+            float gz = Mathf.Abs(off.z) - th.z;
             if (gz > gb) ga = 2;
+            int la = 0;
+            if (th.y > th[la]) la = 1;
+            if (th.z > th[la]) la = 2;
+            float laOther = Mathf.Max(th[(la + 1) % 3], th[(la + 2) % 3]);
+            if (th[la] >= 2f * laOther && Mathf.Abs(off[la]) > th[la] - 0.02f) ga = la;
             Vector3 derived = Vector3.zero;
             derived[ga] = off[ga] >= 0f ? 1f : -1f;
             ghostNormal = derived;
@@ -2200,6 +2270,7 @@ public class BuilderManager : MonoBehaviour
         selected = -1;
         if (ghost != null) { Destroy(ghost); ghost = null; }
         ghostMats.Clear();
+        ghostBaseCols.Clear();
         ghostBuiltKey = "";
         ghostValid = false;
         ghostReason = "";
@@ -2649,14 +2720,22 @@ public class BuilderManager : MonoBehaviour
     {
         if (r == null) return;
         Transform t = r.transform;
-        if (t.position.y > -3f) return;
-        t.position += new Vector3(0f, 1.2f - t.position.y, 0f);
+        Vector3 p = t.position;
+        float m = ARENA_HALF + 0.3f;
+        bool below = p.y < -3f;
+        bool outside = Mathf.Abs(p.x) > m || Mathf.Abs(p.z) > m;
+        if (!below && !outside) return;
+        Vector3 target = new Vector3(
+            Mathf.Clamp(p.x, -(ARENA_HALF - 1.2f), ARENA_HALF - 1.2f),
+            1.2f,
+            Mathf.Clamp(p.z, -(ARENA_HALF - 1.2f), ARENA_HALF - 1.2f));
+        t.position += target - p;
         foreach (var rb in r.GetComponentsInChildren<Rigidbody>())
         {
             rb.linearVelocity = Vector3.zero;
             rb.angularVelocity = Vector3.zero;
         }
-        CompoundRobot.Log("FloorNet: machine recovered from below the arena");
+        CompoundRobot.Log("FloorNet: machine returned to the arena");
     }
 
     void BuildArena()
@@ -2678,6 +2757,16 @@ public class BuilderManager : MonoBehaviour
             wall.transform.position = alongX ? new Vector3(0f, 0.75f, sign * HALF) : new Vector3(sign * HALF, 0.75f, 0f);
             wall.transform.localScale = alongX ? new Vector3(2f * HALF + 0.5f, 1.5f, 0.5f) : new Vector3(0.5f, 1.5f, 2f * HALF + 0.5f);
             wall.GetComponent<Renderer>().sharedMaterial = PartVisualFactory.Mat(new Color(0.22f, 0.22f, 0.25f), 0.5f, 0.4f);
+
+            // iPad bug fix (2026-07-30): the 1.5 m visual wall was low enough
+            // to beach a rammed bot on its flat top or throw it clean out of
+            // the arena. Invisible barrier continues the wall up to 6 m.
+            var barrier = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            barrier.name = "wall_barrier_" + i;
+            barrier.transform.SetParent(sandboxRoot.transform, false);
+            barrier.transform.position = alongX ? new Vector3(0f, 3f, sign * HALF) : new Vector3(sign * HALF, 3f, 0f);
+            barrier.transform.localScale = alongX ? new Vector3(2f * HALF + 0.5f, 6f, 0.5f) : new Vector3(0.5f, 6f, 2f * HALF + 0.5f);
+            Object.Destroy(barrier.GetComponent<MeshRenderer>());
 
             // Hazard-striped wall tops (decorative, collider-free).
             for (int k = 0; k < 7; k++)
