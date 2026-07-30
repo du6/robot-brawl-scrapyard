@@ -1,5 +1,7 @@
 using UnityEngine;
 
+namespace RobotBrawl.Phase0
+{
 /// <summary>Simple smoothed chase camera for the Phase 0 sandbox.</summary>
 public class FollowCamera : MonoBehaviour
 {
@@ -70,4 +72,6 @@ public class FollowCamera : MonoBehaviour
         transform.position = Vector3.Lerp(transform.position, DesiredPos(), smooth * Time.deltaTime);
         transform.LookAt(target.position + Vector3.up * 0.5f);
     }
+}
+
 }

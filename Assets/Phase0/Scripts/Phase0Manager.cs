@@ -1,6 +1,9 @@
 using System.Collections.Generic;
 using UnityEngine;
 
+namespace RobotBrawl.Phase0
+{
+
 /// <summary>
 /// Builds the whole Phase 0 test scene procedurally (no scene authoring, no
 /// prefabs — press Play in any empty scene) and runs the three checks from
@@ -239,4 +242,5 @@ public class Phase0Manager : MonoBehaviour
                 r.name, e.label, e.peak, e.threshold, status));
         }
     }
+}
 }

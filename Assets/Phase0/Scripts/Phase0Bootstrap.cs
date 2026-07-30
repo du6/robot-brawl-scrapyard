@@ -1,5 +1,8 @@
 using UnityEngine;
 
+namespace RobotBrawl.Phase0
+{
+
 /// <summary>
 /// Zero-setup entry point: as soon as any scene loads in Play mode, show the
 /// mode-select menu (Phase 0 physics sandbox / Phase 1 robot builder) unless a
@@ -20,7 +23,11 @@ public static class Phase0Bootstrap
                     || Object.FindObjectOfType<BuilderManager>() != null
                     || Object.FindObjectOfType<ModeSelect>() != null;
 #endif
+        // Phase 5: mobile Unity defaults to 30 fps — the §2.3 budget is 60,
+        // and any perf number measured at the default would be meaningless.
+        Application.targetFrameRate = 60;
         if (!running)
             new GameObject("ModeSelect").AddComponent<ModeSelect>();
     }
+}
 }
