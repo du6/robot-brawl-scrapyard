@@ -1245,6 +1245,7 @@ public class CompoundRobot : MonoBehaviour
             var one = new HashSet<int>();
             one.Add(i);
             SpawnDebris(one);
+            SfxSynth.Shear();
             shed++;
         }
         foreach (int i in ready)

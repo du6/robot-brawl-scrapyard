@@ -95,6 +95,7 @@ public class FightManager : MonoBehaviour
     public static float SHOVE_PUSH = 2.2f;
 
     public BuilderManager bm;
+    AudioSource music;   // fight theme, started in Setup, stopped in End
     public Side player = new Side();
     public Side enemy = new Side();
     /// <summary>§8: set by StartFight from the chosen roster entry.</summary>
@@ -126,6 +127,20 @@ public class FightManager : MonoBehaviour
         settleLeft = SETTLE_TIME;
         Protect(player);
         Protect(enemy);
+
+        // Fight music (2026-07-30, owen's track). Lives in Resources so it
+        // ships in device builds; loops for the match, stops at the verdict.
+        var musicClip = Resources.Load<AudioClip>("FightTheme");
+        if (musicClip != null)
+        {
+            music = gameObject.AddComponent<AudioSource>();
+            music.clip = musicClip;
+            music.loop = true;
+            music.volume = 0.55f;
+            music.spatialBlend = 0f;   // 2D: same in both ears, everywhere
+            music.Play();
+        }
+        else CompoundRobot.Log("FightTheme missing from Resources - fight is silent");
     }
 
     void Protect(Side s)
@@ -662,6 +677,7 @@ public class FightManager : MonoBehaviour
     {
         if (state == State.Ended) return;
         state = State.Ended;
+        if (music != null) music.Stop();   // the verdict gets silence
         outcome = o;
         causeLine = cause;
         Poll(player);

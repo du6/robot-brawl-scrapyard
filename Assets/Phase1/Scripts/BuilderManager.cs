@@ -1032,6 +1032,11 @@ public class BuilderManager : MonoBehaviour
                     ghostTarget, activeMat);
             message = "";
             RefreshOverlay();
+            SfxSynth.Place();
+        }
+        else if (down0 && !overPanel && clicksLive && selected >= 0 && !ghostValid)
+        {
+            SfxSynth.Deny();   // clicked, but the ghost is red - say no out loud
         }
         if (down1 && !overPanel && clicksLive)
         {
@@ -1041,6 +1046,7 @@ public class BuilderManager : MonoBehaviour
                 // Push BEFORE the edit and only if the edit can actually happen,
                 // so Z never burns a step on a refused core click.
                 if (hitPart != placed[0]) PushUndo();
+                if (hitPart != placed[0]) SfxSynth.Remove();
                 RemovePart(hitPart);
             }
         }
