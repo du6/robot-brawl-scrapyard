@@ -214,6 +214,8 @@ public static class Progression
     {
         if (rewarded) return;
         rewarded = true;
+        // C3: a career contest settles on the CAREER ledger, not this profile.
+        if (Career.active && Career.SettleFight(win, dealt)) return;
         int ri = activeRungIndex;
         Rung r = ri >= 0 && ri < Ladder.Length ? Ladder[ri] : null;
         int basePay = r != null ? r.reward : 150;   // exhibitions: small flat purse

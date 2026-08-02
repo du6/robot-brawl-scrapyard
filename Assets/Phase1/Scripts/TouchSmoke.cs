@@ -138,6 +138,65 @@ public class TouchSmoke : MonoBehaviour
         Check(tapped && bm.LastMessage != null && bm.LastMessage.Contains("wheel"), "invalid build blocked with a visible message");
         Tap("BUILD"); yield return null;
 
+        // ---- C1: career inventory asserts. IN-MEMORY ONLY - Career.Save() is
+        // never called, so the owner's career file is untouched.
+        var savedCareer = Career.Data;
+        Career.Data = new CareerData();
+        Career.AddItem("beam", "Aluminum", 1);
+        Career.active = true;
+        bm.ActiveMatKey = "Aluminum";
+        int bi = -1;
+        for (int i = 1; i < bm.PaletteCount; i++)
+            if (bi < 0 && bm.PartLabel(i).StartsWith("Beam")) bi = i;
+        yield return null;
+        int nc = bm.PlacedCount;
+        Tap("Beam"); yield return null;
+        Phase0Input.debugPointer = true;
+        Phase0Input.debugMousePos = corePos;
+        // Real-time wait: this block runs right after a FIGHT->BUILD tab
+        // switch, and the builder's click-grace window swallows clicks for
+        // a beat after any full-screen transition. Frame-count yields are
+        // not enough at editor frame rates.
+        yield return new WaitForSeconds(0.6f);
+        yield return null; yield return null;
+        Phase0Input.DebugClick(0);
+        yield return null; yield return null;
+        bool placedOne = bm.PlacedCount == nc + 1;
+        // The stock gate only speaks on a PLACEABLE spot - an invalid ghost
+        // is the ordinary deny (no message). Hunt a valid ghost first: the
+        // core face, the placed beam, then small x-offsets around each.
+        bool gotValid = false;
+        for (int attempt = 0; attempt < 24 && !gotValid; attempt++)
+        {
+            Vector3 cand = attempt % 2 == 0 ? PartOnScreen(true) : PartOnScreen(false);
+            if (cand == Vector3.zero) { yield return null; continue; }
+            cand.x += (attempt / 4) * 8f * (attempt % 4 < 2 ? 1f : -1f);
+            Phase0Input.debugMousePos = cand;
+            yield return null; yield return null;
+            gotValid = bm.TestGhostValid;
+        }
+        Phase0Input.DebugClick(0);   // the shelf is empty now - must refuse
+        yield return null; yield return null;
+        Debug.Log("[TouchSmoke][diag] placedOne=" + placedOne + " placed=" + bm.PlacedCount
+                  + " nc=" + nc + " ghostValid=" + bm.TestGhostValid + " ghostTarget=" + bm.TestGhostTarget
+                  + " rem=" + bm.CareerRemaining(bi) + " msg='" + bm.LastMessage + "'");
+        Check(placedOne && gotValid && bm.PlacedCount == nc + 1
+              && bm.LastMessage != null && bm.LastMessage.Contains("left"),
+              "career: placement stops at the owned count with an amber message");
+        Phase0Input.debugPointer = false;
+        yield return null;
+        var beamBtn2 = Btn("Beam");
+        Check(bi >= 0 && beamBtn2 != null
+              && beamBtn2.GetComponentInChildren<Text>().text.Contains("×0"),
+              "career: part tile shows the ×0 stock badge");
+        Tap("DONE"); yield return null;
+        Tap("UNDO"); yield return null; yield return null;
+        Check(bm.PlacedCount == nc && bm.CareerRemaining(bi) == 1,
+              "career: undo returns the part to stock");
+        Career.active = false;
+        Career.Data = savedCareer;
+        yield return null;
+
         foreach (var l in log) Debug.Log("[TouchSmoke] " + l);
         Debug.Log(string.Format("[TouchSmoke] RESULT: {0} pass, {1} fail{2}",
                   passed, failed, failed == 0 ? " - ALL GREEN" : " - FIX NEEDED"));

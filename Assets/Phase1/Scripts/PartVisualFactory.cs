@@ -67,7 +67,12 @@ public static class PartVisualFactory
     public static Material TargetRed { get { return Mat(new Color(0.85f, 0.12f, 0.10f), 0.1f, 0.45f); } }
     public static Material TargetWhite { get { return Mat(new Color(0.92f, 0.92f, 0.90f), 0.1f, 0.45f); } }
     public static Material CeilingStrip { get { return Emissive(new Color(0.96f, 0.96f, 0.93f), new Color(2.4f, 2.4f, 2.25f), 0f, 0.5f); } }
-    public static Material FloorMark { get { return Emissive(new Color(0.45f, 0.75f, 0.9f), new Color(0.22f, 0.45f, 0.58f), 0f, 0.3f); } }
+    // R5 (critic finding 3): the arena's painted centre circle and radial
+    // lines are real floor markings, not gizmos - but at this emission they
+    // read as editor debug geometry (a critic reviewing round 5 called them
+    // "a ~430 px teal circle and a full-width cross"). Same markings, painted
+    // rather than lit: dimmer albedo, a quarter of the emission.
+    public static Material FloorMark { get { return Emissive(new Color(0.34f, 0.44f, 0.52f), new Color(0.05f, 0.10f, 0.13f), 0f, 0.3f); } }
 
     // ---------------------------------------------------------- prim helper
 

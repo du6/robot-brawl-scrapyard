@@ -37,7 +37,7 @@ public class PerfHUD : MonoBehaviour
     void OnGUI()
     {
         if (style == null) style = new GUIStyle(GUI.skin.label) { fontSize = 16, fontStyle = FontStyle.Bold };
-        float s = Screen.dpi > 250f ? Mathf.Min(2.5f, Screen.dpi / 160f) : 1f;
+        float s = BuilderManager.GuiScale;   // R4 finding 3: one rule, one place
         GUI.matrix = Matrix4x4.Scale(new Vector3(s, s, 1f));
         float w = 430f;
         GUI.Box(new Rect(Screen.width / s - w - 8f, 8f, w, 30f), "");
@@ -104,7 +104,8 @@ public class TouchControls : MonoBehaviour
     Vector2 anchor;        // floating stick anchor, input space (y up)
     Vector2 stickPos;
 
-    static float S { get { float d = Screen.dpi; return d > 250f ? Mathf.Min(2.5f, d / 160f) : 1f; } }
+    // R4 finding 3: was a seventh copy of the dpi rule; now one rule, one place.
+    static float S { get { return BuilderManager.GuiScale; } }
 
     bool HasTouch
     {

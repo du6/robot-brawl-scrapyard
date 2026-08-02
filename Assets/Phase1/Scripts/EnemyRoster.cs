@@ -337,8 +337,16 @@ public static class EnemyRoster
             // by 0.02. Measured back as rotorDip 0.080 -> 0.000.
             L.Add(new BuilderManager.PlacedPart { def = spindle, pos = new Vector3(0f, 0.80f, 0.80f),
                                                   wheelAxis = Vector3.forward, matName = "Aluminum" });
+            // C6 tune (owner-approved direction): the disc matches the rest of
+            // the tower - ALUMINUM, not Steel. A steel disc on the SECOND
+            // contest of the career out-classed every value-appropriate build
+            // (C5/C6 probes: 0-1/6 for the same-class wedge, 300-800 dmg per
+            // fight taken). The tipper's authored identity is the topple
+            // gimmick; the disc is set dressing, and it now bites like the
+            // Scrap-class bot it is. The CHAMPION widowmaker keeps tungsten -
+            // flagships are supposed to be scary.
             L.Add(new BuilderManager.PlacedPart { def = spinner, pos = new Vector3(0f, 0.80f, 1.00f),
-                                                  wheelAxis = Vector3.forward, matName = "Steel" });
+                                                  wheelAxis = Vector3.forward, matName = "Aluminum" });
             return L;
         }
         if (id == "widowmaker")

@@ -148,7 +148,13 @@ public static class SfxSynth
     public static void Place()  { PlayClip(EnsureAnd(ref clipPlace),  0.85f, Random.Range(0.95f, 1.06f)); }
     public static void Deny()   { PlayClip(EnsureAnd(ref clipDeny),   0.55f, 1f); }
     public static void Remove() { PlayClip(EnsureAnd(ref clipRemove), 0.85f, Random.Range(0.90f, 1.05f)); }
-    public static void Shear()  { PlayClip(EnsureAnd(ref clipShear),  0.95f, Random.Range(0.88f, 1.10f)); }
+    /// <summary>A seam shearing is the crowd's favourite moment - it is the
+    /// one event a spectator can read without knowing the damage model.</summary>
+    public static void Shear()
+    {
+        PlayClip(EnsureAnd(ref clipShear), 0.95f, Random.Range(0.88f, 1.10f));
+        CrowdAudio.Surge(0.62f);
+    }
 
     static AudioClip EnsureAnd(ref AudioClip c) { Ensure(); return c; }
 

@@ -106,10 +106,28 @@ public class FightManager : MonoBehaviour
     public float settleLeft;
     float bellFlash;
     public State state = State.Settling;
+    /// <summary>Build stamp - bumped by hand whenever this file changes, so a
+    /// harness can PROVE which assembly the editor actually loaded rather than
+    /// inferring it from DLL timestamps (which lied once during round 3).</summary>
+    public static readonly string BuildStamp = "r4-b1";
+    /// <summary>Round-3 probe: the HUD header width DrawHud last used, so a
+    /// harness can prove from inside play mode which build is really drawing
+    /// instead of measuring pixels in a screenshot.</summary>
+    public static float lastHudW;
     public Outcome outcome = Outcome.None;
     public string causeLine = "";
+    // ROUND-3 (critic CRITICAL 2c): the contest identity and its money, cached
+    // in End() because Career.SettleFight() nulls activeLeague/activeContest
+    // before DrawResults() ever runs. Read nowhere else.
+    bool cIsContest; string cLeague = "", cArena = ""; int cPurse, cEntry, cPay;
+    /// <summary>MEDALS (2026-08-02): the championship line, cached in End()
+    /// from Career.lastMedal for the same reason every other field here is -
+    /// SettleFight clears its own handoff state, so reading it from
+    /// DrawResults() would yield nothing.</summary>
+    string cMedal = "";
 
     GUIStyle hudStyle, nameStyle, bigStyle, medStyle, smallStyle, btnStyle, tinyStyle;
+    GUIStyle idStyle, hudIdStyle, moneyStyle, moneySmall, medalStyle;
 
     public void Setup(BuilderManager owner, CompoundRobot pBot, RaycastWheelDrive pDrive,
                       CompoundRobot eBot, RaycastWheelDrive eDrive, AIController eAi)
@@ -171,6 +189,8 @@ public class FightManager : MonoBehaviour
             InitSide(s);
             Poll(s);
         }
+        // The house comes up on the bell and goes quiet at the verdict.
+        CrowdAudio.Begin();
         if (player.drive != null) player.drive.useAI = false;  // keyboard back
         if (enemy.ai != null) enemy.ai.enabled = true;
         state = State.Fighting;
@@ -400,7 +420,7 @@ public class FightManager : MonoBehaviour
             int live = s.gyro != null ? s.gyro.LiveGyros() : 0;
             bool fitted = s.gyro != null && s.gyro.gyroParts.Length > 0;
             why = !fitted
-                ? "flipped onto its back — the emergency struts could not roll a hull this shape back over; a gyro rights you in under a second"
+                ? "flipped onto its back with nothing aboard to right it — fit a gyro, or build an arm that can push you back over"
                 : (live == 0
                     ? "flipped onto its back — its gyro had already been sheared off, leaving only the slow emergency struts"
                     : string.Format("flipped onto its back — {0} gyro(s) still live, but not enough righting torque for a hull this shape", live));
@@ -584,9 +604,12 @@ public class FightManager : MonoBehaviour
     /// this band; two normal brawlers within ~20% of each other never are.</summary>
     public static float AGGRESSION_BAND = 0.20f;
 
-    /// <summary>Phase 5: IMGUI scale for high-DPI (phone) screens — 1 on
-    /// desktop, up to 2.5x at phone DPI so the fight HUD stays readable.</summary>
-    static float UIS { get { float d = Screen.dpi; return d > 250f ? Mathf.Min(2.5f, d / 160f) : 1f; } }
+    /// <summary>IMGUI scale for the fight HUD AND the results screen. R4
+    /// (critic finding 3): this used to be its own copy of the dpi rule, so at
+    /// the dpi this editor reports it evaluated to exactly 1 and round 3's
+    /// results screen shipped at a scale it was not designed for while the
+    /// career panel next door scaled. One rule, one place.</summary>
+    static float UIS { get { return BuilderManager.GuiScale; } }
 
     /// <summary>ROUND-2-CRITIC FIX: the card is re-ordered and gains a third
     /// criterion.
@@ -678,14 +701,47 @@ public class FightManager : MonoBehaviour
         if (state == State.Ended) return;
         state = State.Ended;
         if (music != null) music.Stop();   // the verdict gets silence
+        // One last roar for a decisive finish, then the arena empties. A draw
+        // or a count-out gets no roar - the crowd is not impressed by a clock.
+        if (o == Outcome.PlayerWin || o == Outcome.PlayerLoss) CrowdAudio.Surge(1f);
+        CrowdAudio.Stop();
         outcome = o;
         causeLine = cause;
         Poll(player);
         Poll(enemy);
         Freeze(player);
         Freeze(enemy);
+        // ROUND-3 FIX (critic CRITICAL 2c): cache the contest identity HERE.
+        // Career.SettleFight() nulls activeLeague/activeContest as its third
+        // statement, long before DrawResults() draws, so reading them from the
+        // results screen yields two empty strings and an unnamed title fight.
+        cIsContest = false; cLeague = ""; cArena = ""; cPurse = 0; cEntry = 0; cPay = 0;
+        if (Career.active && !string.IsNullOrEmpty(Career.activeContest))
+        {
+            var clg = Career.FindLeague(Career.activeLeague);
+            var ccon = Career.FindContest(clg, Career.activeContest);
+            if (clg != null && ccon != null)
+            {
+                cIsContest = true;
+                cLeague = clg.name.ToUpper();
+                cArena = clg.arenaName.ToUpper();
+                cEntry = ccon.entryFee;
+                bool re = Career.Data.doneContests.Contains(ccon.id);
+                cPurse = Mathf.RoundToInt(ccon.purse * (re ? CareerDB.REENTRY_FRAC : 1f));
+            }
+        }
+        Career.lastSettled = false;
+        Career.lastMedal = null; cMedal = "";
         // Phase 4: settle scrap + ladder advancement, exactly once per fight.
         Progression.OnMatchEnd(o == Outcome.PlayerWin, player.dealt);
+        // ...and what the settlement actually paid. If it did not run as a
+        // contest (already rewarded, exhibition), drop the contest framing
+        // entirely rather than print a purse that was never won.
+        if (Career.lastSettled) cPay = Career.lastPay; else cIsContest = false;
+        // MEDALS: SettleFight mints at most one per settle and nulls the field
+        // on every settle, so this is never a stale championship.
+        if (Career.lastMedal != null)
+            cMedal = "\u2605  " + Career.lastMedal.leagueName.ToUpper() + " CHAMPION  \u2605";
         // Round-2 fix 3: cut to the fixed safe overview BEFORE the results
         // overlay draws — the chase camera could end a count-out wedged in a
         // wall corner and render the results screen into wall geometry.
@@ -727,13 +783,26 @@ public class FightManager : MonoBehaviour
         // (B is a keyboard key). Small corner button, far from the pads.
         if (MobileBuilderUI.Active && bm != null)
             if (GUI.Button(new Rect(10f, 8f, 88f, 36f), "QUIT")) { bm.BackToBuild(); return; }
-        float w = 620f;
+        // ROUND-3 FIX (critic MAJOR 4): 620 was too narrow for the side
+        // lines, which clipped mid-string - the player's row ended on an
+        // orphan separator and the opponent's lost the word "wheels".
+        // R5 finding 2: the side lines are 18pt now, not 14. Measured against
+        // the longest real string the HUD prints - "WIDOWMAKER · 8/8 parts ·
+        // 4/4 wheels · HP 88%" - which clipped its own percentage at 900/425.
+        float w = 1010f;
+        lastHudW = w;
         float x = (Screen.width / UIS - w) * 0.5f;
-        GUI.Box(new Rect(x, 8, w, 120), "");
+        // ...and the fight now says WHICH fight it is. Arriving at the World
+        // Championship in The Crucible for a 3000 purse looked exactly like an
+        // exhibition: no league, no arena, no purse anywhere on screen.
+        string cid = ContestHudLine();
+        float dy = cid == null ? 0f : 22f;
+        GUI.Box(new Rect(x, 8, w, 130 + dy), "");
+        if (cid != null) GUI.Label(new Rect(x, 11, w, 26), cid, hudIdStyle);
         int t = Mathf.Max(0, Mathf.CeilToInt(timer));
-        GUI.Label(new Rect(x, 12, w, 26), string.Format("{0}:{1:00}", t / 60, t % 60), hudStyle);
-        DrawBar(x + 16, 40, 270, player);
-        DrawBar(x + w - 286, 40, 270, enemy);
+        GUI.Label(new Rect(x, 12 + dy, w, 26), string.Format("{0}:{1:00}", t / 60, t % 60), hudStyle);
+        DrawBar(x + 16, 40 + dy, 482, player);
+        DrawBar(x + w - 498, 40 + dy, 482, enemy);
 
         if (state == State.Settling)
         {
@@ -786,13 +855,13 @@ public class FightManager : MonoBehaviour
     /// shear, not damage, is what was actually taking robots apart.</summary>
     void DrawBar(float x, float y, float w, Side s)
     {
-        GUI.Label(new Rect(x, y, w, 18),
-            string.Format("{0}   {1}/{2} parts   ·   {3}/{4} wheels   ·   HP {5:F0}%",
+        GUI.Label(new Rect(x, y, w, 23),
+            string.Format("{0} · {1}/{2} parts · {3}/{4} wheels · HP {5:F0}%",
                           s.label, s.bodyNow, s.startBody, s.wheelsNow, s.startWheels, s.hpFrac * 100f),
             nameStyle);
         Color old = GUI.color;
         GUI.color = new Color(0.12f, 0.12f, 0.14f, 0.95f);
-        GUI.DrawTexture(new Rect(x, y + 20, w, 10), Texture2D.whiteTexture);
+        GUI.DrawTexture(new Rect(x, y + 24, w, 10), Texture2D.whiteTexture);
         // Round-6 fix 5: the big bar is STRUCTURE now, not hp-on-attached-parts.
         // Across 69 measured matches hpFrac never fell below 0.49 and typically
         // ended 0.82-0.99, so two thirds of its colour range was unreachable and
@@ -803,7 +872,7 @@ public class FightManager : MonoBehaviour
         GUI.color = s.structFrac > 0.85f ? new Color(0.25f, 0.9f, 0.35f)
                   : s.structFrac > 0.65f ? new Color(1f, 0.8f, 0.2f)
                   : new Color(1f, 0.3f, 0.2f);
-        GUI.DrawTexture(new Rect(x, y + 20, w * Mathf.Clamp(s.structFrac, 0f, 1f), 10), Texture2D.whiteTexture);
+        GUI.DrawTexture(new Rect(x, y + 24, w * Mathf.Clamp(s.structFrac, 0f, 1f), 10), Texture2D.whiteTexture);
 
         // Round-4 fix 5: the pip row is every PIECE — body parts in blue, then
         // the drivetrain in amber. A wheel-less wreck used to read as intact.
@@ -815,7 +884,7 @@ public class FightManager : MonoBehaviour
             bool live = isWheel ? (i - s.startBody) < s.wheelsNow : i < s.bodyNow;
             GUI.color = live ? (isWheel ? new Color(1f, 0.72f, 0.25f) : new Color(0.55f, 0.75f, 1f))
                              : new Color(0.42f, 0.16f, 0.14f);
-            GUI.DrawTexture(new Rect(x + i * (pw + 2f), y + 34, pw, 6), Texture2D.whiteTexture);
+            GUI.DrawTexture(new Rect(x + i * (pw + 2f), y + 38, pw, 6), Texture2D.whiteTexture);
         }
 
         // Round-6 fix 3: the section 6.2 ENERGY BUDGET, live. It appeared
@@ -825,16 +894,16 @@ public class FightManager : MonoBehaviour
         // screen saying so. Every number here is already computed each
         // FixedUpdate; only the readout was missing.
         GUI.color = new Color(0.10f, 0.10f, 0.13f, 0.95f);
-        GUI.DrawTexture(new Rect(x, y + 46, w, 8), Texture2D.whiteTexture);
+        GUI.DrawTexture(new Rect(x, y + 50, w, 8), Texture2D.whiteTexture);
         bool blink = (Time.unscaledTime % 0.6f) < 0.3f;
         GUI.color = s.pwrFlat     ? (blink ? new Color(1f, 0.30f, 0.22f) : new Color(0.45f, 0.12f, 0.10f))
                   : s.pwrStrained ? new Color(1f, 0.62f, 0.12f)
                   : s.pwrFrac <= PowerPlant.LOW_FRAC ? new Color(1f, 0.85f, 0.25f)
                   : new Color(0.30f, 0.80f, 1f);
-        GUI.DrawTexture(new Rect(x, y + 46, w * (s.pwrFlat ? 1f : Mathf.Clamp01(s.pwrFrac)), 8),
+        GUI.DrawTexture(new Rect(x, y + 50, w * (s.pwrFlat ? 1f : Mathf.Clamp01(s.pwrFrac)), 8),
                         Texture2D.whiteTexture);
         GUI.color = old;
-        GUI.Label(new Rect(x, y + 55, w, 16),
+        GUI.Label(new Rect(x, y + 61, w, 20),
             s.startCapKJ <= 0.01f ? "no power part fitted"
           : s.pwrFlat ? "BATTERY FLAT"
           : string.Format("{0:F0} / {1:F0} kJ{2}{3}", s.storedKJ, s.capKJ,
@@ -846,17 +915,53 @@ public class FightManager : MonoBehaviour
     void DrawResults()
     {
         Color old = GUI.color;
-        GUI.color = new Color(0f, 0f, 0f, 0.78f);
+        float H = Screen.height / UIS, W = Screen.width / UIS;
+        Color accent = outcome == Outcome.PlayerWin  ? new Color(0.35f, 1f, 0.45f)
+                     : outcome == Outcome.PlayerLoss ? new Color(1f, 0.32f, 0.26f)
+                     :                                 new Color(1f, 0.85f, 0.30f);
+
+        // ROUND-3 FIX (critic CRITICAL 2a): winning the World Championship and
+        // being destroyed used to be the SAME PICTURE apart from one word. The
+        // backdrop and a band behind the verdict now carry the outcome as
+        // colour, so the two read apart before a single glyph is parsed.
+        // These look absurdly dark as numbers because the project renders in
+        // LINEAR colour space: GUI.color is a linear value, so 0.013 lands on
+        // screen at roughly sRGB 0.14. The first attempt used sRGB-looking
+        // numbers and produced a pale wash the arena showed straight through.
+        // R5 (critic finding 3): at 0.93 the arena's emissive floor paint - the
+        // 24-segment centre circle and the two full-width radial lines - still
+        // burned straight through the backdrop and lay across `NET -160 SCRAP`
+        // and both buttons, which reads as debug geometry over the single most
+        // important line in the career loop. 0.985 is opaque to an emissive
+        // without going flat black.
+        GUI.color = outcome == Outcome.PlayerWin  ? new Color(0.0012f, 0.0110f, 0.0028f, 0.985f)
+                  : outcome == Outcome.PlayerLoss ? new Color(0.0130f, 0.0011f, 0.0011f, 0.985f)
+                  :                                 new Color(0.0100f, 0.0070f, 0.0006f, 0.985f);
         GUI.DrawTexture(new Rect(0, 0, Screen.width, Screen.height), Texture2D.whiteTexture);
+        GUI.color = new Color(accent.r, accent.g, accent.b, 0.20f);
+        GUI.DrawTexture(new Rect(0, H * 0.145f, W, 96f), Texture2D.whiteTexture);
+        GUI.color = accent;
+        GUI.DrawTexture(new Rect(0, H * 0.145f, W, 4f), Texture2D.whiteTexture);
+        GUI.DrawTexture(new Rect(0, H * 0.145f + 92f, W, 4f), Texture2D.whiteTexture);
         GUI.color = old;
+
+        // (2c) The contest gets a name. Cached in End(); see the field comment.
+        if (cIsContest)
+        {
+            idStyle.normal.textColor = new Color(0.88f, 0.90f, 0.95f);
+            GUI.Label(new Rect(0, H * 0.095f, W, 30), cLeague + "   ·   " + cArena, idStyle);
+        }
 
         string title = outcome == Outcome.PlayerWin ? "VICTORY"
                      : outcome == Outcome.PlayerLoss ? "DEFEAT" : "DRAW";
-        bigStyle.normal.textColor = outcome == Outcome.PlayerWin ? new Color(0.35f, 1f, 0.45f)
-                                  : outcome == Outcome.PlayerLoss ? new Color(1f, 0.3f, 0.25f)
-                                  : new Color(1f, 0.85f, 0.3f);
-        float H = Screen.height / UIS, W = Screen.width / UIS;
+        bigStyle.normal.textColor = accent;
         GUI.Label(new Rect(0, H * 0.15f, W, 90), title, bigStyle);
+        // (2a) medStyle is SHARED with BigLine's mid-fight toasts, which write
+        // it and used not to restore it - so the colour of the line explaining
+        // how the match ended was decided by whichever warning fired last.
+        // Set it explicitly here AND restore it in BigLine; either alone is a
+        // fix, both together mean nothing can leak in future.
+        medStyle.normal.textColor = accent;
         GUI.Label(new Rect(0, H * 0.29f, W, 40), causeLine, medStyle);
 
         int tsec = Mathf.RoundToInt(elapsed);
@@ -864,27 +969,108 @@ public class FightManager : MonoBehaviour
         // already computes every one of these numbers — a Titanium build losing
         // 0 parts where the Aluminium twin lost 3 was invisible to the player
         // because both matches printed the same one-line verdict.
-        GUI.Label(new Rect(0, H * 0.375f, W, 26), SideLine("YOU", player), smallStyle);
-        GUI.Label(new Rect(0, H * 0.415f, W, 26), SideDetail(player), smallStyle);
-        GUI.Label(new Rect(0, H * 0.465f, W, 26), SideLine(enemy.label, enemy), smallStyle);
-        GUI.Label(new Rect(0, H * 0.505f, W, 26), SideDetail(enemy), smallStyle);
-        GUI.Label(new Rect(0, H * 0.555f, W, 26),
+        GUI.Label(new Rect(0, H * 0.375f, W, 30), SideLine("YOU", player), smallStyle);
+        GUI.Label(new Rect(0, H * 0.415f, W, 30), SideDetail(player), smallStyle);
+        GUI.Label(new Rect(0, H * 0.465f, W, 30), SideLine(enemy.label, enemy), smallStyle);
+        GUI.Label(new Rect(0, H * 0.505f, W, 30), SideDetail(enemy), smallStyle);
+        GUI.Label(new Rect(0, H * 0.555f, W, 30),
             string.Format("Match time {0}:{1:00}", tsec / 60, tsec % 60), smallStyle);
-        // Phase 4: what this fight paid, and what it unlocked.
-        if (Progression.lastRewardLine.Length > 0)
-            GUI.Label(new Rect(0, H * 0.598f, W, 26), Progression.lastRewardLine, smallStyle);
+        // ---------------------------------------------------------- MONEY
+        // ROUND-3 FIX (critic CRITICAL 2b) - this was a TRUST bug, not a
+        // hierarchy one. The screen printed the gross award with a plus sign
+        // and never mentioned the entry fee, so a World Championship loss that
+        // cost the player 160 scrap net was reported to them as "+40". Show
+        // the arithmetic: purse, bonus, fee, net. A player must never be told
+        // they gained money in a match where they lost money.
+        float my = H * 0.585f;
+        if (cIsContest)
+        {
+            int net = cPay - cEntry;
+            string line1 = outcome == Outcome.PlayerWin
+                ? string.Format("PURSE {0}      BONUS {1}{2}      ENTRY FEE −{3}",
+                                cPurse, cPay - cPurse < 0 ? "−" : "+", Mathf.Abs(cPay - cPurse), cEntry)
+                : string.Format("PURSE {0} NOT WON      CONSOLATION +{1}      ENTRY FEE −{2}",
+                                cPurse, cPay, cEntry);
+            moneySmall.normal.textColor = new Color(0.72f, 0.74f, 0.80f);
+            GUI.Label(new Rect(0, my, W, 26), line1, moneySmall);
+            moneyStyle.normal.textColor = net >= 0 ? new Color(0.40f, 1f, 0.50f)
+                                                   : new Color(1f, 0.42f, 0.34f);
+            GUI.Label(new Rect(0, my + 27f, W, 36),
+                string.Format("NET {0}{1} SCRAP          BALANCE {2}",
+                              net >= 0 ? "+" : "−", Mathf.Abs(net), Career.Data.scrap),
+                moneyStyle);
+        }
+        else if (Progression.lastRewardLine.Length > 0)
+        {
+            GUI.Label(new Rect(0, my + 14f, W, 30), Progression.lastRewardLine, smallStyle);
+        }
 
-        float bw = 220f, bh = 46f, by = H * 0.645f;
+        // ------------------------------------------------------- CHAMPIONSHIP
+        // MEDALS (2026-08-02, owen). Winning a whole league campaign and being
+        // told nothing is a wasted moment, so it gets its own gold ribbon under
+        // the money block - the last thing read before the buttons.
+        //
+        // COLOUR LAW: amber (1, 0.82, 0.25) is this project's WARNING (over
+        // weight cap, SHORT inventory) and red is live damage, so gold has to
+        // hold itself apart from amber. Three things do that: it is paler and
+        // warmer (1, 0.87, 0.46), it sits inside a ribbon rather than being
+        // loose text, and it can only ever appear on a VICTORY screen, whose
+        // accent is green - the amber accent belongs to a DRAW, which by
+        // definition wins no contest and therefore no medal.
+        //
+        // Y is clamped above the button row instead of being a bare fraction:
+        // the money block is the only thing between it and the buttons, and at
+        // a short window height a literal offset would have drawn the
+        // championship underneath BACK TO WORKSHOP.
+        // The button row moves DOWN when a championship is on screen. First
+        // pass clamped the ribbon above a fixed button row instead and the two
+        // ended up 1px apart with the ribbon jammed under NET - photographed,
+        // and it read as an overlap bug rather than an award. There is a large
+        // dead band below the buttons; spend it.
+        float medalDrop = cMedal.Length > 0 ? 52f : 0f;
+        if (cMedal.Length > 0)
+        {
+            float ry = my + 72f;
+            GUI.color = new Color(1f, 0.72f, 0.18f, 0.26f);
+            GUI.DrawTexture(new Rect(W * 0.5f - 330f, ry - 4f, 660f, 40f), Texture2D.whiteTexture);
+            GUI.color = new Color(1f, 0.80f, 0.32f, 0.85f);
+            GUI.DrawTexture(new Rect(W * 0.5f - 330f, ry - 4f, 660f, 2f), Texture2D.whiteTexture);
+            GUI.DrawTexture(new Rect(W * 0.5f - 330f, ry + 34f, 660f, 2f), Texture2D.whiteTexture);
+            GUI.color = old;
+            medalStyle.normal.textColor = new Color(1f, 0.87f, 0.46f);
+            GUI.Label(new Rect(0, ry, W, 32), cMedal, medalStyle);
+        }
+
+        // -------------------------------------------------------- BUTTONS
+        // (2d) The (R)/(B) hints were shown on the touch build, where there is
+        // no keyboard. They are drawn only when the desktop keys are the real
+        // input path. BACK is first and coloured: after a contest the play is
+        // to go spend the purse or rebuild, never to rematch.
+        bool touch = MobileBuilderUI.Active;
+        float bw = 264f, bh = 54f, by = H * 0.705f + medalDrop;
         float cx = W * 0.5f;
-        if (GUI.Button(new Rect(cx - bw - 12f, by, bw, bh), "REMATCH  (R)", btnStyle))
-            bm.ResetFight();
-        if (GUI.Button(new Rect(cx + 12f, by, bw, bh), "BACK TO BUILDER  (B)", btnStyle))
-            bm.BackToBuild();
+        GUI.backgroundColor = new Color(0.30f, 0.62f, 0.88f);
+        bool back = GUI.Button(new Rect(cx - bw - 10f, by, bw, bh),
+                               touch ? "BACK TO WORKSHOP" : "BACK TO WORKSHOP  (B)", btnStyle);
+        GUI.backgroundColor = Color.white;
+        // REMATCH re-runs the same builds as an EXHIBITION: ResetFight() goes
+        // through StartFight(), not StartCareerFight(), and SettleFight() has
+        // already cleared the contest - so it charges no entry fee, pays
+        // sandbox scrap, and cannot re-win the purse. Label it as what it is.
+        bool again = GUI.Button(new Rect(cx + 10f, by, bw, bh),
+                                cIsContest ? (touch ? "REMATCH · EXHIBITION" : "REMATCH · EXHIBITION  (R)")
+                                           : (touch ? "REMATCH" : "REMATCH  (R)"), btnStyle);
+        if (back) { if (bm != null) bm.BackToBuild(); return; }
+        if (again && bm != null) bm.ResetFight();
     }
 
     string SideLine(string label, Side s)
     {
-        return string.Format("{0} — dealt {1:F0} ({2:F1}/s) · taken {3:F0} · HP {4:F0}% · parts {5}/{6} · wheels {7}/{8}",
+        // R5 (critic finding 8): "dealt 0" sat directly above the opponent's
+        // "taken 170" and the two lines flatly contradicted each other. `dealt`
+        // has always counted WEAPON damage only; `taken` includes hazards and
+        // impacts. Say which is which instead of making the player guess.
+        return string.Format("{0} — weapon dmg {1:F0} ({2:F1}/s) · total taken {3:F0} · HP {4:F0}% · parts {5}/{6} · wheels {7}/{8}",
             label, s.dealt, s.dealt / Mathf.Max(1f, elapsed), s.taken,
             s.hpFrac * 100f, s.bodyNow, s.startBody, s.wheelsNow, s.startWheels);
     }
@@ -893,7 +1079,7 @@ public class FightManager : MonoBehaviour
     {
         float span = Mathf.Max(1f, elapsed);
         var pp = s.bot != null ? s.bot.GetComponent<PowerPlant>() : null;
-        string pwr = pp == null ? "n/a"
+        string pwr = pp == null ? "none fitted"
                    : pp.Flat ? "FLAT"
                    : string.Format("{0:F0}%{1}", pp.Frac * 100f, pp.Strained ? " (straining)" : "");
         return string.Format("      seams sheared {0} · flipped {1:F0}% of the match · immobile {2:F0}% · gyros {3} · battery {4}",
@@ -904,23 +1090,56 @@ public class FightManager : MonoBehaviour
 
     void BigLine(string text, Color c, float yFrac)
     {
+        // ROUND-3 FIX (critic CRITICAL 2a): medStyle is shared with the
+        // results cause line. This used to leave whatever colour the last
+        // toast used sitting in the style, which is how "KO - enemy core
+        // destroyed" came out amber on a VICTORY screen.
+        Color keep = medStyle.normal.textColor;
         float y = Screen.height / UIS * yFrac;
         medStyle.normal.textColor = new Color(0f, 0f, 0f, 0.85f);
         GUI.Label(new Rect(3f, y + 3f, Screen.width / UIS, 60f), text, medStyle);
         medStyle.normal.textColor = c;
         GUI.Label(new Rect(0f, y, Screen.width / UIS, 60f), text, medStyle);
+        medStyle.normal.textColor = keep;
     }
 
     void EnsureStyles()
     {
         if (hudStyle != null) return;
         hudStyle = new GUIStyle(GUI.skin.label) { fontSize = 22, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
-        nameStyle = new GUIStyle(GUI.skin.label) { fontSize = 14, fontStyle = FontStyle.Bold };
+        nameStyle = new GUIStyle(GUI.skin.label) { fontSize = 18, fontStyle = FontStyle.Bold };   // R5 finding 2
         bigStyle = new GUIStyle(GUI.skin.label) { fontSize = 64, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
         medStyle = new GUIStyle(GUI.skin.label) { fontSize = 26, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter, wordWrap = true };
-        smallStyle = new GUIStyle(GUI.skin.label) { fontSize = 17, alignment = TextAnchor.MiddleCenter };
+        smallStyle = new GUIStyle(GUI.skin.label) { fontSize = 22, alignment = TextAnchor.MiddleCenter };   // R5 finding 2: the two lines that answer "why did I lose" were the smallest text on the results screen
         btnStyle = new GUIStyle(GUI.skin.button) { fontSize = 17, fontStyle = FontStyle.Bold };
-        tinyStyle = new GUIStyle(GUI.skin.label) { fontSize = 11, fontStyle = FontStyle.Bold };
+        tinyStyle = new GUIStyle(GUI.skin.label) { fontSize = 14, fontStyle = FontStyle.Bold };   // R5 finding 2
+        // Round-3: the identity and money readouts get their OWN styles, so
+        // nothing they draw shares a mutable style with the fight toasts.
+        idStyle = new GUIStyle(GUI.skin.label) { fontSize = 21, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
+        hudIdStyle = new GUIStyle(GUI.skin.label) { fontSize = 18, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };   // R5 finding 2
+        hudIdStyle.normal.textColor = new Color(1f, 0.82f, 0.32f);
+        moneyStyle = new GUIStyle(GUI.skin.label) { fontSize = 28, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
+        moneySmall = new GUIStyle(GUI.skin.label) { fontSize = 19, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
+        // Sits between moneySmall (19) and moneyStyle (28) on the existing type
+        // scale - a championship outranks the purse breakdown and is outranked
+        // by the net, which is still the number the player acts on.
+        medalStyle = new GUIStyle(GUI.skin.label) { fontSize = 24, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
+    }
+
+    /// <summary>ROUND-3 FIX (critic MAJOR 4): which fight this is, for the
+    /// fight HUD. Null for exhibitions, test drives and ladder rungs, where
+    /// there is no contest to name and the header stays as it was.</summary>
+    string ContestHudLine()
+    {
+        if (!Career.active || string.IsNullOrEmpty(Career.activeContest)) return null;
+        var lg = Career.FindLeague(Career.activeLeague);
+        var c = Career.FindContest(lg, Career.activeContest);
+        if (lg == null || c == null) return null;
+        bool re = Career.Data.doneContests.Contains(c.id);
+        int purse = Mathf.RoundToInt(c.purse * (re ? CareerDB.REENTRY_FRAC : 1f));
+        return lg.name.ToUpper() + "   ·   " + lg.arenaName.ToUpper()
+             + "   ·   PURSE " + purse + (re ? " (re-entry)" : "")
+             + (c.entryFee > 0 ? "   ·   ENTRY " + c.entryFee : "   ·   FREE ENTRY");
     }
 }
 
