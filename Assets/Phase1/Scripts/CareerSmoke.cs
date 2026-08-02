@@ -357,8 +357,21 @@ public class CareerSmoke : MonoBehaviour
         yield return null;
         int beams4 = Career.CountOf("beam", "Aluminum");
         Career.Txn(200, "c4 shop grant");
-        TapNamed("buy_beam_Aluminum"); yield return null;
-        Check(Career.CountOf("beam", "Aluminum") == beams4 + 1, "shop purchase lands in the shelf");
+        // The accordion is SINGLE-open and its state is UI state, not career
+        // state - resetting Career.Data above did not reopen anything. C1
+        // opened the bracket section to reach the REWORK row, which closed
+        // beam, and a closed section SetActive(false)s its material rows, so
+        // GameObject.Find could not see buy_beam_Aluminum and TapNamed
+        // returned false. The purchase never happened; the assertion was
+        // reporting an untouched shelf, not a broken shop.
+        int beamSec = -1;
+        for (int i = 1; i < bm.PaletteCount; i++)
+            if (bm.PartId(i) == "beam") beamSec = i;
+        TapNamed("shophead_" + beamSec); yield return null;
+        // Assert the TAP, not just its effect. A silent false here is exactly
+        // how the whole shop section stayed dead without anyone noticing.
+        bool buy4 = TapNamed("buy_beam_Aluminum"); yield return null;
+        Check(buy4 && Career.CountOf("beam", "Aluminum") == beams4 + 1, "shop purchase lands in the shelf");
 
         // drafting table: place a Tungsten beam we do not own, blueprint it,
         // then one-tap convert buys exactly the missing part
