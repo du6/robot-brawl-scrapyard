@@ -3753,7 +3753,15 @@ public class BuilderManager : MonoBehaviour
     public string StableCreate(string name)
     {
         if (!Career.active) return "Career is off.";
-        name = string.IsNullOrEmpty(name) ? "ROBOT " + (Career.Data.stable.Count + 1) : name.Trim();
+        // OWEN 2026-08-02: "we should force user to provide a name when
+        // creating a new robot". It used to invent "ROBOT 1", "ROBOT 2"... and
+        // that is how a stable fills with machines nobody can tell apart -
+        // exactly the same failure as the blueprints that all came out "DRAFT n".
+        // Enforced HERE, not only in the touch UI, because desktop IMGUI calls
+        // this too and a rule that lives in one front end is not a rule.
+        if (string.IsNullOrEmpty(name) || name.Trim().Length == 0)
+            return "Name the robot first \u2014 type a name in the box above.";
+        name = name.Trim();
         foreach (var r in Career.Data.stable) if (r.name == name) return "A robot named " + name + " already exists.";
         Career.Data.stable.Add(new CareerRobot { name = name, snapshot = SnapshotString() });
         Career.Data.activeRobot = Career.Data.stable.Count - 1;
@@ -4825,8 +4833,14 @@ public class BuilderManager : MonoBehaviour
             // ---- C4: the stable ----
             GUILayout.BeginHorizontal();
             stableNameBuf = GUILayout.TextField(stableNameBuf ?? "", GUILayout.Width(110f));   // R2: 150 left no room for NEW ROBOT
+            // Desktop half of the same gate: reads unavailable while the name
+            // box is empty, but still clickable so the click explains itself.
+            bool noName = string.IsNullOrEmpty(stableNameBuf) || stableNameBuf.Trim().Length == 0;
+            Color savedNm = GUI.color;
+            if (noName) GUI.color = new Color(0.60f, 0.60f, 0.64f);
             if (GUILayout.Button("NEW ROBOT", matStyle))
-            { string e4 = StableCreate(stableNameBuf); if (e4 != null) message = e4; stableNameBuf = ""; }
+            { string e4 = StableCreate(stableNameBuf); if (e4 != null) { message = e4; SfxSynth.Deny(); } stableNameBuf = ""; }
+            GUI.color = savedNm;
             if (GUILayout.Button("SAVE", matStyle))
             { string e4 = StableSave(); if (e4 != null) message = e4; }
             GUILayout.EndHorizontal();

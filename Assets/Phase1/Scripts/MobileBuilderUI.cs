@@ -1029,8 +1029,10 @@ public class MobileBuilderUI : MonoBehaviour
         var rh0 = row.AddComponent<HorizontalLayoutGroup>(); rh0.spacing = 4f; rh0.childForceExpandHeight = true; rh0.childForceExpandWidth = false;
         nameInput = MkInput("namein", row.transform);
         nameInput.gameObject.AddComponent<LayoutElement>().flexibleWidth = 1f;
-        MkButton("stnew", row.transform, "NEW ROBOT", 14, () => { if (bm == null) return; Feedback(bm.StableCreate(nameInput.text)); nameInput.text = ""; RefreshRobots(); })
-            .gameObject.AddComponent<LayoutElement>().minWidth = 100f;
+        nameInput.onValueChanged.AddListener(delegate { RefreshNameGates(); });
+        var newBtn = MkButton("stnew", row.transform, "NEW ROBOT", 14, () => { if (bm == null) return; Feedback(bm.StableCreate(nameInput.text)); nameInput.text = ""; RefreshRobots(); });
+        newBtn.gameObject.AddComponent<LayoutElement>().minWidth = 100f;
+        RegisterNameGated(newBtn);
         MkButton("stsave", row.transform, "SAVE", 14, () => { if (bm == null) return; Feedback(bm.StableSave()); RefreshRobots(); })
             .gameObject.AddComponent<LayoutElement>().minWidth = 60f;
         MkButton("stdraft", row.transform, "DRAFT", 14, () => { Career.devFreeBuild = !Career.devFreeBuild; RefreshRobots(); RefreshPartLabels(); RefreshHighlight(); })
@@ -1051,6 +1053,47 @@ public class MobileBuilderUI : MonoBehaviour
         AddListOverflow(scrollGO, scroll, vp);   // R2 finding 8: ROBOTS
         robotsContent = content.transform;
         RefreshRobots();
+    }
+
+    // OWEN 2026-08-02: "if the name text field is empty, disable the
+    // corresponding buttons and give user a hint when hovering or clicking the
+    // disabled buttons."
+    //
+    // Styled dead, but deliberately NOT Button.interactable = false. A truly
+    // disabled uGUI button swallows the pointer outright - no click, no hover,
+    // no EventTrigger - so it could never deliver the hint that was asked for.
+    // It stays live and refuses with a sentence, which is the same choice the
+    // FIGHT gate makes two screens over, for the same reason.
+    readonly List<Button> nameGated = new List<Button>();
+    const string NAME_HINT = "Type a name in the box on the left first.";
+    static readonly Color GATE_LIVE = new Color(0.16f, 0.18f, 0.22f, 0.96f);
+    static readonly Color GATE_DEAD = new Color(0.12f, 0.13f, 0.16f, 0.96f);
+
+    bool NameEmpty()
+    { return nameInput == null || nameInput.text == null || nameInput.text.Trim().Length == 0; }
+
+    void RegisterNameGated(Button b)
+    {
+        if (b == null) return;
+        nameGated.Add(b);
+        var trig = b.gameObject.AddComponent<EventTrigger>();
+        var en = new EventTrigger.Entry { eventID = EventTriggerType.PointerEnter };
+        en.callback.AddListener(delegate { if (NameEmpty()) Feedback(NAME_HINT); });
+        trig.triggers.Add(en);
+    }
+
+    void RefreshNameGates()
+    {
+        bool empty = NameEmpty();
+        for (int i = nameGated.Count - 1; i >= 0; i--)
+        {
+            var b = nameGated[i];
+            if (b == null) { nameGated.RemoveAt(i); continue; }   // its row was rebuilt
+            var im = b.GetComponent<Image>();
+            if (im != null) im.color = empty ? GATE_DEAD : GATE_LIVE;
+            var t = b.GetComponentInChildren<Text>();
+            if (t != null) t.color = empty ? new Color(0.44f, 0.46f, 0.50f) : Color.white;
+        }
     }
 
     void RefreshRobots()
@@ -1117,8 +1160,9 @@ public class MobileBuilderUI : MonoBehaviour
             var edb = MkButton("stedit_" + i2, row.transform, "EDIT", 13, () => { Feedback(bm.StableEdit(ri)); RefreshRobots(); RefreshPartLabels(); RefreshHighlight(); ShowTab(0); });
             edb.gameObject.AddComponent<LayoutElement>().minWidth = 56f;
             edb.GetComponent<Image>().color = new Color(0.20f,0.45f,0.65f,1f);
-            MkButton("stren_" + i2, row.transform, "RENAME", 13, () => { Feedback(bm.StableRename(ri, nameInput != null ? nameInput.text : "")); if (nameInput != null) nameInput.text = ""; RefreshRobots(); })
-                .gameObject.AddComponent<LayoutElement>().minWidth = 74f;
+            var renBtn = MkButton("stren_" + i2, row.transform, "RENAME", 13, () => { Feedback(bm.StableRename(ri, nameInput != null ? nameInput.text : "")); if (nameInput != null) nameInput.text = ""; RefreshRobots(); });
+            renBtn.gameObject.AddComponent<LayoutElement>().minWidth = 74f;
+            RegisterNameGated(renBtn);
             bool armedR = retireArmM == ri;
             var rtb = MkButton("stret_" + i2, row.transform, armedR ? "CONFIRM \u2715" : "RETIRE", 13, () => {
                 if (retireArmM == ri) { retireArmM = -1; Feedback(bm.StableRetire(ri)); RefreshRobots(); }
@@ -1159,6 +1203,9 @@ public class MobileBuilderUI : MonoBehaviour
             var bdt = bdb.GetComponentInChildren<Text>();
             if (bdt != null) bdt.color = armedB ? Color.white : new Color(1f,0.68f,0.62f,1f);
         }
+        // The RENAME buttons above were just created; style them to match the
+        // name box's current state instead of waiting for the next keystroke.
+        RefreshNameGates();
     }
 
     void BuildPartsTab()
