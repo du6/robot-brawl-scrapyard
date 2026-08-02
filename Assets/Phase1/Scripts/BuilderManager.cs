@@ -3882,7 +3882,18 @@ public class BuilderManager : MonoBehaviour
     }
     public string BlueprintSave(string name)
     {
-        name = string.IsNullOrEmpty(name) ? "DRAFT " + (Career.Data.blueprints.Count + 1) : name.Trim();
+        // OWEN 2026-08-02: "the naming requirements for 'new robot' and 'new
+        // draft' should be consistent." They sit side by side in the same row;
+        // one demanding a name while the other quietly invented "DRAFT 3" was
+        // an inconsistency you could see without reading any code.
+        //
+        // Both now require one, and this is the auto-namer that produced the
+        // DRAFT 2 / DRAFT 3 owen actually had in his stable - names that tell
+        // you nothing about which design is which. Same argument as ROBOT 1 /
+        // ROBOT 2 in StableCreate.
+        if (string.IsNullOrEmpty(name) || name.Trim().Length == 0)
+            return "Name the draft first \u2014 type a name in the box above.";
+        name = name.Trim();
         Career.Data.blueprints.Add(new CareerBlueprint { name = name, snapshot = SnapshotString() });
         // The draft you just made is the one you are now editing, so a second
         // SAVE updates it instead of making another copy.
@@ -4955,8 +4966,12 @@ public class BuilderManager : MonoBehaviour
             // Mobile uGUI and IMGUI are two separate paths and the
             // one-side-only fix is this project's signature bug.
             GUILayout.BeginHorizontal();
+            // Same gate and same dimming as NEW ROBOT above.
+            Color savedDr = GUI.color;
+            if (noName) GUI.color = new Color(0.60f, 0.60f, 0.64f);
             if (GUILayout.Button("NEW DRAFT", matStyle, GUILayout.Width(96f)))
-            { string e5 = BlueprintSave(stableNameBuf); if (e5 != null) message = e5; stableNameBuf = ""; }
+            { string e5 = BlueprintSave(stableNameBuf); if (e5 != null) { message = e5; SfxSynth.Deny(); } stableNameBuf = ""; }
+            GUI.color = savedDr;
             GUILayout.Label("blueprints \u2014 designs you do not own the parts for yet", descStyle);
             GUILayout.EndHorizontal();
             // Deletion is DEFERRED to after the loop. Removing a row mid-loop

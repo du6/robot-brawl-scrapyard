@@ -1045,8 +1045,12 @@ public class MobileBuilderUI : MonoBehaviour
         // drafting-table toggle - renamed because "DRAFT" next to "NEW DRAFT"
         // read as two flavours of the same thing when one is a mode and the
         // other makes an object.
-        MkButton("stnewbp", row.transform, "NEW DRAFT", 14, () => { if (bm == null) return; Feedback(bm.BlueprintSave(nameInput != null ? nameInput.text : "")); if (nameInput != null) nameInput.text = ""; RefreshRobots(); })
-            .gameObject.AddComponent<LayoutElement>().minWidth = 106f;
+        // OWEN 2026-08-02: gated identically to NEW ROBOT beside it. Two
+        // adjacent CREATE buttons behaving differently is the kind of
+        // inconsistency you feel before you can name it.
+        var newBpBtn = MkButton("stnewbp", row.transform, "NEW DRAFT", 14, () => { if (bm == null) return; Feedback(bm.BlueprintSave(nameInput != null ? nameInput.text : "")); if (nameInput != null) nameInput.text = ""; RefreshRobots(); });
+        newBpBtn.gameObject.AddComponent<LayoutElement>().minWidth = 106f;
+        RegisterNameGated(newBpBtn);
         // OWEN 2026-08-02: the DRAFT MODE toggle is gone. Drafting is derived
         // from whether a design is open, so NEW DRAFT / OPEN are the way in and
         // NEW ROBOT / EDIT / CONVERT are the ways out - there is no longer a
