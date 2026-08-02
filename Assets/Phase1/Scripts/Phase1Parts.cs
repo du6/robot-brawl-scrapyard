@@ -118,8 +118,46 @@ public class P1PartDef
     {
         return new[]
         {
+            // OWEN 2026-08-02: "should core only have one material?" - yes.
+            //
+            // The core's material was the strongest single lever in the game
+            // and the least legible one. MEASURED across the six materials:
+            //   mat           kg    coreHP   seamCap(N.s)   career price
+            //   ABS           28      57         525            0
+            //   CarbonFiber   43     178        1650            0
+            //   Aluminum      73      97         900            0
+            //   Titanium     122     227        2100            0
+            //   Steel        212     162        1500            0
+            //   Tungsten     521     194        1800            0
+            //
+            // Two reasons that is too much power for one picker click:
+            //  1. It is a 4x swing on the HP of the ONE part you cannot afford
+            //     to lose - the KO target.
+            //  2. A seam breaks at the WEAKER of its two parts (CompoundRobot:
+            //     min(strengthRel) x BREAK_K), so the core also CAPPED every
+            //     joint touching it. An ABS core held every core seam to
+            //     525 N.s no matter what was bolted to it; Titanium raised the
+            //     same seams to 2100. That is a whole-machine structural
+            //     decision hidden inside one part's material.
+            //
+            // And in career it was not even a trade: CareerDB.PartPrice returns
+            // 0 for the core in EVERY material, and BuildValueCareer sums those
+            // same prices - so a Titanium core cost nothing AND made the build
+            // read as poorer, which inflated the underdog payout. Meanwhile
+            // Aluminium, the DEFAULT, is strictly dominated by CarbonFiber on
+            // weight, HP and seam strength simultaneously. The only correct
+            // play was to switch off the default immediately, for free, and
+            // nothing in the UI said so.
+            //
+            // Pinning is one flag. PlacedPart.MatName() resolves through
+            // EffectiveMat, so the builder picker, the shop shelf, the snapshot
+            // loader, the arena spawn and EnemyRoster's recipes all follow from
+            // this line - there is no second place to keep in sync. The armour
+            // decision now lives where it is legible and priced: plates,
+            // chassis blocks and the frame material.
             new P1PartDef { id = "core",    label = "Core (controller)", category = P1Category.Control,    size = new Vector3(0.30f, 0.30f, 0.30f),
-                            desc = "The robot's brain and KO target. Lose it, lose the fight." },
+                            materialChoice = false,
+                            desc = "The robot's brain and KO target. Lose it, lose the fight. Always aluminium - protect it with armour plate and frame, not by rebuilding it." },
             new P1PartDef { id = "beam",    label = "Beam",              category = P1Category.Structural, size = new Vector3(0.20f, 0.20f, 0.60f),
                             desc = "Structural spar. Extends the chassis and gives wheels somewhere to mount. R rotates it." },
             new P1PartDef { id = "beamlong", label = "Long beam",        category = P1Category.Structural, size = new Vector3(0.20f, 0.20f, 1.00f),
