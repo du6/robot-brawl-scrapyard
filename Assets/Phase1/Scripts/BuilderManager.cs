@@ -336,6 +336,8 @@ public class BuilderManager : MonoBehaviour
     /// <summary>C4: desktop stable UI buffers.</summary>
     string stableNameBuf = "";
     int retireArm = -1;
+    /// <summary>Blueprint index armed for deletion (arm-then-confirm).</summary>
+    int bpDelArm = -1;
 
     // Round-1 combat fixes: builder-click grace after any full-screen UI /
     // mode transition (results buttons must never leak a placement click into
@@ -3743,6 +3745,24 @@ public class BuilderManager : MonoBehaviour
         message = "Blueprint " + name + " saved.";
         return null;
     }
+    /// <summary>OWEN 2026-08-02: "How do I delete drafts" - you could not.
+    /// BlueprintSave and BlueprintEdit shipped without a counterpart, so the
+    /// list could only ever grow: every SAVE BP with an empty name box added
+    /// another "DRAFT n" and nothing in the game could remove it. Stable robots
+    /// had RETIRE from the start; blueprints had nothing, which is the same
+    /// asymmetry in miniature as the one the FIGHT gate fixed this morning.
+    ///
+    /// Mirrors StableRetire exactly, including the arm-then-confirm both UIs
+    /// wrap it in: deleting a design is not undoable and must not be a mis-tap.</summary>
+    public string BlueprintDelete(int i)
+    {
+        if (!Career.active) return "Career is off.";
+        if (i < 0 || i >= Career.Data.blueprints.Count) return "No such blueprint.";
+        message = "Blueprint " + Career.Data.blueprints[i].name + " deleted.";
+        Career.Data.blueprints.RemoveAt(i);
+        if (Career.autosave) Career.Save();
+        return null;
+    }
     public string BlueprintEdit(int i)
     {
         if (i < 0 || i >= Career.Data.blueprints.Count) return "No such blueprint.";
@@ -4745,6 +4765,41 @@ public class BuilderManager : MonoBehaviour
             if (Career.devFreeBuild && GUILayout.Button("CONVERT \u2014 " + ConvertQuote() + " scrap", matStyle))
             { string e4 = ConvertDraft(); if (e4 != null) { message = e4; SfxSynth.Deny(); } }
             GUILayout.EndHorizontal();
+            // ---- blueprints (OWEN 2026-08-02) ----------------------------
+            // Desktop could not even SEE a blueprint. BlueprintSave/Edit
+            // existed but ONLY MobileBuilderUI called them, so IMGUI showed the
+            // Drafting Table toggle and a CONVERT quote with nothing to apply
+            // them to, and a design saved on the touch UI was invisible here.
+            // Mobile uGUI and IMGUI are two separate paths and the
+            // one-side-only fix is this project's signature bug.
+            GUILayout.BeginHorizontal();
+            if (GUILayout.Button("SAVE BP", matStyle, GUILayout.Width(80f)))
+            { string e5 = BlueprintSave(stableNameBuf); if (e5 != null) message = e5; stableNameBuf = ""; }
+            GUILayout.Label("blueprints \u2014 designs you do not own the parts for yet", descStyle);
+            GUILayout.EndHorizontal();
+            // Deletion is DEFERRED to after the loop. Removing a row mid-loop
+            // changes the control count between the Layout and Repaint passes
+            // of the same OnGUI, which is exactly what throws "GUILayout:
+            // Mismatched LayoutGroup".
+            int bpKill = -1;
+            for (int bi = 0; bi < Career.Data.blueprints.Count; bi++)
+            {
+                var bpd = Career.Data.blueprints[bi];
+                GUILayout.BeginHorizontal();
+                GUILayout.Label("\u270e " + bpd.name, descStyle);
+                if (GUILayout.Button("draft it", matStyle, GUILayout.Width(66f))) BlueprintEdit(bi);
+                bool armedB = bpDelArm == bi;
+                Color savedBp = GUI.color;
+                if (armedB) GUI.color = new Color(1f, 0.55f, 0.45f);
+                if (GUILayout.Button(armedB ? "confirm \u2715" : "delete", matStyle, GUILayout.Width(72f)))
+                {
+                    if (armedB) { bpDelArm = -1; bpKill = bi; }
+                    else { bpDelArm = bi; message = "Delete blueprint " + bpd.name + "? Click delete again \u2014 this cannot be undone."; }
+                }
+                GUI.color = savedBp;
+                GUILayout.EndHorizontal();
+            }
+            if (bpKill >= 0) { string e5 = BlueprintDelete(bpKill); if (e5 != null) message = e5; }
             for (int li = 0; li < CareerDB.Leagues.Length; li++)
             {
                 var clg2 = CareerDB.Leagues[li];

@@ -64,6 +64,7 @@ public class MobileBuilderUI : MonoBehaviour
     GameObject trophyPanel; Transform trophyContent; Text trophyHeader;
     InputField nameInput;
     int retireArmM = -1;
+    int bpDelArmM = -1;   // OWEN: blueprint armed for deletion
     readonly List<Button> partButtons = new List<Button>();
     readonly List<Button> matButtons = new List<Button>();
     readonly List<string> matKeys = new List<string>();
@@ -1105,6 +1106,19 @@ public class MobileBuilderUI : MonoBehaviour
             lbl.gameObject.AddComponent<LayoutElement>().flexibleWidth = 1f;
             MkButton("bpedit_" + i3, row.transform, "DRAFT IT", 13, () => { Feedback(bm.BlueprintEdit(bi)); RefreshRobots(); RefreshPartLabels(); RefreshHighlight(); })
                 .gameObject.AddComponent<LayoutElement>().minWidth = 86f;
+            // OWEN 2026-08-02: "How do I delete drafts". Same arm-then-confirm
+            // as RETIRE one loop up, and styled the same destructive red, so
+            // the only two irreversible actions on this tab look and behave
+            // alike instead of one of them simply not existing.
+            bool armedB = bpDelArmM == i3;
+            var bdb = MkButton("bpdel_" + i3, row.transform, armedB ? "CONFIRM \u2715" : "DELETE", 13, () => {
+                if (bpDelArmM == bi) { bpDelArmM = -1; Feedback(bm.BlueprintDelete(bi)); RefreshRobots(); }
+                else { bpDelArmM = bi; Feedback("Delete blueprint " + bp.name + "? This cannot be undone \u2014 tap CONFIRM."); RefreshRobots(); }
+            });
+            bdb.gameObject.AddComponent<LayoutElement>().minWidth = 86f;
+            bdb.GetComponent<Image>().color = armedB ? new Color(0.78f,0.18f,0.13f,1f) : new Color(0.34f,0.13f,0.12f,1f);
+            var bdt = bdb.GetComponentInChildren<Text>();
+            if (bdt != null) bdt.color = armedB ? Color.white : new Color(1f,0.68f,0.62f,1f);
         }
     }
 
