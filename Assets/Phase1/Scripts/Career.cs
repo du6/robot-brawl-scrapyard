@@ -230,7 +230,36 @@ public static class CareerDB
 /// old unrestricted boot for TouchSmoke/AimProbe/critic runs.</summary>
 public static class Career
 {
+    /// <summary>HARNESS OVERRIDE ONLY. CareerBench and MedalDev force unlimited
+    /// parts for a whole run; nothing the player can touch sets this any more.
+    /// Read `Drafting`, not this.</summary>
     public static bool devFreeBuild;
+
+    /// <summary>OWEN 2026-08-02: "given that there is a 'new robot' and 'new
+    /// draft' buttons, should we remove the 'draft mode' button?" - yes, and
+    /// the reason is that the toggle was the ONLY thing that could decouple two
+    /// ideas the rest of the game keeps in lockstep: WHAT you are editing (a
+    /// machine or a design) and WHETHER parts are unlimited.
+    ///
+    /// Both states it uniquely reached were bugs:
+    ///   draft ON  + editing a robot     -> a fieldable machine silently
+    ///       accepting parts you do not own. This is how a stable filled with
+    ///       robots that refuse at the LEAGUE tab.
+    ///   draft OFF + editing a blueprint -> editing a design without the parts
+    ///       that make it one.
+    ///
+    /// So the mode is now DERIVED and cannot drift: you are drafting exactly
+    /// when a design is open. NEW DRAFT and OPEN put you there, NEW ROBOT and
+    /// EDIT take you out, CONVERT buys the difference.</summary>
+    public static bool Drafting
+    {
+        get
+        {
+            if (devFreeBuild) return true;                 // harness override
+            if (!active || Data == null) return false;
+            return Data.activeBlueprint >= 0 && Data.activeBlueprint < Data.blueprints.Count;
+        }
+    }
         /// <summary>C1: the builder consults the career inventory only when
         /// this is on. Off = today's sandbox behaviour, untouched.</summary>
         public static bool active;

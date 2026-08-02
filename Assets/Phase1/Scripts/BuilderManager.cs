@@ -2414,7 +2414,7 @@ public class BuilderManager : MonoBehaviour
     /// -1 = unlimited (career off, dev free-build, or the core).</summary>
     public int CareerRemaining(int i)
     {
-        if (!Career.active || Career.devFreeBuild) return -1;
+        if (!Career.active || Career.Drafting) return -1;
         if (i <= 0 || i >= PaletteCount) return -1;
         var d = palette[i];
         string mat = d.EffectiveMat(activeMat);
@@ -2442,7 +2442,7 @@ public class BuilderManager : MonoBehaviour
     public bool CareerAllows(int i) { int r = CareerRemaining(i); return r == -1 || r > 0; }
     bool CareerAllowsMat(PlacedPart pp, string newMat)
     {
-        if (!Career.active || Career.devFreeBuild) return true;
+        if (!Career.active || Career.Drafting) return true;
         if (placed.Count > 0 && pp == placed[0]) return true;
         return Career.CountOf(pp.def.id, newMat) - CareerUsed(pp.def.id, newMat) > 0;
     }
@@ -2451,7 +2451,7 @@ public class BuilderManager : MonoBehaviour
     public List<string> CareerShortfall()
     {
         var lack = new List<string>();
-        if (!Career.active || Career.devFreeBuild) return lack;
+        if (!Career.active || Career.Drafting) return lack;
         var seen = new List<string>();
         for (int k = 1; k < placed.Count; k++)
         {
@@ -2471,7 +2471,7 @@ public class BuilderManager : MonoBehaviour
     /// keeping a robot they already own.</summary>
     string PoolWarning()
     {
-        if (!Career.active || Career.devFreeBuild) return "";
+        if (!Career.active || Career.Drafting) return "";
         var lack = CareerShortfall();
         if (lack.Count == 0) return "";
         return "  \u26a0 The stable is over the parts pool: " + string.Join(", ", lack.ToArray())
@@ -2528,7 +2528,7 @@ public class BuilderManager : MonoBehaviour
     /// this per material now that every material is on screen at once.</summary>
     public int CareerRemainingMat(int i, string mat)
     {
-        if (!Career.active || Career.devFreeBuild) return -1;
+        if (!Career.active || Career.Drafting) return -1;
         if (i <= 0 || i >= PaletteCount) return -1;
         var d = palette[i];
         int rem = Career.CountOf(d.id, mat) - CareerUsed(d.id, mat);
@@ -2649,7 +2649,7 @@ public class BuilderManager : MonoBehaviour
         // whole inventory system exists to prevent. A UI that asserts a rule
         // the code does not implement is worse than no rule; the claim is now
         // true, and it is stated on the row that refuses.
-        if (Career.devFreeBuild)
+        if (Career.Drafting)
         {
             shortTag = "draft \u2014 CONVERT to enroll";
             return "This is a DRAFT \u2014 parts are unlimited, so it cannot be entered. "
@@ -3753,6 +3753,13 @@ public class BuilderManager : MonoBehaviour
     public string StableCreate(string name)
     {
         if (!Career.active) return "Career is off.";
+        // OWEN 2026-08-02: founding a MACHINE out of a DESIGN is the category
+        // error that fills a stable with robots that refuse at the LEAGUE tab -
+        // they look real, carry a 0-0 record, and only fail once you are trying
+        // to enter a contest. A stable robot is a machine you own.
+        if (Career.Drafting)
+            return "You are editing a draft \u2014 CONVERT to buy the missing parts first, "
+                 + "then found it as a robot.";
         // OWEN 2026-08-02: "we should force user to provide a name when
         // creating a new robot". It used to invent "ROBOT 1", "ROBOT 2"... and
         // that is how a stable fills with machines nobody can tell apart -
@@ -3849,8 +3856,7 @@ public class BuilderManager : MonoBehaviour
     {
         if (i < 0 || i >= Career.Data.stable.Count) return "No such robot.";
         Career.Data.activeRobot = i;
-        Career.Data.activeBlueprint = -1;   // a machine is open, not a design
-        Career.devFreeBuild = false;
+        Career.Data.activeBlueprint = -1;   // a machine is open, so not drafting
         LoadSnapshot(Career.Data.stable[i].snapshot);
         if (Career.autosave) Career.Save();
         return null;
@@ -3911,7 +3917,7 @@ public class BuilderManager : MonoBehaviour
     public string BlueprintEdit(int i)
     {
         if (i < 0 || i >= Career.Data.blueprints.Count) return "No such blueprint.";
-        Career.devFreeBuild = true;   // the Drafting Table: everything unlocked
+        // No flag to set any more - opening a design IS drafting.
         Career.Data.activeBlueprint = i;
         Career.Data.activeRobot = -1;
         LoadSnapshot(Career.Data.blueprints[i].snapshot);
@@ -4673,7 +4679,7 @@ public class BuilderManager : MonoBehaviour
     void ModeBanner()
     {
         bool dev = !Career.active;
-        bool draft = Career.active && Career.devFreeBuild;
+        bool draft = Career.active && Career.Drafting;
         bannerNow = dev ? "dev" : draft ? "draft" : "";
         if (!dev && !draft) return;
         // OWEN 2026-08-02: "The draft banner overlaps with other text."
@@ -4934,9 +4940,11 @@ public class BuilderManager : MonoBehaviour
                 GUILayout.EndHorizontal();
             }
             GUILayout.BeginHorizontal();
-            if (GUILayout.Button(Career.devFreeBuild ? "\u25c9 DRAFT MODE \u2014 everything unlocked" : "\u25cb Drafting Table", matStyle))
-                Career.devFreeBuild = !Career.devFreeBuild;
-            if (Career.devFreeBuild && GUILayout.Button("CONVERT \u2014 " + ConvertQuote() + " scrap", matStyle))
+            // The Drafting Table toggle is gone: drafting is now derived from
+            // whether a design is open (Career.Drafting), so there is no
+            // independent switch that could contradict it.
+            if (Career.Drafting) GUILayout.Label("DRAFTING \u2014 parts unlimited, cannot enrol", descStyle);
+            if (Career.Drafting && GUILayout.Button("CONVERT \u2014 " + ConvertQuote() + " scrap", matStyle))
             { string e4 = ConvertDraft(); if (e4 != null) { message = e4; SfxSynth.Deny(); } }
             GUILayout.EndHorizontal();
             // ---- blueprints (OWEN 2026-08-02) ----------------------------

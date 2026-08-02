@@ -317,7 +317,11 @@ public class CareerSmoke : MonoBehaviour
         Check(Career.Data.stable.Count == 1 && Career.Data.stable[0].name == "VICE GRIP"
               && Career.Data.activeRobot == 0 && Career.Data.tutorialStep == 1,
               "NEW ROBOT founds VICE GRIP, makes it active, onboarding -> step 1");
-        TapNamed("stsave"); yield return null;
+        // OWEN 2026-08-02: SAVE moved off ROBOTS onto the build bar, where the
+        // work happens, so the harness has to go where the player now goes.
+        Tap("BUILD"); yield return null;
+        TapNamed("bsave"); yield return null;
+        Tap("ROBOTS"); yield return null;
         Check(Career.Data.stable[0].snapshot.Length > 0 && Career.Data.tutorialStep == 2,
               "SAVE stores the fight-legal build, onboarding -> step 2");
 
@@ -344,9 +348,14 @@ public class CareerSmoke : MonoBehaviour
 
         // drafting table: place a Tungsten beam we do not own, blueprint it,
         // then one-tap convert buys exactly the missing part
+        // OWEN 2026-08-02: the stdraft toggle no longer exists - drafting is
+        // derived from having a design open, so NEW DRAFT is the way in.
         Tap("ROBOTS"); yield return null;
-        TapNamed("stdraft"); yield return null;
-        Check(Career.devFreeBuild, "drafting table unlocks everything");
+        if (nameGO != null) nameGO.GetComponent<InputField>().text = "DREAM MACHINE";
+        TapNamed("stnewbp"); yield return null;
+        Check(Career.Data.blueprints.Count == 1 && Career.Data.blueprints[0].name == "DREAM MACHINE",
+              "NEW DRAFT saves the design and opens it");
+        Check(Career.Drafting, "editing a design unlocks everything");
         Check(BuilderManager.bannerNow == "draft",
               "C6.5: DRAFT banner up while drafting (" + BuilderManager.bannerNow + ")");
         Tap("BUILD"); yield return null;
@@ -375,16 +384,19 @@ public class CareerSmoke : MonoBehaviour
         bm.SelectPart(bm.SelectedPart); yield return null;
         Check(bm.PlacedCount == np4 + 1 && Career.CountOf("beam", "Tungsten") == 0,
               "draft mode places an unowned Tungsten beam");
+        // The build bar's SAVE writes back into the OPEN design. Saving twice
+        // must update it, not append a second copy - that was the whole reason
+        // activeBlueprint exists.
+        TapNamed("bsave"); yield return null;
+        TapNamed("bsave"); yield return null;
+        Check(Career.Data.blueprints.Count == 1,
+              "SAVE updates the open draft instead of duplicating it");
         Tap("ROBOTS"); yield return null;
-        if (nameGO != null) nameGO.GetComponent<InputField>().text = "DREAM MACHINE";
-        TapNamed("bpsave"); yield return null;
-        Check(Career.Data.blueprints.Count == 1 && Career.Data.blueprints[0].name == "DREAM MACHINE",
-              "blueprint saved from the drafting table");
         int quote4 = bm.ConvertQuote();
         Career.Txn(3000, "c4 convert grant");
         int s5 = Career.Data.scrap;
         TapNamed("bpconv"); yield return null;
-        Check(!Career.devFreeBuild && Career.CountOf("beam", "Tungsten") == 1
+        Check(!Career.Drafting && Career.CountOf("beam", "Tungsten") == 1
               && Career.Data.scrap == s5 - quote4 && bm.CareerShortfallItems().Count == 0,
               "CONVERT buys exactly the missing parts and leaves draft mode");
 

@@ -1040,8 +1040,10 @@ public class MobileBuilderUI : MonoBehaviour
         // other makes an object.
         MkButton("stnewbp", row.transform, "NEW DRAFT", 14, () => { if (bm == null) return; Feedback(bm.BlueprintSave(nameInput != null ? nameInput.text : "")); if (nameInput != null) nameInput.text = ""; RefreshRobots(); })
             .gameObject.AddComponent<LayoutElement>().minWidth = 106f;
-        MkButton("stdraft", row.transform, "DRAFT MODE", 14, () => { Career.devFreeBuild = !Career.devFreeBuild; RefreshRobots(); RefreshPartLabels(); RefreshHighlight(); })
-            .gameObject.AddComponent<LayoutElement>().minWidth = 112f;
+        // OWEN 2026-08-02: the DRAFT MODE toggle is gone. Drafting is derived
+        // from whether a design is open, so NEW DRAFT / OPEN are the way in and
+        // NEW ROBOT / EDIT / CONVERT are the ways out - there is no longer a
+        // switch that can disagree with what you are actually editing.
         var scrollGO = MkPanel("stscroll", robotsPanel.transform, new Color(0f,0f,0f,0f));
         var sle = scrollGO.AddComponent<LayoutElement>(); sle.flexibleHeight = 1f; sle.minHeight = 80f;
         var scroll = scrollGO.AddComponent<ScrollRect>(); scroll.horizontal = false; scroll.vertical = true;
@@ -1110,7 +1112,7 @@ public class MobileBuilderUI : MonoBehaviour
         // "tipskip" button) but left this one behind, so a new career drew TWO
         // identical SKIP TIPS buttons six rows apart on the ROBOTS tab. One
         // button, one place.
-        if (Career.Data.stable.Count == 0 && Career.Data.blueprints.Count == 0 && !Career.devFreeBuild)
+        if (Career.Data.stable.Count == 0 && Career.Data.blueprints.Count == 0 && !Career.Drafting)
         {
             // R2 critic: a new player's ROBOTS tab was an input row over a void.
             var erow = MkPanel("emptyrow", robotsContent, new Color(0f,0f,0f,0f));
@@ -1119,7 +1121,7 @@ public class MobileBuilderUI : MonoBehaviour
             et.color = new Color(0.65f, 0.75f, 0.9f);
             var ert = et.rectTransform; ert.anchorMin = Vector2.zero; ert.anchorMax = Vector2.one; ert.offsetMin = new Vector2(8f, 0f); ert.offsetMax = Vector2.zero;
         }
-        if (Career.devFreeBuild)
+        if (Career.Drafting)
         {
             var drow = MkPanel("draftrow", robotsContent, new Color(0.25f,0.16f,0.05f,0.9f));
             var dle = drow.AddComponent<LayoutElement>(); dle.minHeight = 34f; dle.preferredHeight = 34f;
@@ -1790,7 +1792,7 @@ public class MobileBuilderUI : MonoBehaviour
         // has to answer "which mode am I in", on every tab, without wrapping
         // the status line.
         if (!Career.active) return "DEV SANDBOX  \u00b7  ";
-        if (Career.devFreeBuild) return "DRAFT  \u00b7  ";
+        if (Career.Drafting) return "DRAFT  \u00b7  ";
         return "";
     }
 
