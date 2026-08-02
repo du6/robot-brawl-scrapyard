@@ -335,6 +335,16 @@ public class MobileBuilderUI : MonoBehaviour
         MkButton("undo", actRow.transform, "UNDO", 17, () => Phase0Input.DebugUndo());
         removeBtn = MkButton("del", actRow.transform, "REMOVE", 17, () => { removeArmed = !removeArmed; if (removeArmed && bm != null && bm.HasSelection) bm.SelectPart(bm.SelectedPart); RefreshRemoveBtn(); });
         MkButton("desel", actRow.transform, "DONE", 17, () => { if (bm != null && bm.HasSelection) bm.SelectPart(bm.SelectedPart); Phase0Input.debugPointer = false; RefreshHighlight(); });
+        // OWEN 2026-08-02: SAVE belongs where the work happens. DONE, one slot
+        // to the left, only puts down the held part - it was never a commit,
+        // and its name invited exactly that reading. The commit now sits beside
+        // it instead of two tab-taps away on ROBOTS.
+        saveBtn = MkButton("bsave", actRow.transform, "SAVE", 17, () => {
+            if (bm == null) return;
+            Feedback(bm.StableSave());
+            RefreshRobots();
+            PumpDirty(true);
+        });
         // parts scroll (middle)
         var scrollGO = MkPanel("partscroll", buildPanel.transform, new Color(0f,0f,0f,0.0f));
         var sr = scrollGO.GetComponent<RectTransform>();
@@ -1101,7 +1111,10 @@ public class MobileBuilderUI : MonoBehaviour
             // exactly like the primary one. EDIT reads primary; RETIRE reads
             // destructive and states its own confirm on the button face instead
             // of only in a message bar the player may not be looking at.
-            var edb = MkButton("stedit_" + i2, row.transform, "EDIT", 13, () => { Feedback(bm.StableEdit(ri)); RefreshRobots(); RefreshPartLabels(); RefreshHighlight(); });
+            // OWEN 2026-08-02: EDIT already loaded the machine and made it
+            // active - it just left you standing on ROBOTS to go find the tools
+            // yourself. Loading a robot IS the intent to work on it.
+            var edb = MkButton("stedit_" + i2, row.transform, "EDIT", 13, () => { Feedback(bm.StableEdit(ri)); RefreshRobots(); RefreshPartLabels(); RefreshHighlight(); ShowTab(0); });
             edb.gameObject.AddComponent<LayoutElement>().minWidth = 56f;
             edb.GetComponent<Image>().color = new Color(0.20f,0.45f,0.65f,1f);
             MkButton("stren_" + i2, row.transform, "RENAME", 13, () => { Feedback(bm.StableRename(ri, nameInput != null ? nameInput.text : "")); if (nameInput != null) nameInput.text = ""; RefreshRobots(); })
@@ -1438,6 +1451,7 @@ public class MobileBuilderUI : MonoBehaviour
             // the status below is rebuilt every frame no matter what they do.
             PumpMessage(bm.LastMessage);
             PumpFightGates();   // OWEN: the contest rows answer before the tap
+            PumpDirty(false);   // OWEN: does the active robot owe a save?
             PumpTip();          // R4 finding 4: onboarding is a THIRD channel
             {
             statsText.color = Color.white;
@@ -1448,7 +1462,10 @@ public class MobileBuilderUI : MonoBehaviour
             if (Career.active)
             {
                 string rn = bm.ActiveRobotName();
-                if (rn != null) statsText.text = "[" + rn + "]  " + statsText.text;
+                // The dot is the whole point of an explicit SAVE: without it
+                // you cannot tell a saved robot from an unsaved one, and the
+                // button becomes something you tap superstitiously.
+                if (rn != null) statsText.text = "[" + rn + (buildDirty ? " \u25cf" : "") + "]  " + statsText.text;
                 var tlg = CareerDB.Leagues[Mathf.Clamp(Career.targetLeagueIdx, 0, CareerDB.Leagues.Length - 1)];
                 bool over = bm.BuildMassInt > tlg.weightCap;
                 statsText.text += string.Format("  \u00b7  {0}/{1} kg {2}{3}",
@@ -1678,6 +1695,30 @@ public class MobileBuilderUI : MonoBehaviour
     float fightGateAt = -99f;
     static readonly Color FIGHT_OK   = new Color(0.40f, 0.22f, 0.09f, 1f);
     static readonly Color FIGHT_DEAD = new Color(0.19f, 0.19f, 0.21f, 1f);
+
+    // OWEN 2026-08-02: recomputed on a timer, not per frame - ActiveRobotDirty
+    // builds a full snapshot string to compare, which is fine four times a
+    // second and wasteful sixty.
+    Button saveBtn;
+    bool buildDirty;
+    float dirtyAt = -99f;
+    static readonly Color SAVE_DIRTY = new Color(0.20f, 0.45f, 0.65f, 1f);
+    static readonly Color SAVE_CLEAN = new Color(0.16f, 0.18f, 0.22f, 0.96f);
+
+    void PumpDirty(bool force)
+    {
+        if (bm == null) return;
+        if (!force && Time.unscaledTime - dirtyAt < 0.25f) return;
+        dirtyAt = Time.unscaledTime;
+        buildDirty = bm.ActiveRobotDirty();
+        if (saveBtn != null)
+        {
+            var im = saveBtn.GetComponent<Image>();
+            if (im != null) im.color = buildDirty ? SAVE_DIRTY : SAVE_CLEAN;
+            var t = saveBtn.GetComponentInChildren<Text>();
+            if (t != null) t.color = buildDirty ? Color.white : new Color(0.62f, 0.64f, 0.68f);
+        }
+    }
 
     void PumpFightGates()
     {

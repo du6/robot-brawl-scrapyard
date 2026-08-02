@@ -3747,6 +3747,22 @@ public class BuilderManager : MonoBehaviour
         message = name + " founded \u2014 it holds the current build. SAVE keeps it current." + PoolWarning();
         return null;
     }
+    /// <summary>OWEN 2026-08-02: "The UI of saving/loading robot is not very
+    /// intuitive." True, and the reason is that the OBJECT you are editing and
+    /// the TOOLS that edit it lived on different tabs: ROBOTS -> EDIT -> find
+    /// BUILD -> work -> find ROBOTS -> SAVE. Five moves for one edit.
+    ///
+    /// This is the state the build screen was missing to close that loop. It
+    /// already knew WHICH robot was being edited (the header prints its name);
+    /// it just could not tell you whether you owed it a save.</summary>
+    public bool ActiveRobotDirty()
+    {
+        if (!Career.active) return false;
+        int a = Career.Data.activeRobot;
+        if (a < 0 || a >= Career.Data.stable.Count) return false;
+        return Career.Data.stable[a].snapshot != SnapshotString();
+    }
+
     public string StableSave()
     {
         int a = Career.Data.activeRobot;
