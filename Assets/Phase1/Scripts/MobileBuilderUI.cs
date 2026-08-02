@@ -836,13 +836,20 @@ public class MobileBuilderUI : MonoBehaviour
                 var mle = lbl.gameObject.AddComponent<LayoutElement>();
                 mle.preferredWidth = 400f; mle.minWidth = 400f; mle.flexibleWidth = 0f;
                 var mr = new ShopMatRow(); mr.part = i; mr.mat = mat; mr.go = row; mr.lbl = lbl;
-                mr.buy = MkButton("buy", row.transform, "BUY", 13, () => ShopBuy(idx, mat));
+                // OWEN 2026-08-02: named by CONTENT, not position. These were
+                // "buy"/"sell"/"swap" on every row, so a harness could only
+                // reach the first one; CareerSmoke's shop section had been dead
+                // since the per-material catalog landed and nobody noticed
+                // because the names it used ("shopbuy_1") simply found nothing.
+                // partId rather than palette index, so a reordered palette does
+                // not silently retarget the test.
+                mr.buy = MkButton("buy_" + bm.PartId(i) + "_" + mat, row.transform, "BUY", 13, () => ShopBuy(idx, mat));
                 mr.buy.gameObject.AddComponent<LayoutElement>().minWidth = 62f;
                 mr.buyT = mr.buy.GetComponentInChildren<Text>();
-                mr.sell = MkButton("sell", row.transform, "SELL", 13, () => ShopSell(idx, mat));
+                mr.sell = MkButton("sell_" + bm.PartId(i) + "_" + mat, row.transform, "SELL", 13, () => ShopSell(idx, mat));
                 mr.sell.gameObject.AddComponent<LayoutElement>().minWidth = 78f;
                 mr.sellT = mr.sell.GetComponentInChildren<Text>();
-                mr.swap = MkButton("swap", row.transform, "REWORK", 13, () => ShopSwap(idx, mat));
+                mr.swap = MkButton("swap_" + bm.PartId(i) + "_" + mat, row.transform, "REWORK", 13, () => ShopSwap(idx, mat));
                 mr.swap.gameObject.AddComponent<LayoutElement>().minWidth = 104f;
                 mr.swapT = mr.swap.GetComponentInChildren<Text>();
                 shopMats.Add(mr);

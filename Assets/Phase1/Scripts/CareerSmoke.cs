@@ -94,24 +94,33 @@ public class CareerSmoke : MonoBehaviour
         int beamP = CareerDB.PartPrice("beam", "Aluminum");
         int sellP = CareerDB.SellPrice("beam", "Aluminum");
         int s0 = Career.Data.scrap;
-        TapNamed("shopbuy_1"); yield return null;
+        // OWEN 2026-08-02: addressed by part+material now. The old
+        // "shopbuy_1" was a palette-index name that stopped existing when the
+        // shop became one row per part PER MATERIAL; TapNamed returned false
+        // and every assertion below it had been failing silently since.
+        Check(TapNamed("buy_beam_Aluminum"), "shop rows are reachable by part+material");
+        yield return null;
         exp -= beamP;
         Check(Career.Data.scrap == s0 - beamP && Career.CountOf("beam", "Aluminum") == 2,
               "buy: scrap -price, owned +1");
+        // The tile prints REMAINING stock ("2 free"), not a xN owned badge -
+        // it changed when the palette started showing what is still spare
+        // rather than what is owned. The assertion follows the UI, and the
+        // thing under test is unchanged: buying updates the palette.
         var beamTile = Btn("Beam");
-        Check(beamTile != null && beamTile.GetComponentInChildren<Text>().text.Contains("\u00d72"),
-              "buy: part tile badge follows to \u00d72");
+        Check(beamTile != null && beamTile.GetComponentInChildren<Text>().text.Contains("2 free"),
+              "buy: part tile stock badge follows to 2 free");
 
         // deliberately broke (drain THROUGH the ledger so the audit holds)
         int drain = Career.Data.scrap - 3;
         Career.Txn(-drain, "test drain"); exp -= drain;
         int s1 = Career.Data.scrap;
-        TapNamed("shopbuy_1"); yield return null;
+        TapNamed("buy_beam_Aluminum"); yield return null;
         Check(Career.Data.scrap == s1 && Career.CountOf("beam", "Aluminum") == 2
               && Career.shopMsg.Contains("Not enough"),
               "insufficient funds: refused with the amber message, nothing changes");
 
-        TapNamed("shopsell_1"); yield return null;
+        TapNamed("sell_beam_Aluminum"); yield return null;
         exp += sellP;
         Check(Career.CountOf("beam", "Aluminum") == 1 && Career.Data.scrap == s1 + sellP,
               "sell: owned -1, scrap +50% of price");
@@ -133,10 +142,10 @@ public class CareerSmoke : MonoBehaviour
         Tap("SHOP"); yield return null;
 
         int owned = Career.CountOf("beam", "Aluminum");
-        TapNamed("shopsell_1"); yield return null;
+        TapNamed("sell_beam_Aluminum"); yield return null;
         Check(Career.CountOf("beam", "Aluminum") == owned,
               "in-use sell: first tap arms, does not sell");
-        TapNamed("shopsell_1"); yield return null;
+        TapNamed("sell_beam_Aluminum"); yield return null;
         exp += sellP;
         Check(Career.CountOf("beam", "Aluminum") == owned - 1,
               "in-use sell: second tap sells anyway");
@@ -148,7 +157,12 @@ public class CareerSmoke : MonoBehaviour
         for (int i = 1; i < bm.PaletteCount; i++)
             if (bm.PartId(i) == "bracket") bi = i;
         int swapC = Career.SwapCost("bracket", "Steel", "Aluminum");
-        bool swapTapped = bi > 0 && TapNamed("shopswap_" + bi);
+        // The shop is an ACCORDION and closed sections SetActive(false) their
+        // material rows - GameObject.Find cannot see them. Only part 1 (beam)
+        // is open by default, so the bracket section has to be opened first.
+        // This is why addressing by name alone was not enough.
+        TapNamed("shophead_" + bi); yield return null;
+        bool swapTapped = bi > 0 && TapNamed("swap_bracket_Aluminum");
         yield return null;
         exp -= swapC;
         Check(swapTapped && Career.CountOf("bracket", "Steel") == 0
@@ -343,7 +357,7 @@ public class CareerSmoke : MonoBehaviour
         yield return null;
         int beams4 = Career.CountOf("beam", "Aluminum");
         Career.Txn(200, "c4 shop grant");
-        TapNamed("shopbuy_1"); yield return null;
+        TapNamed("buy_beam_Aluminum"); yield return null;
         Check(Career.CountOf("beam", "Aluminum") == beams4 + 1, "shop purchase lands in the shelf");
 
         // drafting table: place a Tungsten beam we do not own, blueprint it,
