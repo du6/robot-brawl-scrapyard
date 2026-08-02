@@ -3765,6 +3765,7 @@ public class BuilderManager : MonoBehaviour
         foreach (var r in Career.Data.stable) if (r.name == name) return "A robot named " + name + " already exists.";
         Career.Data.stable.Add(new CareerRobot { name = name, snapshot = SnapshotString() });
         Career.Data.activeRobot = Career.Data.stable.Count - 1;
+        Career.Data.activeBlueprint = -1;
         if (Career.Data.tutorialStep == 0) Career.Data.tutorialStep = 1;
         if (Career.autosave) Career.Save();
         message = name + " founded \u2014 it holds the current build. SAVE keeps it current." + PoolWarning();
@@ -3778,12 +3779,60 @@ public class BuilderManager : MonoBehaviour
     /// This is the state the build screen was missing to close that loop. It
     /// already knew WHICH robot was being edited (the header prints its name);
     /// it just could not tell you whether you owed it a save.</summary>
-    public bool ActiveRobotDirty()
+    public bool ActiveEditDirty()
     {
         if (!Career.active) return false;
+        int b = Career.Data.activeBlueprint;
+        if (b >= 0 && b < Career.Data.blueprints.Count)
+            return Career.Data.blueprints[b].snapshot != SnapshotString();
         int a = Career.Data.activeRobot;
         if (a < 0 || a >= Career.Data.stable.Count) return false;
         return Career.Data.stable[a].snapshot != SnapshotString();
+    }
+
+    /// <summary>Name of whatever is open - robot or draft - or null.</summary>
+    public string ActiveEditName()
+    {
+        if (!Career.active) return null;
+        int b = Career.Data.activeBlueprint;
+        if (b >= 0 && b < Career.Data.blueprints.Count) return Career.Data.blueprints[b].name;
+        int a = Career.Data.activeRobot;
+        return a >= 0 && a < Career.Data.stable.Count ? Career.Data.stable[a].name : null;
+    }
+
+    public bool ActiveEditIsDraft
+    {
+        get
+        {
+            return Career.active && Career.Data.activeBlueprint >= 0
+                   && Career.Data.activeBlueprint < Career.Data.blueprints.Count;
+        }
+    }
+
+    /// <summary>OWEN 2026-08-02: "consider merging to one save button. depending
+    /// on what user is editing, save to the corresponding robot or blueprint."
+    ///
+    /// One commit verb. Which object it lands on is state the game already has
+    /// to track anyway - it prints the name in the header - so making the
+    /// player choose the button was making them restate something the game
+    /// knew. activeRobot and activeBlueprint are mutually exclusive by
+    /// construction; every method that opens one clears the other.</summary>
+    public string SaveActive()
+    {
+        if (!Career.active) return "Career is off.";
+        int b = Career.Data.activeBlueprint;
+        if (b >= 0 && b < Career.Data.blueprints.Count)
+        {
+            Career.Data.blueprints[b].snapshot = SnapshotString();
+            if (Career.autosave) Career.Save();
+            message = "Draft " + Career.Data.blueprints[b].name + " saved.";
+            return null;
+        }
+        int a = Career.Data.activeRobot;
+        if (a < 0 || a >= Career.Data.stable.Count)
+            return "Nothing open to save \u2014 NEW ROBOT to found this build, "
+                 + "or NEW DRAFT to keep it as a design.";
+        return StableSave();
     }
 
     public string StableSave()
@@ -3800,6 +3849,7 @@ public class BuilderManager : MonoBehaviour
     {
         if (i < 0 || i >= Career.Data.stable.Count) return "No such robot.";
         Career.Data.activeRobot = i;
+        Career.Data.activeBlueprint = -1;   // a machine is open, not a design
         Career.devFreeBuild = false;
         LoadSnapshot(Career.Data.stable[i].snapshot);
         if (Career.autosave) Career.Save();
@@ -3828,8 +3878,12 @@ public class BuilderManager : MonoBehaviour
     {
         name = string.IsNullOrEmpty(name) ? "DRAFT " + (Career.Data.blueprints.Count + 1) : name.Trim();
         Career.Data.blueprints.Add(new CareerBlueprint { name = name, snapshot = SnapshotString() });
+        // The draft you just made is the one you are now editing, so a second
+        // SAVE updates it instead of making another copy.
+        Career.Data.activeBlueprint = Career.Data.blueprints.Count - 1;
+        Career.Data.activeRobot = -1;
         if (Career.autosave) Career.Save();
-        message = "Blueprint " + name + " saved.";
+        message = "Draft " + name + " saved.";
         return null;
     }
     /// <summary>OWEN 2026-08-02: "How do I delete drafts" - you could not.
@@ -3847,6 +3901,10 @@ public class BuilderManager : MonoBehaviour
         if (i < 0 || i >= Career.Data.blueprints.Count) return "No such blueprint.";
         message = "Blueprint " + Career.Data.blueprints[i].name + " deleted.";
         Career.Data.blueprints.RemoveAt(i);
+        // Same index bookkeeping StableRetire does, for the same reason: the
+        // list shifted under the pointer.
+        if (Career.Data.activeBlueprint == i) Career.Data.activeBlueprint = -1;
+        else if (Career.Data.activeBlueprint > i) Career.Data.activeBlueprint--;
         if (Career.autosave) Career.Save();
         return null;
     }
@@ -3854,6 +3912,8 @@ public class BuilderManager : MonoBehaviour
     {
         if (i < 0 || i >= Career.Data.blueprints.Count) return "No such blueprint.";
         Career.devFreeBuild = true;   // the Drafting Table: everything unlocked
+        Career.Data.activeBlueprint = i;
+        Career.Data.activeRobot = -1;
         LoadSnapshot(Career.Data.blueprints[i].snapshot);
         message = "Drafting " + Career.Data.blueprints[i].name + " \u2014 everything unlocked. CONVERT buys the missing parts.";
         return null;
@@ -3895,6 +3955,9 @@ public class BuilderManager : MonoBehaviour
         foreach (var it in need)
             for (int n = 0; n < it.count; n++) Career.TryBuy(it.partId, it.mat);
         Career.devFreeBuild = false;
+        // The build is a real machine now, not a design, so SAVE must not write
+        // it back over the draft it came from.
+        Career.Data.activeBlueprint = -1;
         message = need.Count == 0 ? "Draft converted \u2014 everything was already owned."
                 : "Draft converted \u2014 bought the missing parts for " + quote + " scrap.";
         return null;
@@ -4842,7 +4905,7 @@ public class BuilderManager : MonoBehaviour
             { string e4 = StableCreate(stableNameBuf); if (e4 != null) { message = e4; SfxSynth.Deny(); } stableNameBuf = ""; }
             GUI.color = savedNm;
             if (GUILayout.Button("SAVE", matStyle))
-            { string e4 = StableSave(); if (e4 != null) message = e4; }
+            { string e4 = SaveActive(); if (e4 != null) { message = e4; SfxSynth.Deny(); } }
             GUILayout.EndHorizontal();
             for (int ri = 0; ri < Career.Data.stable.Count; ri++)
             {
@@ -4884,7 +4947,7 @@ public class BuilderManager : MonoBehaviour
             // Mobile uGUI and IMGUI are two separate paths and the
             // one-side-only fix is this project's signature bug.
             GUILayout.BeginHorizontal();
-            if (GUILayout.Button("SAVE BP", matStyle, GUILayout.Width(80f)))
+            if (GUILayout.Button("NEW DRAFT", matStyle, GUILayout.Width(96f)))
             { string e5 = BlueprintSave(stableNameBuf); if (e5 != null) message = e5; stableNameBuf = ""; }
             GUILayout.Label("blueprints \u2014 designs you do not own the parts for yet", descStyle);
             GUILayout.EndHorizontal();

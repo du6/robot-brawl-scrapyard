@@ -341,7 +341,7 @@ public class MobileBuilderUI : MonoBehaviour
         // it instead of two tab-taps away on ROBOTS.
         saveBtn = MkButton("bsave", actRow.transform, "SAVE", 17, () => {
             if (bm == null) return;
-            Feedback(bm.StableSave());
+            Feedback(bm.SaveActive());
             RefreshRobots();
             PumpDirty(true);
         });
@@ -1033,10 +1033,15 @@ public class MobileBuilderUI : MonoBehaviour
         var newBtn = MkButton("stnew", row.transform, "NEW ROBOT", 14, () => { if (bm == null) return; Feedback(bm.StableCreate(nameInput.text)); nameInput.text = ""; RefreshRobots(); });
         newBtn.gameObject.AddComponent<LayoutElement>().minWidth = 100f;
         RegisterNameGated(newBtn);
-        MkButton("stsave", row.transform, "SAVE", 14, () => { if (bm == null) return; Feedback(bm.StableSave()); RefreshRobots(); })
-            .gameObject.AddComponent<LayoutElement>().minWidth = 60f;
-        MkButton("stdraft", row.transform, "DRAFT", 14, () => { Career.devFreeBuild = !Career.devFreeBuild; RefreshRobots(); RefreshPartLabels(); RefreshHighlight(); })
-            .gameObject.AddComponent<LayoutElement>().minWidth = 66f;
+        // OWEN 2026-08-02: SAVE has moved to the build bar, where the work is.
+        // What is left here are the two CREATE actions, side by side, plus the
+        // drafting-table toggle - renamed because "DRAFT" next to "NEW DRAFT"
+        // read as two flavours of the same thing when one is a mode and the
+        // other makes an object.
+        MkButton("stnewbp", row.transform, "NEW DRAFT", 14, () => { if (bm == null) return; Feedback(bm.BlueprintSave(nameInput != null ? nameInput.text : "")); if (nameInput != null) nameInput.text = ""; RefreshRobots(); })
+            .gameObject.AddComponent<LayoutElement>().minWidth = 106f;
+        MkButton("stdraft", row.transform, "DRAFT MODE", 14, () => { Career.devFreeBuild = !Career.devFreeBuild; RefreshRobots(); RefreshPartLabels(); RefreshHighlight(); })
+            .gameObject.AddComponent<LayoutElement>().minWidth = 112f;
         var scrollGO = MkPanel("stscroll", robotsPanel.transform, new Color(0f,0f,0f,0f));
         var sle = scrollGO.AddComponent<LayoutElement>(); sle.flexibleHeight = 1f; sle.minHeight = 80f;
         var scroll = scrollGO.AddComponent<ScrollRect>(); scroll.horizontal = false; scroll.vertical = true;
@@ -1124,8 +1129,9 @@ public class MobileBuilderUI : MonoBehaviour
             dl.gameObject.AddComponent<LayoutElement>().flexibleWidth = 1f;
             MkButton("bpconv", drow.transform, "CONVERT " + bm.ConvertQuote() + " scrap", 13, () => { Feedback(bm.ConvertDraft()); RefreshRobots(); RefreshPartLabels(); RefreshHighlight(); })
                 .gameObject.AddComponent<LayoutElement>().minWidth = 128f;
-            MkButton("bpsave", drow.transform, "SAVE BP", 13, () => { Feedback(bm.BlueprintSave(nameInput != null ? nameInput.text : "")); if (nameInput != null) nameInput.text = ""; RefreshRobots(); })
-                .gameObject.AddComponent<LayoutElement>().minWidth = 80f;
+            // SAVE BP used to sit here as a second commit button. NEW DRAFT in
+            // the row above now owns creating one, and the build bar's SAVE
+            // updates the draft already open, so this row is just CONVERT.
         }
         for (int i2 = 0; i2 < Career.Data.stable.Count; i2++)
         {
@@ -1514,11 +1520,13 @@ public class MobileBuilderUI : MonoBehaviour
             // C3: live weight-cap readout against the targeted league
             if (Career.active)
             {
-                string rn = bm.ActiveRobotName();
+                string rn = bm.ActiveEditName();
                 // The dot is the whole point of an explicit SAVE: without it
                 // you cannot tell a saved robot from an unsaved one, and the
                 // button becomes something you tap superstitiously.
-                if (rn != null) statsText.text = "[" + rn + (buildDirty ? " \u25cf" : "") + "]  " + statsText.text;
+                if (rn != null)
+                    statsText.text = "[" + (bm.ActiveEditIsDraft ? "draft: " : "") + rn
+                                   + (buildDirty ? " \u25cf" : "") + "]  " + statsText.text;
                 var tlg = CareerDB.Leagues[Mathf.Clamp(Career.targetLeagueIdx, 0, CareerDB.Leagues.Length - 1)];
                 bool over = bm.BuildMassInt > tlg.weightCap;
                 statsText.text += string.Format("  \u00b7  {0}/{1} kg {2}{3}",
@@ -1791,7 +1799,7 @@ public class MobileBuilderUI : MonoBehaviour
         if (bm == null) return;
         if (!force && Time.unscaledTime - dirtyAt < 0.25f) return;
         dirtyAt = Time.unscaledTime;
-        buildDirty = bm.ActiveRobotDirty();
+        buildDirty = bm.ActiveEditDirty();
         if (saveBtn != null)
         {
             var im = saveBtn.GetComponent<Image>();

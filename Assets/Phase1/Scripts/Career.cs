@@ -205,6 +205,17 @@ public static class CareerDB
     public int tutorialStep;
     /// <summary>C4: index into stable of the robot being edited; -1 = none.</summary>
     public int activeRobot = -1;
+    /// <summary>OWEN 2026-08-02: index into blueprints of the draft being
+    /// edited; -1 = none. Blueprints had no such notion, which is why
+    /// BlueprintSave could only ever APPEND - opening a draft and saving it
+    /// twice produced two copies of it. Mutually exclusive with activeRobot:
+    /// you are editing a machine or a design, never both.
+    ///
+    /// The -1 initialiser is load-bearing. JsonUtility runs the constructor
+    /// before populating, so a save written before this field existed keeps -1
+    /// rather than defaulting to 0 and silently "opening" blueprint zero.
+    /// activeRobot has always relied on the same thing.</summary>
+    public int activeBlueprint = -1;
     public bool kitGranted;
     public int kitVersion;     // R2: 0 on every save older than Career.KitVersion
     // ---- C6.4 telemetry (design doc §14): LOCAL ONLY, no network - the
