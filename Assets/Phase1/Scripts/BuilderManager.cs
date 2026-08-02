@@ -2641,6 +2641,21 @@ public class BuilderManager : MonoBehaviour
             return blg.name + " is locked \u2014 beat every " + CareerDB.Leagues[li - 1].name + " contest first.";
         }
 
+        // OWEN 2026-08-02, found while fixing the overlapping banner: that
+        // banner has been promising "can't enroll" since C6.5 and NOTHING
+        // enforced it. CareerShortfall returns empty while devFreeBuild is on,
+        // so a draft sailed through CareerValidate and could be entered into a
+        // contest with parts the player does not own - the exact thing the
+        // whole inventory system exists to prevent. A UI that asserts a rule
+        // the code does not implement is worse than no rule; the claim is now
+        // true, and it is stated on the row that refuses.
+        if (Career.devFreeBuild)
+        {
+            shortTag = "draft \u2014 CONVERT to enroll";
+            return "This is a DRAFT \u2014 parts are unlimited, so it cannot be entered. "
+                 + "CONVERT buys the parts it is missing and leaves draft mode.";
+        }
+
         // THE GATE - exactly the checks StartCareerFight runs, in its order.
         string err = Validate();
         if (err == null) err = CareerValidate(blg);
@@ -4590,6 +4605,24 @@ public class BuilderManager : MonoBehaviour
         bool draft = Career.active && Career.devFreeBuild;
         bannerNow = dev ? "dev" : draft ? "draft" : "";
         if (!dev && !draft) return;
+        // OWEN 2026-08-02: "The draft banner overlaps with other text."
+        //
+        // It did, and it always would have. This is IMGUI drawn OVER a uGUI
+        // screen at a GUESSED fraction of screen height (0.075), so it knew
+        // nothing about where the touch UI's bars actually end - and the bar
+        // stack is variable: the message bar and the tip bar come and go. Any
+        // constant here is wrong for some combination of them.
+        //
+        // The floating overlay is not the right instrument on a screen that
+        // owns its own layout. When the touch UI is up it now prints the mode
+        // in its STATUS LINE instead (MobileBuilderUI, ModeTag) - present on
+        // every tab, and part of the layout, so it cannot overlap anything by
+        // construction. bannerNow is still set above, because it is the state
+        // seam CareerSmoke asserts on and that is independent of who draws it.
+        //
+        // Desktop keeps the banner: IMGUI is the whole UI there, and it has no
+        // status line to put this in.
+        if (MobileBuilderUI.Active) return;
         var prevM = GUI.matrix;
         var prevC = GUI.color;
         float sc = GuiScale;   // R4 finding 3: one rule, one place

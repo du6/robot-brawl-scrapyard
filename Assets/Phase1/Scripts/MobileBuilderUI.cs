@@ -1137,7 +1137,13 @@ public class MobileBuilderUI : MonoBehaviour
             var rh = row.AddComponent<HorizontalLayoutGroup>(); rh.spacing = 4f; rh.childForceExpandHeight = true; rh.childForceExpandWidth = false; rh.padding = new RectOffset(6,4,2,2);
             var lbl = MkText("lbl", row.transform, "\u270e " + bp.name + " (blueprint)", 13, TextAnchor.MiddleLeft);
             lbl.gameObject.AddComponent<LayoutElement>().flexibleWidth = 1f;
-            MkButton("bpedit_" + i3, row.transform, "DRAFT IT", 13, () => { Feedback(bm.BlueprintEdit(bi)); RefreshRobots(); RefreshPartLabels(); RefreshHighlight(); })
+            // OWEN 2026-08-02: "what does 'Draft it' button mean?" - it read as
+            // "turn this into a draft", but the thing already IS a draft. It
+            // OPENS the blueprint with everything unlocked. The row already says
+            // "(blueprint)" and draft mode now announces itself in the status
+            // line the moment you land, so the button only has to name the verb.
+            // It also lands you on BUILD, for the same reason EDIT does.
+            MkButton("bpedit_" + i3, row.transform, "OPEN", 13, () => { Feedback(bm.BlueprintEdit(bi)); RefreshRobots(); RefreshPartLabels(); RefreshHighlight(); ShowTab(0); })
                 .gameObject.AddComponent<LayoutElement>().minWidth = 86f;
             // OWEN 2026-08-02: "How do I delete drafts". Same arm-then-confirm
             // as RETIRE one loop up, and styled the same destructive red, so
@@ -1476,6 +1482,17 @@ public class MobileBuilderUI : MonoBehaviour
                 // weight budget is a spec requirement and must NEVER again be
                 // conditional on onboarding state.
             }
+            // OWEN 2026-08-02: mode goes FIRST, and is written LAST - after the
+            // career block, so nothing above can overwrite it, and prefixed so
+            // it reads before the robot name. This replaces the floating IMGUI
+            // banner that used to land on top of the tip bar.
+            string modeTag = ModeTag();
+            if (modeTag.Length > 0)
+            {
+                statsText.text = modeTag + statsText.text;
+                statsText.color = Career.active ? new Color(1f, 0.82f, 0.25f)
+                                                : new Color(1f, 0.45f, 0.38f);
+            }
             }
         }
         // The edge chevron is a promise that there is more to the right. It
@@ -1704,6 +1721,23 @@ public class MobileBuilderUI : MonoBehaviour
     float dirtyAt = -99f;
     static readonly Color SAVE_DIRTY = new Color(0.20f, 0.45f, 0.65f, 1f);
     static readonly Color SAVE_CLEAN = new Color(0.16f, 0.18f, 0.22f, 0.96f);
+
+    /// <summary>OWEN 2026-08-02: the mode banner used to float over this screen
+    /// as an IMGUI box at a guessed fraction of screen height, and landed on the
+    /// tip bar. A screen that owns its layout should say this IN its layout.
+    /// Present on every tab, and impossible to overlap by construction.</summary>
+    static string ModeTag()
+    {
+        // Short on purpose. The two CONSEQUENCES are each stated where they
+        // actually bite - the ROBOTS tab carries "DRAFT MODE - everything
+        // unlocked" with the CONVERT quote, and the LEAGUE rows now say
+        // "draft - CONVERT to enroll" on the button that refuses. This tag only
+        // has to answer "which mode am I in", on every tab, without wrapping
+        // the status line.
+        if (!Career.active) return "DEV SANDBOX  \u00b7  ";
+        if (Career.devFreeBuild) return "DRAFT  \u00b7  ";
+        return "";
+    }
 
     void PumpDirty(bool force)
     {
