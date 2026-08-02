@@ -968,9 +968,57 @@ public class BuilderManager : MonoBehaviour
             }
             return;
         }
+        PumpBuildMusic();
         if (mode == Mode.Build) UpdateBuild();
         else if (mode == Mode.Test) UpdateTest();
         else UpdateFight();
+    }
+
+    // ---- BUILD-mode music (OWEN 2026-08-02) --------------------------------
+    /// <summary>owen: "Use this music as the background music in BUILD model".
+    /// His Steel Atrium.wav, transcoded to mp3 and dropped in Resources beside
+    /// FightTheme so it ships in device builds - a 34 MB 48 kHz stereo WAV in
+    /// Resources would be carried into every build and into git, where the
+    /// whole repo is currently 3.3 MB.
+    ///
+    /// Driven by ONE rule here rather than by hooks in StartFight, StartTest,
+    /// BackToBuild, StartCareerFight and EndScout. That is five call sites
+    /// today and a sixth would eventually be added without the music hook -
+    /// the same class of defect as a button whose look drifts from what it
+    /// does. `mode` is the truth; the music simply follows it.
+    ///
+    /// PAUSE, not Stop, on leaving Build: coming back from a fight resumes the
+    /// track where it left off instead of restarting a three-minute piece from
+    /// the top every single time you return to the workshop.</summary>
+    public static float BUILD_MUSIC_VOL = 0.40f;
+    AudioSource buildMusic;
+    bool buildMusicStarted, buildMusicMissing;
+
+    void PumpBuildMusic()
+    {
+        if (buildMusicMissing) return;
+        if (buildMusic == null)
+        {
+            var clip = Resources.Load<AudioClip>("BuildTheme");
+            if (clip == null)
+            {
+                buildMusicMissing = true;
+                CompoundRobot.Log("BuildTheme missing from Resources - the build screen is silent");
+                return;
+            }
+            buildMusic = gameObject.AddComponent<AudioSource>();
+            buildMusic.clip = clip;
+            buildMusic.loop = true;
+            buildMusic.spatialBlend = 0f;   // 2D: same in both ears, everywhere
+            buildMusic.playOnAwake = false;
+        }
+        buildMusic.volume = BUILD_MUSIC_VOL;   // live-tunable from a probe
+        if (mode == Mode.Build)
+        {
+            if (!buildMusicStarted) { buildMusic.Play(); buildMusicStarted = true; }
+            else if (!buildMusic.isPlaying) buildMusic.UnPause();
+        }
+        else if (buildMusic.isPlaying) buildMusic.Pause();
     }
 
     void UpdateBuild()
