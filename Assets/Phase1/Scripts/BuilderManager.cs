@@ -2548,6 +2548,72 @@ public class BuilderManager : MonoBehaviour
                 lg.name, sz.x, sz.y, sz.z, lg.sizeBox.x, lg.sizeBox.y, lg.sizeBox.z);
         return null;
     }
+
+    /// <summary>OWEN 2026-08-02: "why clicking fight doesn't trigger anything
+    /// in this view".
+    ///
+    /// It WAS triggering. StartCareerFight refused, set `message` and played
+    /// Deny() - and the bar that carries `message` lives at the TOP of the
+    /// screen for 7 s, while the button he tapped is at the bottom right of a
+    /// contest list. Reproduced on his own save: career scrap 0, inventory =
+    /// the starter kit (no engine, no spinner blade), build named "Spinner1"
+    /// -> CareerShortfall listed three missing parts and the fight was refused
+    /// before a FightManager ever existed. Confirmed msgtext still held the
+    /// full explanation and had simply expired.
+    ///
+    /// The real defect is an asymmetry. Career legality has TWO rules and the
+    /// UI treated them completely differently: the weight cap is printed in the
+    /// status bar continuously ("799/1500 kg Scrapyard Open"), while
+    /// parts-you-own only ever appeared as a 7-second flash AFTER you failed.
+    /// One rule you can answer before committing; the other you could only
+    /// discover by being refused. This makes both answerable before the tap.
+    ///
+    /// ONE set of checks, two renderings. StartCareerFight calls this, so a
+    /// button's appearance can never drift from what the button actually does -
+    /// that drift is how you ship a live-looking button that refuses, or a
+    /// greyed one that would have worked.
+    ///
+    /// Returns null when the contest can be entered right now. Otherwise it
+    /// returns the LONG message (what the message bar shows) and hands back a
+    /// row-sized restatement in `shortTag`.</summary>
+    public string CareerFightBlocker(int li, int ci, out string shortTag)
+    {
+        shortTag = null;
+        if (!Career.active) return null;
+        if (li < 0 || li >= CareerDB.Leagues.Length) { shortTag = "unavailable"; return "Contest unavailable."; }
+        var blg = CareerDB.Leagues[li];
+        if (ci < 0 || ci >= blg.contests.Length) { shortTag = "unavailable"; return "Contest unavailable."; }
+        var bc = blg.contests[ci];
+
+        if (!Career.LeagueUnlocked(li))
+        {
+            shortTag = "league locked";
+            return blg.name + " is locked \u2014 beat every " + CareerDB.Leagues[li - 1].name + " contest first.";
+        }
+
+        // THE GATE - exactly the checks StartCareerFight runs, in its order.
+        string err = Validate();
+        if (err == null) err = CareerValidate(blg);
+        if (err == null && Career.Data.scrap < bc.entryFee)
+            err = "Entry fee is " + bc.entryFee + " scrap \u2014 you hold " + Career.Data.scrap + ".";
+        if (err == null) return null;
+
+        // Row-sized restatement of the SAME failure. Falls back to the long
+        // text, so a new rule added to CareerValidate can never make the button
+        // lie - at worst the row label gets verbose.
+        var lack = CareerShortfall();
+        if (lack.Count > 0) shortTag = "needs " + string.Join(", ", lack.ToArray());
+        else if (BuildMassInt > blg.weightCap)
+            shortTag = (BuildMassInt - Mathf.RoundToInt(blg.weightCap)) + " kg over cap";
+        else if (Career.Data.scrap < bc.entryFee)
+            shortTag = "needs " + bc.entryFee + " scrap entry fee";
+        else shortTag = err;
+        return err;
+    }
+
+    public string CareerFightBlocker(int li, int ci)
+    { string t; return CareerFightBlocker(li, ci, out t); }
+
     public void SelectPart(int i) { selected = (selected == i) ? -1 : i; }
     public int SelectedPart { get { return selected; } }
     public bool HasSelection { get { return selected >= 0; } }
@@ -3464,19 +3530,10 @@ public class BuilderManager : MonoBehaviour
         // does NOT set it - a scouting turntable has no audience.)
         CrowdAudio.SetVenue(li);
         EndScout();
-        if (!Career.LeagueUnlocked(li))
-        {
-            message = lg.name + " is locked \u2014 beat every " + CareerDB.Leagues[li - 1].name + " contest first.";
-            SfxSynth.Deny(); return;
-        }
-        string err = Validate();
-        if (err == null) err = CareerValidate(lg);
-        if (err != null) { message = err; SfxSynth.Deny(); return; }
-        if (Career.Data.scrap < c.entryFee)
-        {
-            message = "Entry fee is " + c.entryFee + " scrap \u2014 you hold " + Career.Data.scrap + ".";
-            SfxSynth.Deny(); return;
-        }
+        // Single gate - the same call the FIGHT buttons use to decide whether
+        // they look available. See CareerFightBlocker.
+        string blocked = CareerFightBlocker(li, ci);
+        if (blocked != null) { message = blocked; SfxSynth.Deny(); return; }
         if (c.entryFee > 0) Career.Txn(-c.entryFee, "entry fee " + c.id);
         Career.fightBuildValue = BuildValueCareer();
         var recipe = EnemyRoster.Recipe(c.oppId, palette);
@@ -4706,12 +4763,22 @@ public class BuilderManager : MonoBehaviour
                     // player to scout before committing an entry fee.
                     if (GUILayout.Button("SCOUT", matStyle, GUILayout.Width(72f)))
                         StartScout(li, ci3);
-                    if (GUILayout.Button(string.Format("{0} {1} ({2}) \u00b7 {3} scrap{4}{5}",
+                    // OWEN 2026-08-02: the row now answers "can I actually
+                    // enter this?" BEFORE the click. Desktop IMGUI and the
+                    // mobile uGUI board are two separate code paths and this
+                    // project's signature bug is the one-side-only fix, so both
+                    // get it, from the same CareerFightBlocker call.
+                    string cTag; bool cBlocked = CareerFightBlocker(li, ci3, out cTag) != null;
+                    Color cSaved = GUI.color;
+                    if (cBlocked) GUI.color = new Color(0.60f, 0.60f, 0.64f);
+                    if (GUILayout.Button(string.Format("{0} {1} ({2}) \u00b7 {3} scrap{4}{5}{6}",
                         cdone ? "\u2713" : "\u25b8", EnemyRoster.Find(cc.oppId).label, cc.tier,
                         cdone ? Mathf.RoundToInt(cc.purse * 0.4f) : cc.purse,
                         cdone ? " (re-entry)" : "",
-                        cc.entryFee > 0 ? " \u00b7 fee " + cc.entryFee + " scrap" : ""), matStyle))
+                        cc.entryFee > 0 ? " \u00b7 fee " + cc.entryFee + " scrap" : "",
+                        cBlocked ? "   \u2014   " + cTag : ""), matStyle))
                         StartCareerFight(li, ci3);
+                    GUI.color = cSaved;
                     GUILayout.EndHorizontal();
                 }
             }

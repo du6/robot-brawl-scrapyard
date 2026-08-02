@@ -602,6 +602,7 @@ public class MobileBuilderUI : MonoBehaviour
     void RefreshCareerBoard()
     {
         if (careerBoardContent == null || bm == null) return;
+        fightGates.Clear();   // the rows below are about to be destroyed
         for (int i = careerBoardContent.childCount - 1; i >= 0; i--)
             Destroy(careerBoardContent.GetChild(i).gameObject);
         for (int li = 0; li < CareerDB.Leagues.Length; li++)
@@ -642,7 +643,9 @@ public class MobileBuilderUI : MonoBehaviour
                 scb.GetComponent<Image>().color = new Color(0.20f,0.45f,0.65f,1f);
                 var fb = MkButton("cfight_" + c.id, row.transform, "FIGHT", 14, () => { if (bm != null) bm.StartCareerFight(lidx, cidx); });
                 fb.gameObject.AddComponent<LayoutElement>().minWidth = 72f;
-                fb.GetComponent<Image>().color = new Color(0.40f,0.22f,0.09f,1f);
+                fb.GetComponent<Image>().color = FIGHT_OK;
+                fightGates.Add(new FightGate { btn = fb, img = fb.GetComponent<Image>(),
+                                               lbl = lbl, baseLabel = lbl.text, li = lidx, ci = cidx });
             }
         }
     }
@@ -1400,6 +1403,7 @@ public class MobileBuilderUI : MonoBehaviour
             // R2 (critic finding 4): notices go to their own bar and expire;
             // the status below is rebuilt every frame no matter what they do.
             PumpMessage(bm.LastMessage);
+            PumpFightGates();   // OWEN: the contest rows answer before the tap
             PumpTip();          // R4 finding 4: onboarding is a THIRD channel
             {
             statsText.color = Color.white;
@@ -1584,6 +1588,45 @@ public class MobileBuilderUI : MonoBehaviour
         var prt = tipBar.GetComponent<RectTransform>();
         float y = -(BAR_H + ((msgBar != null && msgBar.activeSelf) ? MSG_H : 0f));
         if (Mathf.Abs(prt.anchoredPosition.y - y) > 0.5f) prt.anchoredPosition = new Vector2(0f, y);
+    }
+
+    // OWEN 2026-08-02: "why clicking fight doesn't trigger anything in this
+    // view". It did - it was refused, and the explanation lived in a bar at the
+    // top of the screen for 7 s while his thumb was on a button at the bottom
+    // right. The row now carries the reason itself, and the FIGHT button reads
+    // unavailable, so the question is answered before the tap instead of after.
+    //
+    // Recomputed on a timer rather than baked at build time: RefreshCareerBoard
+    // only rebuilds when the PART COUNT or material changes, so a shop purchase
+    // (which changes what you own but not what is placed) would have left a
+    // stale "needs 1x Engine" sitting under a row that had become legal.
+    class FightGate { public Button btn; public Image img; public Text lbl; public string baseLabel; public int li, ci; }
+    readonly List<FightGate> fightGates = new List<FightGate>();
+    float fightGateAt = -99f;
+    static readonly Color FIGHT_OK   = new Color(0.40f, 0.22f, 0.09f, 1f);
+    static readonly Color FIGHT_DEAD = new Color(0.19f, 0.19f, 0.21f, 1f);
+
+    void PumpFightGates()
+    {
+        if (bm == null || !Career.active || fightGates.Count == 0) return;
+        if (Time.unscaledTime - fightGateAt < 0.25f) return;
+        fightGateAt = Time.unscaledTime;
+        for (int i = 0; i < fightGates.Count; i++)
+        {
+            var g = fightGates[i];
+            if (g.btn == null || g.lbl == null) continue;
+            string tag;
+            bool blocked = bm.CareerFightBlocker(g.li, g.ci, out tag) != null;
+            string want = blocked ? g.baseLabel + "   \u2014   " + tag : g.baseLabel;
+            if (g.lbl.text != want) g.lbl.text = want;
+            g.lbl.color = blocked ? new Color(1f, 0.72f, 0.36f) : Color.white;
+            if (g.img != null) g.img.color = blocked ? FIGHT_DEAD : FIGHT_OK;
+            var face = g.btn.GetComponentInChildren<Text>();
+            // Deliberately still clickable. A dead button that swallows the tap
+            // is the same complaint again; tapping a greyed one still pumps the
+            // full sentence into the message bar for anyone who wants it.
+            if (face != null) face.color = blocked ? new Color(0.52f, 0.52f, 0.56f) : Color.white;
+        }
     }
 
     void PumpMessage(string msg)
