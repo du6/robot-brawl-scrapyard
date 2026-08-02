@@ -224,7 +224,7 @@ public class MobileBuilderUI : MonoBehaviour
         tipText = MkText("tiptext", tipBar.transform, "", 18, TextAnchor.MiddleLeft);
         Stretch(tipText.rectTransform);
         tipText.rectTransform.offsetMin = new Vector2(14f, 0f);
-        tipText.rectTransform.offsetMax = new Vector2(-132f, 0f);
+        tipText.rectTransform.offsetMax = new Vector2(-206f, 0f);   // room for < > + SKIP TIPS
         tipText.color = new Color(0.62f, 0.84f, 1f);
         tipText.horizontalOverflow = HorizontalWrapMode.Wrap;
         tipText.verticalOverflow = VerticalWrapMode.Truncate;
@@ -239,6 +239,26 @@ public class MobileBuilderUI : MonoBehaviour
         tsrt.anchorMin = new Vector2(1f, 0.5f); tsrt.anchorMax = new Vector2(1f, 0.5f);
         tsrt.pivot = new Vector2(1f, 0.5f); tsrt.sizeDelta = new Vector2(116f, 26f);
         tsrt.anchoredPosition = new Vector2(-8f, 0f);
+        // OWEN 2026-08-02: "Add back/next arrows".
+        //
+        // These move a VIEW index, never Career.Data.tutorialStep. That
+        // distinction is the whole design: tutorialStep is progress, and it is
+        // earned - 0->1 by founding a stable, 1->2 by saving a build that
+        // validates, 2->3 by settling a contest. If the arrows wrote to it,
+        // tapping "next" twice would mark the tutorial complete without the
+        // player having done any of it, and tapping it once at step 2 would
+        // silently claim a contest had been fought. Reading ahead must not
+        // count as doing.
+        tipPrev = MkButton("tipprev", tipBar.transform, "\u2039", 20, () => { TipStep(-1); });
+        var tprt = tipPrev.GetComponent<RectTransform>();
+        tprt.anchorMin = new Vector2(1f, 0.5f); tprt.anchorMax = new Vector2(1f, 0.5f);
+        tprt.pivot = new Vector2(1f, 0.5f); tprt.sizeDelta = new Vector2(32f, 26f);
+        tprt.anchoredPosition = new Vector2(-166f, 0f);
+        tipNext = MkButton("tipnext", tipBar.transform, "\u203a", 20, () => { TipStep(1); });
+        var tnrt = tipNext.GetComponent<RectTransform>();
+        tnrt.anchorMin = new Vector2(1f, 0.5f); tnrt.anchorMax = new Vector2(1f, 0.5f);
+        tnrt.pivot = new Vector2(1f, 0.5f); tnrt.sizeDelta = new Vector2(32f, 26f);
+        tnrt.anchoredPosition = new Vector2(-130f, 0f);
         tipBar.AddComponent<RectMask2D>();
         tipBar.SetActive(false);
 
@@ -1591,17 +1611,56 @@ public class MobileBuilderUI : MonoBehaviour
     /// <summary>R4 (critic finding 4): onboarding gets its own row, stacked
     /// under the notice bar when one is live so the two can never eat each
     /// other, and never touches statsText.</summary>
+    Button tipPrev, tipNext;
+    /// <summary>Which tip is being READ. -1 = follow real progress, which is
+    /// the default and the state it returns to the moment progress moves.</summary>
+    int tipView = -1;
+    int tipStepSeen = -1;
+
+    void TipStep(int d)
+    {
+        int cur = tipView < 0 ? TutorialStep() : tipView;
+        tipView = Mathf.Clamp(cur + d, 0, 2);
+        PumpTip();
+    }
+
     void PumpTip()
     {
         if (tipBar == null || tipText == null) return;
         int ts = TutorialStep();
+        // Real progress moved - stop previewing and show what to do NOW. This
+        // is what keeps the arrows from stranding a player on a tip they have
+        // already completed.
+        if (ts != tipStepSeen) { tipStepSeen = ts; tipView = -1; }
         bool show = Career.active && ts < 3;
-        if (show) tipText.text = TutorialTip(ts);
+        int view = tipView < 0 ? ts : Mathf.Clamp(tipView, 0, 2);
+        if (show)
+        {
+            // Reading ahead or back is marked, so a previewed tip is never
+            // mistaken for the thing the game is currently waiting on.
+            tipText.text = TutorialTip(view) + (view == ts ? "" : "   \u00b7   (reading ahead \u2014 you are on " + (ts + 1) + "/3)");
+            tipText.color = view == ts ? new Color(0.62f, 0.84f, 1f) : new Color(0.72f, 0.72f, 0.80f);
+            SetArrow(tipPrev, view > 0);
+            SetArrow(tipNext, view < 2);
+        }
         if (tipBar.activeSelf != show) { tipBar.SetActive(show); ApplyDockH(); }
         if (!show) return;
         var prt = tipBar.GetComponent<RectTransform>();
         float y = -(BAR_H + ((msgBar != null && msgBar.activeSelf) ? MSG_H : 0f));
         if (Mathf.Abs(prt.anchoredPosition.y - y) > 0.5f) prt.anchoredPosition = new Vector2(0f, y);
+    }
+
+    /// <summary>An arrow at the end of the run reads dead instead of vanishing:
+    /// a control that disappears moves everything next to it, and the row would
+    /// reflow under the thumb mid-tap.</summary>
+    static void SetArrow(Button b, bool live)
+    {
+        if (b == null) return;
+        b.interactable = live;
+        var im = b.GetComponent<Image>();
+        if (im != null) im.color = live ? new Color(0.16f,0.28f,0.40f,0.96f) : new Color(0.11f,0.13f,0.16f,0.96f);
+        var t = b.GetComponentInChildren<Text>();
+        if (t != null) t.color = live ? new Color(0.75f,0.90f,1f) : new Color(0.34f,0.36f,0.40f);
     }
 
     // OWEN 2026-08-02: "why clicking fight doesn't trigger anything in this
