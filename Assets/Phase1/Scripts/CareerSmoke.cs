@@ -233,6 +233,15 @@ public class CareerSmoke : MonoBehaviour
         string boxMsg = bm.CareerValidate(fakeBox);
         Check(boxMsg != null && boxMsg.Contains("Too big for the Box League size box"),
               "over-size build refused with the size-box message");
+        // OWEN 2026-08-03: the readout and the refusal must be ONE rule. A
+        // status bar that disagrees with the gate it is predicting is worse
+        // than no status bar - it teaches the player to distrust it.
+        Check(bm.OverSizeBox(fakeBox) && bm.SizeBoxLine(fakeBox).Contains("OVER"),
+              "the size readout agrees with the refusal it predicts");
+        var roomyBox = new CareerDB.League("LZ", "Roomy", "Z", "z", 99999f, new Vector3(99f, 99f, 99f), new CareerDB.Contest[0]);
+        Check(!bm.OverSizeBox(roomyBox) && !bm.SizeBoxLine(roomyBox).Contains("OVER")
+              && bm.CareerValidate(roomyBox) == null,
+              "a build that fits the box is not flagged");
 
         bm.StartCareerFight(2, 0); yield return null;
         Check(bm.LastMessage != null && bm.LastMessage.Contains("locked"),
@@ -318,6 +327,11 @@ public class CareerSmoke : MonoBehaviour
         bm.LoadSnapshot(bm.SnapshotString());   // clears the stale amber message
         Tap("BUILD"); yield return null; yield return null;
         Check(ui.StatsLine.Contains("/1500 kg"), "builder stats bar shows the kg/cap readout");
+        // The second enrollment rule was enforced but never shown - you could
+        // sit 700 kg under the cap and 0.3 m too tall with nothing saying so
+        // until FIGHT refused.
+        Check(ui.StatsLine.Contains("/ box "),
+              "builder stats bar shows the size box, not just the weight");
 
         // ==== C4: the workshop - hands-on run from a fresh kit ====
         Career.Data = new CareerData();
