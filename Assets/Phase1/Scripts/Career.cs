@@ -35,31 +35,36 @@ public static class CareerDB
     public class League
     {
         public string id; public string name; public string arenaName; public string arenaId;
-        public float weightCap; public Vector3 sizeBox;
+        public float weightCap;
         public Contest[] contests;
-        public League(string i, string n, string an, string aid, float cap, Vector3 box, Contest[] c)
-        { id = i; name = n; arenaName = an; arenaId = aid; weightCap = cap; sizeBox = box; contests = c; }
+        // OWEN 2026-08-03: "we already have the weight limit. why do we also
+        // need size limit?" - and after seeing the numbers, "drop it, weight
+        // only". The size box is GONE, not merely unenforced: a field that no
+        // longer means anything is how a rule gets half-resurrected later by
+        // someone who assumes it is still live.
+        public League(string i, string n, string an, string aid, float cap, Contest[] c)
+        { id = i; name = n; arenaName = an; arenaId = aid; weightCap = cap; contests = c; }
     }
 
     /// <summary>Doc sections 4 + 4b, verbatim. Arena ids consumed by C3A.</summary>
     public static readonly League[] Leagues =
     {
-        new League("L1", "Scrapyard Open", "The Yard", "yard", 1500f, new Vector3(2.0f, 1.5f, 2.0f), new[] {
+        new League("L1", "Scrapyard Open", "The Yard", "yard", 1500f, new[] {
             new Contest("L1C1", "scout",  AiTier.Rookie, 250, 0),
             new Contest("L1C2", "tipper", AiTier.Rookie, 300, 0) }),
-        new League("L2", "Garage League", "The Loading Dock", "dock", 2000f, new Vector3(2.0f, 1.5f, 2.0f), new[] {
+        new League("L2", "Garage League", "The Loading Dock", "dock", 2000f, new[] {
             new Contest("L2C1", "mauler", AiTier.Rookie,  400, 0),
             new Contest("L2C2", "scout",  AiTier.Veteran, 450, 0),
             new Contest("L2C3", "tipper", AiTier.Veteran, 500, 0) }),
-        new League("L3", "Regional Circuit", "The Sawmill", "sawmill", 2800f, new Vector3(2.5f, 1.8f, 2.5f), new[] {
+        new League("L3", "Regional Circuit", "The Sawmill", "sawmill", 2800f, new[] {
             new Contest("L3C1", "bulwark", AiTier.Veteran, 700, 50),
             new Contest("L3C2", "mauler",  AiTier.Veteran, 800, 50),
             new Contest("L3C3", "ripper",  AiTier.Veteran, 900, 50) }),
-        new League("L4", "National Series", "The Press", "press", 4000f, new Vector3(2.5f, 1.8f, 2.5f), new[] {
+        new League("L4", "National Series", "The Press", "press", 4000f, new[] {
             new Contest("L4C1", "widowmaker", AiTier.Veteran,  1200, 100),
             new Contest("L4C2", "bulwark",    AiTier.Champion, 1400, 100),
             new Contest("L4C3", "ripper",     AiTier.Champion, 1600, 100) }),
-        new League("L5", "World Championship", "The Crucible", "crucible", 5500f, new Vector3(3.0f, 2.0f, 3.0f), new[] {
+        new League("L5", "World Championship", "The Crucible", "crucible", 5500f, new[] {
             new Contest("L5C1", "widowmaker", AiTier.Champion, 3000, 200) }),
     };
 

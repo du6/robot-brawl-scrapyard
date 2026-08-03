@@ -225,23 +225,18 @@ public class CareerSmoke : MonoBehaviour
         Check(placedAll && bm.Validate() == null, "c3 setup: wheel + battery make the build fight-legal");
 
         // over-cap + size-box refusals, message wording included
-        var fakeCap = new CareerDB.League("LX", "Test League", "X", "x", 10f, new Vector3(9f, 9f, 9f), new CareerDB.Contest[0]);
+        var fakeCap = new CareerDB.League("LX", "Test League", "X", "x", 10f, new CareerDB.Contest[0]);
         string capMsg = bm.CareerValidate(fakeCap);
         Check(capMsg != null && capMsg.Contains("over the Test League cap"),
               "over-cap build refused with the specific kg message");
-        var fakeBox = new CareerDB.League("LY", "Box League", "Y", "y", 99999f, new Vector3(0.05f, 0.05f, 0.05f), new CareerDB.Contest[0]);
-        string boxMsg = bm.CareerValidate(fakeBox);
-        Check(boxMsg != null && boxMsg.Contains("Too big for the Box League size box"),
-              "over-size build refused with the size-box message");
-        // OWEN 2026-08-03: the readout and the refusal must be ONE rule. A
-        // status bar that disagrees with the gate it is predicting is worse
-        // than no status bar - it teaches the player to distrust it.
-        Check(bm.OverSizeBox(fakeBox) && bm.SizeBoxLine(fakeBox).Contains("OVER"),
-              "the size readout agrees with the refusal it predicts");
-        var roomyBox = new CareerDB.League("LZ", "Roomy", "Z", "z", 99999f, new Vector3(99f, 99f, 99f), new CareerDB.Contest[0]);
-        Check(!bm.OverSizeBox(roomyBox) && !bm.SizeBoxLine(roomyBox).Contains("OVER")
-              && bm.CareerValidate(roomyBox) == null,
-              "a build that fits the box is not flagged");
+        // OWEN 2026-08-03: the size box is gone - weight is the only
+        // enrollment rule now. What replaces those assertions is the one that
+        // matters after a rule is deleted: that a build which would have been
+        // refused for SIZE is now accepted, so the removal is proven rather
+        // than merely uncalled.
+        var roomyCap = new CareerDB.League("LZ", "Roomy", "Z", "z", 99999f, new CareerDB.Contest[0]);
+        Check(bm.CareerValidate(roomyCap) == null,
+              "with a huge cap nothing else refuses the build \u2014 weight is the only rule");
 
         bm.StartCareerFight(2, 0); yield return null;
         Check(bm.LastMessage != null && bm.LastMessage.Contains("locked"),
@@ -327,11 +322,6 @@ public class CareerSmoke : MonoBehaviour
         bm.LoadSnapshot(bm.SnapshotString());   // clears the stale amber message
         Tap("BUILD"); yield return null; yield return null;
         Check(ui.StatsLine.Contains("/1500 kg"), "builder stats bar shows the kg/cap readout");
-        // The second enrollment rule was enforced but never shown - you could
-        // sit 700 kg under the cap and 0.3 m too tall with nothing saying so
-        // until FIGHT refused.
-        Check(ui.StatsLine.Contains("/ box "),
-              "builder stats bar shows the size box, not just the weight");
 
         // ==== C4: the workshop - hands-on run from a fresh kit ====
         Career.Data = new CareerData();

@@ -2583,8 +2583,17 @@ public class BuilderManager : MonoBehaviour
         }
         return got ? b.size : Vector3.zero;
     }
-    /// <summary>C3 enrollment validation: weight cap + size box, refusals
-    /// specific enough to act on. Null = fits.</summary>
+    /// <summary>C3 enrollment validation: weight cap, refusals specific enough
+    /// to act on. Null = fits.
+    ///
+    /// OWEN 2026-08-03: "we already have the weight limit. why do we also need
+    /// size limit?" The size box is gone - one rule, mass. Worth knowing what
+    /// that costs, because it is not nothing: mass = volume x density, and the
+    /// density spread here is 18x (ABS 1.05 -> Tungsten 19.3). A 1500 kg cap
+    /// therefore buys 3 Tungsten beams or 59 ABS ones, so a light material now
+    /// bounds nothing but the wallet. If ultralight structure starts reading
+    /// as strictly correct, the lever to pull is density or a reach cap - NOT
+    /// this function.</summary>
     public string CareerValidate(CareerDB.League lg)
     {
         var lack = CareerShortfall();
@@ -2594,45 +2603,7 @@ public class BuilderManager : MonoBehaviour
         if (mass > lg.weightCap)
             return string.Format("{0} kg over the {1} cap ({2} kg limit, build is {3} kg).",
                 mass - Mathf.RoundToInt(lg.weightCap), lg.name, Mathf.RoundToInt(lg.weightCap), mass);
-        Vector3 sz = BuildAabbSize();
-        if (OverSizeBox(lg))
-            return string.Format("Too big for the {0} size box: build {1:F1}\u00d7{2:F1}\u00d7{3:F1} m, box {4:F1}\u00d7{5:F1}\u00d7{6:F1} m.",
-                lg.name, sz.x, sz.y, sz.z, lg.sizeBox.x, lg.sizeBox.y, lg.sizeBox.z);
         return null;
-    }
-
-    /// <summary>OWEN 2026-08-03: "Why do I see the size limit in the league?
-    /// When I build the robot I only see weight limit?"
-    ///
-    /// Because the build screen only ever reported ONE of the two enrollment
-    /// rules. You could watch mass climb toward the cap with 700 kg of
-    /// headroom - true, and beside the point, because the build was 0.3 m too
-    /// tall and nothing said so until FIGHT refused. A limit you cannot see
-    /// until you have already crossed it is not a limit, it is an ambush.
-    ///
-    /// Extracted from CareerValidate rather than copied into the two status
-    /// bars, because a readout that predicts a refusal has to be the SAME rule
-    /// as the refusal or it is worse than no readout at all.
-    ///
-    /// Spawn yaw is free, so only the footprint's larger/smaller ordering
-    /// matters, not which horizontal axis is which.</summary>
-    public bool OverSizeBox(CareerDB.League lg)
-    {
-        Vector3 sz = BuildAabbSize();
-        float bw = Mathf.Max(sz.x, sz.z), bd = Mathf.Min(sz.x, sz.z);
-        float lw = Mathf.Max(lg.sizeBox.x, lg.sizeBox.z), ld = Mathf.Min(lg.sizeBox.x, lg.sizeBox.z);
-        return bw > lw + 0.01f || bd > ld + 0.01f || sz.y > lg.sizeBox.y + 0.01f;
-    }
-
-    /// <summary>The build's box against the league's, for the status bars.
-    /// Same three axes and the same wording as the refusal, so the bar reads
-    /// like a preview of it rather than a second opinion.</summary>
-    public string SizeBoxLine(CareerDB.League lg)
-    {
-        Vector3 sz = BuildAabbSize();
-        return string.Format("{0:F1}\u00d7{1:F1}\u00d7{2:F1} m / box {3:F1}\u00d7{4:F1}\u00d7{5:F1}{6}",
-            sz.x, sz.y, sz.z, lg.sizeBox.x, lg.sizeBox.y, lg.sizeBox.z,
-            OverSizeBox(lg) ? " OVER" : "");
     }
 
     /// <summary>OWEN 2026-08-02: "why clicking fight doesn't trigger anything
@@ -5006,18 +4977,13 @@ public class BuilderManager : MonoBehaviour
             // same targeted league.
             var tlg4 = CareerDB.Leagues[Mathf.Clamp(Career.targetLeagueIdx, 0, CareerDB.Leagues.Length - 1)];
             bool over4 = BuildMassInt > tlg4.weightCap;
-            // OWEN 2026-08-03: the size box is the OTHER enrollment rule and it
-            // was invisible here too. Desktop is not optional - mobile uGUI and
-            // IMGUI are two separate paths and the one-side-only fix is this
-            // project's signature bug.
-            bool overBox4 = OverSizeBox(tlg4);
             Color savedCol4 = GUI.color;
-            if (over4 || overBox4) GUI.color = new Color(1f, 0.82f, 0.25f);
-            GUILayout.Label(string.Format("CAREER \u00b7 scrap {0} \u00b7 record {1}-{2}\nBUILD {3} / {4} kg \u00b7 {5}{6}\n{7}",
+            if (over4) GUI.color = new Color(1f, 0.82f, 0.25f);
+            GUILayout.Label(string.Format("CAREER \u00b7 scrap {0} \u00b7 record {1}-{2}\nBUILD {3} / {4} kg \u00b7 {5}{6}",
                 Career.Data.scrap, Career.Data.fightWins,
                 Mathf.Max(0, Career.Data.fights - Career.Data.fightWins),
                 BuildMassInt, Mathf.RoundToInt(tlg4.weightCap), tlg4.name,
-                over4 ? " \u2014 OVER" : "", SizeBoxLine(tlg4)), bodyStyle);
+                over4 ? " \u2014 OVER" : ""), bodyStyle);
             GUI.color = savedCol4;
             // ---- C4: the stable ----
             GUILayout.BeginHorizontal();
@@ -5107,9 +5073,9 @@ public class BuilderManager : MonoBehaviour
             {
                 var clg2 = CareerDB.Leagues[li];
                 bool open = Career.LeagueUnlocked(li);
-                GUILayout.Label(string.Format("{0}{1} \u00b7 {2} \u00b7 cap {3} kg \u00b7 box {4:F1}\u00d7{5:F1}\u00d7{6:F1} m \u00b7 {7}",
+                GUILayout.Label(string.Format("{0}{1} \u00b7 {2} \u00b7 cap {3} kg \u00b7 {4}",
                     open ? "" : "[locked] ", clg2.name, clg2.arenaName, Mathf.RoundToInt(clg2.weightCap),
-                    clg2.sizeBox.x, clg2.sizeBox.y, clg2.sizeBox.z, ArenaHazards.Summary(clg2.arenaId)), descStyle);
+                    ArenaHazards.Summary(clg2.arenaId)), descStyle);
                 if (!open) continue;
                 for (int ci3 = 0; ci3 < clg2.contests.Length; ci3++)
                 {

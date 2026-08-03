@@ -1793,18 +1793,11 @@ public class MobileBuilderUI : MonoBehaviour
                 bool over = bm.BuildMassInt > tlg.weightCap;
                 statsText.text += string.Format("  \u00b7  {0}/{1} kg {2}{3}",
                     bm.BuildMassInt, Mathf.RoundToInt(tlg.weightCap), tlg.name, over ? " OVER" : "");
-                // OWEN 2026-08-03: "Why do I see the size limit in the league?
-                // When I build the robot I only see weight limit?"
-                //
-                // Enrollment has always had TWO rules and this bar reported
-                // one. His build was 700 kg under the cap and 0.3 m too tall,
-                // and the only place that said so was the FIGHT refusal - by
-                // which point the robot is built. The box comes from
-                // BuilderManager.SizeBoxLine so it is literally the same rule
-                // and the same numbers the refusal will quote.
-                bool overBox = bm.OverSizeBox(tlg);
-                statsText.text += "  \u00b7  " + bm.SizeBoxLine(tlg);
-                if (over || overBox) statsText.color = new Color(1f, 0.82f, 0.25f);
+                // OWEN 2026-08-03: the size box readout lived here for one
+                // commit. He asked why the rule existed at all, saw the
+                // numbers, and cut it - so there is one budget on this bar
+                // again, and it is mass.
+                if (over) statsText.color = new Color(1f, 0.82f, 0.25f);
                 // C4 onboarding used to overwrite everything above this line.
                 // It now lives in tipBar (PumpTip) - see R4 finding 4. The
                 // weight budget is a spec requirement and must NEVER again be
