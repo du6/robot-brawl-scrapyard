@@ -5884,8 +5884,43 @@ public class BuilderManager : MonoBehaviour
 /// <summary>Tiny startup menu: choose the Phase 0 sandbox or the Phase 1 builder.</summary>
 public class ModeSelect : MonoBehaviour
 {
+    /// <summary>OWEN 2026-08-03: "for a mobile user, it doesn't make sense to
+    /// see the desktop option, and vice versa. can we detect the device type
+    /// and skip the first screen?"
+    ///
+    /// Yes - and the screen was worse than redundant. MobileBuilderUI already
+    /// auto-detected, so on an iPad "START CAREER - Desktop" handed you the
+    /// touch UI regardless. The chooser asked a question the game then
+    /// overruled; both buttons landed in the same place.
+    ///
+    /// A build now boots straight into career in the detected mode. The EDITOR
+    /// keeps the chooser, so testing touch-on-desktop and the dev sandbox
+    /// stays one click away - the dev sandbox was always a dev door anyway,
+    /// and this is the honest place for it.</summary>
+    void Start()
+    {
+        if (Application.isEditor) return;
+        StartCareer(MobileBuilderUI.DeviceWantsTouch());
+    }
+
+    /// <summary>One path in, so the two buttons and the auto-boot cannot drift.
+    /// forceMobileUI is set EXPLICITLY either way rather than only on the touch
+    /// branch - it is a static that survives a play-mode restart in the editor,
+    /// so "not setting it" quietly meant "keep whatever the last run chose".</summary>
+    public static void StartCareer(bool touch)
+    {
+        // C4: the game IS the career now (owner decision 2026-07-31, no
+        // sandbox split). Load grants the starter kit on first run.
+        Career.active = true;
+        Career.Load();
+        MobileBuilderUI.forceMobileUI = touch;
+        new GameObject("BuilderManager").AddComponent<BuilderManager>();
+    }
+
     void OnGUI()
     {
+        // Builds never draw this - Start() has already left. Editor only.
+        if (!Application.isEditor) return;
         // Critic round 1 (mobile): raw pixels made these buttons thumbnail
         // sized on a 264-dpi iPad. Same DPI scale as the rest of the HUD.
         float s = BuilderManager.GuiScale;   // R4 finding 3: one rule, one place
@@ -5901,23 +5936,15 @@ public class ModeSelect : MonoBehaviour
         // C6.5: five taps on the title reveal the dev sandbox entry - players
         // never see a mode choice; the career IS the game (design doc v1.4).
         if (GUI.Button(new Rect(x, y, w, 30), "", GUIStyle.none)) devTaps++;
-        if (GUI.Button(new Rect(x + 24, y + 64, w - 48, 44), "START CAREER \u2014 Desktop", mbst))
-        {
-            // C4: the game IS the career now (owner decision 2026-07-31, no
-            // sandbox split). Load grants the starter kit on first run.
-            Career.active = true;
-            Career.Load();
-            new GameObject("BuilderManager").AddComponent<BuilderManager>();
-            Destroy(gameObject);
-        }
-        if (GUI.Button(new Rect(x + 24, y + 118, w - 48, 44), "START CAREER \u2014 Touch", mbst))
-        {
-            Career.active = true;
-            Career.Load();
-            MobileBuilderUI.forceMobileUI = true;
-            new GameObject("BuilderManager").AddComponent<BuilderManager>();
-            Destroy(gameObject);
-        }
+        // The detected default is marked, so the editor chooser doubles as a
+        // readout of what a real build would have done on this machine.
+        bool wantsTouch = MobileBuilderUI.DeviceWantsTouch();
+        if (GUI.Button(new Rect(x + 24, y + 64, w - 48, 44),
+                       "START CAREER \u2014 Desktop" + (wantsTouch ? "" : "   (detected)"), mbst))
+        { StartCareer(false); Destroy(gameObject); }
+        if (GUI.Button(new Rect(x + 24, y + 118, w - 48, 44),
+                       "START CAREER \u2014 Touch" + (wantsTouch ? "   (detected)" : ""), mbst))
+        { StartCareer(true); Destroy(gameObject); }
         if (devTaps >= 5 && GUI.Button(new Rect(x + 24, y + h + 8, w - 48, 32), "DEV SANDBOX"))
         {
             Career.active = false;   // free-build test mode: loud banner, no career file

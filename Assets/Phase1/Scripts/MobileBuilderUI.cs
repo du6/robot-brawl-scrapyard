@@ -107,15 +107,29 @@ public class MobileBuilderUI : MonoBehaviour
         }
     }
 
+    /// <summary>OWEN 2026-08-03: "can we detect the device type and skip the
+    /// first screen and automatically land user to their device option?"
+    ///
+    /// This is the whole rule, in one place, because the boot mode and the UI
+    /// attach MUST agree. They did not have to before - the chooser asked, and
+    /// then ShouldActivate ignored the answer, which is why "START CAREER -
+    /// Desktop" on an iPad handed you the touch UI anyway. A question the game
+    /// overrules is worse than no question.
+    ///
+    /// HANDHELD, not "has a touchscreen" (owen's call). A Surface or a touch
+    /// laptop has a keyboard and a mouse, and the builder's shortcuts - R
+    /// rotate, Z undo, Q/E orbit - are worth more there than fat tap targets.
+    /// This deliberately drops the old Touchscreen.current / Input.touchSupported
+    /// test, which classified those machines as phones.</summary>
+    public static bool DeviceWantsTouch()
+    {
+        return Application.isMobilePlatform || SystemInfo.deviceType == DeviceType.Handheld;
+    }
+
     public static bool ShouldActivate()
     {
         if (forceMobileUI) return true;
-        if (Application.isMobilePlatform) return true;
-#if ENABLE_INPUT_SYSTEM
-        return Touchscreen.current != null;
-#else
-        return Input.touchSupported;
-#endif
+        return DeviceWantsTouch();
     }
 
     static Font Fnt()

@@ -107,17 +107,16 @@ public class TouchControls : MonoBehaviour
     // R4 finding 3: was a seventh copy of the dpi rule; now one rule, one place.
     static float S { get { return BuilderManager.GuiScale; } }
 
-    bool HasTouch
-    {
-        get
-        {
-#if ENABLE_INPUT_SYSTEM
-            return Touchscreen.current != null;
-#else
-            return Input.touchSupported;
-#endif
-        }
-    }
+    /// <summary>OWEN 2026-08-03, found while wiring the device auto-boot: this
+    /// was a THIRD copy of "is this a touch device", and after the handheld
+    /// rule it would have disagreed with the other two. A Surface would have
+    /// got the desktop builder AND a floating thumbstick in every fight.
+    ///
+    /// The on-screen stick is a UI affordance, not an input capability, so the
+    /// question it should ask is "is the touch UI the UI here" - which is
+    /// exactly ShouldActivate. That also means forcing the touch UI in the
+    /// editor now brings its controls with it, instead of needing mouseTest.</summary>
+    bool HasTouch { get { return MobileBuilderUI.ShouldActivate(); } }
 
     int Points(Vector2[] buf)
     {

@@ -579,6 +579,23 @@ public class CareerSmoke : MonoBehaviour
         Check(swapTapped8 && shdr8 != null && shdr8.GetComponent<Text>().text.Contains("rework"),
               "tapping the dead REWORK says what it is missing");
 
+        // ==== C9: one device rule (owen 2026-08-03) ====
+        // The chooser used to ASK which UI you wanted and ShouldActivate used
+        // to ignore the answer - on an iPad, "START CAREER - Desktop" handed
+        // you the touch UI regardless. Now the boot mode and the UI attach read
+        // the same function, and this is the guard: re-adding a
+        // touchSupported branch to one of them fails here instead of on
+        // somebody's Surface.
+        bool savedForce = MobileBuilderUI.forceMobileUI;
+        MobileBuilderUI.forceMobileUI = false;
+        bool agree = MobileBuilderUI.ShouldActivate() == MobileBuilderUI.DeviceWantsTouch();
+        MobileBuilderUI.forceMobileUI = true;
+        bool overrides = MobileBuilderUI.ShouldActivate();
+        MobileBuilderUI.forceMobileUI = savedForce;
+        yield return null;
+        Check(agree, "boot mode and UI attach read ONE device rule");
+        Check(overrides, "forceMobileUI still overrides detection, so the editor can test touch");
+
         // ---- C6.4: telemetry schema landed (§14) ----
         Check(Career.Data.fights > 0, "telemetry: fights counted (" + Career.Data.fights + ")");
         Check(Career.Data.scrapCurve.Count == Career.Data.fights,
