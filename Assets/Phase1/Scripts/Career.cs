@@ -221,6 +221,12 @@ public static class CareerDB
     /// rather than defaulting to 0 and silently "opening" blueprint zero.
     /// activeRobot has always relied on the same thing.</summary>
     public int activeBlueprint = -1;
+    // OWEN 2026-08-03 tutorial: SKIP TIPS used to set tutorialStep = 3, which
+    // silenced the tips by CLAIMING the player had finished onboarding. The
+    // tips now run past step 3, and more to the point a skip should not lie
+    // about progress. New field, so JsonUtility hands every existing save
+    // false and nobody's career changes.
+    public bool tipsOff;
     public bool kitGranted;
     public int kitVersion;     // R2: 0 on every save older than Career.KitVersion
     // ---- C6.4 telemetry (design doc §14): LOCAL ONLY, no network - the

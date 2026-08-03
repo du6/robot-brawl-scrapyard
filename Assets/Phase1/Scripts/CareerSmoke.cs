@@ -20,6 +20,7 @@ public class CareerSmoke : MonoBehaviour
 
     readonly List<string> log = new List<string>();
     int passed, failed;
+    bool tipStale, tipMisnumbered, tipEmpty;
     void Check(bool ok, string what)
     {
         if (ok) passed++; else failed++;
@@ -578,6 +579,48 @@ public class CareerSmoke : MonoBehaviour
         bool swapTapped8 = TapNamed("swap_beam_Aluminum"); yield return null;
         Check(swapTapped8 && shdr8 != null && shdr8.GetComponent<Text>().text.Contains("rework"),
               "tapping the dead REWORK says what it is missing");
+
+        // ==== C10: the tutorial (owen 2026-08-03) ====
+        // The old 3-tip list had rotted into misinformation - it opened with
+        // "open the ROBOTS tab" and told you to "SAVE on ROBOTS", describing a
+        // flow deleted earlier the same day. So the load-bearing assertion is
+        // not that tips EXIST, it is that no tip names a control that is gone.
+        for (int i = 0; i < BuilderManager.TIP_COUNT; i++)
+        {
+            string t = bm.CareerTip(i, "build");
+            if (t.Contains("SAVE on ROBOTS") || t.Contains("NEW ROBOT to found")) tipStale = true;
+            if (!t.StartsWith("TIP " + (i + 1) + "/" + BuilderManager.TIP_COUNT)) tipMisnumbered = true;
+            if (t.Length < 30) tipEmpty = true;
+        }
+        Check(!tipStale, "no tip points at a control that has been moved or removed");
+        Check(!tipMisnumbered && !tipEmpty,
+              "all " + BuilderManager.TIP_COUNT + " tips are numbered and non-empty");
+
+        // The four systems owen asked for are actually covered, by name.
+        string allTips = "";
+        for (int i = 0; i < BuilderManager.TIP_COUNT; i++) allTips += bm.CareerTip(i, "") + "\n";
+        Check(allTips.Contains("wheel") && allTips.Contains("battery"), "tips teach what makes a machine legal");
+        Check(allTips.Contains("Tungsten"), "tips teach the material trade-off");
+        Check(allTips.Contains("SHOP") && allTips.Contains("SELL"), "tips teach where scrap goes");
+        Check(allTips.Contains("core is the KO target"), "tips teach how you lose");
+
+        // Progress-driven, so it never sits telling you to do what you did.
+        // On a SCRATCH career, not this one: zeroing Data.fights here to fake a
+        // new player is exactly what broke the telemetry assertions below on
+        // the first run of this block - a test that quietly edits state later
+        // tests depend on is its own kind of bug.
+        var c10Saved = Career.Data;
+        Career.Data = new CareerData();
+        yield return null;
+        int stepBuilt = bm.CareerTipStep();
+        Career.Data.tipsOff = true;
+        yield return null;
+        bool silenced = bm.CareerTipStep() == BuilderManager.TIP_COUNT;
+        Career.Data = c10Saved;
+        yield return null;
+        Check(stepBuilt >= 0 && stepBuilt <= 3,
+              "a fresh career sits in the first four tips (" + stepBuilt + ")");
+        Check(silenced, "SKIP TIPS silences the row without faking progress");
 
         // ==== C9: one device rule (owen 2026-08-03) ====
         // The chooser used to ASK which UI you wanted and ShouldActivate used

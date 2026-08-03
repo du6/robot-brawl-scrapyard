@@ -2583,6 +2583,91 @@ public class BuilderManager : MonoBehaviour
         }
         return got ? b.size : Vector3.zero;
     }
+    // ---- onboarding tips (OWEN 2026-08-03) -----------------------------
+    /// <summary>OWEN 2026-08-03: "should we add a tutorial to teach new users
+    /// how to play the game?"
+    ///
+    /// There was one, and it had rotted into misinformation: it opened with
+    /// "open the ROBOTS tab -> found your stable" and told you to "SAVE on
+    /// ROBOTS", both of which describe the UI as it was that MORNING. SAVE had
+    /// moved to the build bar and founding-first stopped being required the
+    /// moment SAVE learned to name its own build. A tutorial that narrates a
+    /// flow you deliberately deleted is worse than none - it sends a first-time
+    /// player to a tab to hunt for a button that is not there.
+    ///
+    /// It also only ever taught NAVIGATION. Nothing said what makes a machine
+    /// legal, what the six materials are for, where scrap comes from, or that
+    /// the core is the thing you lose by. All four are things this code knows
+    /// and the player was left to infer.
+    ///
+    /// ONE list, both front ends, because two copies of onboarding is how the
+    /// desktop half ends up a version behind - which is exactly what had
+    /// happened to the strip in OnGUI.</summary>
+    public const int TIP_COUNT = 7;
+
+    /// <summary>Which tip the player is actually on, derived from real state so
+    /// it can never sit there telling you to do something you have done.
+    /// Returns TIP_COUNT when there is nothing left to say.</summary>
+    public int CareerTipStep()
+    {
+        if (!Career.active || Career.Data == null || Career.Data.tipsOff) return TIP_COUNT;
+        int ts = Career.Data.tutorialStep;
+        // Derive forward from what actually exists, not just the stored step -
+        // a save edited or carried across a version should not strand anyone.
+        var st = Career.Data.stable;
+        if (st != null && st.Count > 0)
+        {
+            if (ts < 1) ts = 1;
+            for (int i = 0; i < st.Count; i++)
+                if (st[i] != null && !string.IsNullOrEmpty(st[i].snapshot)) { if (ts < 2) ts = 2; break; }
+        }
+        if (ts >= 3)
+        {
+            // Past the first fight the rest are the SYSTEMS tips, paced one per
+            // fight rather than arriving as a wall of text nobody reads before
+            // they have felt the problem it describes.
+            int after = 4 + Mathf.Max(0, Career.Data.fights - 1);
+            return after >= TIP_COUNT ? TIP_COUNT : after;
+        }
+        if (placed.Count <= 1) return 0;      // core only
+        if (Validate() != null) return 1;     // placed, but it cannot fight yet
+        if (ts < 2) return 2;                 // legal and unsaved
+        return 3;
+    }
+
+    /// <summary>ctx is the front end's current surface: "build", "league", or
+    /// anything else. Desktop passes "" because its whole panel is on screen at
+    /// once, so "go to the X tab" would be nonsense there.</summary>
+    public string CareerTip(int i, string ctx)
+    {
+        bool onBuild  = ctx == "build"  || ctx == "";
+        bool onLeague = ctx == "league" || ctx == "";
+        string n = "TIP " + (i + 1) + "/" + TIP_COUNT + "  \u00b7  ";
+        if (i <= 0)
+            return n + (onBuild ? "pick a part below, then tap the robot to bolt it on"
+                                : "open the BUILD tab to start your machine");
+        if (i == 1)
+        {
+            // The LIVE reason, not a paraphrase. Validate() is what the FIGHT
+            // button consults, so quoting it means the tip and the refusal can
+            // never say different things.
+            string v = Validate();
+            return n + "to fight, a machine needs a wheel, a battery, and every part touching another"
+                     + (v != null ? "  \u2014  " + v : "");
+        }
+        if (i == 2)
+            return n + (onBuild ? "SAVE names this build and founds it in your stable"
+                                : "open BUILD and press SAVE to name your machine");
+        if (i == 3)
+            return n + (onLeague ? "SCOUT is free \u2014 study the opponent, then FIGHT"
+                                 : "open the LEAGUE tab to enter your first contest");
+        if (i == 4)
+            return n + "materials: the same beam is 7\u00d7 heavier in Tungsten than Aluminium, and twice as strong \u2014 spend that weight where you hit, not everywhere";
+        if (i == 5)
+            return n + "scrap: SHOP buys parts, SELL returns half, REWORK changes a part's material for the price difference";
+        return n + "the core is the KO target \u2014 lose it and you lose the fight. Armour it, and bolt the battery across two seams so one break cannot take it";
+    }
+
     /// <summary>C3 enrollment validation: weight cap, refusals specific enough
     /// to act on. Null = fits.
     ///
@@ -4906,6 +4991,27 @@ public class BuilderManager : MonoBehaviour
             { Progression.Data.tutorialStep = 3; Progression.Save(); }
             GUILayout.EndHorizontal();
             GUILayout.EndArea();
+        }
+        // OWEN 2026-08-03: career mode got NO onboarding on desktop at all -
+        // the strip above is gated on !Career.active, and career IS the game
+        // (design doc v1.4). The comment up there says "career mode owns
+        // onboarding when it is active", which was true of the intent and
+        // false of the code: career owned it only on the touch UI, so a
+        // desktop player was handed a builder and no words whatsoever.
+        if (Career.active)
+        {
+            int ct = CareerTipStep();
+            if (ct < TIP_COUNT)
+            {
+                float cw = 760f;
+                GUILayout.BeginArea(new Rect(PanelPixelW + Mathf.Max(8f, (Screen.width - PanelPixelW - cw) * 0.5f), 10f, cw, 60f), GUI.skin.box);
+                GUILayout.BeginHorizontal();
+                GUILayout.Label(CareerTip(ct, ""), bodyStyle);
+                if (GUILayout.Button("skip", matStyle, GUILayout.Width(46f)))
+                { Career.Data.tipsOff = true; if (Career.autosave) Career.Save(); }
+                GUILayout.EndHorizontal();
+                GUILayout.EndArea();
+            }
         }
         // R2 (critic finding 1): the career panel was the ONLY IMGUI path in
         // this file drawing in raw back-buffer pixels. Everything from here to

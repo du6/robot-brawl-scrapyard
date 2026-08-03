@@ -251,7 +251,11 @@ public class MobileBuilderUI : MonoBehaviour
         tipText.verticalOverflow = VerticalWrapMode.Truncate;
         var tskip = MkButton("tipskip", tipBar.transform, "SKIP TIPS", 14, () =>
         {
-            Career.Data.tutorialStep = 3;
+            // Was tutorialStep = 3, which silenced the row by CLAIMING you had
+            // finished onboarding - and now that the tips run past step 3 it
+            // would not even have silenced it. A skip should turn tips off,
+            // not lie about progress.
+            Career.Data.tipsOff = true;
             if (Career.autosave) Career.Save();
             RefreshRobots();
             PumpTip();
@@ -281,7 +285,7 @@ public class MobileBuilderUI : MonoBehaviour
         tnrt.pivot = new Vector2(1f, 0.5f); tnrt.sizeDelta = new Vector2(32f, 26f);
         tnrt.anchoredPosition = new Vector2(-130f, 0f);
         HoverHint(tipPrev, () => tipViewNow > 0 ? null : TIP_FIRST);
-        HoverHint(tipNext, () => tipViewNow < 2 ? null : TIP_LAST);
+        HoverHint(tipNext, () => tipViewNow < BuilderManager.TIP_COUNT - 1 ? null : TIP_LAST);
         tipBar.AddComponent<RectMask2D>();
         tipBar.SetActive(false);
 
@@ -1947,19 +1951,12 @@ public class MobileBuilderUI : MonoBehaviour
     /// it told a player with two robots in the stable to "found your stable".
     /// State wins: a non-empty stable is past step 0, a saved snapshot is past
     /// step 1.</summary>
+    /// <summary>OWEN 2026-08-03: both of these now defer to BuilderManager,
+    /// which owns the one tip list. They used to be the only copy, and the
+    /// desktop strip was a second, older, career-blind one.</summary>
     int TutorialStep()
     {
-        if (!Career.active) return 3;
-        int ts = Career.Data.tutorialStep;
-        if (ts >= 3) return 3;
-        var st = Career.Data.stable;
-        if (st != null && st.Count > 0)
-        {
-            if (ts < 1) ts = 1;
-            for (int i = 0; i < st.Count; i++)
-                if (st[i] != null && st[i].snapshot != null && st[i].snapshot.Length > 0) { if (ts < 2) ts = 2; break; }
-        }
-        return ts;
+        return bm == null ? BuilderManager.TIP_COUNT : bm.CareerTipStep();
     }
 
     /// <summary>The tip names the tab it is about, and says something different
@@ -1967,14 +1964,8 @@ public class MobileBuilderUI : MonoBehaviour
     /// sentence on BUILD, LEAGUE, SHOP and PARTS.</summary>
     string TutorialTip(int ts)
     {
-        if (ts == 0)
-            return tab == 2 ? "TIP 1/3  ·  type a name above, then tap NEW ROBOT to found your stable"
-                            : "TIP 1/3  ·  open the ROBOTS tab → found your stable";
-        if (ts == 1)
-            return tab == 0 ? "TIP 2/3  ·  pick a part below, tap the robot to bolt it on · SAVE on ROBOTS when it drives"
-                            : "TIP 2/3  ·  open the BUILD tab → build your robot from the starter kit";
-        return tab == 1 ? "TIP 3/3  ·  pick the Scrapyard Open · SCOUT the opponent, then FIGHT"
-                        : "TIP 3/3  ·  open the LEAGUE tab → enter your first contest";
+        if (bm == null) return "";
+        return bm.CareerTip(ts, tab == 0 ? "build" : tab == 1 ? "league" : "other");
     }
 
     /// <summary>R4 (critic finding 4): onboarding gets its own row, stacked
@@ -1989,7 +1980,7 @@ public class MobileBuilderUI : MonoBehaviour
     void TipStep(int d)
     {
         int cur = tipView < 0 ? TutorialStep() : tipView;
-        int next = Mathf.Clamp(cur + d, 0, 2);
+        int next = Mathf.Clamp(cur + d, 0, BuilderManager.TIP_COUNT - 1);
         // Touch has no hover, so the CLICK path has to carry the reason or the
         // hint never reaches a player on a tablet - which is most of them.
         if (next == cur) { Feedback(d < 0 ? TIP_FIRST : TIP_LAST); return; }
@@ -2005,17 +1996,20 @@ public class MobileBuilderUI : MonoBehaviour
         // is what keeps the arrows from stranding a player on a tip they have
         // already completed.
         if (ts != tipStepSeen) { tipStepSeen = ts; tipView = -1; }
-        bool show = Career.active && ts < 3;
-        int view = tipView < 0 ? ts : Mathf.Clamp(tipView, 0, 2);
+        // CareerTipStep returns TIP_COUNT for "nothing left to say", which
+        // covers career-off, skipped, and finished in one test.
+        bool show = ts < BuilderManager.TIP_COUNT;
+        int view = tipView < 0 ? ts : Mathf.Clamp(tipView, 0, BuilderManager.TIP_COUNT - 1);
         if (show)
         {
             // Reading ahead or back is marked, so a previewed tip is never
             // mistaken for the thing the game is currently waiting on.
-            tipText.text = TutorialTip(view) + (view == ts ? "" : "   \u00b7   (reading ahead \u2014 you are on " + (ts + 1) + "/3)");
+            tipText.text = TutorialTip(view)
+                         + (view == ts ? "" : "   \u00b7   (reading ahead \u2014 you are on " + (ts + 1) + "/" + BuilderManager.TIP_COUNT + ")");
             tipText.color = view == ts ? new Color(0.62f, 0.84f, 1f) : new Color(0.72f, 0.72f, 0.80f);
             tipViewNow = view;
             SetArrow(tipPrev, view > 0);
-            SetArrow(tipNext, view < 2);
+            SetArrow(tipNext, view < BuilderManager.TIP_COUNT - 1);
         }
         if (tipBar.activeSelf != show) { tipBar.SetActive(show); ApplyDockH(); }
         if (!show) return;
