@@ -2397,6 +2397,7 @@ public class BuilderManager : MonoBehaviour
     public static bool uiPointerBlocked;
     // OWEN 2026-08-02 save dialog, desktop half. Both front ends or neither -
     // a rule that lives in one front end is not a rule.
+    public const string NAME_GATE_HINT = "Type a name in the box first \u2014 every robot and draft needs one.";
     bool deskSaveDlg, deskSaveFocus;
     string deskSaveBuf = "", deskSaveErr = "", deskSaveNote = "";
     public bool TestDesktopSaveDialogOpen { get { return deskSaveDlg; } }
@@ -4794,6 +4795,16 @@ public class BuilderManager : MonoBehaviour
 
     void OnGUI()
     {
+        // Read LAST frame's hover and clear. Doing it here rather than at the
+        // end means the several early returns below cannot skip it, and only
+        // re-toasting on CHANGE stops a resting cursor from pinning the message
+        // bar and clobbering everything else that wants to speak.
+        if (Event.current.type == EventType.Repaint)
+        {
+            if (gateHoverWhy == null) gateHoverShown = null;
+            else if (gateHoverWhy != gateHoverShown) { message = gateHoverWhy; gateHoverShown = gateHoverWhy; }
+            gateHoverWhy = null;
+        }
         ModeBanner();
         if (MobileBuilderUI.Active)
         {
@@ -4979,11 +4990,8 @@ public class BuilderManager : MonoBehaviour
             // Desktop half of the same gate: reads unavailable while the name
             // box is empty, but still clickable so the click explains itself.
             bool noName = string.IsNullOrEmpty(stableNameBuf) || stableNameBuf.Trim().Length == 0;
-            Color savedNm = GUI.color;
-            if (noName) GUI.color = new Color(0.60f, 0.60f, 0.64f);
-            if (GUILayout.Button("NEW ROBOT", matStyle))
+            if (GatedButton("NEW ROBOT", matStyle, noName ? NAME_GATE_HINT : null))
             { string e4 = StableCreate(stableNameBuf); if (e4 != null) { message = e4; SfxSynth.Deny(); } stableNameBuf = ""; }
-            GUI.color = savedNm;
             if (GUILayout.Button("SAVE", matStyle))
             {
                 if (NothingOpen) OpenDesktopSaveDialog();
@@ -5033,11 +5041,8 @@ public class BuilderManager : MonoBehaviour
             // one-side-only fix is this project's signature bug.
             GUILayout.BeginHorizontal();
             // Same gate and same dimming as NEW ROBOT above.
-            Color savedDr = GUI.color;
-            if (noName) GUI.color = new Color(0.60f, 0.60f, 0.64f);
-            if (GUILayout.Button("NEW DRAFT", matStyle, GUILayout.Width(96f)))
+            if (GatedButton("NEW DRAFT", matStyle, noName ? NAME_GATE_HINT : null, GUILayout.Width(96f)))
             { string e5 = BlueprintSave(stableNameBuf); if (e5 != null) { message = e5; SfxSynth.Deny(); } stableNameBuf = ""; }
-            GUI.color = savedDr;
             GUILayout.Label("blueprints \u2014 designs you do not own the parts for yet", descStyle);
             GUILayout.EndHorizontal();
             // Deletion is DEFERRED to after the loop. Removing a row mid-loop
@@ -5086,17 +5091,15 @@ public class BuilderManager : MonoBehaviour
                     // mobile uGUI board are two separate code paths and this
                     // project's signature bug is the one-side-only fix, so both
                     // get it, from the same CareerFightBlocker call.
-                    string cTag; bool cBlocked = CareerFightBlocker(li, ci3, out cTag) != null;
-                    Color cSaved = GUI.color;
-                    if (cBlocked) GUI.color = new Color(0.60f, 0.60f, 0.64f);
-                    if (GUILayout.Button(string.Format("{0} {1} ({2}) \u00b7 {3} scrap{4}{5}{6}",
+                    string cTag; string cWhy = CareerFightBlocker(li, ci3, out cTag);
+                    bool cBlocked = cWhy != null;
+                    if (GatedButton(string.Format("{0} {1} ({2}) \u00b7 {3} scrap{4}{5}{6}",
                         cdone ? "\u2713" : "\u25b8", EnemyRoster.Find(cc.oppId).label, cc.tier,
                         cdone ? Mathf.RoundToInt(cc.purse * 0.4f) : cc.purse,
                         cdone ? " (re-entry)" : "",
                         cc.entryFee > 0 ? " \u00b7 fee " + cc.entryFee + " scrap" : "",
-                        cBlocked ? "   \u2014   " + cTag : ""), matStyle))
+                        cBlocked ? "   \u2014   " + cTag : ""), matStyle, cWhy))
                         StartCareerFight(li, ci3);
-                    GUI.color = cSaved;
                     GUILayout.EndHorizontal();
                 }
             }
@@ -5745,6 +5748,32 @@ public class BuilderManager : MonoBehaviour
         SaveDialogGUI();
     }
 
+    /// <summary>OWEN 2026-08-03: "whenever a button is disabled, it should show
+    /// hint to user on why it is disabled when hovering or being clicked."
+    ///
+    /// IMGUI has no hover events, so this is the desktop half: draw the button
+    /// dim when `why` is non-null, catch the pointer resting on it during the
+    /// Repaint pass, and refuse the click with the reason instead of running
+    /// the action. The caller writes the condition ONCE and gets all three.
+    ///
+    /// Returns true only when the button was pressed AND is live, so callers
+    /// read exactly like a plain GUILayout.Button.</summary>
+    string gateHoverWhy, gateHoverShown;
+    bool GatedButton(string label, GUIStyle st, string why, params GUILayoutOption[] opt)
+    {
+        Color sv = GUI.color;
+        if (why != null) GUI.color = new Color(0.60f, 0.60f, 0.64f);
+        bool hit = GUILayout.Button(label, st, opt);
+        GUI.color = sv;
+        // GetLastRect is only meaningful once layout has been resolved, and
+        // mousePosition is already in the scaled GUI space this panel draws in.
+        if (why != null && Event.current.type == EventType.Repaint
+            && GUILayoutUtility.GetLastRect().Contains(Event.current.mousePosition))
+            gateHoverWhy = why;
+        if (hit && why != null) { message = why; SfxSynth.Deny(); return false; }
+        return hit;
+    }
+
     void OpenDesktopSaveDialog()
     {
         deskSaveDlg = true; deskSaveFocus = true;
@@ -5797,8 +5826,19 @@ public class BuilderManager : MonoBehaviour
         GUILayout.FlexibleSpace();
         if (GUILayout.Button("CANCEL", matStyle, GUILayout.Width(96f))) CloseDesktopSaveDialog();
         bool noName = string.IsNullOrEmpty(deskSaveBuf) || deskSaveBuf.Trim().Length == 0;
+        // The window has its own error lane an inch away, so the reason goes
+        // THERE rather than to the message bar behind the modal. Same gate,
+        // nearer surface - a toast under a dimmed backdrop is worse than no
+        // toast, and this is the one place on screen that already has a better
+        // place to put it.
+        Color svSave = GUI.color;
         if (noName) GUI.color = new Color(0.60f, 0.60f, 0.64f);
-        if (GUILayout.Button("SAVE", matStyle, GUILayout.Width(110f)))
+        bool saveHit = GUILayout.Button("SAVE", matStyle, GUILayout.Width(110f));
+        GUI.color = svSave;
+        if (noName && Event.current.type == EventType.Repaint
+            && GUILayoutUtility.GetLastRect().Contains(Event.current.mousePosition))
+            deskSaveErr = NAME_GATE_HINT;
+        if (saveHit)
         {
             string e = SaveAsNew(deskSaveBuf);
             // A refusal keeps the window open with the reason in it - closing

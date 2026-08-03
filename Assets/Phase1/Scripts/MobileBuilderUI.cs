@@ -266,6 +266,8 @@ public class MobileBuilderUI : MonoBehaviour
         tnrt.anchorMin = new Vector2(1f, 0.5f); tnrt.anchorMax = new Vector2(1f, 0.5f);
         tnrt.pivot = new Vector2(1f, 0.5f); tnrt.sizeDelta = new Vector2(32f, 26f);
         tnrt.anchoredPosition = new Vector2(-130f, 0f);
+        HoverHint(tipPrev, () => tipViewNow > 0 ? null : TIP_FIRST);
+        HoverHint(tipNext, () => tipViewNow < 2 ? null : TIP_LAST);
         tipBar.AddComponent<RectMask2D>();
         tipBar.SetActive(false);
 
@@ -999,6 +1001,30 @@ public class MobileBuilderUI : MonoBehaviour
                 mr.swap = MkButton("swap_" + bm.PartId(i) + "_" + mat, row.transform, "REWORK", 13, () => ShopSwap(idx, mat));
                 mr.swap.gameObject.AddComponent<LayoutElement>().minWidth = 104f;
                 mr.swapT = mr.swap.GetComponentInChildren<Text>();
+                // OWEN 2026-08-03. RefreshShop owns these colours, so these are
+                // hint-only gates - two writers on one Image is how a button
+                // ends up flickering between two people's ideas of "dead".
+                HoverHint(mr.buy, () => {
+                    if (bm == null || !Career.active || Career.Data == null) return null;
+                    int pr = CareerDB.PartPrice(bm.PartId(idx), mat);
+                    return Career.Data.scrap >= pr ? null
+                         : "Not enough scrap \u2014 " + MatDB.Get(mat).name + " " + bm.PartLabel(idx)
+                           + " costs " + pr + ", you hold " + Career.Data.scrap + ".";
+                });
+                HoverHint(mr.sell, () => {
+                    if (bm == null || !Career.active || Career.Data == null) return null;
+                    return Career.CountOf(bm.PartId(idx), mat) > 0 ? null
+                         : "You own no " + MatDB.Get(mat).name + " " + bm.PartLabel(idx) + " to sell.";
+                });
+                HoverHint(mr.swap, () => {
+                    if (bm == null || !Career.active || Career.Data == null) return null;
+                    if (bm.PartMatFixed(idx))
+                        return bm.PartLabel(idx) + " is always " + MatDB.Get(mat).name
+                             + " \u2014 there is nothing to rework it from.";
+                    return bm.SwapSourceFor(idx, mat) != null ? null
+                         : "You own no " + bm.PartLabel(idx) + " in another material to rework into "
+                           + MatDB.Get(mat).name + ".";
+                });
                 shopMats.Add(mr);
             }
         }
@@ -1134,21 +1160,26 @@ public class MobileBuilderUI : MonoBehaviour
                 pdef != null ? Mathf.RoundToInt(pdef.MassOf(mr.mat)) : 0, ownm);
             mr.lbl.color = afford ? new Color(0.92f,0.95f,1f) : new Color(0.70f,0.65f,0.60f);
             mr.buyT.text = "BUY";
+            mr.buyT.color = afford ? GATE_TXT_LIVE : GATE_TXT_DEAD;
             mr.buy.GetComponent<Image>().color = afford ? new Color(0.17f,0.33f,0.24f,0.98f)
                                                         : new Color(0.13f,0.14f,0.17f,0.96f);
-            // An unavailable action keeps its SLOT (invisible, non-interactable)
-            // instead of collapsing it, so BUY / SELL / REWORK stay in fixed
-            // columns all the way down the list.
+            // OWEN 2026-08-03: "whenever a button is disabled, it should show
+            // hint to user on why it is disabled."
+            //
+            // These used to hold their SLOT but go fully transparent and
+            // non-interactive - so an unavailable SELL was not a disabled
+            // button, it was an unexplained gap. You could not hover it, click
+            // it, or even see it. Now it stays visible, keeps its label, reads
+            // dead, and says why (own none / nothing to rework from) on hover
+            // or tap. Fixed columns either way, which was the original point.
             bool canSell = ownm > 0;
-            mr.sellT.text = canSell ? "SELL " + CareerDB.SellPrice(id, mr.mat) : "";
-            mr.sell.interactable = canSell;
-            mr.sell.GetComponent<Image>().color = canSell ? new Color(0.16f,0.18f,0.22f,0.96f)
-                                                          : new Color(0f,0f,0f,0f);
+            mr.sellT.text = canSell ? "SELL " + CareerDB.SellPrice(id, mr.mat) : "SELL";
+            mr.sellT.color = canSell ? GATE_TXT_LIVE : GATE_TXT_DEAD;
+            mr.sell.GetComponent<Image>().color = canSell ? GATE_LIVE : GATE_DEAD;
             string src = fixedMat ? null : bm.SwapSourceFor(mr.part, mr.mat);
-            mr.swapT.text = src != null ? "REWORK " + Career.SwapCost(id, src, mr.mat) : "";
-            mr.swap.interactable = src != null;
-            mr.swap.GetComponent<Image>().color = src != null ? new Color(0.16f,0.18f,0.22f,0.96f)
-                                                              : new Color(0f,0f,0f,0f);
+            mr.swapT.text = src != null ? "REWORK " + Career.SwapCost(id, src, mr.mat) : "REWORK";
+            mr.swapT.color = src != null ? GATE_TXT_LIVE : GATE_TXT_DEAD;
+            mr.swap.GetComponent<Image>().color = src != null ? GATE_LIVE : GATE_DEAD;
         }
     }
 
@@ -1233,20 +1264,87 @@ public class MobileBuilderUI : MonoBehaviour
     const string NAME_HINT = "Type a name in the box on the left first.";
     static readonly Color GATE_LIVE = new Color(0.16f, 0.18f, 0.22f, 0.96f);
     static readonly Color GATE_DEAD = new Color(0.12f, 0.13f, 0.16f, 0.96f);
+    static readonly Color GATE_TXT_LIVE = Color.white;
+    static readonly Color GATE_TXT_DEAD = new Color(0.44f, 0.46f, 0.50f);
 
     bool NameEmpty()
     { return nameInput == null || nameInput.text == null || nameInput.text.Trim().Length == 0; }
+
+    /// <summary>OWEN 2026-08-03: "whenever a button is disabled, it should show
+    /// hint to user on why it is disabled when hovering or being clicked."
+    ///
+    /// Generalised from the name gate, because there were THREE bespoke
+    /// versions of this idea in this file - nameGated, fightGates and SetArrow -
+    /// and only the first two could talk. Three mechanisms is how the fourth
+    /// one gets written without a hint and nobody notices.
+    ///
+    /// A gate is a button plus a function that returns WHY it is unavailable,
+    /// or null when it is not. That single function drives all three
+    /// behaviours: the dimming, the hover hint, and the refusal on click. They
+    /// cannot drift apart because there is nothing to keep in sync.</summary>
+    class BtnGate
+    {
+        public Button btn;
+        public Image img;
+        public Text txt;
+        public System.Func<string> why;
+        public Color live, dead, txtLive, txtDead;
+        public bool paint;
+    }
+    readonly List<BtnGate> gates = new List<BtnGate>();
+    float gateAt = -99f;
+
+    /// <summary>Dim it, hint on hover, refuse on click.</summary>
+    Button Gated(Button b, System.Func<string> why)
+    { return Gated(b, why, GATE_LIVE, GATE_DEAD, GATE_TXT_LIVE, GATE_TXT_DEAD, true); }
+
+    /// <summary>Hint only - for buttons whose colour is already owned by a
+    /// refresh pass (the shop rows), so the two do not fight over the Image.</summary>
+    Button HoverHint(Button b, System.Func<string> why)
+    { return Gated(b, why, GATE_LIVE, GATE_DEAD, GATE_TXT_LIVE, GATE_TXT_DEAD, false); }
+
+    Button Gated(Button b, System.Func<string> why, Color live, Color dead, Color tl, Color td, bool paint)
+    {
+        if (b == null || why == null) return b;
+        gates.Add(new BtnGate { btn = b, img = b.GetComponent<Image>(), txt = b.GetComponentInChildren<Text>(),
+                                why = why, live = live, dead = dead, txtLive = tl, txtDead = td, paint = paint });
+        // NEVER Button.interactable = false on a gated button. A truly disabled
+        // uGUI button swallows the pointer outright - no click, no hover, no
+        // EventTrigger - so it can never deliver the hint that was asked for.
+        // Every gate here stays live and refuses with a sentence.
+        b.interactable = true;
+        var trig = b.gameObject.GetComponent<EventTrigger>();
+        if (trig == null) trig = b.gameObject.AddComponent<EventTrigger>();
+        var en = new EventTrigger.Entry { eventID = EventTriggerType.PointerEnter };
+        en.callback.AddListener(delegate { string r = why(); if (r != null) Feedback(r); });
+        trig.triggers.Add(en);
+        return b;
+    }
+
+    void PumpGates()
+    {
+        if (Time.unscaledTime - gateAt < 0.25f) return;
+        gateAt = Time.unscaledTime;
+        for (int i = gates.Count - 1; i >= 0; i--)
+        {
+            var g = gates[i];
+            if (g.btn == null) { gates.RemoveAt(i); continue; }   // its row was rebuilt
+            if (!g.paint) continue;
+            bool blocked = g.why() != null;
+            if (g.img != null) g.img.color = blocked ? g.dead : g.live;
+            if (g.txt != null) g.txt.color = blocked ? g.txtDead : g.txtLive;
+        }
+    }
 
     void RegisterNameGated(Button b)
     {
         if (b == null) return;
         nameGated.Add(b);
-        var trig = b.gameObject.AddComponent<EventTrigger>();
-        var en = new EventTrigger.Entry { eventID = EventTriggerType.PointerEnter };
-        en.callback.AddListener(delegate { if (NameEmpty()) Feedback(NAME_HINT); });
-        trig.triggers.Add(en);
+        Gated(b, () => NameEmpty() ? NAME_HINT : null);
     }
 
+    /// <summary>Kept alongside the 0.25 s gate pump because typing wants an
+    /// answer on the same frame as the keystroke, not a quarter second later.</summary>
     void RefreshNameGates()
     {
         bool empty = NameEmpty();
@@ -1257,7 +1355,7 @@ public class MobileBuilderUI : MonoBehaviour
             var im = b.GetComponent<Image>();
             if (im != null) im.color = empty ? GATE_DEAD : GATE_LIVE;
             var t = b.GetComponentInChildren<Text>();
-            if (t != null) t.color = empty ? new Color(0.44f, 0.46f, 0.50f) : Color.white;
+            if (t != null) t.color = empty ? GATE_TXT_DEAD : GATE_TXT_LIVE;
         }
     }
 
@@ -1673,6 +1771,7 @@ public class MobileBuilderUI : MonoBehaviour
             // the status below is rebuilt every frame no matter what they do.
             PumpMessage(bm.LastMessage);
             PumpFightGates();   // OWEN: the contest rows answer before the tap
+            PumpGates();        // OWEN 2026-08-03: every gated button, one rule
             PumpDirty(false);   // OWEN: does the active robot owe a save?
             PumpTip();          // R4 finding 4: onboarding is a THIRD channel
             {
@@ -1872,7 +1971,11 @@ public class MobileBuilderUI : MonoBehaviour
     void TipStep(int d)
     {
         int cur = tipView < 0 ? TutorialStep() : tipView;
-        tipView = Mathf.Clamp(cur + d, 0, 2);
+        int next = Mathf.Clamp(cur + d, 0, 2);
+        // Touch has no hover, so the CLICK path has to carry the reason or the
+        // hint never reaches a player on a tablet - which is most of them.
+        if (next == cur) { Feedback(d < 0 ? TIP_FIRST : TIP_LAST); return; }
+        tipView = next;
         PumpTip();
     }
 
@@ -1892,6 +1995,7 @@ public class MobileBuilderUI : MonoBehaviour
             // mistaken for the thing the game is currently waiting on.
             tipText.text = TutorialTip(view) + (view == ts ? "" : "   \u00b7   (reading ahead \u2014 you are on " + (ts + 1) + "/3)");
             tipText.color = view == ts ? new Color(0.62f, 0.84f, 1f) : new Color(0.72f, 0.72f, 0.80f);
+            tipViewNow = view;
             SetArrow(tipPrev, view > 0);
             SetArrow(tipNext, view < 2);
         }
@@ -1905,10 +2009,16 @@ public class MobileBuilderUI : MonoBehaviour
     /// <summary>An arrow at the end of the run reads dead instead of vanishing:
     /// a control that disappears moves everything next to it, and the row would
     /// reflow under the thumb mid-tap.</summary>
+    int tipViewNow;
+    const string TIP_FIRST = "This is the first tip \u2014 there is nothing before it.";
+    const string TIP_LAST  = "This is the last tip \u2014 SKIP TIPS clears the row.";
+
     static void SetArrow(Button b, bool live)
     {
         if (b == null) return;
-        b.interactable = live;
+        // NOT interactable = false any more. A dead arrow that swallows the tap
+        // is a button that cannot tell you it is the end of the run - which is
+        // the whole of what owen asked for on 2026-08-03.
         var im = b.GetComponent<Image>();
         if (im != null) im.color = live ? new Color(0.16f,0.28f,0.40f,0.96f) : new Color(0.11f,0.13f,0.16f,0.96f);
         var t = b.GetComponentInChildren<Text>();

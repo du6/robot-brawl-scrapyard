@@ -55,6 +55,15 @@ public class CareerSmoke : MonoBehaviour
         b.onClick.Invoke();
         return true;
     }
+    /// <summary>Like TapNamed's lookup but sees INACTIVE objects too -
+    /// GameObject.Find does not, and half the gated buttons live on tabs that
+    /// are not currently up.</summary>
+    static Button ByName(string goName)
+    {
+        foreach (var b in Object.FindObjectsByType<Button>(FindObjectsInactive.Include, FindObjectsSortMode.None))
+            if (b.gameObject.name == goName) return b;
+        return null;
+    }
     /// <summary>Screen position of the core (true) or the most recently
     /// placed part (false); zero when unavailable.</summary>
     static Vector3 PartOnScreen(bool core)
@@ -516,6 +525,55 @@ public class CareerSmoke : MonoBehaviour
         TapNamed("bsave"); yield return null;
         Check(GameObject.Find("savedlg_ok") == null,
               "SAVE with a robot open commits silently, no window");
+
+        // ==== C8: a disabled button explains itself (owen 2026-08-03) ====
+        // "whenever a button is disabled, it should show hint to user on why it
+        // is disabled when hovering or being clicked."
+        //
+        // Button.interactable = false swallows the pointer outright - no click,
+        // no hover, no EventTrigger - so a button in that state can never do
+        // either thing owen asked for. That makes "none of the gated buttons
+        // are interactable = false" the load-bearing assertion here: it is the
+        // one property that would silently take the hint away again.
+        Career.Data.inventory.Clear();       // own nothing, so SELL/REWORK are the dead ones
+        Tap("SHOP"); yield return null;
+        // The accordion header TOGGLES. C4 already left the beam section open,
+        // so tapping it "to open it" closed it instead and the two taps below
+        // landed on nothing - the identical failure the c4 shop assertion had.
+        // Ask whether the row is reachable rather than toggling blind.
+        if (GameObject.Find("sell_beam_Aluminum") == null)
+        {
+            int beamSec8 = -1;
+            for (int i = 1; i < bm.PaletteCount; i++) if (bm.PartId(i) == "beam") beamSec8 = i;
+            TapNamed("shophead_" + beamSec8); yield return null;
+        }
+        yield return null;
+
+        var sellB = ByName("sell_beam_Aluminum");
+        var swapB = ByName("swap_beam_Aluminum");
+        var prevB = ByName("tipprev");
+        var nextB = ByName("tipnext");
+        Check(sellB != null && sellB.interactable
+              && swapB != null && swapB.interactable
+              && prevB != null && prevB.interactable
+              && nextB != null && nextB.interactable,
+              "gated buttons stay clickable so they can explain themselves");
+
+        // An unavailable action used to blank its label and go fully
+        // transparent - not a disabled button, an unexplained gap.
+        Check(sellB != null && sellB.GetComponentInChildren<Text>().text == "SELL",
+              "an unavailable SELL keeps its label instead of vanishing");
+
+        // Assert the TAP as well as its effect, every time. A silent false is
+        // how the whole shop section stayed dead for weeks.
+        bool sellTapped8 = TapNamed("sell_beam_Aluminum"); yield return null;
+        var shdr8 = GameObject.Find("shopheader");
+        Check(sellTapped8 && shdr8 != null && shdr8.GetComponent<Text>().text.Contains("\u26a0"),
+              "tapping the dead SELL answers with the amber reason");
+
+        bool swapTapped8 = TapNamed("swap_beam_Aluminum"); yield return null;
+        Check(swapTapped8 && shdr8 != null && shdr8.GetComponent<Text>().text.Contains("rework"),
+              "tapping the dead REWORK says what it is missing");
 
         // ---- C6.4: telemetry schema landed (§14) ----
         Check(Career.Data.fights > 0, "telemetry: fights counted (" + Career.Data.fights + ")");
