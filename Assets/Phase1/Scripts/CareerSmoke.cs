@@ -447,6 +447,76 @@ public class CareerSmoke : MonoBehaviour
         Check(BuilderManager.bannerNow == "",
               "C6.5: no banner in plain career play (" + BuilderManager.bannerNow + ")");
 
+        // ==== C7: SAVE names its own build (owen 2026-08-02) ====
+        // "The SAVE button on the build tab is disabled by default, and
+        // requires the user to create a new robot or draft from the ROBOT tab
+        // first." The first build a player ever makes was the one SAVE refused.
+        Career.Data.activeRobot = -1;
+        Career.Data.activeBlueprint = -1;
+        foreach (var it in bm.CareerShortfallItems()) Career.AddItem(it.partId, it.mat, it.count);
+        Tap("BUILD"); yield return null;
+        Check(bm.NothingOpen, "C7 setup: nothing is open, so SAVE has nothing to commit to");
+        int stable7 = Career.Data.stable.Count;
+
+        TapNamed("bsave"); yield return null;
+        var dlg = GameObject.Find("savedlg");
+        Check(dlg != null && dlg.activeSelf, "SAVE with nothing open opens the naming window");
+        Check(bm.SaveAsNewNote().Contains("Founds a robot"),
+              "the window says it will found a robot when every part is owned");
+
+        // empty name is refused IN the window - it must not close and lose it
+        TapNamed("savedlg_ok"); yield return null;
+        var errT = GameObject.Find("savedlg_err");
+        Check(GameObject.Find("savedlg") != null && Career.Data.stable.Count == stable7
+              && errT != null && errT.GetComponent<Text>().text.Length > 0,
+              "empty name: refused in place, window stays open, nothing created");
+
+        // CANCEL commits nothing
+        TapNamed("savedlg_cancel"); yield return null;
+        Check(GameObject.Find("savedlg_ok") == null && Career.Data.stable.Count == stable7,
+              "CANCEL closes the window and creates nothing");
+
+        // named + affordable -> a ROBOT
+        TapNamed("bsave"); yield return null;
+        var dlgName = GameObject.Find("savedlg_name");
+        if (dlgName != null) dlgName.GetComponent<InputField>().text = "BOLT CUTTER";
+        yield return null;
+        TapNamed("savedlg_ok"); yield return null;
+        Check(GameObject.Find("savedlg_ok") == null
+              && Career.Data.stable.Count == stable7 + 1
+              && Career.Data.stable[Career.Data.stable.Count - 1].name == "BOLT CUTTER"
+              && !Career.Drafting,
+              "named save founds a ROBOT when the build is fully owned");
+
+        // same button, unaffordable build -> a DRAFT, not a robot that would
+        // only fail later at the LEAGUE tab
+        Career.Data.activeRobot = -1;
+        Career.Data.activeBlueprint = -1;
+        Career.Data.inventory.Clear();
+        yield return null;
+        Check(bm.SaveWouldDraft && bm.SaveAsNewNote().Contains("Keeps a draft"),
+              "the window switches to draft when parts are missing");
+        int bp7 = Career.Data.blueprints.Count;
+        int st7b = Career.Data.stable.Count;
+        TapNamed("bsave"); yield return null;
+        var dlgName2 = GameObject.Find("savedlg_name");
+        if (dlgName2 != null) dlgName2.GetComponent<InputField>().text = "WISH LIST";
+        yield return null;
+        TapNamed("savedlg_ok"); yield return null;
+        Check(Career.Data.blueprints.Count == bp7 + 1
+              && Career.Data.stable.Count == st7b
+              && Career.Data.blueprints[Career.Data.blueprints.Count - 1].name == "WISH LIST",
+              "named save keeps a DRAFT when parts are missing");
+
+        // and with something open again, SAVE commits straight through with no
+        // window - the dialog is for the empty case only
+        Career.Data.activeBlueprint = -1;
+        Career.Data.activeRobot = 0;
+        yield return null;
+        TapNamed("bsave"); yield return null;
+        Check(GameObject.Find("savedlg_ok") == null,
+              "SAVE with a robot open commits silently, no window");
+
         // ---- C6.4: telemetry schema landed (§14) ----
         Check(Career.Data.fights > 0, "telemetry: fights counted (" + Career.Data.fights + ")");
         Check(Career.Data.scrapCurve.Count == Career.Data.fights,

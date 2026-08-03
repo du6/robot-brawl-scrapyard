@@ -2395,6 +2395,11 @@ public class BuilderManager : MonoBehaviour
     /// panels, so the placement raycast doesn't fire under the UI (the phone
     /// analogue of the old PANEL_W gate).</summary>
     public static bool uiPointerBlocked;
+    // OWEN 2026-08-02 save dialog, desktop half. Both front ends or neither -
+    // a rule that lives in one front end is not a rule.
+    bool deskSaveDlg, deskSaveFocus;
+    string deskSaveBuf = "", deskSaveErr = "", deskSaveNote = "";
+    public bool TestDesktopSaveDialogOpen { get { return deskSaveDlg; } }
     public float TestOrbitDist { get { return orbitDist; } set { orbitDist = Mathf.Clamp(value, 2.2f, 9f); } }
     public int PaletteCount { get { return palette != null ? palette.Length : 0; } }
     public string PartLabel(int i) { return (i >= 0 && i < PaletteCount) ? palette[i].label : ""; }
@@ -3837,9 +3842,67 @@ public class BuilderManager : MonoBehaviour
         }
         int a = Career.Data.activeRobot;
         if (a < 0 || a >= Career.Data.stable.Count)
-            return "Nothing open to save \u2014 NEW ROBOT to found this build, "
-                 + "or NEW DRAFT to keep it as a design.";
+            return "Nothing open to save \u2014 name this build first.";
         return StableSave();
+    }
+
+    /// <summary>OWEN 2026-08-02: "The SAVE button on the build tab is disabled
+    /// by default, and requires the user to create a new robot or draft from
+    /// the ROBOT tab first. I think we should allow the user to save directly
+    /// under BUILD."
+    ///
+    /// He is right, and the shape of the bug is familiar: SAVE was a commit
+    /// verb that only worked once you had already performed the real creation
+    /// step somewhere else. So the first build a player ever makes - the one
+    /// they care most about - is the one SAVE refuses. The naming step was
+    /// never the hard part; making them go and find it was.
+    ///
+    /// True when SAVE has nothing to commit to and should ask for a name.</summary>
+    public bool NothingOpen
+    {
+        get
+        {
+            if (!Career.active) return false;
+            int b = Career.Data.activeBlueprint;
+            if (b >= 0 && b < Career.Data.blueprints.Count) return false;
+            int a = Career.Data.activeRobot;
+            return a < 0 || a >= Career.Data.stable.Count;
+        }
+    }
+
+    /// <summary>Would a fresh save keep this build as a DRAFT rather than
+    /// found a robot? A robot is a machine you OWN; a build leaning on parts
+    /// you have not bought is a design, and calling it a robot is how a stable
+    /// fills with machines that only fail at the LEAGUE tab.</summary>
+    public bool SaveWouldDraft { get { return CareerShortfallItems().Count > 0; } }
+
+    /// <summary>The one line the dialog shows, so the player knows which of
+    /// the two they are about to make BEFORE they commit - and why. The
+    /// robot/draft distinction is then a consequence of what they built
+    /// rather than a quiz they have to pass.</summary>
+    public string SaveAsNewNote()
+    {
+        if (!Career.active) return "";
+        var need = CareerShortfallItems();
+        if (need.Count == 0)
+            return "Founds a robot \u2014 you own every part in this build ("
+                 + Mathf.Max(0, placed.Count - 1) + ").";
+        var bits = new List<string>();
+        foreach (var it in need) bits.Add(it.count + "\u00d7 " + it.mat + " " + it.partId);
+        return "Keeps a draft \u2014 you do not own " + string.Join(", ", bits.ToArray())
+             + ". CONVERT buys them when you are ready.";
+    }
+
+    /// <summary>Name a build that has no object behind it yet. Robot when every
+    /// part is owned, draft when it is not - the same rule StableCreate and the
+    /// LEAGUE gate already enforce, just applied at creation time instead of
+    /// sprung on the player later.</summary>
+    public string SaveAsNew(string name)
+    {
+        if (!Career.active) return "Career is off.";
+        if (string.IsNullOrEmpty(name) || name.Trim().Length == 0)
+            return "Name it first \u2014 type a name in the box above.";
+        return SaveWouldDraft ? BlueprintSave(name) : StableCreate(name);
     }
 
     public string StableSave()
@@ -4922,7 +4985,10 @@ public class BuilderManager : MonoBehaviour
             { string e4 = StableCreate(stableNameBuf); if (e4 != null) { message = e4; SfxSynth.Deny(); } stableNameBuf = ""; }
             GUI.color = savedNm;
             if (GUILayout.Button("SAVE", matStyle))
-            { string e4 = SaveActive(); if (e4 != null) { message = e4; SfxSynth.Deny(); } }
+            {
+                if (NothingOpen) OpenDesktopSaveDialog();
+                else { string e4 = SaveActive(); if (e4 != null) { message = e4; SfxSynth.Deny(); } }
+            }
             GUILayout.EndHorizontal();
             for (int ri = 0; ri < Career.Data.stable.Count; ri++)
             {
@@ -5674,6 +5740,77 @@ public class BuilderManager : MonoBehaviour
         GUILayout.Label("Aim at a face — it lights up with its sockets.\nParts snap to sockets only. Green dots = the\nsockets that will mate; more mated = stronger\njoint.\nR rotate part (beams/plates stand up too)\nright-click removes a part AND everything it\ncarries — red markers show what goes · Z undo\nQ/E orbit · scroll zoom\nGreen arrow = FRONT (W drives that way)\nRed dot = center of mass\nBlue rect = wheel support\n(dot outside rect → it tips)", descStyle);
         GUILayout.EndArea();
         GUI.matrix = panelSavedMatrix;   // R2: restore before anything else draws
+        // LAST. IMGUI paints in call order, so a modal drawn any earlier ends
+        // up underneath the panel it is supposed to be blocking.
+        SaveDialogGUI();
+    }
+
+    void OpenDesktopSaveDialog()
+    {
+        deskSaveDlg = true; deskSaveFocus = true;
+        deskSaveBuf = ""; deskSaveErr = "";
+        deskSaveNote = SaveAsNewNote();
+        uiPointerBlocked = true;   // modal: no placing parts through the window
+    }
+    void CloseDesktopSaveDialog()
+    {
+        deskSaveDlg = false;
+        uiPointerBlocked = false;
+    }
+
+    /// <summary>Desktop twin of MobileBuilderUI's savedlg.</summary>
+    void SaveDialogGUI()
+    {
+        if (!deskSaveDlg) return;
+        if (MobileBuilderUI.Active) { CloseDesktopSaveDialog(); return; }
+        EnsureStyles();
+        var prevM = GUI.matrix;
+        var prevC = GUI.color;
+        float sc = GuiScale;
+        GUI.matrix = Matrix4x4.Scale(new Vector3(sc, sc, 1f));
+        float sw = Screen.width / sc, sh = Screen.height / sc;
+        GUI.color = new Color(0f, 0f, 0f, 0.55f);
+        GUI.DrawTexture(new Rect(0f, 0f, sw, sh), Texture2D.whiteTexture);
+        GUI.color = prevC;
+
+        float w = 470f, h = 240f;
+        var r = new Rect((sw - w) * 0.5f, (sh - h) * 0.5f, w, h);
+        GUI.Box(r, "");
+        GUILayout.BeginArea(new Rect(r.x + 16f, r.y + 14f, r.width - 32f, r.height - 28f));
+        GUILayout.Label("NAME THIS BUILD", headStyle);
+        GUILayout.Space(4f);
+        GUI.SetNextControlName("desksavename");
+        deskSaveBuf = GUILayout.TextField(deskSaveBuf ?? "", GUILayout.Height(22f));
+        if (deskSaveFocus) { GUI.FocusControl("desksavename"); deskSaveFocus = false; }
+        GUILayout.Space(4f);
+        GUILayout.Label(deskSaveNote, descStyle);
+        // Drawn UNCONDITIONALLY, empty string and all. A label that appears
+        // only when there is an error changes the control count between the
+        // Layout and Repaint passes of the very frame the error is set -
+        // "GUILayout: Mismatched LayoutGroup", the same trap the blueprint
+        // list hit when it deleted a row mid-loop.
+        GUI.color = new Color(1f, 0.78f, 0.30f);
+        GUILayout.Label(deskSaveErr, bodyStyle);
+        GUI.color = prevC;
+        GUILayout.FlexibleSpace();
+        GUILayout.BeginHorizontal();
+        GUILayout.FlexibleSpace();
+        if (GUILayout.Button("CANCEL", matStyle, GUILayout.Width(96f))) CloseDesktopSaveDialog();
+        bool noName = string.IsNullOrEmpty(deskSaveBuf) || deskSaveBuf.Trim().Length == 0;
+        if (noName) GUI.color = new Color(0.60f, 0.60f, 0.64f);
+        if (GUILayout.Button("SAVE", matStyle, GUILayout.Width(110f)))
+        {
+            string e = SaveAsNew(deskSaveBuf);
+            // A refusal keeps the window open with the reason in it - closing
+            // would drop the name they typed and hide why it did not take.
+            if (e != null) { deskSaveErr = e; SfxSynth.Deny(); }
+            else CloseDesktopSaveDialog();
+        }
+        GUI.color = prevC;
+        GUILayout.EndHorizontal();
+        GUILayout.EndArea();
+        GUI.matrix = prevM;
+        GUI.color = prevC;
     }
 
     void EnsureStyles()

@@ -73,6 +73,13 @@ public class MobileBuilderUI : MonoBehaviour
     // hit test read this ONE RectTransform so they can never disagree.
     RectTransform dockRt;
     GameObject scrim;          // dims the 3D view behind an expanded dock
+    // OWEN 2026-08-02 save dialog: SAVE on BUILD no longer needs a robot to
+    // already exist - it asks for a name and makes one.
+    GameObject saveDlg;
+    RectTransform saveDlgCard;
+    InputField saveDlgName;
+    Text saveDlgNote, saveDlgErr;
+    Button saveDlgOk;
     ScrollRect partScroll; GameObject partEdge;   // palette overflow affordance
     bool removeArmed; int clickHold; Button removeBtn;
     bool dragging; Vector2 lastP, downP; float moved; float pinchPrev = -1f;
@@ -308,6 +315,140 @@ public class MobileBuilderUI : MonoBehaviour
         BuildRobotsTab();
         BuildPartsTab();
         BuildTrophiesTab();
+        // LAST, so it is the final sibling and therefore draws over every
+        // panel above. A modal that renders under the dock is not a modal.
+        BuildSaveDialog();
+    }
+
+    /// <summary>The naming window SAVE opens when there is nothing to commit
+    /// to. It reports which of the two things it is about to make - robot or
+    /// draft - and why, so the distinction is a consequence of what you built
+    /// rather than a quiz you have to pass before you can save.</summary>
+    void BuildSaveDialog()
+    {
+        saveDlg = MkPanel("savedlg", canvas.transform, new Color(0.03f, 0.04f, 0.06f, 0.72f));
+        Stretch(saveDlg.GetComponent<RectTransform>());
+        // raycastTarget TRUE here (unlike the scrim): this one IS meant to
+        // swallow every tap behind it. OverUI() short-circuits to match.
+        saveDlg.GetComponent<UnityEngine.UI.Image>().raycastTarget = true;
+        // Sibling order alone did NOT put this above the dock - the first
+        // capture showed the tab row painting over the card's bottom edge and
+        // the dock left undimmed, which is the tell: something re-parents or
+        // re-orders the dock after this is built. An overriding sub-canvas
+        // settles it by declaration instead of by construction order, which is
+        // the only version of this that stays true when the dock changes again.
+        var dlgCv = saveDlg.AddComponent<Canvas>();
+        dlgCv.overrideSorting = true;
+        dlgCv.sortingOrder = 320;            // canvas itself is 200
+        saveDlg.AddComponent<GraphicRaycaster>();   // a sub-canvas needs its own
+
+        var card = MkPanel("savedlg_card", saveDlg.transform, new Color(0.10f, 0.12f, 0.15f, 1f));
+        var crt = saveDlgCard = card.GetComponent<RectTransform>();
+        crt.anchorMin = new Vector2(0.5f, 0.5f); crt.anchorMax = new Vector2(0.5f, 0.5f);
+        crt.pivot = new Vector2(0.5f, 0.5f); crt.sizeDelta = new Vector2(560f, 250f);
+        crt.anchoredPosition = Vector2.zero;
+
+        var title = MkText("savedlg_title", card.transform, "NAME THIS BUILD", 22, TextAnchor.MiddleLeft);
+        var trt = title.rectTransform;
+        trt.anchorMin = new Vector2(0f, 1f); trt.anchorMax = new Vector2(1f, 1f);
+        trt.pivot = new Vector2(0.5f, 1f); trt.sizeDelta = new Vector2(-40f, 34f);
+        trt.anchoredPosition = new Vector2(0f, -16f);
+
+        saveDlgName = MkInput("savedlg_name", card.transform);
+        // MkInput's placeholder says "robot name" - but this window makes a
+        // draft just as often, and the note right under it may be saying so.
+        var phT = saveDlgName.placeholder as Text;
+        if (phT != null) phT.text = "name this build\u2026";
+        var nrt = saveDlgName.GetComponent<RectTransform>();
+        nrt.anchorMin = new Vector2(0f, 1f); nrt.anchorMax = new Vector2(1f, 1f);
+        nrt.pivot = new Vector2(0.5f, 1f); nrt.sizeDelta = new Vector2(-40f, 40f);
+        nrt.anchoredPosition = new Vector2(0f, -58f);
+        saveDlgName.onValueChanged.AddListener(delegate { RefreshSaveDlgGate(); });
+
+        saveDlgNote = MkText("savedlg_note", card.transform, "", 15, TextAnchor.UpperLeft);
+        var ort = saveDlgNote.rectTransform;
+        ort.anchorMin = new Vector2(0f, 1f); ort.anchorMax = new Vector2(1f, 1f);
+        ort.pivot = new Vector2(0.5f, 1f); ort.sizeDelta = new Vector2(-40f, 58f);
+        ort.anchoredPosition = new Vector2(0f, -106f);
+        saveDlgNote.color = new Color(0.72f, 0.78f, 0.86f);
+
+        saveDlgErr = MkText("savedlg_err", card.transform, "", 15, TextAnchor.UpperLeft);
+        var ert = saveDlgErr.rectTransform;
+        ert.anchorMin = new Vector2(0f, 1f); ert.anchorMax = new Vector2(1f, 1f);
+        ert.pivot = new Vector2(0.5f, 1f); ert.sizeDelta = new Vector2(-40f, 36f);
+        ert.anchoredPosition = new Vector2(0f, -166f);
+        saveDlgErr.color = new Color(0.95f, 0.72f, 0.30f);
+
+        var cancel = MkButton("savedlg_cancel", card.transform, "CANCEL", 16, () => CloseSaveDialog());
+        var carrt = cancel.GetComponent<RectTransform>();
+        carrt.anchorMin = new Vector2(1f, 0f); carrt.anchorMax = new Vector2(1f, 0f);
+        carrt.pivot = new Vector2(1f, 0f); carrt.sizeDelta = new Vector2(120f, 42f);
+        carrt.anchoredPosition = new Vector2(-152f, 16f);
+
+        saveDlgOk = MkButton("savedlg_ok", card.transform, "SAVE", 16, () => ConfirmSaveDialog());
+        var okrt = saveDlgOk.GetComponent<RectTransform>();
+        okrt.anchorMin = new Vector2(1f, 0f); okrt.anchorMax = new Vector2(1f, 0f);
+        okrt.pivot = new Vector2(1f, 0f); okrt.sizeDelta = new Vector2(132f, 42f);
+        okrt.anchoredPosition = new Vector2(-20f, 16f);
+        // Styled dead but LEFT LIVE, same as NEW ROBOT / NEW DRAFT:
+        // interactable = false swallows the pointer, and a button that cannot
+        // explain why it refused is worse than one that refuses out loud.
+        var trig = saveDlgOk.gameObject.AddComponent<EventTrigger>();
+        var en = new EventTrigger.Entry { eventID = EventTriggerType.PointerEnter };
+        en.callback.AddListener(delegate { if (SaveDlgNameEmpty()) SetSaveDlgErr("Type a name first."); });
+        trig.triggers.Add(en);
+
+        saveDlg.SetActive(false);
+    }
+
+    bool SaveDlgNameEmpty()
+    {
+        return saveDlgName == null || saveDlgName.text == null || saveDlgName.text.Trim().Length == 0;
+    }
+    void SetSaveDlgErr(string e) { if (saveDlgErr != null) saveDlgErr.text = e == null ? "" : e; }
+    void RefreshSaveDlgGate()
+    {
+        if (saveDlgOk == null) return;
+        bool empty = SaveDlgNameEmpty();
+        var im = saveDlgOk.GetComponent<UnityEngine.UI.Image>();
+        if (im != null) im.color = empty ? GATE_DEAD : GATE_LIVE;
+        var t = saveDlgOk.GetComponentInChildren<Text>();
+        if (t != null) t.color = empty ? new Color(0.44f, 0.46f, 0.50f) : Color.white;
+        if (!empty) SetSaveDlgErr("");
+    }
+    public void OpenSaveDialog()
+    {
+        if (saveDlg == null || bm == null) return;
+        if (saveDlgName != null) saveDlgName.text = "";
+        SetSaveDlgErr("");
+        if (saveDlgNote != null) saveDlgNote.text = bm.SaveAsNewNote();
+        saveDlg.SetActive(true);
+        saveDlg.transform.SetAsLastSibling();
+        // Centre in the space the player can actually SEE, not in the canvas.
+        // Dead centre put the card's bottom 18.5px under the dock (measured) -
+        // and relying on paint order to win that argument is the wrong fix
+        // twice over: it leaves the buttons crowded against the tab row even
+        // when it works, and the dock's height is per-tab, so the number to
+        // beat changes underneath you.
+        if (saveDlgCard != null)
+        {
+            float dh = dockRt != null ? dockRt.sizeDelta.y : 0f;
+            saveDlgCard.anchoredPosition = new Vector2(0f, dh * 0.5f);
+        }
+        RefreshSaveDlgGate();
+    }
+    public void CloseSaveDialog() { if (saveDlg != null) saveDlg.SetActive(false); }
+    public bool SaveDialogOpen { get { return saveDlg != null && saveDlg.activeSelf; } }
+    void ConfirmSaveDialog()
+    {
+        if (bm == null) return;
+        string err = bm.SaveAsNew(saveDlgName != null ? saveDlgName.text : "");
+        // A refusal keeps the window OPEN with the reason in it. Closing on
+        // failure would drop the name they typed and hide why it did not take.
+        if (err != null) { SetSaveDlgErr(err); SfxSynth.Deny(); return; }
+        CloseSaveDialog();
+        RefreshRobots();
+        PumpDirty(true);
     }
 
     void BuildBuildTab()
@@ -341,6 +482,12 @@ public class MobileBuilderUI : MonoBehaviour
         // it instead of two tab-taps away on ROBOTS.
         saveBtn = MkButton("bsave", actRow.transform, "SAVE", 17, () => {
             if (bm == null) return;
+            // OWEN 2026-08-02: "allow user to save directly under BUILD tab,
+            // and pop up a window to let user name the saved robot." With
+            // nothing open SAVE used to refuse and point at another tab -
+            // so the very first build a player makes was the one SAVE would
+            // not take. Now it asks for the name itself.
+            if (bm.NothingOpen) { OpenSaveDialog(); return; }
             Feedback(bm.SaveActive());
             RefreshRobots();
             PumpDirty(true);
@@ -1479,6 +1626,9 @@ public class MobileBuilderUI : MonoBehaviour
 
     bool OverUI(Vector2 p)
     {
+        // The save dialog is modal: while it is up the entire screen is UI, or
+        // a tap that misses the card places a part in the build room behind it.
+        if (saveDlg != null && saveDlg.activeSelf) return true;
         float sf = canvas != null ? canvas.scaleFactor : 1f;
         // R1 fix 2: NEVER re-introduce a literal here. The dock height is
         // per-tab; a stale 210 lets taps in the expanded panel fall through
