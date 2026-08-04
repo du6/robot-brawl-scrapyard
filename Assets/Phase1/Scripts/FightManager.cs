@@ -146,9 +146,29 @@ public class FightManager : MonoBehaviour
         Protect(player);
         Protect(enemy);
 
-        // Fight music (2026-07-30, owen's track). Lives in Resources so it
-        // ships in device builds; loops for the match, stops at the verdict.
-        var musicClip = Resources.Load<AudioClip>("FightTheme");
+        // Fight music. Lives in Resources so it ships in device builds; loops
+        // for the match, stops at the verdict.
+        //
+        // OWEN 2026-08-04: "randomly pick one of the three songs as background
+        // music when user enters fight mode." Uniform pick per match - note
+        // that with three tracks a back-to-back repeat lands one time in
+        // three, which tends to read as broken shuffle; say the word and this
+        // becomes an exclude-the-last pick instead.
+        //
+        // ChromeWar was converted on 2026-08-02 and never wired (see
+        // Battle_Music_ChromeWar_2026-08-02.md, "NOT done - the wiring"), so
+        // this is the commit that actually puts it in the game.
+        string pick = FIGHT_THEMES[UnityEngine.Random.Range(0, FIGHT_THEMES.Length)];
+        var musicClip = Resources.Load<AudioClip>(pick);
+        // One missing file must not mean SILENCE while the other two are
+        // sitting there - fall through the list rather than trusting one Load.
+        if (musicClip == null)
+            foreach (var alt in FIGHT_THEMES)
+            {
+                musicClip = Resources.Load<AudioClip>(alt);
+                if (musicClip != null) { pick = alt; break; }
+            }
+        lastFightTheme = musicClip != null ? pick : "";
         if (musicClip != null)
         {
             music = gameObject.AddComponent<AudioSource>();
@@ -158,8 +178,17 @@ public class FightManager : MonoBehaviour
             music.spatialBlend = 0f;   // 2D: same in both ears, everywhere
             music.Play();
         }
-        else CompoundRobot.Log("FightTheme missing from Resources - fight is silent");
+        else CompoundRobot.Log("no fight theme found in Resources - fight is silent");
     }
+
+    /// <summary>The three fight tracks, by Resources name. A harness can assert
+    /// every one of them still loads - a renamed or missing file would
+    /// otherwise just quietly shrink the pool and nobody would notice which
+    /// song stopped appearing.</summary>
+    public static readonly string[] FIGHT_THEMES =
+    { "FightTheme", "FightTheme_ChromeWar", "FightTheme_AshAndWire" };
+    /// <summary>Which one this match drew. "" = none loaded.</summary>
+    public static string lastFightTheme = "";
 
     void Protect(Side s)
     {

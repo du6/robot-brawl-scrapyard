@@ -318,7 +318,12 @@ public class CareerSmoke : MonoBehaviour
                 bm.EndScout();
                 yield return null;
             }
-        Check(rendered == 6, "scouting renders all six roster bots (" + rendered + "/6)");
+        // Count the ROSTER, do not hard-code it. This read "all six" and
+        // failed at 8/6 the moment MILLSTONE and BASTION joined - i.e. it
+        // failed for succeeding, which is the least useful kind of red.
+        int rosterN = EnemyRoster.All.Length;
+        Check(rendered == rosterN,
+              "scouting renders every roster bot (" + rendered + "/" + rosterN + ")");
         Career.targetLeagueIdx = 0;
         bm.LoadSnapshot(bm.SnapshotString());   // clears the stale amber message
         Tap("BUILD"); yield return null; yield return null;
@@ -348,10 +353,16 @@ public class CareerSmoke : MonoBehaviour
         // OWEN 2026-08-02: SAVE moved off ROBOTS onto the build bar, where the
         // work happens, so the harness has to go where the player now goes.
         Tap("BUILD"); yield return null;
+        // OWEN 2026-08-03: SAVE asks overwrite-or-new when a robot is open, so
+        // the tap that used to commit now only opens the window. The harness
+        // has to answer it, exactly as a player does - this assertion went red
+        // the moment the confirmation shipped and it was RIGHT to.
         TapNamed("bsave"); yield return null;
+        bool c4Confirmed = TapNamed("savedlg_over"); yield return null;
         Tap("ROBOTS"); yield return null;
-        Check(Career.Data.stable[0].snapshot.Length > 0 && Career.Data.tutorialStep == 2,
-              "SAVE stores the fight-legal build, onboarding -> step 2");
+        Check(c4Confirmed && Career.Data.stable[0].snapshot.Length > 0
+              && Career.Data.tutorialStep == 2,
+              "SAVE \u2192 OVERWRITE stores the fight-legal build, onboarding -> step 2");
 
         int s4 = Career.Data.scrap;
         bm.StartCareerFight(0, 0);
@@ -531,6 +542,61 @@ public class CareerSmoke : MonoBehaviour
         Check(GameObject.Find("savedlg_ok") == null,
               "SAVE with a robot open commits silently, no window");
 
+        // ==== C7b: SAVE asks before it overwrites (owen 2026-08-03) ====
+        // "pop up a confirmation window when clicking save to confirm
+        // overwrite vs save a new robot." The failure that matters is the one
+        // where SAVE AS NEW silently overwrites anyway - you only notice after
+        // the robot you wanted is gone.
+        Career.Data.activeBlueprint = -1;
+        Career.Data.activeRobot = 0;
+        foreach (var it in bm.CareerShortfallItems()) Career.AddItem(it.partId, it.mat, it.count);
+        yield return null;
+        int stableB4 = Career.Data.stable.Count;
+        string keepName = Career.Data.stable[0].name;
+        string keepSnap = Career.Data.stable[0].snapshot;
+        Tap("BUILD"); yield return null;
+
+        bool askedFirst = TapNamed("bsave"); yield return null;
+        Check(askedFirst && GameObject.Find("savedlg_over") != null
+              && GameObject.Find("savedlg_new") != null,
+              "SAVE asks overwrite-or-new when a robot is open");
+        // The naming field has no business on the confirm face.
+        Check(GameObject.Find("savedlg_name") == null,
+              "the confirm face hides the name box \u2014 one question at a time");
+
+        // route: SAVE AS NEW -> the naming face -> a NEW robot
+        TapNamed("savedlg_new"); yield return null;
+        Check(GameObject.Find("savedlg_name") != null && GameObject.Find("savedlg_over") == null,
+              "SAVE AS NEW switches the window to naming");
+        var sawName = GameObject.Find("savedlg_name");
+        if (sawName != null) sawName.GetComponent<InputField>().text = "FORK ONE";
+        yield return null;
+        TapNamed("savedlg_ok"); yield return null;
+        Check(Career.Data.stable.Count == stableB4 + 1
+              && Career.Data.stable[Career.Data.stable.Count - 1].name == "FORK ONE",
+              "SAVE AS NEW founds a NEW robot rather than overwriting");
+        Check(Career.Data.stable[0].name == keepName && Career.Data.stable[0].snapshot == keepSnap,
+              "SAVE AS NEW leaves the original robot untouched");
+        Check(Career.Data.activeRobot == Career.Data.stable.Count - 1,
+              "the fork becomes the open robot, so the next SAVE lands on it");
+
+        // route: OVERWRITE -> commits, creates nothing
+        int beforeOver = Career.Data.stable.Count;
+        TapNamed("bsave"); yield return null;
+        bool overTapped = TapNamed("savedlg_over"); yield return null;
+        Check(overTapped && Career.Data.stable.Count == beforeOver
+              && GameObject.Find("savedlg_over") == null,
+              "OVERWRITE commits in place and closes, creating nothing");
+
+        // nothing open -> no question worth asking, straight to naming
+        Career.Data.activeRobot = -1;
+        Career.Data.activeBlueprint = -1;
+        yield return null;
+        TapNamed("bsave"); yield return null;
+        Check(GameObject.Find("savedlg_name") != null && GameObject.Find("savedlg_over") == null,
+              "with nothing open SAVE skips the question and just asks for a name");
+        TapNamed("savedlg_cancel"); yield return null;
+
         // ==== C8: a disabled button explains itself (owen 2026-08-03) ====
         // "whenever a button is disabled, it should show hint to user on why it
         // is disabled when hovering or being clicked."
@@ -641,6 +707,28 @@ public class CareerSmoke : MonoBehaviour
         Check(freeUnderHarness && !draftUnderHarness,
               "devFreeBuild frees parts without pretending a design is open");
 
+        // ==== C12: three fight tracks, all present (owen 2026-08-04) ====
+        // The pick is random, so a missing file does not fail the fight - it
+        // just quietly shrinks the pool and that song stops turning up. The
+        // only way to catch it is to assert every name still resolves.
+        int themesFound = 0;
+        string missingTheme = "";
+        foreach (var nm in FightManager.FIGHT_THEMES)
+        {
+            if (Resources.Load<AudioClip>(nm) != null) themesFound++;
+            else missingTheme += nm + " ";
+        }
+        Check(themesFound == FightManager.FIGHT_THEMES.Length,
+              "all " + FightManager.FIGHT_THEMES.Length + " fight tracks load from Resources"
+              + (missingTheme.Length > 0 ? " (missing: " + missingTheme.Trim() + ")" : ""));
+        // A fight ran back in C3/C4, so the picker has been exercised for real.
+        Check(FightManager.lastFightTheme.Length > 0,
+              "a fight drew a track (" + FightManager.lastFightTheme + ")");
+        bool drewKnown = false;
+        foreach (var nm in FightManager.FIGHT_THEMES)
+            if (nm == FightManager.lastFightTheme) drewKnown = true;
+        Check(drewKnown, "the track it drew is one of the three, not a stale name");
+
         // ==== C9: one device rule (owen 2026-08-03) ====
         // The chooser used to ASK which UI you wanted and ShouldActivate used
         // to ignore the answer - on an iPad, "START CAREER - Desktop" handed
@@ -676,8 +764,18 @@ public class CareerSmoke : MonoBehaviour
         Finish();
     }
 
+    /// <summary>The FAIL lines, as a string a harness caller can read.
+    ///
+    /// Unity's console buffer truncates from the HEAD, so a suite this long
+    /// pushes its early failures out of reach exactly when they are the ones
+    /// you need - I burned several attempts reading the tail before adding
+    /// this. The result line alone tells you a number, not which number.</summary>
+    public static string failLines = "";
+
     void Finish()
     {
+        failLines = "";
+        foreach (var l in log) if (l.StartsWith("FAIL")) failLines += l + "\n";
         foreach (var l in log) Debug.Log("[CareerSmoke] " + l);
         Debug.Log(string.Format("[CareerSmoke] RESULT: {0} pass, {1} fail{2}",
                   passed, failed, failed == 0 ? " - ALL GREEN" : " - FIX NEEDED"));

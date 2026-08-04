@@ -77,6 +77,9 @@ public class MobileBuilderUI : MonoBehaviour
     // already exist - it asks for a name and makes one.
     GameObject saveDlg;
     RectTransform saveDlgCard;
+    Text saveDlgTitle;
+    Button saveDlgOver, saveDlgNew;
+    bool saveDlgConfirm;
     InputField saveDlgName;
     Text saveDlgNote, saveDlgErr;
     Button saveDlgOk;
@@ -368,7 +371,7 @@ public class MobileBuilderUI : MonoBehaviour
         crt.pivot = new Vector2(0.5f, 0.5f); crt.sizeDelta = new Vector2(560f, 250f);
         crt.anchoredPosition = Vector2.zero;
 
-        var title = MkText("savedlg_title", card.transform, "NAME THIS BUILD", 22, TextAnchor.MiddleLeft);
+        var title = saveDlgTitle = MkText("savedlg_title", card.transform, "NAME THIS BUILD", 22, TextAnchor.MiddleLeft);
         var trt = title.rectTransform;
         trt.anchorMin = new Vector2(0f, 1f); trt.anchorMax = new Vector2(1f, 1f);
         trt.pivot = new Vector2(0.5f, 1f); trt.sizeDelta = new Vector2(-40f, 34f);
@@ -418,7 +421,72 @@ public class MobileBuilderUI : MonoBehaviour
         en.callback.AddListener(delegate { if (SaveDlgNameEmpty()) SetSaveDlgErr("Type a name first."); });
         trig.triggers.Add(en);
 
+        // OWEN 2026-08-03: "pop up a confirmation window when clicking save to
+        // confirm overwrite vs save a new robot". Same card, second face - two
+        // dialogs would be two places for the rules to drift apart, and this
+        // one already owns the naming half of the answer.
+        saveDlgOver = MkButton("savedlg_over", card.transform, "OVERWRITE", 16, () => {
+            if (bm == null) return;
+            Feedback(bm.SaveActive());
+            CloseSaveDialog();
+            RefreshRobots();
+            PumpDirty(true);
+        });
+        var ovrt = saveDlgOver.GetComponent<RectTransform>();
+        ovrt.anchorMin = new Vector2(0f, 0f); ovrt.anchorMax = new Vector2(0f, 0f);
+        ovrt.pivot = new Vector2(0f, 0f); ovrt.sizeDelta = new Vector2(250f, 42f);
+        ovrt.anchoredPosition = new Vector2(20f, 70f);
+
+        saveDlgNew = MkButton("savedlg_new", card.transform, "SAVE AS NEW\u2026", 16,
+                              () => OpenSaveDialog("SAVE AS \u2014 NEW COPY"));
+        var nwrt = saveDlgNew.GetComponent<RectTransform>();
+        nwrt.anchorMin = new Vector2(0f, 0f); nwrt.anchorMax = new Vector2(0f, 0f);
+        nwrt.pivot = new Vector2(0f, 0f); nwrt.sizeDelta = new Vector2(250f, 42f);
+        nwrt.anchoredPosition = new Vector2(20f, 20f);
+
         saveDlg.SetActive(false);
+    }
+
+    /// <summary>The confirm face: which of the two things did you mean?
+    /// Only reached when something IS open - with nothing open there is
+    /// nothing to overwrite and SAVE goes straight to naming.</summary>
+    public void OpenSaveConfirm()
+    {
+        if (saveDlg == null || bm == null) return;
+        string open = bm.ActiveEditName();
+        if (open == null) { OpenSaveDialog(); return; }
+        saveDlgConfirm = true;
+        if (saveDlgTitle != null) saveDlgTitle.text = "SAVE";
+        if (saveDlgNote != null)
+            saveDlgNote.text = "OVERWRITE replaces " + open + " with what is on the bench now. "
+                             + "SAVE AS NEW keeps " + open + " as it was and starts a copy.";
+        SetSaveDlgErr("");
+        if (saveDlgOver != null)
+        {
+            var ot = saveDlgOver.GetComponentInChildren<Text>();
+            if (ot != null) ot.text = "OVERWRITE " + open;
+        }
+        ApplySaveDlgFace();
+        saveDlg.SetActive(true);
+        saveDlg.transform.SetAsLastSibling();
+        CentreSaveDlgCard();
+    }
+
+    /// <summary>One place decides which controls belong to which face, so a
+    /// third face later cannot leave a stray button live on the wrong one.</summary>
+    void ApplySaveDlgFace()
+    {
+        if (saveDlgName != null) saveDlgName.gameObject.SetActive(!saveDlgConfirm);
+        if (saveDlgOk != null) saveDlgOk.gameObject.SetActive(!saveDlgConfirm);
+        if (saveDlgOver != null) saveDlgOver.gameObject.SetActive(saveDlgConfirm);
+        if (saveDlgNew != null) saveDlgNew.gameObject.SetActive(saveDlgConfirm);
+    }
+
+    void CentreSaveDlgCard()
+    {
+        if (saveDlgCard == null) return;
+        float dh = dockRt != null ? dockRt.sizeDelta.y : 0f;
+        saveDlgCard.anchoredPosition = new Vector2(0f, dh * 0.5f);
     }
 
     bool SaveDlgNameEmpty()
@@ -436,9 +504,21 @@ public class MobileBuilderUI : MonoBehaviour
         if (t != null) t.color = empty ? new Color(0.44f, 0.46f, 0.50f) : Color.white;
         if (!empty) SetSaveDlgErr("");
     }
-    public void OpenSaveDialog()
+    public void OpenSaveDialog() { OpenSaveDialog("NAME THIS BUILD"); }
+
+    /// <summary>OWEN 2026-08-03: "add a SAVE AS option in the build tab to
+    /// allow users save different robots."
+    ///
+    /// Same window as the empty-case one, reached on purpose rather than
+    /// because there was nothing to commit to. The heading changes because the
+    /// two are genuinely different acts: one names a build that has no object
+    /// behind it, the other forks a copy and leaves the original where it was.</summary>
+    public void OpenSaveDialog(string heading)
     {
         if (saveDlg == null || bm == null) return;
+        saveDlgConfirm = false;
+        ApplySaveDlgFace();
+        if (saveDlgTitle != null) saveDlgTitle.text = heading;
         if (saveDlgName != null) saveDlgName.text = "";
         SetSaveDlgErr("");
         if (saveDlgNote != null) saveDlgNote.text = bm.SaveAsNewNote();
@@ -507,10 +587,12 @@ public class MobileBuilderUI : MonoBehaviour
             // nothing open SAVE used to refuse and point at another tab -
             // so the very first build a player makes was the one SAVE would
             // not take. Now it asks for the name itself.
+            // OWEN 2026-08-03: "pop up a confirmation window when clicking
+            // save to confirm overwrite vs save a new robot." Nothing open ->
+            // there is nothing to overwrite, so that case still goes straight
+            // to naming rather than asking a question with one answer.
             if (bm.NothingOpen) { OpenSaveDialog(); return; }
-            Feedback(bm.SaveActive());
-            RefreshRobots();
-            PumpDirty(true);
+            OpenSaveConfirm();
         });
         // parts scroll (middle)
         var scrollGO = MkPanel("partscroll", buildPanel.transform, new Color(0f,0f,0f,0.0f));

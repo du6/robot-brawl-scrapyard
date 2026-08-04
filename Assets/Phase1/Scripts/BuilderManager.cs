@@ -2399,6 +2399,8 @@ public class BuilderManager : MonoBehaviour
     // a rule that lives in one front end is not a rule.
     public const string NAME_GATE_HINT = "Type a name in the box first \u2014 every robot and draft needs one.";
     bool deskSaveDlg, deskSaveFocus;
+    /// <summary>Desktop twin of MobileBuilderUI's confirm face.</summary>
+    bool deskSaveConfirm;
     string deskSaveBuf = "", deskSaveErr = "", deskSaveNote = "";
     public bool TestDesktopSaveDialogOpen { get { return deskSaveDlg; } }
     public float TestOrbitDist { get { return orbitDist; } set { orbitDist = Mathf.Clamp(value, 2.2f, 9f); } }
@@ -3989,7 +3991,16 @@ public class BuilderManager : MonoBehaviour
         if (!Career.active) return "Career is off.";
         if (string.IsNullOrEmpty(name) || name.Trim().Length == 0)
             return "Name it first \u2014 type a name in the box above.";
-        return SaveWouldDraft ? BlueprintSave(name) : StableCreate(name);
+        if (SaveWouldDraft) return BlueprintSave(name);
+        // OWEN 2026-08-03 (SAVE AS): founding a robot while a DESIGN is open
+        // used to hit StableCreate's draft guard - "CONVERT to buy the missing
+        // parts first" - which is the wrong sentence when there are no missing
+        // parts. That guard exists to stop a machine being minted from parts
+        // you do not own, and SaveWouldDraft above has already established
+        // that you own all of them. So close the design and found the machine:
+        // this IS a convert, with nothing left to buy.
+        Career.Data.activeBlueprint = -1;
+        return StableCreate(name);
     }
 
     public string StableSave()
@@ -5099,10 +5110,14 @@ public class BuilderManager : MonoBehaviour
             bool noName = string.IsNullOrEmpty(stableNameBuf) || stableNameBuf.Trim().Length == 0;
             if (GatedButton("NEW ROBOT", matStyle, noName ? NAME_GATE_HINT : null))
             { string e4 = StableCreate(stableNameBuf); if (e4 != null) { message = e4; SfxSynth.Deny(); } stableNameBuf = ""; }
+            // OWEN 2026-08-03: "pop up a confirmation window when clicking
+            // save to confirm overwrite vs save a new robot." Nothing open ->
+            // nothing to overwrite, so that case goes straight to naming
+            // rather than asking a question with only one answer.
             if (GUILayout.Button("SAVE", matStyle))
             {
                 if (NothingOpen) OpenDesktopSaveDialog();
-                else { string e4 = SaveActive(); if (e4 != null) { message = e4; SfxSynth.Deny(); } }
+                else { deskSaveConfirm = true; deskSaveErr = ""; }
             }
             GUILayout.EndHorizontal();
             for (int ri = 0; ri < Career.Data.stable.Count; ri++)
@@ -5881,6 +5896,51 @@ public class BuilderManager : MonoBehaviour
         return hit;
     }
 
+    /// <summary>"Did you mean to replace it, or to keep it and start a copy?"
+    /// Both front ends ask the same question in the same words - a rule that
+    /// lives in one front end is not a rule.</summary>
+    void SaveConfirmGUI()
+    {
+        if (MobileBuilderUI.Active) { deskSaveConfirm = false; return; }
+        string open = ActiveEditName();
+        if (open == null) { deskSaveConfirm = false; return; }
+        EnsureStyles();
+        var prevM = GUI.matrix;
+        var prevC = GUI.color;
+        float sc = GuiScale;
+        GUI.matrix = Matrix4x4.Scale(new Vector3(sc, sc, 1f));
+        float sw = Screen.width / sc, sh = Screen.height / sc;
+        GUI.color = new Color(0f, 0f, 0f, 0.55f);
+        GUI.DrawTexture(new Rect(0f, 0f, sw, sh), Texture2D.whiteTexture);
+        GUI.color = prevC;
+
+        float w = 470f, h = 210f;
+        var r = new Rect((sw - w) * 0.5f, (sh - h) * 0.5f, w, h);
+        GUI.Box(r, "");
+        GUILayout.BeginArea(new Rect(r.x + 16f, r.y + 14f, r.width - 32f, r.height - 28f));
+        GUILayout.Label("SAVE", headStyle);
+        GUILayout.Space(4f);
+        GUILayout.Label("OVERWRITE replaces " + open + " with what is on the bench now.  "
+                      + "SAVE AS NEW keeps " + open + " as it was and starts a copy.", descStyle);
+        GUILayout.FlexibleSpace();
+        if (GUILayout.Button("OVERWRITE " + open, matStyle, GUILayout.Height(30f)))
+        {
+            string e = SaveActive();
+            if (e != null) { message = e; SfxSynth.Deny(); }
+            deskSaveConfirm = false;
+        }
+        if (GUILayout.Button("SAVE AS NEW\u2026", matStyle, GUILayout.Height(30f)))
+        {
+            deskSaveConfirm = false;
+            OpenDesktopSaveDialog();
+        }
+        GUILayout.Space(4f);
+        if (GUILayout.Button("CANCEL", matStyle, GUILayout.Height(26f))) deskSaveConfirm = false;
+        GUILayout.EndArea();
+        GUI.matrix = prevM;
+        GUI.color = prevC;
+    }
+
     void OpenDesktopSaveDialog()
     {
         deskSaveDlg = true; deskSaveFocus = true;
@@ -5897,6 +5957,7 @@ public class BuilderManager : MonoBehaviour
     /// <summary>Desktop twin of MobileBuilderUI's savedlg.</summary>
     void SaveDialogGUI()
     {
+        if (deskSaveConfirm) { SaveConfirmGUI(); return; }
         if (!deskSaveDlg) return;
         if (MobileBuilderUI.Active) { CloseDesktopSaveDialog(); return; }
         EnsureStyles();
