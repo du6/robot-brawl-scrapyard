@@ -831,6 +831,23 @@ public class CareerSmoke : MonoBehaviour
         TapNamed("mat_Steel");
         yield return null; yield return null;
         Check(!ui.MatSheetOpen, "picking a material closes the sheet");
+
+        // The chooser must LOOK like one, and must still name the material
+        // while it is open - the first version blanked the name to "CLOSE",
+        // which put the only readout of the selection off screen exactly while
+        // you were changing it. Caret up when closed, down when open, name
+        // present in both.
+        string shutLbl = ui.MatButtonLabel;
+        ui.SetMatSheet(true);
+        yield return null;
+        string openLbl = ui.MatButtonLabel;
+        ui.SetMatSheet(false);
+        yield return null;
+        Check(shutLbl.Contains("\u25b4") && openLbl.Contains("\u25be"),
+              "the material button shows a disclosure caret that flips (" + shutLbl
+              + " / " + openLbl + ")");
+        Check(shutLbl.ToUpper().Contains("STEEL") && openLbl.ToUpper().Contains("STEEL"),
+              "the material stays named whether the sheet is open or shut");
         Check(MatDB.Canon(bm.ActiveMatKey) == MatDB.Canon("Steel"),
               "picking a material actually selects it (" + bm.ActiveMatKey + ")");
         bm.ActiveMatKey = "Aluminum";

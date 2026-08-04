@@ -766,6 +766,18 @@ public class MobileBuilderUI : MonoBehaviour
 
     public bool MatSheetOpen { get { return matSheetGO != null && matSheetGO.activeSelf; } }
 
+    /// <summary>What the chooser currently reads. Test hook - the affordance
+    /// IS the label, so the suite has to look at the actual string.</summary>
+    public string MatButtonLabel
+    {
+        get
+        {
+            if (matBtn == null) return "";
+            var t = matBtn.GetComponentInChildren<UnityEngine.UI.Text>();
+            return t != null ? t.text : "";
+        }
+    }
+
     void PickMat(string k)
     {
         if (Progression.MatUnlocked(k)) { if (bm != null) bm.ActiveMatKey = k; }
@@ -866,11 +878,26 @@ public class MobileBuilderUI : MonoBehaviour
         // next to ROTATE and UNDO looks like another verb. Naming the current
         // material is also the only place that state is now visible at all,
         // since the chips it used to live on are behind the sheet.
+        //
+        // OWEN 2026-08-04: "should we add some indicator to the aluminum button
+        // to tell users that this can be expanded to a list of materials?"
+        //
+        // Yes - and the first version was worse than missing an affordance. It
+        // swapped the label to "CLOSE" when open, so the one place the selected
+        // material was visible went blank at the exact moment you were changing
+        // it, and the button stopped being a readout at all for as long as it
+        // mattered. The NAME now stays put in both states and only the caret
+        // moves, which is the part that should carry the state.
+        //
+        // The caret points UP because the sheet opens upward, over the palette.
+        // A disclosure arrow that points the wrong way is worse than none: it
+        // is a promise about where to look.
         if (matBtn != null)
         {
             var bt = matBtn.GetComponentInChildren<Text>();
             if (bt != null)
-                bt.text = MatSheetOpen ? "\u25bc CLOSE" : MatDB.Get(cur).name.ToUpper();
+                bt.text = MatDB.Get(cur).name.ToUpper()
+                        + (MatSheetOpen ? "  \u25be" : "  \u25b4");
             var bi = matBtn.GetComponent<Image>();
             if (bi != null)
                 bi.color = MatSheetOpen ? new Color(0.20f,0.45f,0.65f,1f)
