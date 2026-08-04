@@ -28,8 +28,24 @@ public static class CareerDB
     {
         public string id; public string oppId; public AiTier tier;
         public int purse; public int entryFee;
-        public Contest(string i, string o, AiTier t, int p, int f)
-        { id = i; oppId = o; tier = t; purse = p; entryFee = f; }
+        /// <summary>OWEN 2026-08-03: the material the opponent's STRUCTURE and
+        /// ARMOUR is rebuilt in for this contest. null = the recipe's own.
+        ///
+        /// Until now StartCareerFight called EnemyRoster.Recipe with no league,
+        /// no tier and no material, so the BULWARK in the World Championship
+        /// was byte-for-byte the BULWARK in Garage League. The player's cap
+        /// went 1500 -> 5500 kg and their materials ran to tungsten; the
+        /// opponent never changed at all. ApplyTier only ever touched DRIVING.
+        ///
+        /// WEAPONS are deliberately NOT reskinned. A blanket one-material pass
+        /// is right for the bench's value-class test and wrong here: it would
+        /// drop WIDOWMAKER's tungsten rim to titanium and make the flagship
+        /// weaker as the league got harder. Disc damage is rotational energy,
+        /// which wants density; armour wants strength per kilogram. They are
+        /// different jobs and they take different metals.</summary>
+        public string armourMat;
+        public Contest(string i, string o, AiTier t, int p, int f, string armour = null)
+        { id = i; oppId = o; tier = t; purse = p; entryFee = f; armourMat = armour; }
     }
 
     public class League
@@ -49,23 +65,39 @@ public static class CareerDB
     /// <summary>Doc sections 4 + 4b, verbatim. Arena ids consumed by C3A.</summary>
     public static readonly League[] Leagues =
     {
+        // ARMOUR CLASS PER LEAGUE (owen 2026-08-03). Structure and plate only;
+        // weapons keep whatever the recipe chose.
+        //
+        // The ladder runs by ABSOLUTE strengthRel - aluminium 0.6, steel 1.0,
+        // titanium 1.4 - because HP is strengthRel * VOLUME and a reskin does
+        // not change volume. My first pass climbed the HP-PER-KILOGRAM table
+        // instead and ended at carbon fibre, which would have bought +10% hit
+        // points and -65% mass: a lighter opponent, not a tougher one. HP/kg
+        // only decides anything when weight is the binding constraint, and at
+        // ~1.3 t under a 4 t cap it is not. This progression is +133% HP from
+        // L2 to L4 on every structural part.
         new League("L1", "Scrapyard Open", "The Yard", "yard", 1500f, new[] {
             new Contest("L1C1", "scout",  AiTier.Rookie, 250, 0),
             new Contest("L1C2", "tipper", AiTier.Rookie, 300, 0) }),
         new League("L2", "Garage League", "The Loading Dock", "dock", 2000f, new[] {
             new Contest("L2C1", "mauler", AiTier.Rookie,  400, 0),
-            new Contest("L2C2", "scout",  AiTier.Veteran, 450, 0),
-            new Contest("L2C3", "tipper", AiTier.Veteran, 500, 0) }),
+            new Contest("L2C2", "scout",  AiTier.Veteran, 450, 0, "Aluminum"),
+            new Contest("L2C3", "tipper", AiTier.Veteran, 500, 0, "Aluminum") }),
         new League("L3", "Regional Circuit", "The Sawmill", "sawmill", 2800f, new[] {
-            new Contest("L3C1", "bulwark", AiTier.Veteran, 700, 50),
-            new Contest("L3C2", "mauler",  AiTier.Veteran, 800, 50),
-            new Contest("L3C3", "ripper",  AiTier.Veteran, 900, 50) }),
+            new Contest("L3C1", "bulwark", AiTier.Veteran, 700, 50, "Steel"),
+            new Contest("L3C2", "mauler",  AiTier.Veteran, 800, 50, "Steel"),
+            new Contest("L3C3", "ripper",  AiTier.Veteran, 900, 50, "Steel"),
+            // The first disc a player ever meets. Before this the roster had
+            // none until L4, which is exactly why one spinner cleared three
+            // leagues unopposed.
+            new Contest("L3C4", "millstone", AiTier.Veteran, 950, 50, "Steel") }),
         new League("L4", "National Series", "The Press", "press", 4000f, new[] {
-            new Contest("L4C1", "widowmaker", AiTier.Veteran,  1200, 100),
-            new Contest("L4C2", "bulwark",    AiTier.Champion, 1400, 100),
-            new Contest("L4C3", "ripper",     AiTier.Champion, 1600, 100) }),
+            new Contest("L4C1", "widowmaker", AiTier.Veteran,  1200, 100, "Titanium"),
+            new Contest("L4C2", "bulwark",    AiTier.Champion, 1400, 100, "Titanium"),
+            new Contest("L4C3", "ripper",     AiTier.Champion, 1600, 100, "Titanium"),
+            new Contest("L4C4", "bastion",    AiTier.Champion, 1800, 100, "Titanium") }),
         new League("L5", "World Championship", "The Crucible", "crucible", 5500f, new[] {
-            new Contest("L5C1", "widowmaker", AiTier.Champion, 3000, 200) }),
+            new Contest("L5C1", "widowmaker", AiTier.Champion, 3000, 200, "Titanium") }),
     };
 
     public class KitItem { public string partId; public string mat; public int count;

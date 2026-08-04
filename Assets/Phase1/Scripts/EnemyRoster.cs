@@ -61,6 +61,28 @@ public static class EnemyRoster
         // an opponent that uses it.
         new Entry { id = "ripper",     label = "RIPPER",     tier = AiTier.Veteran,
                     blurb = "Pivot hammer on a light frame. Swings when you get close." },
+        // OWEN 2026-08-03: "I beat all robots so far with a simple spinner
+        // robot." He had - 8-1, three leagues - and the bench says why: the
+        // damage ratio across the roster tracks exactly ONE variable, whether
+        // the opponent owns a disc. WIDOWMAKER is the only bot that did, it is
+        // the only bot that beat him (1/3), and it does not appear until L4.
+        // Everything before it lost between 3:1 and 11:1.
+        //
+        // These two are the answers, and both are derived from the damage
+        // model rather than from theme:
+        //
+        //   HP = HP_K * strengthRel * volume,  so HP per kg = 6*strength/density
+        //     CarbonFiber 4.13   ABS 2.00   Titanium 1.86   Aluminium 1.33
+        //     Steel 0.76         Tungsten 0.37
+        //
+        // BULWARK is the "juggernaut" and it is STEEL - the second-worst
+        // armour per kilogram in the game. That is why it takes 1929 and deals
+        // 381. Under a weight cap, carbon fibre buys 5.4x the hit points steel
+        // does, which is the whole of BASTION's design.
+        new Entry { id = "millstone",  label = "MILLSTONE",  tier = AiTier.Veteran,
+                    blurb = "Steel disc on an aluminium frame. Trades bite for bite." },
+        new Entry { id = "bastion",    label = "BASTION",    tier = AiTier.Champion,
+                    blurb = "Carbon-fibre fortress. Outlasts a disc instead of duelling it." },
     };
 
     public static Entry Find(string id)
@@ -263,6 +285,32 @@ public static class EnemyRoster
         };
     }
 
+    /// <summary>Recipe with STRUCTURE and ARMOUR rebuilt in `armourMat`, which
+    /// is how a league scales its opponents (Contest.armourMat).
+    ///
+    /// WEAPONS are skipped on purpose. Disc damage is rotational energy, so a
+    /// rim wants DENSITY; hit points are strengthRel * volume, so armour wants
+    /// STRENGTH PER KILOGRAM. A blanket one-material pass - which is what the
+    /// bench's MakeRef does for its value-class test - would drop WIDOWMAKER's
+    /// tungsten rim to titanium and make the flagship weaker the harder the
+    /// league got. Mobility is skipped too: wheels are rubber-pinned.
+    ///
+    /// One implementation, called by the fight spawn AND the scout preview, so
+    /// SCOUT cannot show you a machine other than the one you will fight.</summary>
+    public static List<BuilderManager.PlacedPart> Recipe(string id, P1PartDef[] pal, string armourMat)
+    {
+        var L = Recipe(id, pal);
+        if (string.IsNullOrEmpty(armourMat)) return L;
+        foreach (var p in L)
+        {
+            if (p.def == null || !p.def.materialChoice) continue;   // pinned stays pinned
+            if (p.def.category == P1Category.Weapon) continue;
+            if (p.def.category == P1Category.Mobility) continue;
+            p.matName = p.def.EffectiveMat(armourMat);
+        }
+        return L;
+    }
+
     /// <summary>Build one roster entry. `palette` is BuilderManager's own array,
     /// so these bots are made of exactly the parts the player can buy.</summary>
     public static List<BuilderManager.PlacedPart> Recipe(string id, P1PartDef[] pal)
@@ -364,6 +412,70 @@ public static class EnemyRoster
             L.Add(new BuilderManager.PlacedPart { def = spinner, pos = new Vector3(0f, 0.80f, 1.00f),
                                                   wheelAxis = Vector3.forward, matName = "Tungsten" });
             return L;
+        }
+
+        if (id == "millstone")
+        {
+            // The roster's missing mid-game answer: a DISC before L4. Steel,
+            // not tungsten - tungsten is WIDOWMAKER's flagship identity and
+            // the C6 probes showed a steel disc out-classing value-appropriate
+            // builds when it arrived as early as L2. At L3, against a player
+            // who has already fielded a disc of their own, it is a mirror
+            // rather than an ambush.
+            //
+            // Aluminium frame: HP/kg 1.33, four times steel's. This machine is
+            // meant to trade, so it cannot spend its whole budget on the rim.
+            var Ms = Skeleton(pal, "Aluminum");
+            Ms.Add(P(battery, 0f, 0.975f,  0f,    "Aluminum"));
+            // Roof, not the rear face: AuditPowerMounting caught this hanging
+            // on ONE seam off the back block, which is the exact defect the
+            // roster exists to avoid - a power part one break from gone.
+            // WIDOWMAKER mounts here for the same reason.
+            Ms.Add(P(engine,  0f, 0.975f, -0.40f, "Aluminum"));
+            // Gyro is NOT optional on a disc bot - the rotor's reaction torque
+            // is what puts TIPPER on its roof, and this one is supposed to
+            // survive its own weapon.
+            Ms.Add(P(gyro,    0f, 0.97f,   0.40f, "Aluminum"));
+            Ms.Add(new BuilderManager.PlacedPart { def = spindle, pos = new Vector3(0f, 0.80f, 0.80f),
+                                                   wheelAxis = Vector3.forward, matName = "Aluminum" });
+            Ms.Add(new BuilderManager.PlacedPart { def = spinner, pos = new Vector3(0f, 0.80f, 1.00f),
+                                                   wheelAxis = Vector3.forward, matName = "Steel" });
+            return Ms;
+        }
+        if (id == "bastion")
+        {
+            // The OTHER answer to a disc, and the one the roster never had: do
+            // not out-bite it, outlast it.
+            //
+            // TITANIUM, and the correction is worth recording because I got it
+            // wrong first. Carbon fibre wins HP PER KILOGRAM (4.13 vs steel's
+            // 0.76) and that is the number I reached for - but HP is
+            // strengthRel * VOLUME, and reskinning a fixed recipe does not add
+            // volume. So carbon fibre bought +10% hit points and -65% mass:
+            // a LIGHTER bot, not a tougher one. Weight is not the binding
+            // constraint here (this sits at ~1.3 t under a 4 t cap), so what
+            // matters is absolute strength, and titanium leads it at 1.4.
+            // HP/kg is the right metric only when you spend the saved weight
+            // on more armour, which a fixed recipe cannot.
+            //
+            // Four roof plates rather than BULWARK's two, on BULWARK's own
+            // proven mounts - authored geometry that has never been physically
+            // verified is how you ship an opponent with parts touching nothing.
+            //
+            // Its weapon is a TUNGSTEN spike rather than a disc on purpose:
+            // this machine should never win a damage race. It should still be
+            // standing, which under the fight rules is enough.
+            var B = Skeleton(pal, "Titanium");
+            B.Add(P(plate,   0f, 0.88f,  0.40f, "Titanium"));   // roof, front
+            B.Add(P(plate,   0f, 0.88f, -0.40f, "Titanium"));   // roof, rear
+            B.Add(P(plate,  0.28f, 0.88f, 0f,   "Titanium"));   // roof, left spine
+            B.Add(P(plate, -0.28f, 0.88f, 0f,   "Titanium"));   // roof, right spine
+            B.Add(P(battery, 0f, 0.975f, 0f,    "Aluminum"));
+            B.Add(P(engine,  0f, 0.70f, -0.875f, "Titanium"));
+            B.Add(P(gyro,    0f, 1.03f,  0.40f, "Aluminum"));      // on the front roof plate
+            B.Add(new BuilderManager.PlacedPart { def = spike, pos = new Vector3(0f, 0.70f, 0.80f),
+                                                  wheelAxis = Vector3.forward, matName = "Tungsten" });
+            return B;
         }
 
         if (id == "ripper")

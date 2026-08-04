@@ -3693,7 +3693,7 @@ public class BuilderManager : MonoBehaviour
         if (blocked != null) { message = blocked; SfxSynth.Deny(); return; }
         if (c.entryFee > 0) Career.Txn(-c.entryFee, "entry fee " + c.id);
         Career.fightBuildValue = BuildValueCareer();
-        var recipe = EnemyRoster.Recipe(c.oppId, palette);
+        var recipe = EnemyRoster.Recipe(c.oppId, palette, c.armourMat);
         int ov = 0;
         foreach (var p2 in recipe) ov += CareerDB.PartPrice(p2.def.id, p2.MatName());
         Career.fightOppValue = ov;
@@ -3735,7 +3735,7 @@ public class BuilderManager : MonoBehaviour
         scoutSaveYaw = orbitYaw; scoutSavePitch = orbitPitch; scoutSaveDist = orbitDist;
         orbitYaw = 35f; orbitPitch = 16f; orbitDist = 2.6f;
         var entry = EnemyRoster.Find(c.oppId);
-        var recipe = EnemyRoster.Recipe(c.oppId, palette);
+        var recipe = EnemyRoster.Recipe(c.oppId, palette, c.armourMat);
         float smass = 0f; int sval = 0; string weapon = "none";
         foreach (var p2 in recipe)
         {
