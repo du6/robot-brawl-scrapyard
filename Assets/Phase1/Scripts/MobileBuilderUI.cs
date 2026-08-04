@@ -594,6 +594,7 @@ public class MobileBuilderUI : MonoBehaviour
         mr.anchorMin = new Vector2(0f,1f); mr.anchorMax = new Vector2(1f,1f); mr.pivot = new Vector2(0.5f,1f);
         mr.sizeDelta = new Vector2(0f, mr.sizeDelta.y);   // R1 critic: default 100px sizeDelta survived the stretch anchors
         mr.sizeDelta = new Vector2(0f,40f); mr.anchoredPosition = Vector2.zero;
+        matRowRt = mr;
         var mh = matRow.AddComponent<HorizontalLayoutGroup>(); mh.spacing = 4f; mh.childForceExpandWidth = true; mh.childForceExpandHeight = true;
         foreach (var key in MatDB.Order)
         {
@@ -606,6 +607,7 @@ public class MobileBuilderUI : MonoBehaviour
         var ar = actRow.GetComponent<RectTransform>();
         ar.anchorMin = new Vector2(0f,0f); ar.anchorMax = new Vector2(1f,0f); ar.pivot = new Vector2(0.5f,0f);
         ar.sizeDelta = new Vector2(0f,42f); ar.anchoredPosition = Vector2.zero;
+        actRowRt = ar;
         var ah = actRow.AddComponent<HorizontalLayoutGroup>(); ah.spacing = 6f; ah.childForceExpandWidth = true; ah.childForceExpandHeight = true;
         MkButton("rot", actRow.transform, "ROTATE", 17, () => Phase0Input.DebugRotate());
         MkButton("undo", actRow.transform, "UNDO", 17, () => Phase0Input.DebugUndo());
@@ -634,6 +636,7 @@ public class MobileBuilderUI : MonoBehaviour
         var sr = scrollGO.GetComponent<RectTransform>();
         sr.anchorMin = new Vector2(0f,0f); sr.anchorMax = new Vector2(1f,1f);
         sr.offsetMin = new Vector2(0f,46f); sr.offsetMax = new Vector2(0f,-44f);
+        partScrollRt = sr;
         var scroll = scrollGO.AddComponent<ScrollRect>(); scroll.horizontal = true; scroll.vertical = false;
         var viewport = MkPanel("viewport", scrollGO.transform, new Color(0f,0f,0f,0.15f));
         var vp = viewport.GetComponent<RectTransform>(); Stretch(vp);
@@ -661,6 +664,7 @@ public class MobileBuilderUI : MonoBehaviour
         // surface. 112 makes the whole 19-part palette fit with ~18 units to
         // spare, verified by screenshot, not by arithmetic alone.
         grid.cellSize = new Vector2(112f, 50f);
+        partGrid = grid;
         grid.spacing = new Vector2(6f, 4f);
         grid.padding = new RectOffset(4,4,4,4);
         grid.constraint = GridLayoutGroup.Constraint.FixedRowCount;
@@ -1007,8 +1011,7 @@ public class MobileBuilderUI : MonoBehaviour
     /// than a third of the screen it starts closed. A phone starts closed, an
     /// iPad starts open, and a device I have never seen decides for itself
     /// rather than matching whichever one I happened to hard-code.</summary>
-    const float HANDLE_H = 44f;
-    const float COLLAPSED_H = 48f;      // the tab strip, and nothing else
+    float HANDLE_H { get { return TouchRow(); } }
     bool dockOpen = true;
     UnityEngine.UI.Button dockHandle;
     RectTransform handleRt;
@@ -1075,10 +1078,112 @@ public class MobileBuilderUI : MonoBehaviour
         }
     }
 
+    RectTransform matRowRt, actRowRt, partScrollRt;
+    UnityEngine.UI.GridLayoutGroup partGrid;
+    float lastScaleFactor;
+
+    /// <summary>One finger-sized row, in canvas units.
+    ///
+    /// R7 (owen 2026-08-04, after the collapse landed). Measured on his
+    /// landscape iPhone, every tap target in this UI was under Apple's 44 pt
+    /// floor: materials 25.4, action row 26.7, tabs 28.0, palette tiles 31.8.
+    /// The dock was covering 41% of the screen AND was too small to hit - the
+    /// worst of both, and the reason "make the dock smaller" was the wrong
+    /// instinct on its own.
+    ///
+    /// The cause is that every row height in this file is a LITERAL in canvas
+    /// units, and canvas units are pixels divided by a scale factor that tracks
+    /// resolution, not physical size. A 460-dpi phone therefore shrinks
+    /// everything relative to the finger holding it. 44 units meant 44 pt on
+    /// whatever screen these numbers were first eyeballed on and nothing in
+    /// particular anywhere else.
+    ///
+    /// So convert properly: 44 pt is 44/163 inch, times the device's real dpi
+    /// gives pixels, divided by the live scale factor gives units. Clamped at
+    /// both ends because dpi is a value devices lie about, and a lie must not
+    /// be able to produce either an untappable row or a dock that fills the
+    /// screen.
+    ///
+    /// UnityEngine.Device.Screen, not Screen - under the simulator the plain
+    /// one reports the editor window, which is the wrong physical device.</summary>
+    float TouchRow()
+    {
+        float sf = canvas != null ? canvas.scaleFactor : 0f;
+        float dpi = UnityEngine.Device.Screen.dpi;
+        if (sf < 0.01f || dpi < 1f) return 44f;         // unknown: previous behaviour
+        return Mathf.Clamp((44f / 163f) * dpi / sf, 34f, 110f);
+    }
+
+    /// <summary>Push the finger-sized row into every control that is one.
+    ///
+    /// Re-applied whenever the scale factor moves rather than once at build
+    /// time: CanvasScaler sets scaleFactor in its own Update, so anything read
+    /// during Awake is a value from before the first layout pass. That is the
+    /// same trap the dock's open/closed default fell into an hour earlier, and
+    /// it fails the same silent way - correct-looking code, numbers that never
+    /// change.</summary>
+    void ApplyTouchSizes()
+    {
+        float R = TouchRow();
+        foreach (var tb in tabBtns)
+        {
+            if (tb == null) continue;
+            var rt = tb.GetComponent<RectTransform>();
+            if (rt != null) rt.sizeDelta = new Vector2(-4f, R);
+        }
+        foreach (var pn in new[] { buildPanel, fightPanel, garagePanel, shopPanel,
+                                   robotsPanel, partsPanel, trophyPanel })
+        {
+            if (pn == null) continue;
+            var rt = pn.GetComponent<RectTransform>();
+            if (rt != null) rt.offsetMax = new Vector2(-6f, -(R + 4f));
+        }
+        if (matRowRt != null) matRowRt.sizeDelta = new Vector2(0f, R);
+        if (actRowRt != null) actRowRt.sizeDelta = new Vector2(0f, R);
+        if (partScrollRt != null)
+        {
+            partScrollRt.offsetMin = new Vector2(0f, R + 4f);
+            partScrollRt.offsetMax = new Vector2(0f, -(R + 2f));
+        }
+        if (partGrid != null) partGrid.cellSize = new Vector2(112f, R);
+        if (handleRt != null) handleRt.sizeDelta = new Vector2(300f, R);
+        ApplyDockH();
+    }
+
+    /// <summary>Test hook: how tall a named control actually is, in points.
+    ///
+    /// Named rather than "the smallest button anywhere", because the list tabs
+    /// have their own dense rows that this change does not claim to fix -
+    /// a global minimum would fail for something it was never measuring and
+    /// teach us to lower the bar.</summary>
+    public float TapTargetPt(string goName)
+    {
+        var go = GameObject.Find(goName);
+        if (go == null) return -1f;
+        var rt = go.GetComponent<RectTransform>();
+        if (rt == null) return -1f;
+        float dpi = UnityEngine.Device.Screen.dpi;
+        if (dpi < 1f) return 99f;
+        var c = new Vector3[4];
+        rt.GetWorldCorners(c);
+        return (c[1].y - c[0].y) / (dpi / 163f);
+    }
+
     float DockH(int t)
     {
-        if (!dockOpen) return COLLAPSED_H;
-        if (t == 0) return 272f;                  // BUILD: two palette rows fit
+        float R = TouchRow();
+        if (!dockOpen) return R + 4f;             // the tab strip, and nothing else
+        // BUILD, derived rather than the old literal 272: tab strip + material
+        // row + two palette rows + action row + the scrollbar's lane and the
+        // padding between them. Capped so a device that overstates its dpi
+        // cannot hand back a dock taller than the screen it is sitting on.
+        if (t == 0)
+        {
+            float ch1 = 0f;
+            if (canvas != null) { var c1 = canvas.GetComponent<RectTransform>(); if (c1 != null) ch1 = c1.rect.height; }
+            float want = 5f * R + 38f;
+            return ch1 > 100f ? Mathf.Min(want, ch1 * 0.62f) : want;
+        }
         if (!Career.active) return 210f;
         // R5 (critic finding 4, filed in R2/R3/R4/R5): a content-sized dock left
         // 37-53% of LEAGUE / ROBOTS / SHOP / PARTS as dimmed build room with the
@@ -2021,6 +2126,11 @@ public class MobileBuilderUI : MonoBehaviour
     void Update()
     {
         if (bm == null) { bm = Object.FindFirstObjectByType<BuilderManager>(); if (bm == null) return; }
+        if (canvas != null && Mathf.Abs(canvas.scaleFactor - lastScaleFactor) > 0.001f)
+        {
+            lastScaleFactor = canvas.scaleFactor;
+            ApplyTouchSizes();
+        }
         bool fighting = Object.FindFirstObjectByType<FightManager>() != null
                      || bm.mode == BuilderManager.Mode.Test   // fix: dock stayed up over TEST DRIVE
                      || bm.Scouting;                          // C3: scouting overlay owns the screen

@@ -774,6 +774,29 @@ public class CareerSmoke : MonoBehaviour
               + " -> " + coverOpen.ToString("F2") + ")");
         Check(GameObject.Find("mats") != null, "re-opening restores the panel");
 
+        // ---- C16: the build controls are finger-sized (owen 2026-08-04) ----
+        // Measured before this change, on owen's landscape iPhone: materials
+        // 25.4 pt, action row 26.7, tabs 28.0, palette tiles 31.8 - every one
+        // of them under Apple's 44 pt floor, while the dock covered 41% of the
+        // screen. Row heights were literals in canvas units, which are pixels
+        // over a scale factor that tracks resolution rather than physical size,
+        // so a high-dpi phone shrank every control relative to the finger
+        // holding it. 40 rather than 44 here is rounding tolerance, not a
+        // negotiated-down target.
+        ui.SetDockOpen(true);
+        ui.TestShowTab(0);
+        yield return null; yield return null;
+        string[] tapNames = { "tab0", "mat_Aluminum", "rot", "bsave", "part_0", "dockhandle" };
+        string tooSmall = "";
+        foreach (var nm in tapNames)
+        {
+            float pt = ui.TapTargetPt(nm);
+            if (pt >= 0f && pt < 40f) tooSmall += nm + "=" + pt.ToString("F1") + "pt ";
+        }
+        Check(tooSmall.Length == 0,
+              "build controls clear the 44 pt touch floor"
+              + (tooSmall.Length > 0 ? " (too small: " + tooSmall.Trim() + ")" : ""));
+
         var handle = GameObject.Find("dockhandle");
         Check(handle != null && handle.activeInHierarchy, "the handle is always reachable");
         Check(ui.HandleIsUiForTest, "taps on the handle count as UI, not as taps on the robot");
