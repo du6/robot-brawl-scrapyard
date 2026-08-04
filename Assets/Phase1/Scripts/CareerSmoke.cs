@@ -837,6 +837,38 @@ public class CareerSmoke : MonoBehaviour
         ui.SetMatSheet(false);
         yield return null;
 
+        // ---- C18: nothing you must read or hit is under the notch ----
+        // Measured on owen's landscape iPhone: screen 2532x1170, safe area
+        // x=141 w=2250 y=63 - 141 px bitten out of each side and 63 off the
+        // bottom. The UI drew edge to edge, so BUILD and TROPHIES ran under the
+        // notch and the whole action row sat in the home-indicator strip, which
+        // on iOS also swallows the swipe that would have hit them. Asserted on
+        // the real corners: a device with no notch passes trivially, which is
+        // exactly why this has to be checked against the DEVICE's safe area
+        // rather than the editor window's.
+        var sa = UnityEngine.Device.Screen.safeArea;
+        float dw = UnityEngine.Device.Screen.width, dh2 = UnityEngine.Device.Screen.height;
+        string outside = "";
+        if (sa.width > 1f && sa.height > 1f && dw > 1f)
+        {
+            string[] mustClear = { "tab0", "tab5", "rot", "bsave", "matbtn", "dockhandle" };
+            foreach (var nm in mustClear)
+            {
+                var go = GameObject.Find(nm);
+                if (go == null) continue;
+                var rt = go.GetComponent<RectTransform>();
+                var cc = new Vector3[4];
+                rt.GetWorldCorners(cc);
+                // world corners are device pixels for an overlay canvas
+                if (cc[0].x < sa.x - 1f || cc[2].x > sa.x + sa.width + 1f
+                    || cc[0].y < sa.y - 1f)
+                    outside += nm + " ";
+            }
+        }
+        Check(outside.Length == 0,
+              "every control clears the notch and the home indicator"
+              + (outside.Length > 0 ? " (outside: " + outside.Trim() + ")" : ""));
+
         var handle = GameObject.Find("dockhandle");
         Check(handle != null && handle.activeInHierarchy, "the handle is always reachable");
         Check(ui.HandleIsUiForTest, "taps on the handle count as UI, not as taps on the robot");

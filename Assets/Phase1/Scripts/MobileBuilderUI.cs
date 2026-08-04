@@ -215,6 +215,7 @@ public class MobileBuilderUI : MonoBehaviour
         var brt = bar.GetComponent<RectTransform>();
         brt.anchorMin = new Vector2(0f, 1f); brt.anchorMax = new Vector2(1f, 1f);
         brt.pivot = new Vector2(0.5f, 1f); brt.sizeDelta = new Vector2(0f, 46f); brt.anchoredPosition = Vector2.zero;
+        statsRt = brt;
         statsText = MkText("statsText", bar.transform, "", 20, TextAnchor.MiddleCenter);
         Stretch(statsText.rectTransform);
         statsText.rectTransform.offsetMin = new Vector2(10f, 0f);
@@ -1178,8 +1179,86 @@ public class MobileBuilderUI : MonoBehaviour
     /// same trap the dock's open/closed default fell into an hour earlier, and
     /// it fails the same silent way - correct-looking code, numbers that never
     /// change.</summary>
+    RectTransform statsRt;
+    float safeL, safeR, safeB, safeT;
+
+    /// <summary>The notch, the rounded corners and the home indicator, in
+    /// canvas units.
+    ///
+    /// R9 (owen 2026-08-04). Measured on his landscape iPhone: the screen is
+    /// 2532x1170 but the SAFE area is x=141 w=2250 y=63 - 141 px bitten out of
+    /// each side and 63 px off the bottom. The UI ignored all of it and drew
+    /// edge to edge, so the outer tabs (BUILD and TROPHIES) ran under the notch
+    /// and the rounded corners, and the whole action row - ROTATE through SAVE -
+    /// sat in the home-indicator strip, which on iOS also swallows the swipe
+    /// that would have hit them.
+    ///
+    /// Only the UI is inset. The 3D view still runs edge to edge, which is what
+    /// you want behind a notch: the arena bleeds off the sides, and nothing you
+    /// have to READ or HIT is underneath anything.
+    ///
+    /// UnityEngine.Device.Screen again - the plain one reports the editor
+    /// window, which has no notch at all, so this whole class of defect is
+    /// invisible until it ships.</summary>
+    void ReadSafeArea()
+    {
+        safeL = safeR = safeB = safeT = 0f;
+        if (canvas == null) return;
+        float sf = canvas.scaleFactor;
+        if (sf < 0.01f) return;
+        var sa = UnityEngine.Device.Screen.safeArea;
+        float w = UnityEngine.Device.Screen.width, h = UnityEngine.Device.Screen.height;
+        if (w < 1f || h < 1f || sa.width < 1f || sa.height < 1f) return;
+        safeL = Mathf.Max(0f, sa.x) / sf;
+        safeR = Mathf.Max(0f, w - (sa.x + sa.width)) / sf;
+        safeB = Mathf.Max(0f, sa.y) / sf;
+        safeT = Mathf.Max(0f, h - (sa.y + sa.height)) / sf;
+    }
+
+    /// <summary>Inset a full-width bar so its CONTENT clears the notch. The
+    /// panel itself still spans the screen - a dark bar that stops short of the
+    /// edge reads as a rendering fault, not as a considered margin.</summary>
+    float safeFracL
+    {
+        get
+        {
+            float cw = CanvasW;
+            return cw > 1f ? Mathf.Clamp01(safeL / cw) : 0f;
+        }
+    }
+    float safeFracR
+    {
+        get
+        {
+            float cw = CanvasW;
+            return cw > 1f ? Mathf.Clamp01(1f - safeR / cw) : 1f;
+        }
+    }
+    float CanvasW
+    {
+        get
+        {
+            if (canvas == null) return 0f;
+            var c = canvas.GetComponent<RectTransform>();
+            return c != null ? c.rect.width : 0f;
+        }
+    }
+
+    void InsetBar(RectTransform rt)
+    {
+        if (rt == null) return;
+        var t = rt.GetComponentInChildren<UnityEngine.UI.Text>();
+        if (t != null)
+        {
+            var trt = t.rectTransform;
+            trt.offsetMin = new Vector2(10f + safeL, trt.offsetMin.y);
+            trt.offsetMax = new Vector2(-(10f + safeR), trt.offsetMax.y);
+        }
+    }
+
     void ApplyTouchSizes()
     {
+        ReadSafeArea();
         float R = TouchRow();
         foreach (var tb in tabBtns)
         {
@@ -1192,8 +1271,14 @@ public class MobileBuilderUI : MonoBehaviour
         {
             if (pn == null) continue;
             var rt = pn.GetComponent<RectTransform>();
-            if (rt != null) rt.offsetMax = new Vector2(-6f, -(R + 4f));
+            if (rt == null) continue;
+            rt.offsetMin = new Vector2(6f + safeL, 6f + safeB);
+            rt.offsetMax = new Vector2(-(6f + safeR), -(R + 4f));
         }
+        InsetBar(statsRt);
+        InsetBar(msgBar != null ? msgBar.GetComponent<RectTransform>() : null);
+        InsetBar(tipBar != null ? tipBar.GetComponent<RectTransform>() : null);
+        LayoutTabs();
         if (matRowRt != null) matRowRt.sizeDelta = new Vector2(-12f, R);
         if (actRowRt != null) actRowRt.sizeDelta = new Vector2(0f, R);
         if (partScrollRt != null)
@@ -1257,7 +1342,12 @@ public class MobileBuilderUI : MonoBehaviour
     float DockH(int t)
     {
         float R = TouchRow();
-        if (!dockOpen) return R + 4f;             // the tab strip, and nothing else
+        // + safeB everywhere: the dock's BACKGROUND still reaches the bottom of
+        // the screen, but its contents are pushed above the home indicator.
+        // Because OverUI measures the dock rect, the hit band follows for free -
+        // the alternative, lifting the dock off the bottom, would have left a
+        // live strip underneath it that places parts through the UI.
+        if (!dockOpen) return R + 4f + safeB;     // the tab strip, and nothing else
         // BUILD, derived rather than the old literal 272: tab strip + material
         // row + two palette rows + action row + the scrollbar's lane and the
         // padding between them. Capped so a device that overstates its dpi
@@ -1268,8 +1358,8 @@ public class MobileBuilderUI : MonoBehaviour
             if (canvas != null) { var c1 = canvas.GetComponent<RectTransform>(); if (c1 != null) ch1 = c1.rect.height; }
             // R8: four rows, not five - the material chips folded into the
             // action row as a chooser and gave their row back.
-            float want = 4f * R + 38f;
-            return ch1 > 100f ? Mathf.Min(want, ch1 * 0.62f) : want;
+            float want = 4f * R + 38f + safeB;
+            return ch1 > 100f ? Mathf.Min(want, ch1 * 0.68f) : want;
         }
         if (!Career.active) return 210f;
         // R5 (critic finding 4, filed in R2/R3/R4/R5): a content-sized dock left
@@ -1375,8 +1465,13 @@ public class MobileBuilderUI : MonoBehaviour
             tabBtns[i].gameObject.SetActive(show);
             if (!show) continue;
             var rt = tabBtns[i].GetComponent<RectTransform>();
-            rt.anchorMin = new Vector2(i / (float)n, 1f);
-            rt.anchorMax = new Vector2((i + 1) / (float)n, 1f);
+            // R9: spread the tabs across the SAFE width, not the screen width.
+            // Measured on owen's landscape iPhone, 141 px is bitten out of each
+            // side by the notch and the rounded corners - so the first and last
+            // tabs, BUILD and TROPHIES, were the two sitting underneath it.
+            // Dividing 0..1 evenly is only correct on a rectangle.
+            rt.anchorMin = new Vector2(Mathf.Lerp(safeFracL, safeFracR, i / (float)n), 1f);
+            rt.anchorMax = new Vector2(Mathf.Lerp(safeFracL, safeFracR, (i + 1) / (float)n), 1f);
         }
         // C4: the workshop renames FIGHT/GARAGE in career mode
         var tl1 = tabBtns.Count > 1 ? tabBtns[1].GetComponentInChildren<Text>() : null;
@@ -2230,7 +2325,7 @@ public class MobileBuilderUI : MonoBehaviour
                 ApplyTouchSizes();
             }
         }
-        bool fighting = Object.FindFirstObjectByType<FightManager>() != null
+        bool fighting = FightManager.current != null
                      || bm.mode == BuilderManager.Mode.Test   // fix: dock stayed up over TEST DRIVE
                      || bm.Scouting;                          // C3: scouting overlay owns the screen
         if (canvas != null) canvas.enabled = !fighting;

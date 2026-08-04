@@ -20,6 +20,23 @@ namespace RobotBrawl.Phase0
 /// </summary>
 public class FightManager : MonoBehaviour
 {
+    /// <summary>The fight in progress, or null.
+    ///
+    /// R9 (owen 2026-08-04, smoothness pass): MobileBuilderUI.Update asked
+    /// "is a fight running?" with FindFirstObjectByType EVERY FRAME - a
+    /// scene-wide type scan, measured at 0.087 ms and 49 bytes per call in a
+    /// 244-object scene, for an answer that changes about twice a minute. It
+    /// also scales with scene size, so it costs most exactly when a big robot
+    /// is on the floor and the frame is already busy.
+    ///
+    /// Assigned in Awake and cleared in OnDestroy rather than by whoever
+    /// happens to start a fight - the object's own lifetime is the only thing
+    /// that is always right, including when a fight ends by being destroyed.</summary>
+    public static FightManager current;
+
+    void Awake() { current = this; }
+    void OnDestroy() { if (current == this) current = null; }
+
     public enum State { Settling, Fighting, Ended }
     public enum Outcome { None, PlayerWin, PlayerLoss, Draw }
 
