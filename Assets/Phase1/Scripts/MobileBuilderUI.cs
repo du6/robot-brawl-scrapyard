@@ -126,7 +126,22 @@ public class MobileBuilderUI : MonoBehaviour
     /// test, which classified those machines as phones.</summary>
     public static bool DeviceWantsTouch()
     {
-        return Application.isMobilePlatform || SystemInfo.deviceType == DeviceType.Handheld;
+        // UnityEngine.Device.*, NOT the plain Application/SystemInfo. Measured
+        // 2026-08-04 with owen's Device Simulator set to an iPad Pro:
+        //
+        //     REAL   : isMobilePlatform=False deviceType=Desktop  model=Mac15,13
+        //     DEVICE : isMobilePlatform=False deviceType=Handheld model=Generic iPad Pro
+        //
+        // The plain API answers "what is this Mac", which is true and useless -
+        // the whole point of the simulator is to be asked what it is EMULATING.
+        // Reading the wrong one put "(detected)" next to the Desktop button on
+        // a simulated iPad and, worse, handed the desktop builder to a window
+        // that cannot click it (see ModeSelect.ShouldAutoBoot).
+        //
+        // Outside the simulator UnityEngine.Device.* forwards to the real
+        // values, so this is the same answer everywhere else.
+        return UnityEngine.Device.Application.isMobilePlatform
+            || UnityEngine.Device.SystemInfo.deviceType == DeviceType.Handheld;
     }
 
     public static bool ShouldActivate()

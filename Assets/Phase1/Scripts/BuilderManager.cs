@@ -6187,10 +6187,43 @@ public class ModeSelect : MonoBehaviour
     /// keeps the chooser, so testing touch-on-desktop and the dev sandbox
     /// stays one click away - the dev sandbox was always a dev door anyway,
     /// and this is the honest place for it.</summary>
+    /// <summary>Should we skip the chooser and boot straight in?
+    ///
+    /// OWEN 2026-08-04: "I'm using the device simulator in unity to test
+    /// running on iphone. But when i click the 'start career' button there is
+    /// no response."
+    ///
+    /// Nothing was wrong with the button. Unity's Device Simulator DISABLES the
+    /// mouse and substitutes a simulated touchscreen - measured, with this
+    /// project's Input System-only handling:
+    ///
+    ///     devices: Keyboard[on] Mouse[off] Pen[off] Touchscreen[on]
+    ///
+    /// IMGUI wants mouse events, so with no mouse device every OnGUI screen in
+    /// the game RENDERS in the simulator and none of them can be clicked. That
+    /// includes this chooser, which is why it was a dead end rather than a
+    /// cosmetic annoyance.
+    ///
+    /// "Application.isEditor" was the wrong question all along. The real one is
+    /// "is a human going to drive the DESKTOP builder here", and under a
+    /// simulated phone the answer is no - the same as in a build, which is
+    /// exactly the thing the simulator exists to imitate. So the simulator now
+    /// boots like a build: past this screen, into the touch UI, which is uGUI
+    /// and does receive the simulated touches.
+    ///
+    /// A real editor on a real desktop still gets the chooser, so the dev
+    /// sandbox door stays one click away.</summary>
+    public static bool ShouldAutoBoot()
+    {
+        if (!Application.isEditor) return true;
+        return MobileBuilderUI.DeviceWantsTouch();
+    }
+
     void Start()
     {
-        if (Application.isEditor) return;
+        if (!ShouldAutoBoot()) return;
         StartCareer(MobileBuilderUI.DeviceWantsTouch());
+        Destroy(gameObject);
     }
 
     /// <summary>One path in, so the two buttons and the auto-boot cannot drift.
@@ -6209,8 +6242,11 @@ public class ModeSelect : MonoBehaviour
 
     void OnGUI()
     {
-        // Builds never draw this - Start() has already left. Editor only.
-        if (!Application.isEditor) return;
+        // Builds never draw this, and neither does a simulated device - Start()
+        // has already booted past it. Destroy is deferred to the end of the
+        // frame and OnGUI runs before that, so without this guard the chooser
+        // would flash over the game for one frame on the way through.
+        if (ShouldAutoBoot()) return;
         // Critic round 1 (mobile): raw pixels made these buttons thumbnail
         // sized on a 264-dpi iPad. Same DPI scale as the rest of the HUD.
         float s = BuilderManager.GuiScale;   // R4 finding 3: one rule, one place

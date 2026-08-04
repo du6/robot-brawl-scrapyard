@@ -808,6 +808,23 @@ public class CareerSmoke : MonoBehaviour
         Check(agree, "boot mode and UI attach read ONE device rule");
         Check(overrides, "forceMobileUI still overrides detection, so the editor can test touch");
 
+        // ==== C14: the chooser is only skipped when it is safe to (owen 2026-08-04) ====
+        // Under the Device Simulator the mouse device is off, so IMGUI - which
+        // is the ENTIRE desktop builder - cannot be clicked at all. Skipping
+        // the chooser is therefore only safe if the touch UI is what comes up;
+        // skipping it into the desktop builder would strand you exactly the way
+        // the chooser itself did, one screen later and harder to diagnose.
+        bool savedForce2 = MobileBuilderUI.forceMobileUI;
+        MobileBuilderUI.forceMobileUI = false;
+        bool autoBoot = ModeSelect.ShouldAutoBoot();
+        bool touchWanted = MobileBuilderUI.DeviceWantsTouch();
+        MobileBuilderUI.forceMobileUI = savedForce2;
+        yield return null;
+        Check(!Application.isEditor || !autoBoot || touchWanted,
+              "the editor only skips the chooser when the touch UI will be the UI");
+        Check(autoBoot == (!Application.isEditor || touchWanted),
+              "auto-boot and the device rule read the same answer");
+
         // ---- C6.4: telemetry schema landed (§14) ----
         Check(Career.Data.fights > 0, "telemetry: fights counted (" + Career.Data.fights + ")");
         Check(Career.Data.scrapCurve.Count == Career.Data.fights,
