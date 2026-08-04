@@ -2420,7 +2420,7 @@ public class BuilderManager : MonoBehaviour
     /// -1 = unlimited (career off, dev free-build, or the core).</summary>
     public int CareerRemaining(int i)
     {
-        if (!Career.active || Career.Drafting) return -1;
+        if (!Career.active || Career.FreeParts) return -1;
         if (i <= 0 || i >= PaletteCount) return -1;
         var d = palette[i];
         string mat = d.EffectiveMat(activeMat);
@@ -2448,7 +2448,7 @@ public class BuilderManager : MonoBehaviour
     public bool CareerAllows(int i) { int r = CareerRemaining(i); return r == -1 || r > 0; }
     bool CareerAllowsMat(PlacedPart pp, string newMat)
     {
-        if (!Career.active || Career.Drafting) return true;
+        if (!Career.active || Career.FreeParts) return true;
         if (placed.Count > 0 && pp == placed[0]) return true;
         return Career.CountOf(pp.def.id, newMat) - CareerUsed(pp.def.id, newMat) > 0;
     }
@@ -2457,7 +2457,7 @@ public class BuilderManager : MonoBehaviour
     public List<string> CareerShortfall()
     {
         var lack = new List<string>();
-        if (!Career.active || Career.Drafting) return lack;
+        if (!Career.active || Career.FreeParts) return lack;
         var seen = new List<string>();
         for (int k = 1; k < placed.Count; k++)
         {
@@ -2477,7 +2477,7 @@ public class BuilderManager : MonoBehaviour
     /// keeping a robot they already own.</summary>
     string PoolWarning()
     {
-        if (!Career.active || Career.Drafting) return "";
+        if (!Career.active || Career.FreeParts) return "";
         var lack = CareerShortfall();
         if (lack.Count == 0) return "";
         return "  \u26a0 The stable is over the parts pool: " + string.Join(", ", lack.ToArray())
@@ -2534,7 +2534,7 @@ public class BuilderManager : MonoBehaviour
     /// this per material now that every material is on screen at once.</summary>
     public int CareerRemainingMat(int i, string mat)
     {
-        if (!Career.active || Career.Drafting) return -1;
+        if (!Career.active || Career.FreeParts) return -1;
         if (i <= 0 || i >= PaletteCount) return -1;
         var d = palette[i];
         int rem = Career.CountOf(d.id, mat) - CareerUsed(d.id, mat);

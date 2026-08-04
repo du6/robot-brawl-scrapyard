@@ -52,6 +52,36 @@ public class CareerBench : MonoBehaviour
     }
     bool probeMode; string probeRecipe, probeMat; int probeLi, probeCi, probeN;
 
+    /// <summary>OWEN 2026-08-03: "I beat all robots so far with a simple
+    /// spinner robot, which makes the game boring."
+    ///
+    /// The other probes run ROSTER recipes as the player, which answers
+    /// "is the roster internally balanced" - a different question from "can
+    /// the roster handle the thing the player actually built". This one takes
+    /// a real saved snapshot out of the stable and runs it against every bot
+    /// on the roster, so the margin is measured against the machine that is
+    /// actually winning rather than a stand-in for it.</summary>
+    public static CareerBench RunPlayerProbe(string snapshot, string label, int n)
+    {
+        finished = false;
+        var b = new GameObject("career_bench").AddComponent<CareerBench>();
+        b.playerMode = true;
+        b.playerSnap = snapshot; b.playerLabel = label; b.playerN = n;
+        return b;
+    }
+    bool playerMode; string playerSnap, playerLabel; int playerN;
+
+    /// <summary>A Ref around an existing snapshot rather than a roster recipe.
+    /// parts is derived from the snapshot's own line count so Match's
+    /// "did it actually load" guard still means something.</summary>
+    Ref RefFromSnapshot(string snap, string label)
+    {
+        int lines = 0;
+        foreach (var ln in snap.Split('\n')) if (ln.Trim().Length > 0) lines++;
+        return new Ref { recipe = label, mat = "as-built", snapshot = snap,
+                         parts = Mathf.Max(1, lines - 1), value = 0, mass = 0 };
+    }
+
     readonly List<string> log = new List<string>();
     int passed, failed;
     void Check(bool ok, string what)
@@ -243,6 +273,27 @@ public class CareerBench : MonoBehaviour
             var wm = new int[2];
             yield return StartCoroutine(Series(mref, 2, 0, 10, wm));
             Check(true, string.Format("MIRROR bulwark-Steel vs bulwark-V (L3C1): {0}/10 player wins, {1} non-starts", wm[0], wm[1]));
+            Career.active = savedActive; Career.Data = savedData; Career.autosave = true;
+            Finish();
+            yield break;
+        }
+
+        if (playerMode)
+        {
+            var pr = RefFromSnapshot(playerSnap, playerLabel);
+            // One canonical contest per roster bot, at the league it first
+            // appears in - so each row is "your build vs THAT machine", not
+            // "your build vs a league".
+            string[] who = { "SCOUT", "TIPPER", "MAULER", "BULWARK", "RIPPER", "WIDOWMAKER" };
+            int[] LI     = {   0,       0,        1,        2,         2,        3 };
+            int[] CI     = {   0,       1,        0,        0,         2,        0 };
+            for (int q = 0; q < who.Length; q++)
+            {
+                var wq = new int[2];
+                yield return StartCoroutine(Series(pr, LI[q], CI[q], playerN, wq));
+                Check(true, string.Format("{0} vs {1} (L{2}C{3}): {4}/{5} wins, {6} non-starts",
+                    playerLabel, who[q], LI[q] + 1, CI[q] + 1, wq[0], playerN, wq[1]));
+            }
             Career.active = savedActive; Career.Data = savedData; Career.autosave = true;
             Finish();
             yield break;

@@ -622,6 +622,25 @@ public class CareerSmoke : MonoBehaviour
               "a fresh career sits in the first four tips (" + stepBuilt + ")");
         Check(silenced, "SKIP TIPS silences the row without faking progress");
 
+        // ==== C11: devFreeBuild is not a draft (owen 2026-08-03) ====
+        // Career.Drafting used to return true whenever devFreeBuild was set,
+        // so CareerBench - which sets it to test fights rather than inventory -
+        // tripped the fight gate's draft refusal and could not start a single
+        // match. It reported 0/3 for every pairing and read like a balance
+        // result for a full day. The two ideas are now separate and this is
+        // the guard: freeing PARTS must never imply a design is OPEN.
+        bool savedFree = Career.devFreeBuild;
+        int savedBp = Career.Data.activeBlueprint;
+        Career.Data.activeBlueprint = -1;
+        Career.devFreeBuild = true;
+        bool freeUnderHarness = Career.FreeParts;
+        bool draftUnderHarness = Career.Drafting;
+        Career.devFreeBuild = savedFree;
+        Career.Data.activeBlueprint = savedBp;
+        yield return null;
+        Check(freeUnderHarness && !draftUnderHarness,
+              "devFreeBuild frees parts without pretending a design is open");
+
         // ==== C9: one device rule (owen 2026-08-03) ====
         // The chooser used to ASK which UI you wanted and ShouldActivate used
         // to ignore the answer - on an iPad, "START CAREER - Desktop" handed

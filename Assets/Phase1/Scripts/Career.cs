@@ -262,15 +262,30 @@ public static class Career
     /// So the mode is now DERIVED and cannot drift: you are drafting exactly
     /// when a design is open. NEW DRAFT and OPEN put you there, NEW ROBOT and
     /// EDIT take you out, CONVERT buys the difference.</summary>
+    /// <summary>Is a DESIGN open? This is the real thing, and it is what every
+    /// GATE must read - the fight blocker, StableCreate, the banner.
+    ///
+    /// OWEN 2026-08-03 (found while benching his spinner): this used to return
+    /// true whenever devFreeBuild was set, conflating two unrelated ideas -
+    /// "the harness is ignoring inventory" and "the player is editing a
+    /// design". CareerBench sets devFreeBuild, so from the moment the fight
+    /// gate learned to refuse drafts (2026-08-02) the entire balance harness
+    /// could not start a single fight. It reported 0/3 for every pairing and
+    /// read like a balance result. Same failure as the shop harness: a test
+    /// that produces numbers while doing nothing.</summary>
     public static bool Drafting
     {
         get
         {
-            if (devFreeBuild) return true;                 // harness override
             if (!active || Data == null) return false;
             return Data.activeBlueprint >= 0 && Data.activeBlueprint < Data.blueprints.Count;
         }
     }
+
+    /// <summary>Are parts free right now - either because a design is open or
+    /// because a harness said so? This is what the INVENTORY checks want, and
+    /// the only thing devFreeBuild was ever meant to influence.</summary>
+    public static bool FreeParts { get { return devFreeBuild || Drafting; } }
         /// <summary>C1: the builder consults the career inventory only when
         /// this is on. Off = today's sandbox behaviour, untouched.</summary>
         public static bool active;
