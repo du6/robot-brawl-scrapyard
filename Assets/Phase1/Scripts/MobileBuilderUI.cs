@@ -588,12 +588,30 @@ public class MobileBuilderUI : MonoBehaviour
 
     void BuildBuildTab()
     {
-        // material chip row (top)
-        var matRow = MkPanel("mats", buildPanel.transform, new Color(0f,0f,0f,0f));
+        // R8 (owen 2026-08-04): "fold material row into one chooser".
+        //
+        // Seven material chips had a permanent 44 pt row of their own, which on
+        // a 2.5-inch landscape phone is 11% of the screen spent on a setting
+        // you change a few times a build. Folding it into the action row costs
+        // NO row at all - the chooser is a sixth button there - and the chips
+        // themselves become a sheet that borrows the palette's space while it
+        // is open. Dock 58.9% -> 48.1% with nothing made smaller.
+        //
+        // Over the palette rather than above the dock deliberately: a sheet
+        // that floats above the dock would push into the build view, and this
+        // whole loop has been about giving that space back. The palette is also
+        // the right thing to cover - you are choosing what the NEXT part is
+        // made of, so the parts are exactly what you are not reading.
+        var matSheet = MkPanel("matsheet", buildPanel.transform, new Color(0.07f,0.08f,0.11f,0.98f));
+        matSheetGO = matSheet;
+        var msr = matSheet.GetComponent<RectTransform>();
+        msr.anchorMin = new Vector2(0f,0f); msr.anchorMax = new Vector2(1f,1f);
+        matSheetRt = msr;
+
+        var matRow = MkPanel("mats", matSheet.transform, new Color(0f,0f,0f,0f));
         var mr = matRow.GetComponent<RectTransform>();
-        mr.anchorMin = new Vector2(0f,1f); mr.anchorMax = new Vector2(1f,1f); mr.pivot = new Vector2(0.5f,1f);
-        mr.sizeDelta = new Vector2(0f, mr.sizeDelta.y);   // R1 critic: default 100px sizeDelta survived the stretch anchors
-        mr.sizeDelta = new Vector2(0f,40f); mr.anchoredPosition = Vector2.zero;
+        mr.anchorMin = new Vector2(0f,0.5f); mr.anchorMax = new Vector2(1f,0.5f); mr.pivot = new Vector2(0.5f,0.5f);
+        mr.sizeDelta = new Vector2(-12f,40f); mr.anchoredPosition = Vector2.zero;
         matRowRt = mr;
         var mh = matRow.AddComponent<HorizontalLayoutGroup>(); mh.spacing = 4f; mh.childForceExpandWidth = true; mh.childForceExpandHeight = true;
         foreach (var key in MatDB.Order)
@@ -602,6 +620,7 @@ public class MobileBuilderUI : MonoBehaviour
             var mb = MkButton("mat_"+k, matRow.transform, MatDB.Get(k).name, 15, () => PickMat(k));
             matButtons.Add(mb); matKeys.Add(k);
         }
+        matSheet.SetActive(false);
         // action row (bottom)
         var actRow = MkPanel("acts", buildPanel.transform, new Color(0f,0f,0f,0f));
         var ar = actRow.GetComponent<RectTransform>();
@@ -609,6 +628,9 @@ public class MobileBuilderUI : MonoBehaviour
         ar.sizeDelta = new Vector2(0f,42f); ar.anchoredPosition = Vector2.zero;
         actRowRt = ar;
         var ah = actRow.AddComponent<HorizontalLayoutGroup>(); ah.spacing = 6f; ah.childForceExpandWidth = true; ah.childForceExpandHeight = true;
+        // First slot, because it is the only one of these that changes what the
+        // NEXT tap does - the rest act on what is already there.
+        matBtn = MkButton("matbtn", actRow.transform, "MATERIAL", 17, ToggleMatSheet);
         MkButton("rot", actRow.transform, "ROTATE", 17, () => Phase0Input.DebugRotate());
         MkButton("undo", actRow.transform, "UNDO", 17, () => Phase0Input.DebugUndo());
         removeBtn = MkButton("del", actRow.transform, "REMOVE", 17, () => { removeArmed = !removeArmed; if (removeArmed && bm != null && bm.HasSelection) bm.SelectPart(bm.SelectedPart); RefreshRemoveBtn(); });
@@ -635,7 +657,7 @@ public class MobileBuilderUI : MonoBehaviour
         var scrollGO = MkPanel("partscroll", buildPanel.transform, new Color(0f,0f,0f,0.0f));
         var sr = scrollGO.GetComponent<RectTransform>();
         sr.anchorMin = new Vector2(0f,0f); sr.anchorMax = new Vector2(1f,1f);
-        sr.offsetMin = new Vector2(0f,46f); sr.offsetMax = new Vector2(0f,-44f);
+        sr.offsetMin = new Vector2(0f,46f); sr.offsetMax = new Vector2(0f,-2f);
         partScrollRt = sr;
         var scroll = scrollGO.AddComponent<ScrollRect>(); scroll.horizontal = true; scroll.vertical = false;
         var viewport = MkPanel("viewport", scrollGO.transform, new Color(0f,0f,0f,0.15f));
@@ -726,10 +748,30 @@ public class MobileBuilderUI : MonoBehaviour
         RefreshMats(); RefreshPartLabels();
     }
 
+    GameObject matSheetGO;
+    RectTransform matSheetRt;
+    Button matBtn;
+
+    public void ToggleMatSheet() { SetMatSheet(matSheetGO == null || !matSheetGO.activeSelf); }
+
+    /// <summary>Show or hide the material sheet. Public so the suite can reach
+    /// the chips, which are no longer on screen by default - a test that can
+    /// only see what happens to be visible stops testing the rest.</summary>
+    public void SetMatSheet(bool v)
+    {
+        if (matSheetGO != null) matSheetGO.SetActive(v);
+        RefreshMats();
+    }
+
+    public bool MatSheetOpen { get { return matSheetGO != null && matSheetGO.activeSelf; } }
+
     void PickMat(string k)
     {
         if (Progression.MatUnlocked(k)) { if (bm != null) bm.ActiveMatKey = k; }
         else if (Progression.TryBuyMat(k)) { if (bm != null) bm.ActiveMatKey = k; }
+        // Close on pick. Leaving it open would mean the sheet covers the
+        // palette at the exact moment you go to choose the part it applies to.
+        SetMatSheet(false);
         RefreshHighlight(); RefreshMats(); RefreshPartLabels();
     }
 
@@ -818,6 +860,20 @@ public class MobileBuilderUI : MonoBehaviour
                       : new Color(0.10f,0.10f,0.12f,0.96f);
             var t = matButtons[i].GetComponentInChildren<Text>();
             if (t != null) t.color = unlocked ? Color.white : new Color(0.55f,0.55f,0.6f,1f);
+        }
+        // The chooser has to READ as a chooser: a button labelled "MATERIAL"
+        // next to ROTATE and UNDO looks like another verb. Naming the current
+        // material is also the only place that state is now visible at all,
+        // since the chips it used to live on are behind the sheet.
+        if (matBtn != null)
+        {
+            var bt = matBtn.GetComponentInChildren<Text>();
+            if (bt != null)
+                bt.text = MatSheetOpen ? "\u25bc CLOSE" : MatDB.Get(cur).name.ToUpper();
+            var bi = matBtn.GetComponent<Image>();
+            if (bi != null)
+                bi.color = MatSheetOpen ? new Color(0.20f,0.45f,0.65f,1f)
+                                        : new Color(0.16f,0.18f,0.22f,0.96f);
         }
     }
 
@@ -1138,12 +1194,19 @@ public class MobileBuilderUI : MonoBehaviour
             var rt = pn.GetComponent<RectTransform>();
             if (rt != null) rt.offsetMax = new Vector2(-6f, -(R + 4f));
         }
-        if (matRowRt != null) matRowRt.sizeDelta = new Vector2(0f, R);
+        if (matRowRt != null) matRowRt.sizeDelta = new Vector2(-12f, R);
         if (actRowRt != null) actRowRt.sizeDelta = new Vector2(0f, R);
         if (partScrollRt != null)
         {
             partScrollRt.offsetMin = new Vector2(0f, R + 4f);
-            partScrollRt.offsetMax = new Vector2(0f, -(R + 2f));
+            partScrollRt.offsetMax = new Vector2(0f, -2f);
+        }
+        if (matSheetRt != null)
+        {
+            // Exactly the palette's footprint, so the sheet cannot creep over
+            // the action row - which is where CLOSE lives.
+            matSheetRt.offsetMin = new Vector2(0f, R + 4f);
+            matSheetRt.offsetMax = new Vector2(0f, -2f);
         }
         if (partGrid != null)
         {
@@ -1203,7 +1266,9 @@ public class MobileBuilderUI : MonoBehaviour
         {
             float ch1 = 0f;
             if (canvas != null) { var c1 = canvas.GetComponent<RectTransform>(); if (c1 != null) ch1 = c1.rect.height; }
-            float want = 5f * R + 38f;
+            // R8: four rows, not five - the material chips folded into the
+            // action row as a chooser and gave their row back.
+            float want = 4f * R + 38f;
             return ch1 > 100f ? Mathf.Min(want, ch1 * 0.62f) : want;
         }
         if (!Career.active) return 210f;

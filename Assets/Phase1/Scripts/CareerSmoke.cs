@@ -756,7 +756,7 @@ public class CareerSmoke : MonoBehaviour
         ui.SetDockOpen(false);
         yield return null; yield return null;
         int shutH = Mathf.RoundToInt(ui.DockHeightForTest);
-        bool panelGone = GameObject.Find("mats") == null;
+        bool panelGone = GameObject.Find("partscroll") == null;
         bool tabsStay = GameObject.Find("tab0") != null;
         Check(shutH < openH / 2, "collapsing the dock at least halves it ("
               + openH + " -> " + shutH + " units)");
@@ -772,7 +772,7 @@ public class CareerSmoke : MonoBehaviour
         Check(coverOpen > coverShut + 0.05f,
               "the camera is told the dock moved (cover " + coverShut.ToString("F2")
               + " -> " + coverOpen.ToString("F2") + ")");
-        Check(GameObject.Find("mats") != null, "re-opening restores the panel");
+        Check(GameObject.Find("partscroll") != null, "re-opening restores the panel");
 
         // ---- C16: the build controls are finger-sized (owen 2026-08-04) ----
         // Measured before this change, on owen's landscape iPhone: materials
@@ -786,7 +786,7 @@ public class CareerSmoke : MonoBehaviour
         ui.SetDockOpen(true);
         ui.TestShowTab(0);
         yield return null; yield return null;
-        string[] tapNames = { "tab0", "mat_Aluminum", "rot", "bsave", "part_0", "dockhandle" };
+        string[] tapNames = { "tab0", "matbtn", "rot", "bsave", "part_0", "dockhandle" };
         string tooSmall = "";
         foreach (var nm in tapNames)
         {
@@ -815,6 +815,27 @@ public class CareerSmoke : MonoBehaviour
         }
         Check(pcont != null && overflow <= 4f,
               "the whole palette fits its viewport (overflow " + overflow.ToString("F0") + " px)");
+
+        // ---- C17: the material chooser (owen 2026-08-04) ----
+        // The chips gave up their permanent row and became a sheet over the
+        // palette. Three things have to hold: the sheet is reachable, the chips
+        // in it are still finger-sized, and picking one CLOSES it - leaving it
+        // open would cover the palette at the moment you go to choose the part
+        // the material applies to.
+        ui.SetMatSheet(true);
+        yield return null; yield return null;
+        bool sheetOpens = GameObject.Find("mat_Aluminum") != null;
+        float chipPt = ui.TapTargetPt("mat_Aluminum");
+        Check(sheetOpens && chipPt >= 40f,
+              "the material sheet opens with finger-sized chips (" + chipPt.ToString("F1") + "pt)");
+        TapNamed("mat_Steel");
+        yield return null; yield return null;
+        Check(!ui.MatSheetOpen, "picking a material closes the sheet");
+        Check(MatDB.Canon(bm.ActiveMatKey) == MatDB.Canon("Steel"),
+              "picking a material actually selects it (" + bm.ActiveMatKey + ")");
+        bm.ActiveMatKey = "Aluminum";
+        ui.SetMatSheet(false);
+        yield return null;
 
         var handle = GameObject.Find("dockhandle");
         Check(handle != null && handle.activeInHierarchy, "the handle is always reachable");
