@@ -969,6 +969,7 @@ public class BuilderManager : MonoBehaviour
             return;
         }
         PumpBuildMusic();
+        PumpUiFraming();
         if (mode == Mode.Build) UpdateBuild();
         else if (mode == Mode.Test) UpdateTest();
         else UpdateFight();
@@ -1142,6 +1143,59 @@ public class BuilderManager : MonoBehaviour
             buildMusic.Pause();
             buildMusicPaused = true;
         }
+    }
+
+    bool camShifted;
+
+    /// <summary>Frame the robot in the part of the screen you can actually SEE.
+    ///
+    /// OWEN 2026-08-04: "Looks like the menu partially blocks the building
+    /// area." The dock's height was half the story; the other half is that this
+    /// camera aimed at the centre of the full viewport, which on a phone is a
+    /// point underneath the dock. The machine was being deliberately posed
+    /// behind the furniture.
+    ///
+    /// This is a LENS SHIFT, not a camera move. Moving the camera down would
+    /// also frame the robot higher, but it changes the angle you view it from -
+    /// you would start seeing the underside, and near the floor it would clip
+    /// through. An off-centre frustum slides the framing without touching the
+    /// eye position, which is what a tilt-shift lens does and exactly what is
+    /// wanted: same shot, different part of the film.
+    ///
+    /// TRAP worth knowing: overriding projectionMatrix can desynchronise
+    /// ScreenPointToRay, and ScreenPointToRay is how parts get placed - a
+    /// silent version of this bug would leave the robot looking right and
+    /// dropping parts a few centimetres from the finger. Verified by
+    /// round-tripping a known world point through WorldToScreenPoint and back;
+    /// see the R1 evidence in the critic-loop doc.
+    ///
+    /// Driven by `mode` in one place, like the music, so a future mode cannot
+    /// forget to reset it.</summary>
+    void PumpUiFraming()
+    {
+        float below = 0f, above = 0f;
+        if (mode == Mode.Build && MobileBuilderUI.Active)
+        {
+            below = MobileBuilderUI.coverBottom;
+            above = MobileBuilderUI.coverTop;
+        }
+
+        // Centre of the visible band, as an offset from the centre of the screen.
+        float delta = (below - above) * 0.5f;
+
+        if (Mathf.Abs(delta) < 0.002f)
+        {
+            if (camShifted) { cam.ResetProjectionMatrix(); camShifted = false; }
+            return;
+        }
+
+        float t = cam.nearClipPlane * Mathf.Tan(cam.fieldOfView * 0.5f * Mathf.Deg2Rad);
+        float aspect = cam.pixelHeight > 0 ? (float)cam.pixelWidth / cam.pixelHeight : 1.777f;
+        float r = t * aspect;
+        float s = 2f * t * delta;   // shift the window DOWN so the subject rides UP
+        cam.projectionMatrix = Matrix4x4.Frustum(-r, r, -t - s, t - s,
+                                                 cam.nearClipPlane, cam.farClipPlane);
+        camShifted = true;
     }
 
     void UpdateBuild()

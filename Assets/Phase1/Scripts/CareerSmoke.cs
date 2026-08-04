@@ -85,6 +85,15 @@ public class CareerSmoke : MonoBehaviour
         if (bm == null || ui == null)
         { Check(false, "builder + mobile UI present"); Finish(); yield break; }
 
+        // R6 (owen 2026-08-04): the dock now starts CLOSED on a screen too
+        // small to afford it, which is a phone. Nearly every assertion below
+        // taps something inside the content panel, so pin it open - a suite
+        // that passes or fails by which simulator was last selected is not
+        // measuring the game. C15 below tests the collapse itself, deliberately
+        // and in one place.
+        ui.SetDockOpen(true);
+        yield return null;
+
         var savedData = Career.Data;
         bool savedActive = Career.active;
         Career.autosave = false;
@@ -728,6 +737,46 @@ public class CareerSmoke : MonoBehaviour
         foreach (var nm in FightManager.FIGHT_THEMES)
             if (nm == FightManager.lastFightTheme) drewKnown = true;
         Check(drewKnown, "the track it drew is one of the three, not a stale name");
+
+        // ==== C15: the dock gets out of the way (owen 2026-08-04) ====
+        // The handle floats ABOVE the dock, so the dock's own height - which is
+        // what OverUI measures - does not cover it. The first version of this
+        // control would therefore have placed a part on the robot every time
+        // you tapped SHOW PANEL. That is the same fall-through the R1 note in
+        // OverUI warns about, reintroduced by a control living outside the band
+        // the warning is about, which is exactly how that class of bug comes
+        // back.
+        // Pin the BUILD tab first. By the time this section runs the suite has
+        // navigated to SHOP and PARTS, so "the panel came back" was asserted
+        // against a panel that was never showing - the test failed a working
+        // collapse because it was looking at the wrong tab.
+        ui.TestShowTab(0);
+        yield return null;
+        int openH = Mathf.RoundToInt(ui.DockHeightForTest);
+        ui.SetDockOpen(false);
+        yield return null; yield return null;
+        int shutH = Mathf.RoundToInt(ui.DockHeightForTest);
+        bool panelGone = GameObject.Find("mats") == null;
+        bool tabsStay = GameObject.Find("tab0") != null;
+        Check(shutH < openH / 2, "collapsing the dock at least halves it ("
+              + openH + " -> " + shutH + " units)");
+        Check(panelGone, "collapsed: the content panel is gone");
+        Check(tabsStay, "collapsed: the tab strip stays, so you can still navigate");
+
+        // The camera must be told, or it reframes the robot for a dock that is
+        // no longer there and centres it into empty space.
+        float coverShut = MobileBuilderUI.coverBottom;
+        ui.SetDockOpen(true);
+        yield return null; yield return null;
+        float coverOpen = MobileBuilderUI.coverBottom;
+        Check(coverOpen > coverShut + 0.05f,
+              "the camera is told the dock moved (cover " + coverShut.ToString("F2")
+              + " -> " + coverOpen.ToString("F2") + ")");
+        Check(GameObject.Find("mats") != null, "re-opening restores the panel");
+
+        var handle = GameObject.Find("dockhandle");
+        Check(handle != null && handle.activeInHierarchy, "the handle is always reachable");
+        Check(ui.HandleIsUiForTest, "taps on the handle count as UI, not as taps on the robot");
 
         // ==== C13: the build playlist rotates (owen 2026-08-04) ====
         // "randomly shuffle the three songs in build mode and play them one by

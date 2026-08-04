@@ -162,8 +162,10 @@ public class MobileBuilderUI : MonoBehaviour
         inst = this;
         bm = Object.FindFirstObjectByType<BuilderManager>();
         EnsureEventSystem();
+        dockOpen = ScreenIsTallEnoughForAnOpenDock();
         BuildCanvas();
         ShowTab(0);
+        if (!dockOpen) SetDockOpen(false);   // ShowTab just switched a panel on
     }
 
     void OnDestroy()
@@ -313,6 +315,24 @@ public class MobileBuilderUI : MonoBehaviour
         drt.anchorMin = new Vector2(0f, 0f); drt.anchorMax = new Vector2(1f, 0f);
         drt.pivot = new Vector2(0.5f, 0f); drt.sizeDelta = new Vector2(0f, DockH(0)); drt.anchoredPosition = Vector2.zero;
         dockRt = drt;
+
+        // R6 (owen 2026-08-04): the collapse handle. Sits ABOVE the dock rather
+        // than inside it, because a control that hides a panel cannot live in
+        // the panel it hides.
+        //
+        // 300 x 44 units - deliberately the widest thing in the UI for its
+        // height. Measured on owen's phone, 44 units is 28 pt tall, which is
+        // under Apple's 44 pt floor and would be a bad tap target for a small
+        // button; a 190 pt wide bar at that height is not, and the whole point
+        // of this control is that it must never be the thing you miss.
+        dockHandle = MkButton("dockhandle", canvas.transform, "", 18, ToggleDock);
+        handleRt = dockHandle.GetComponent<RectTransform>();
+        handleRt.anchorMin = new Vector2(0.5f, 0f);
+        handleRt.anchorMax = new Vector2(0.5f, 0f);
+        handleRt.pivot = new Vector2(0.5f, 0f);
+        handleRt.sizeDelta = new Vector2(300f, HANDLE_H);
+        var hImg = dockHandle.GetComponent<UnityEngine.UI.Image>();
+        if (hImg != null) hImg.color = new Color(0.11f, 0.12f, 0.15f, 0.96f);
 
         // tab buttons across the top of the dock. SHOP (C2) exists only in
         // career mode; LayoutTabs re-anchors whenever the career switch flips.
@@ -970,8 +990,94 @@ public class MobileBuilderUI : MonoBehaviour
     /// numbers disagree, taps in the newly exposed strip fall THROUGH the
     /// panel and place parts on the robot behind it. OverUI() now measures
     /// dockRt, so there is exactly one source of truth.</summary>
+    /// <summary>R6, owen 2026-08-04: "Looks like the menu partially blocks the
+    /// building area."
+    ///
+    /// Measured on his landscape iPhone: dock 488 px of 1191, 41.7% of the
+    /// screen. The camera reframe stops the dock covering the ROBOT, but it
+    /// cannot give back the space - a phone in landscape is about 415 pt tall
+    /// in total, and no honest layout fits a tab strip, a material row, two
+    /// palette rows and an action row into that while leaving room to work.
+    ///
+    /// So the dock closes. Collapsed keeps the tab strip - navigation is not
+    /// the thing that was in the way - and drops the content panel, taking the
+    /// dock from 41.7% to about 14% including the handle.
+    ///
+    /// The DEFAULT is measured, not assumed: if the open dock would cover more
+    /// than a third of the screen it starts closed. A phone starts closed, an
+    /// iPad starts open, and a device I have never seen decides for itself
+    /// rather than matching whichever one I happened to hard-code.</summary>
+    const float HANDLE_H = 44f;
+    const float COLLAPSED_H = 48f;      // the tab strip, and nothing else
+    bool dockOpen = true;
+    UnityEngine.UI.Button dockHandle;
+    RectTransform handleRt;
+
+    public void ToggleDock() { SetDockOpen(!dockOpen); }
+
+    /// <summary>Can this screen afford to show the dock by default?
+    ///
+    /// Asked in INCHES, off the device, before anything is laid out. Two
+    /// earlier versions of this rule got it wrong in ways worth recording:
+    ///
+    ///   - "canvas height in units" needed a laid-out canvas, and every
+    ///     ApplyDockH call during Awake happens BEFORE the first layout pass.
+    ///     The rule locked in "open" from a transient rect and the phone came
+    ///     up at 41% anyway. It reported no error; the dock was simply still
+    ///     there. Measured dockOpen=True three times before I stopped trusting
+    ///     the reasoning and printed the number.
+    ///   - "points", via dpi/163, invents a scale factor Apple does not use.
+    ///     It happens to separate phones from tablets, but it is a made-up
+    ///     unit dressed up as a real one.
+    ///
+    /// Inches are the actual question. owen's iPhone in landscape is 2.5 in
+    /// tall; an iPad is about 7.8. Nothing between 4 and 7 inches tall exists
+    /// in landscape, so the threshold is not near anything real.</summary>
+    static bool ScreenIsTallEnoughForAnOpenDock()
+    {
+        float dpi = UnityEngine.Device.Screen.dpi;
+        if (dpi < 1f) return true;                       // unknown: behave as before
+        return UnityEngine.Device.Screen.height / dpi >= 4f;
+    }
+
+    /// <summary>Open or close the dock. Public so the smoke suite can pin it
+    /// rather than inherit whatever this device decided - a suite whose
+    /// assertions depend on a screen-size heuristic is a suite that passes or
+    /// fails by which simulator was last selected.</summary>
+    public void SetDockOpen(bool v)
+    {
+        dockOpen = v;
+        // One path either way: ShowTab now honours dockOpen, so it deactivates
+        // everything when closed and restores exactly the right panel when
+        // open. Two branches here is how the two ideas drift apart.
+        ShowTab(tab);
+    }
+
+    /// <summary>True when the content panel is showing. Read by the suite.</summary>
+    public bool DockOpen { get { return dockOpen; } }
+
+    /// <summary>Test hooks. DockHeightForTest reads the LIVE rect rather than
+    /// DockH(tab) - the two disagreeing is the bug worth catching, not a
+    /// detail.</summary>
+    public float DockHeightForTest { get { return dockRt != null ? dockRt.sizeDelta.y : 0f; } }
+
+    /// <summary>Does OverUI actually claim the handle? Asked through the real
+    /// hit test, at the handle's real centre, so it stays true if the handle
+    /// moves.</summary>
+    public bool HandleIsUiForTest
+    {
+        get
+        {
+            if (handleRt == null) return false;
+            var c = new Vector3[4];
+            handleRt.GetWorldCorners(c);
+            return OverUI(new Vector2((c[0].x + c[2].x) * 0.5f, (c[0].y + c[1].y) * 0.5f));
+        }
+    }
+
     float DockH(int t)
     {
+        if (!dockOpen) return COLLAPSED_H;
         if (t == 0) return 272f;                  // BUILD: two palette rows fit
         if (!Career.active) return 210f;
         // R5 (critic finding 4, filed in R2/R3/R4/R5): a content-sized dock left
@@ -998,6 +1104,47 @@ public class MobileBuilderUI : MonoBehaviour
         float dh = DockH(tab);
         if (Mathf.Abs(dockRt.sizeDelta.y - dh) > 0.5f) dockRt.sizeDelta = new Vector2(0f, dh);
         if (scrim != null) scrim.SetActive(dh > 300f);
+
+        if (handleRt != null)
+        {
+            handleRt.anchoredPosition = new Vector2(0f, dh);
+            var ht = dockHandle.GetComponentInChildren<UnityEngine.UI.Text>();
+            if (ht != null)
+                ht.text = dockOpen ? "\u25bc  HIDE PANEL" : "\u25b2  SHOW PANEL";
+        }
+
+        PublishCover(dh + (handleRt != null ? HANDLE_H : 0f));
+    }
+
+    /// <summary>What fraction of the screen this UI is sitting on top of, at the
+    /// bottom and at the top. 0..1 each.
+    ///
+    /// OWEN 2026-08-04, on a landscape iPhone: "Looks like the menu partially
+    /// blocks the building area."
+    ///
+    /// It did, and measurement said worse than it looked: dock 488 px of a
+    /// 1191-px screen, 41%. But shrinking the dock alone would not have fixed
+    /// it, because the build camera framed the robot against the WHOLE
+    /// viewport and therefore aimed it squarely into the covered half. Any dock
+    /// at all would have clipped the machine.
+    ///
+    /// So the UI publishes what it covers and the camera reads it. Measured
+    /// from the live rects rather than from the constants that produced them -
+    /// the numbers drift (this dock is already per-tab, and now collapsible),
+    /// and a camera working from a stale literal is the same defect one layer
+    /// down.</summary>
+    public static float coverBottom, coverTop;
+
+    void PublishCover(float dockH)
+    {
+        float ch = 0f;
+        if (canvas != null) { var crt = canvas.GetComponent<RectTransform>(); if (crt != null) ch = crt.rect.height; }
+        if (ch < 100f) { coverBottom = coverTop = 0f; return; }
+        float top = BAR_H
+                  + ((msgBar != null && msgBar.activeSelf) ? MSG_H : 0f)
+                  + ((tipBar != null && tipBar.activeSelf) ? TIP_H : 0f);
+        coverBottom = Mathf.Clamp01(dockH / ch);
+        coverTop = Mathf.Clamp01(top / ch);
     }
 
     /// <summary>R1 fix 6: five screens shared one tab strip in which no tab
@@ -1807,13 +1954,21 @@ public class MobileBuilderUI : MonoBehaviour
         armSell = -1;
         retireArmM = -1;
         bool robots = i == 2 && Career.active;
-        if (buildPanel != null) buildPanel.SetActive(i == 0);
-        if (fightPanel != null) fightPanel.SetActive(i == 1);
-        if (garagePanel != null) garagePanel.SetActive(i == 2 && !Career.active);
-        if (robotsPanel != null) robotsPanel.SetActive(robots);
-        if (shopPanel != null) shopPanel.SetActive(i == 3);
-        if (partsPanel != null) partsPanel.SetActive(i == 4);
-        if (trophyPanel != null) trophyPanel.SetActive(i == 5 && Career.active);
+        // R6: `open` gates every one of these. ShowTab is not only called by the
+        // tab buttons - Update calls it whenever career state moves, and that
+        // path re-activated the panel behind the collapsed dock's back. The
+        // panel then laid out inside a 48-unit dock, which gives an INVERTED
+        // rect: measured `build` at y 11..0 with its material row hanging at
+        // y -72, off the bottom of the screen. Invisible, still live, still
+        // taking taps. Collapsing has to mean collapsed no matter who asks.
+        bool open = dockOpen;
+        if (buildPanel != null) buildPanel.SetActive(open && i == 0);
+        if (fightPanel != null) fightPanel.SetActive(open && i == 1);
+        if (garagePanel != null) garagePanel.SetActive(open && i == 2 && !Career.active);
+        if (robotsPanel != null) robotsPanel.SetActive(open && robots);
+        if (shopPanel != null) shopPanel.SetActive(open && i == 3);
+        if (partsPanel != null) partsPanel.SetActive(open && i == 4);
+        if (trophyPanel != null) trophyPanel.SetActive(open && i == 5 && Career.active);
         if (i == 3) { shopNote = ""; shopNoteBad = false; RefreshShop(); }
         if (robots) RefreshRobots();
         if (i == 4) RefreshParts();
@@ -1853,6 +2008,13 @@ public class MobileBuilderUI : MonoBehaviour
         float top = BAR_H
                   + ((msgBar != null && msgBar.activeSelf) ? MSG_H : 0f)
                   + ((tipBar != null && tipBar.activeSelf) ? TIP_H : 0f);
+        // The handle floats ABOVE the dock, so the dock's height does not cover
+        // it. Without this, tapping SHOW PANEL would also drop a part on the
+        // robot behind it - the exact class of fall-through the R1 note above
+        // warns about, reintroduced by a control that sits outside the band.
+        if (dockHandle != null && dockHandle.gameObject.activeInHierarchy && handleRt != null
+            && RectTransformUtility.RectangleContainsScreenPoint(handleRt, p, null))
+            return true;
         return p.y < dh * sf || p.y > Screen.height - top * sf;
     }
 
