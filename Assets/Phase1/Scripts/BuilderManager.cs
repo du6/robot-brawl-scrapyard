@@ -991,34 +991,157 @@ public class BuilderManager : MonoBehaviour
     /// track where it left off instead of restarting a three-minute piece from
     /// the top every single time you return to the workshop.</summary>
     public static float BUILD_MUSIC_VOL = 0.40f;
+
+    /// <summary>OWEN 2026-08-04: "Adding two new songs for the build mode too.
+    /// Similar as fighting mode, randomly shuffle the three songs in build mode
+    /// and play them one by one."
+    ///
+    /// Note the word ONE BY ONE - this is deliberately NOT what fight mode
+    /// does. A fight draws one track at random and loops it, because a fight is
+    /// two minutes long and ends. The workshop is where the hours go, so a
+    /// single track on repeat is the thing you eventually mute. This is a
+    /// PLAYLIST: shuffle the three, play them through in that order, reshuffle
+    /// and go again.
+    ///
+    /// Resources names, so they ship in device builds. Adding a fourth track is
+    /// one line here plus the file - nothing else in this class counts to
+    /// three.</summary>
+    public static readonly string[] BUILD_THEMES =
+    { "BuildTheme", "BuildTheme_NeonAtriumDrift", "BuildTheme_CircuitGarden" };
+
+    /// <summary>What is playing right now, by Resources name - "" when the
+    /// workshop is silent. Exposed for the smoke suite and for a probe, which
+    /// otherwise has no way to ask.</summary>
+    public static string buildTrackNow = "";
+
     AudioSource buildMusic;
-    bool buildMusicStarted, buildMusicMissing;
+    bool buildMusicMissing;
+
+    /// <summary>Indices into BUILD_THEMES, in the order this pass will play
+    /// them. buildPos is the one currently sounding.</summary>
+    readonly List<int> buildOrder = new List<int>();
+    int buildPos = -1;
+
+    /// <summary>Did WE pause it (left the workshop), as opposed to the track
+    /// simply having ended? AudioSource.isPlaying is false in both cases and
+    /// the old code conflated them - fine when the source looped forever, but
+    /// with a playlist "not playing" has to mean two different things, and
+    /// calling UnPause on a finished clip does nothing at all. That would have
+    /// presented as the music stopping for good after the first song.</summary>
+    bool buildMusicPaused;
+
+    /// <summary>Fisher-Yates over the whole list, then one fix-up: if the new
+    /// first track is the one that just finished, swap it away. Without that,
+    /// a fresh shuffle can legally put the same song back-to-back across the
+    /// seam between passes - which sounds exactly like the bug this replaced.</summary>
+    void ShuffleBuildOrder()
+    {
+        int last = (buildPos >= 0 && buildPos < buildOrder.Count) ? buildOrder[buildPos] : -1;
+        buildOrder.Clear();
+        for (int i = 0; i < BUILD_THEMES.Length; i++) buildOrder.Add(i);
+        for (int i = buildOrder.Count - 1; i > 0; i--)
+        {
+            int j = UnityEngine.Random.Range(0, i + 1);
+            int t = buildOrder[i]; buildOrder[i] = buildOrder[j]; buildOrder[j] = t;
+        }
+        if (buildOrder.Count > 1 && buildOrder[0] == last)
+        {
+            int k = UnityEngine.Random.Range(1, buildOrder.Count);
+            int t = buildOrder[0]; buildOrder[0] = buildOrder[k]; buildOrder[k] = t;
+        }
+        buildPos = -1;
+    }
+
+    /// <summary>Advance to the next track and start it. Reshuffles at the end
+    /// of a pass.
+    ///
+    /// A clip that will not load is SKIPPED rather than fatal: one missing mp3
+    /// used to mean a silent workshop, and now it just means a shorter
+    /// playlist. Returns false only when none of them load, which is the one
+    /// case worth a log line.</summary>
+    bool NextBuildTrack()
+    {
+        for (int guard = 0; guard < BUILD_THEMES.Length + 1; guard++)
+        {
+            if (buildOrder.Count == 0 || buildPos + 1 >= buildOrder.Count) ShuffleBuildOrder();
+            buildPos++;
+            if (buildPos >= buildOrder.Count) break;   // nothing to play at all
+            string name = BUILD_THEMES[buildOrder[buildPos]];
+            var clip = Resources.Load<AudioClip>(name);
+            if (clip == null)
+            {
+                CompoundRobot.Log("build track missing from Resources: " + name + " - skipping it");
+                buildOrder.RemoveAt(buildPos);
+                buildPos--;
+                if (buildOrder.Count == 0) break;
+                continue;
+            }
+            buildMusic.clip = clip;
+            buildMusic.time = 0f;
+            buildMusic.Play();
+            buildMusicPaused = false;
+            buildTrackNow = name;
+            return true;
+        }
+        buildTrackNow = "";
+        return false;
+    }
+
+    /// <summary>Smoke hook: advance the playlist by hand and report what came
+    /// up. The suite asserts against the REAL shuffle rather than a copy of it,
+    /// because a re-implemented shuffle in the test proves only that the test
+    /// can shuffle.</summary>
+    public string DebugNextBuildTrack()
+    {
+        if (buildMusic == null)
+        {
+            buildMusic = gameObject.AddComponent<AudioSource>();
+            buildMusic.loop = false;
+            buildMusic.spatialBlend = 0f;
+            buildMusic.playOnAwake = false;
+        }
+        NextBuildTrack();
+        return buildTrackNow;
+    }
+
+    /// <summary>How far into the current pass we are; 0 is the first track of a
+    /// freshly shuffled pass. The suite needs this to line its window up with a
+    /// pass BOUNDARY - by the time it runs, the workshop has been open for
+    /// minutes and the playlist is somewhere in the middle of a pass, so six
+    /// advances from wherever-we-are straddle two passes and "every track once
+    /// per pass" is not even a meaningful claim about them.</summary>
+    public int DebugBuildPos { get { return buildPos; } }
 
     void PumpBuildMusic()
     {
         if (buildMusicMissing) return;
         if (buildMusic == null)
         {
-            var clip = Resources.Load<AudioClip>("BuildTheme");
-            if (clip == null)
-            {
-                buildMusicMissing = true;
-                CompoundRobot.Log("BuildTheme missing from Resources - the build screen is silent");
-                return;
-            }
             buildMusic = gameObject.AddComponent<AudioSource>();
-            buildMusic.clip = clip;
-            buildMusic.loop = true;
-            buildMusic.spatialBlend = 0f;   // 2D: same in both ears, everywhere
+            buildMusic.loop = false;          // a playlist, not one track on repeat
+            buildMusic.spatialBlend = 0f;     // 2D: same in both ears, everywhere
             buildMusic.playOnAwake = false;
         }
         buildMusic.volume = BUILD_MUSIC_VOL;   // live-tunable from a probe
+
         if (mode == Mode.Build)
         {
-            if (!buildMusicStarted) { buildMusic.Play(); buildMusicStarted = true; }
-            else if (!buildMusic.isPlaying) buildMusic.UnPause();
+            if (buildMusicPaused) { buildMusic.UnPause(); buildMusicPaused = false; }
+            // Covers both "nothing has started yet" and "the last one ended".
+            else if (!buildMusic.isPlaying && !NextBuildTrack())
+            {
+                buildMusicMissing = true;
+                CompoundRobot.Log("no build theme found in Resources - the build screen is silent");
+            }
         }
-        else if (buildMusic.isPlaying) buildMusic.Pause();
+        else if (buildMusic.isPlaying)
+        {
+            // PAUSE, not Stop: coming back from a fight resumes the track where
+            // it left off instead of restarting a three-minute piece from the
+            // top every single time you return to the workshop.
+            buildMusic.Pause();
+            buildMusicPaused = true;
+        }
     }
 
     void UpdateBuild()

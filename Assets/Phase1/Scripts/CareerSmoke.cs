@@ -729,6 +729,68 @@ public class CareerSmoke : MonoBehaviour
             if (nm == FightManager.lastFightTheme) drewKnown = true;
         Check(drewKnown, "the track it drew is one of the three, not a stale name");
 
+        // ==== C13: the build playlist rotates (owen 2026-08-04) ====
+        // "randomly shuffle the three songs in build mode and play them one by
+        // one" - so unlike the fight picker there are two claims to hold: every
+        // track must be REACHABLE, and a pass must actually cover all of them
+        // rather than favouring one. Both fail silently in play: you just
+        // notice, three sessions later, that one song never turns up.
+        int bThemes = 0;
+        string bMissing = "";
+        foreach (var nm in BuilderManager.BUILD_THEMES)
+        {
+            if (Resources.Load<AudioClip>(nm) != null) bThemes++;
+            else bMissing += nm + " ";
+        }
+        Check(bThemes == BuilderManager.BUILD_THEMES.Length,
+              "all " + BuilderManager.BUILD_THEMES.Length + " build tracks load from Resources"
+              + (bMissing.Length > 0 ? " (missing: " + bMissing.Trim() + ")" : ""));
+
+        // The workshop has been open for this whole run, so the pump has picked
+        // a track for real - no harness poke required for this one.
+        bool bKnown = false;
+        foreach (var nm in BuilderManager.BUILD_THEMES)
+            if (nm == BuilderManager.buildTrackNow) bKnown = true;
+        Check(bKnown, "the workshop is playing one of the build tracks ("
+              + (BuilderManager.buildTrackNow.Length > 0 ? BuilderManager.buildTrackNow : "silent") + ")");
+
+        // Two full passes, driven through the real shuffle - starting from a
+        // pass BOUNDARY. The workshop has been playing for the whole run, so
+        // the playlist is mid-pass here; six advances from an arbitrary offset
+        // straddle the seam and the per-pass claim would be untestable against
+        // them. Walk forward until a reshuffle lands us at position 0, then
+        // measure. (First version of this test skipped that and failed the
+        // implementation for a fault in itself.)
+        int span = BuilderManager.BUILD_THEMES.Length;
+        var seq = new List<string>();
+        bool atBoundary = false;
+        for (int i = 0; i < span + 1 && !atBoundary; i++)
+        {
+            string nm = bm.DebugNextBuildTrack();
+            yield return null;
+            if (bm.DebugBuildPos == 0) { seq.Add(nm); atBoundary = true; }
+        }
+        Check(atBoundary, "the playlist reaches a fresh pass within one pass of advances");
+        while (seq.Count < span * 2) { seq.Add(bm.DebugNextBuildTrack()); yield return null; }
+
+        bool noRepeat = true;
+        for (int i = 1; i < seq.Count; i++) if (seq[i] == seq[i - 1]) noRepeat = false;
+        Check(noRepeat, "the playlist never plays the same track twice in a row ["
+              + string.Join(", ", seq.ToArray()) + "]");
+
+        // Each window of `span` is one pass and must be a permutation - that is
+        // the difference between a shuffled playlist and rolling a die each
+        // time, which is what fight mode does and what this must NOT do.
+        bool passesCover = true;
+        for (int w = 0; w + span <= seq.Count; w += span)
+            foreach (var nm in BuilderManager.BUILD_THEMES)
+            {
+                bool hit = false;
+                for (int i = w; i < w + span; i++) if (seq[i] == nm) hit = true;
+                if (!hit) passesCover = false;
+            }
+        Check(passesCover, "each pass plays every track once before repeating any");
+
         // ==== C9: one device rule (owen 2026-08-03) ====
         // The chooser used to ASK which UI you wanted and ShouldActivate used
         // to ignore the answer - on an iPad, "START CAREER - Desktop" handed
