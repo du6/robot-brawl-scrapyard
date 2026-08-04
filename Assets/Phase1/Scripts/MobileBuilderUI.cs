@@ -620,6 +620,7 @@ public class MobileBuilderUI : MonoBehaviour
             string k = key;
             var mb = MkButton("mat_"+k, matRow.transform, MatDB.Get(k).name, 15, () => PickMat(k));
             matButtons.Add(mb); matKeys.Add(k);
+            matSwatches.Add(AddSwatch(mb));
         }
         matSheet.SetActive(false);
         // action row (bottom)
@@ -632,6 +633,7 @@ public class MobileBuilderUI : MonoBehaviour
         // First slot, because it is the only one of these that changes what the
         // NEXT tap does - the rest act on what is already there.
         matBtn = MkButton("matbtn", actRow.transform, "MATERIAL", 17, ToggleMatSheet);
+        matBtnSwatch = AddSwatch(matBtn);
         MkButton("rot", actRow.transform, "ROTATE", 17, () => Phase0Input.DebugRotate());
         MkButton("undo", actRow.transform, "UNDO", 17, () => Phase0Input.DebugUndo());
         removeBtn = MkButton("del", actRow.transform, "REMOVE", 17, () => { removeArmed = !removeArmed; if (removeArmed && bm != null && bm.HasSelection) bm.SelectPart(bm.SelectedPart); RefreshRemoveBtn(); });
@@ -753,6 +755,46 @@ public class MobileBuilderUI : MonoBehaviour
     RectTransform matSheetRt;
     Button matBtn;
 
+    readonly List<UnityEngine.UI.Image> matSwatches = new List<UnityEngine.UI.Image>();
+    UnityEngine.UI.Image matBtnSwatch;
+
+    /// <summary>Put a colour chip on the left of a button and move its label
+    /// clear of it.
+    ///
+    /// OWEN 2026-08-04, after the caret landed. The chooser was the only place
+    /// the selected material lived, and it could only be read by reading -
+    /// a swatch makes it scannable, and the same swatch on the chips in the
+    /// sheet is what makes the colour mean anything. On the button alone it
+    /// would be decoration: you would see blue and have nothing to learn the
+    /// mapping FROM.
+    ///
+    /// auditColor, NOT color. `color` is the realistic one, and four of the six
+    /// materials are grey in real life - as a swatch it would say almost
+    /// nothing. auditColor already exists for exactly this job: a categorical
+    /// palette picked to stay distinguishable under the common colour-vision
+    /// deficiencies. The colour is a second channel here, never the only one:
+    /// every chip is still labelled.</summary>
+    UnityEngine.UI.Image AddSwatch(Button b)
+    {
+        if (b == null) return null;
+        var go = MkPanel("sw", b.transform, Color.white);
+        var rt = go.GetComponent<RectTransform>();
+        rt.anchorMin = new Vector2(0f, 0.5f);
+        rt.anchorMax = new Vector2(0f, 0.5f);
+        rt.pivot = new Vector2(0f, 0.5f);
+        rt.sizeDelta = new Vector2(18f, 18f);
+        rt.anchoredPosition = new Vector2(8f, 0f);
+        var img = go.GetComponent<UnityEngine.UI.Image>();
+        if (img != null) img.raycastTarget = false;   // the BUTTON takes the tap
+        var t = b.GetComponentInChildren<Text>();
+        if (t != null)
+        {
+            var trt = t.rectTransform;
+            trt.offsetMin = new Vector2(30f, trt.offsetMin.y);
+        }
+        return img;
+    }
+
     public void ToggleMatSheet() { SetMatSheet(matSheetGO == null || !matSheetGO.activeSelf); }
 
     /// <summary>Show or hide the material sheet. Public so the suite can reach
@@ -765,6 +807,20 @@ public class MobileBuilderUI : MonoBehaviour
     }
 
     public bool MatSheetOpen { get { return matSheetGO != null && matSheetGO.activeSelf; } }
+
+    /// <summary>Test hook: the live colour of a swatch. null asks the
+    /// CHOOSER's; a key asks that material's chip. Read off the Image rather
+    /// than recomputed from MatDB, because "the chooser agrees with the chip"
+    /// is the claim, and recomputing both from the same source would prove
+    /// nothing.</summary>
+    public Color MatSwatchColor(string key)
+    {
+        if (key == null) return matBtnSwatch != null ? matBtnSwatch.color : Color.clear;
+        for (int i = 0; i < matKeys.Count && i < matSwatches.Count; i++)
+            if (MatDB.Canon(matKeys[i]) == MatDB.Canon(key))
+                return matSwatches[i] != null ? matSwatches[i].color : Color.clear;
+        return Color.clear;
+    }
 
     /// <summary>What the chooser currently reads. Test hook - the affordance
     /// IS the label, so the suite has to look at the actual string.</summary>
@@ -873,6 +929,14 @@ public class MobileBuilderUI : MonoBehaviour
                       : new Color(0.10f,0.10f,0.12f,0.96f);
             var t = matButtons[i].GetComponentInChildren<Text>();
             if (t != null) t.color = unlocked ? Color.white : new Color(0.55f,0.55f,0.6f,1f);
+            if (i < matSwatches.Count && matSwatches[i] != null)
+            {
+                var ac = MatDB.Get(matKeys[i]).auditColor;
+                // A locked material keeps its hue but loses its punch, so the
+                // colour still teaches the mapping while the chip still reads
+                // as unavailable.
+                matSwatches[i].color = unlocked ? ac : new Color(ac.r, ac.g, ac.b, 0.35f);
+            }
         }
         // The chooser has to READ as a chooser: a button labelled "MATERIAL"
         // next to ROTATE and UNDO looks like another verb. Naming the current
@@ -898,6 +962,7 @@ public class MobileBuilderUI : MonoBehaviour
             if (bt != null)
                 bt.text = MatDB.Get(cur).name.ToUpper()
                         + (MatSheetOpen ? "  \u25be" : "  \u25b4");
+            if (matBtnSwatch != null) matBtnSwatch.color = MatDB.Get(cur).auditColor;
             var bi = matBtn.GetComponent<Image>();
             if (bi != null)
                 bi.color = MatSheetOpen ? new Color(0.20f,0.45f,0.65f,1f)
@@ -1307,6 +1372,23 @@ public class MobileBuilderUI : MonoBehaviour
         InsetBar(tipBar != null ? tipBar.GetComponent<RectTransform>() : null);
         LayoutTabs();
         if (matRowRt != null) matRowRt.sizeDelta = new Vector2(-12f, R);
+        // Swatches scale with the row, like every other measurement here - a
+        // fixed 18 would have been another literal that means one size on one
+        // phone. 0.40 keeps it clearly a chip rather than a coloured button.
+        float swS = Mathf.Round(R * 0.40f), swPad = Mathf.Round(R * 0.16f);
+        for (int i = -1; i < matSwatches.Count; i++)
+        {
+            var im = i < 0 ? matBtnSwatch : matSwatches[i];
+            if (im == null) continue;
+            var srt = im.rectTransform;
+            srt.sizeDelta = new Vector2(swS, swS);
+            srt.anchoredPosition = new Vector2(swPad, 0f);
+            var host = im.transform.parent;
+            var ht = host != null ? host.GetComponentInChildren<Text>() : null;
+            if (ht != null)
+                ht.rectTransform.offsetMin =
+                    new Vector2(swPad + swS + swPad * 0.6f, ht.rectTransform.offsetMin.y);
+        }
         if (actRowRt != null) actRowRt.sizeDelta = new Vector2(0f, R);
         if (partScrollRt != null)
         {

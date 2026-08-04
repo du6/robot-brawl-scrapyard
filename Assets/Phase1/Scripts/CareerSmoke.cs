@@ -848,6 +848,17 @@ public class CareerSmoke : MonoBehaviour
               + " / " + openLbl + ")");
         Check(shutLbl.ToUpper().Contains("STEEL") && openLbl.ToUpper().Contains("STEEL"),
               "the material stays named whether the sheet is open or shut");
+
+        // The swatch has to be on the CHIPS as well as the chooser, or the
+        // colour is decoration - you would see it on the button with nothing to
+        // learn the mapping from. And it must track the selection, or it is
+        // worse than decoration: a colour that lies.
+        Color swBtn = ui.MatSwatchColor(null);
+        Color swSteel = ui.MatSwatchColor("Steel");
+        Color swAl = ui.MatSwatchColor("Aluminum");
+        Check(swSteel != swAl, "materials get distinguishable swatch colours");
+        Check(swBtn == swSteel,
+              "the chooser's swatch matches the selected material's chip");
         Check(MatDB.Canon(bm.ActiveMatKey) == MatDB.Canon("Steel"),
               "picking a material actually selects it (" + bm.ActiveMatKey + ")");
         bm.ActiveMatKey = "Aluminum";
