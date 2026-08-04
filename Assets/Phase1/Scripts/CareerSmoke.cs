@@ -897,6 +897,68 @@ public class CareerSmoke : MonoBehaviour
               "every control clears the notch and the home indicator"
               + (outside.Length > 0 ? " (outside: " + outside.Trim() + ")" : ""));
 
+        // ---- C19: legibility sweep (owen 2026-08-04) ----
+        // owen: "why didn't you capture the aluminum UI bug in your previous
+        // test iterations?" Because every check written before this one
+        // measured RECTANGLES - point sizes of tap targets, dock percentages,
+        // safe-area corners - and none of them looked at what a person actually
+        // does with a screen, which is read it. The boxes were finger-sized
+        // while the type inside them was 8.3 pt, and nothing failed.
+        //
+        // This sweeps every VISIBLE label and asks three things a rectangle
+        // check cannot: is it big enough to read, does it fit its box, and does
+        // it fit without being cut off. It runs over whatever happens to be on
+        // screen, so it covers controls nobody thought to name.
+        ui.SetDockOpen(true);
+        ui.TestShowTab(0);
+        yield return null; yield return null;
+
+        float sfL = ui.CanvasScaleForTest;
+        float pxPerPtL = UnityEngine.Device.Screen.dpi / 163f;
+        string tooSmallTxt = "", overflowTxt = "", cutTxt = "";
+        int scanned = 0;
+        if (sfL > 0.01f && pxPerPtL > 0.01f)
+        {
+            foreach (var t in Object.FindObjectsByType<UnityEngine.UI.Text>(FindObjectsSortMode.None))
+            {
+                if (!t.gameObject.activeInHierarchy || string.IsNullOrEmpty(t.text)) continue;
+                scanned++;
+                string who = t.transform.parent != null ? t.transform.parent.name : t.name;
+                float pt = t.fontSize * sfL / pxPerPtL;
+                if (pt < 10.5f) tooSmallTxt += who + "(" + pt.ToString("F1") + "pt) ";
+                bool wraps = t.horizontalOverflow == HorizontalWrapMode.Wrap;
+                if (wraps && t.preferredHeight > t.rectTransform.rect.height + 1f)
+                    overflowTxt += who + " ";
+                if (!wraps && t.preferredWidth > t.rectTransform.rect.width + 1f)
+                    cutTxt += who + " ";
+            }
+        }
+        Check(scanned > 10, "the legibility sweep actually saw the UI (" + scanned + " labels)");
+        Check(tooSmallTxt.Length == 0,
+              "every label is at least 10.5 pt"
+              + (tooSmallTxt.Length > 0 ? " (too small: " + tooSmallTxt.Trim() + ")" : ""));
+        Check(overflowTxt.Length == 0,
+              "no wrapped label is taller than its box"
+              + (overflowTxt.Length > 0 ? " (" + overflowTxt.Trim() + ")" : ""));
+        Check(cutTxt.Length == 0,
+              "no label is cut off by its box"
+              + (cutTxt.Length > 0 ? " (" + cutTxt.Trim() + ")" : ""));
+
+        // Affordance, as far as it can be automated: a control that OPENS
+        // something has to say so. This cannot check that the caret is the
+        // right idea - owen had to tell me that - but it can check the
+        // convention stays applied once chosen, which is the part that rots.
+        string noHint = "";
+        var mbLbl = ui.MatButtonLabel;
+        if (!(mbLbl.Contains("\u25b4") || mbLbl.Contains("\u25be"))) noHint += "matbtn ";
+        var dhGo = GameObject.Find("dockhandle");
+        var dhTxt = dhGo != null ? dhGo.GetComponentInChildren<UnityEngine.UI.Text>() : null;
+        string dhLbl = dhTxt != null ? dhTxt.text : "";
+        if (!(dhLbl.Contains("\u25b2") || dhLbl.Contains("\u25bc"))) noHint += "dockhandle ";
+        Check(noHint.Length == 0,
+              "controls that open a panel carry a disclosure mark"
+              + (noHint.Length > 0 ? " (bare: " + noHint.Trim() + ")" : ""));
+
         var handle = GameObject.Find("dockhandle");
         Check(handle != null && handle.activeInHierarchy, "the handle is always reachable");
         Check(ui.HandleIsUiForTest, "taps on the handle count as UI, not as taps on the robot");

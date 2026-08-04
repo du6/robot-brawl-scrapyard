@@ -239,6 +239,7 @@ public class MobileBuilderUI : MonoBehaviour
         mrt.anchorMin = new Vector2(0f, 1f); mrt.anchorMax = new Vector2(1f, 1f);
         mrt.pivot = new Vector2(0.5f, 1f); mrt.sizeDelta = new Vector2(0f, 38f);
         mrt.anchoredPosition = new Vector2(0f, -46f);
+        msgBarRt = mrt;
         msgBar.GetComponent<Image>().raycastTarget = false;
         msgText = MkText("msgtext", msgBar.transform, "", 18, TextAnchor.MiddleCenter);
         Stretch(msgText.rectTransform);
@@ -262,6 +263,7 @@ public class MobileBuilderUI : MonoBehaviour
         var prt = tipBar.GetComponent<RectTransform>();
         prt.anchorMin = new Vector2(0f, 1f); prt.anchorMax = new Vector2(1f, 1f);
         prt.pivot = new Vector2(0.5f, 1f); prt.sizeDelta = new Vector2(0f, TIP_H);
+        tipBarRt = prt;
         prt.anchoredPosition = new Vector2(0f, -BAR_H);
         tipText = MkText("tiptext", tipBar.transform, "", 18, TextAnchor.MiddleLeft);
         Stretch(tipText.rectTransform);
@@ -808,6 +810,10 @@ public class MobileBuilderUI : MonoBehaviour
 
     public bool MatSheetOpen { get { return matSheetGO != null && matSheetGO.activeSelf; } }
 
+    /// <summary>Test hook: the canvas scale factor, so the suite can convert a
+    /// font size into physical points the same way the UI does.</summary>
+    public float CanvasScaleForTest { get { return canvas != null ? canvas.scaleFactor : 0f; } }
+
     /// <summary>Test hook: the live colour of a swatch. null asks the
     /// CHOOSER's; a key asks that material's chip. Read off the Image rather
     /// than recomputed from MatDB, because "the chooser agrees with the chip"
@@ -831,6 +837,44 @@ public class MobileBuilderUI : MonoBehaviour
             if (matBtn == null) return "";
             var t = matBtn.GetComponentInChildren<UnityEngine.UI.Text>();
             return t != null ? t.text : "";
+        }
+    }
+
+    /// <summary>Size the notice bar to the notice. Clamped to three lines: a
+    /// bar that can grow without limit is a bar that can cover the robot.</summary>
+    void FitMsgBar()
+    {
+        if (msgBarRt == null || msgText == null) return;
+        float lineish = Mathf.Max(14f, msgText.fontSize * 1.35f);
+        float want = msgText.preferredHeight + 12f;
+        float h = Mathf.Clamp(want, MSG_H, lineish * 3f + 12f);
+        if (Mathf.Abs(msgBarRt.sizeDelta.y - h) > 0.5f)
+        {
+            msgBarRt.sizeDelta = new Vector2(0f, h);
+            if (tipBarRt != null && tipBar != null && tipBar.activeSelf)
+                tipBarRt.anchoredPosition = new Vector2(0f, -(BAR_H + h));
+            ApplyDockH();
+        }
+    }
+
+    /// <summary>Size the tip bar to the tip. Twin of FitMsgBar - the sweep
+    /// found this one immediately after the notice bar was fixed, which is the
+    /// argument for the sweep: the same defect existed twice and I had looked
+    /// straight at both bars several times without seeing either.
+    ///
+    /// Tips are full sentences and the row also carries two arrows and SKIP
+    /// TIPS, so the text gets a narrower box than the bar - it reaches a second
+    /// line sooner than the notices do.</summary>
+    void FitTipBar()
+    {
+        if (tipBarRt == null || tipText == null) return;
+        float lineish = Mathf.Max(14f, tipText.fontSize * 1.35f);
+        float want = tipText.preferredHeight + 12f;
+        float h = Mathf.Clamp(want, TIP_H, lineish * 3f + 12f);
+        if (Mathf.Abs(tipBarRt.sizeDelta.y - h) > 0.5f)
+        {
+            tipBarRt.sizeDelta = new Vector2(0f, h);
+            ApplyDockH();
         }
     }
 
@@ -1263,6 +1307,40 @@ public class MobileBuilderUI : MonoBehaviour
         return Mathf.Clamp((44f / 163f) * dpi / sf, 34f, 110f);
     }
 
+    /// <summary>A physical type size, in canvas units.
+    ///
+    /// OWEN 2026-08-04: "why didn't you capture the aluminum UI bug in your
+    /// previous test iterations?"
+    ///
+    /// Fair, and this is the same answer one layer down. R7 converted every BOX
+    /// in this file from canvas units to physical inches and left every FONT
+    /// SIZE as a literal - so the targets became finger-sized while the type
+    /// inside them stayed pinned to resolution. Measured on his landscape
+    /// iPhone after all of that work:
+    ///
+    ///   palette tile labels   8.3 pt
+    ///   action row labels    10.8 pt
+    ///
+    /// Apple's smallest recommended type is 11 pt and body text is 17. I had
+    /// made the buttons easy to hit and left them hard to read, and every check
+    /// I had written measured rectangles, so nothing failed.</summary>
+    int FontUnits(float pt)
+    {
+        float sf = canvas != null ? canvas.scaleFactor : 0f;
+        float dpi = UnityEngine.Device.Screen.dpi;
+        if (sf < 0.01f || dpi < 1f) return Mathf.RoundToInt(pt);
+        return Mathf.Max(8, Mathf.RoundToInt(pt * (dpi / 163f) / sf));
+    }
+
+    /// <summary>Set every label in a subtree to one physical size.</summary>
+    void SetFont(Transform root, float pt)
+    {
+        if (root == null) return;
+        int u = FontUnits(pt);
+        var ts = root.GetComponentsInChildren<UnityEngine.UI.Text>(true);
+        for (int i = 0; i < ts.Length; i++) ts[i].fontSize = u;
+    }
+
     /// <summary>Push the finger-sized row into every control that is one.
     ///
     /// Re-applied whenever the scale factor moves rather than once at build
@@ -1402,6 +1480,23 @@ public class MobileBuilderUI : MonoBehaviour
             matSheetRt.offsetMin = new Vector2(0f, R + 4f);
             matSheetRt.offsetMax = new Vector2(0f, -2f);
         }
+        // TYPE, not just boxes. Sizes chosen against what each label has to do:
+        // tabs and the action row are single words you read at a glance, the
+        // palette tiles carry two lines in a fixed cell so they get the floor
+        // rather than the ideal, and the status bar is the one line that must
+        // survive being read mid-build.
+        foreach (var tb in tabBtns) if (tb != null) SetFont(tb.transform, 15f);
+        foreach (var mb in matButtons) if (mb != null) SetFont(mb.transform, 13f);
+        foreach (var pb in partButtons) if (pb != null) SetFont(pb.transform, 11f);
+        if (actRowRt != null) SetFont(actRowRt, 14f);
+        if (statsText != null) statsText.fontSize = FontUnits(13f);
+        // The notice and tip bars were the two the first sweep never saw,
+        // because neither is on screen unless the game has something to say.
+        if (msgBar != null) SetFont(msgBar.transform, 12f);
+        if (tipBar != null) SetFont(tipBar.transform, 12f);
+        FitMsgBar();
+        FitTipBar();
+
         if (partGrid != null)
         {
             // R7b: the cell WIDTH was a literal 112, chosen so ten columns fit
@@ -1481,8 +1576,8 @@ public class MobileBuilderUI : MonoBehaviour
         if (canvas != null) { var crt = canvas.GetComponent<RectTransform>(); if (crt != null) ch = crt.rect.height; }
         if (ch < 100f) return 470f;               // canvas not laid out yet
         float top = BAR_H
-                  + ((msgBar != null && msgBar.activeSelf) ? MSG_H : 0f)
-                  + ((tipBar != null && tipBar.activeSelf) ? TIP_H : 0f);
+                  + ((msgBar != null && msgBar.activeSelf) ? MsgH : 0f)
+                  + ((tipBar != null && tipBar.activeSelf) ? TipH : 0f);
         return Mathf.Clamp(ch - top - 2f, 470f, ch);
     }
 
@@ -1532,8 +1627,8 @@ public class MobileBuilderUI : MonoBehaviour
         if (canvas != null) { var crt = canvas.GetComponent<RectTransform>(); if (crt != null) ch = crt.rect.height; }
         if (ch < 100f) { coverBottom = coverTop = 0f; return; }
         float top = BAR_H
-                  + ((msgBar != null && msgBar.activeSelf) ? MSG_H : 0f)
-                  + ((tipBar != null && tipBar.activeSelf) ? TIP_H : 0f);
+                  + ((msgBar != null && msgBar.activeSelf) ? MsgH : 0f)
+                  + ((tipBar != null && tipBar.activeSelf) ? TipH : 0f);
         coverBottom = Mathf.Clamp01(dockH / ch);
         coverTop = Mathf.Clamp01(top / ch);
     }
@@ -2402,8 +2497,8 @@ public class MobileBuilderUI : MonoBehaviour
         // real button in the third one - a tap there must not also drag the
         // build camera.
         float top = BAR_H
-                  + ((msgBar != null && msgBar.activeSelf) ? MSG_H : 0f)
-                  + ((tipBar != null && tipBar.activeSelf) ? TIP_H : 0f);
+                  + ((msgBar != null && msgBar.activeSelf) ? MsgH : 0f)
+                  + ((tipBar != null && tipBar.activeSelf) ? TipH : 0f);
         // The handle floats ABOVE the dock, so the dock's height does not cover
         // it. Without this, tapping SHOW PANEL would also drop a part on the
         // robot behind it - the exact class of fall-through the R1 note above
@@ -2618,6 +2713,22 @@ public class MobileBuilderUI : MonoBehaviour
     /// is a MODE, not a notice, so it holds until it is disarmed.</summary>
     const float BAR_H = 46f, MSG_H = 38f, TIP_H = 34f;
 
+    /// <summary>The message bar's LIVE height. It grows to fit a long notice.
+    ///
+    /// R11 (owen 2026-08-04, found by the new legibility sweep, not by me):
+    /// msgtext wraps and truncates vertically inside a fixed 38-unit bar, so
+    /// any notice long enough to reach a second line lost that line. Notices
+    /// are how this game explains a refusal - "Needs at least 1 wheel", the
+    /// weight-cap messages - so the half that got clipped was routinely the
+    /// half that said what to do about it.
+    ///
+    /// Everything that stacks under the top bars reads this rather than the
+    /// MSG_H constant, or the dock and the camera would keep budgeting for a
+    /// bar that is no longer 38 tall.</summary>
+    float MsgH { get { return msgBarRt != null ? msgBarRt.sizeDelta.y : MSG_H; } }
+    float TipH { get { return tipBarRt != null ? tipBarRt.sizeDelta.y : TIP_H; } }
+    RectTransform msgBarRt, tipBarRt;
+
     /// <summary>R4 (critic finding 4). The stored counter is a FLOOR, not the
     /// truth. The old tip keyed off tutorialStep alone and checked no state, so
     /// it told a player with two robots in the stable to "found your stable".
@@ -2685,8 +2796,9 @@ public class MobileBuilderUI : MonoBehaviour
         }
         if (tipBar.activeSelf != show) { tipBar.SetActive(show); ApplyDockH(); }
         if (!show) return;
+        FitTipBar();
         var prt = tipBar.GetComponent<RectTransform>();
-        float y = -(BAR_H + ((msgBar != null && msgBar.activeSelf) ? MSG_H : 0f));
+        float y = -(BAR_H + ((msgBar != null && msgBar.activeSelf) ? MsgH : 0f));
         if (Mathf.Abs(prt.anchoredPosition.y - y) > 0.5f) prt.anchoredPosition = new Vector2(0f, y);
     }
 
@@ -2797,12 +2909,18 @@ public class MobileBuilderUI : MonoBehaviour
             msgText.color = new Color(1f, 0.52f, 0.42f);
             msgText.text = "REMOVE armed \u2014 tap a part on the robot to delete it (parts attached to it go too)";
             if (!msgBar.activeSelf) { msgBar.SetActive(true); ApplyDockH(); }
+            FitMsgBar();
             return;
         }
         if (!string.IsNullOrEmpty(msg) && msg != msgSeen) { msgSeen = msg; msgAt = Time.unscaledTime; }
         bool live = !string.IsNullOrEmpty(msgSeen) && Time.unscaledTime - msgAt < MSG_LIFE;
         if (live) { msgText.color = new Color(1f, 0.82f, 0.25f); msgText.text = msgSeen; }
         if (msgBar.activeSelf != live) { msgBar.SetActive(live); ApplyDockH(); }
+        // The bar is sized to the NOTICE, so it has to be re-fitted whenever
+        // the notice changes - not only when the layout changes. The longest
+        // messages in this game are the refusals, which are exactly the ones
+        // worth reading in full.
+        if (msgBar.activeSelf) FitMsgBar();
     }
 
     // R2 (critic finding 8): every vertical list ended flush against the bottom
