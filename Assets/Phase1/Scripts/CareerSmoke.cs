@@ -797,6 +797,25 @@ public class CareerSmoke : MonoBehaviour
               "build controls clear the 44 pt touch floor"
               + (tooSmall.Length > 0 ? " (too small: " + tooSmall.Trim() + ")" : ""));
 
+        // The whole palette must fit its viewport. The original R1 critic
+        // finding was that nine of 19 parts fitted and the tenth - Wheel - was
+        // the first one hidden, so every wheel and every weapon lived
+        // off-screen with nothing saying so. The fix was a hand-fitted cell
+        // width, which then overflowed by 85 units on an iPad, whose canvas is
+        // NARROWER in units than the phone's. Derived now; asserted here so the
+        // next hand-fitted number fails in the suite rather than on a tablet.
+        var pcont = GameObject.Find("content");
+        var pview = GameObject.Find("viewport");
+        float overflow = 0f;
+        if (pcont != null && pview != null)
+        {
+            var a1 = new Vector3[4]; pcont.GetComponent<RectTransform>().GetWorldCorners(a1);
+            var a2 = new Vector3[4]; pview.GetComponent<RectTransform>().GetWorldCorners(a2);
+            overflow = (a1[2].x - a1[0].x) - (a2[2].x - a2[0].x);
+        }
+        Check(pcont != null && overflow <= 4f,
+              "the whole palette fits its viewport (overflow " + overflow.ToString("F0") + " px)");
+
         var handle = GameObject.Find("dockhandle");
         Check(handle != null && handle.activeInHierarchy, "the handle is always reachable");
         Check(ui.HandleIsUiForTest, "taps on the handle count as UI, not as taps on the robot");

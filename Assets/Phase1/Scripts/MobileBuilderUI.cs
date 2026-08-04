@@ -1080,7 +1080,7 @@ public class MobileBuilderUI : MonoBehaviour
 
     RectTransform matRowRt, actRowRt, partScrollRt;
     UnityEngine.UI.GridLayoutGroup partGrid;
-    float lastScaleFactor;
+    float lastScaleFactor, lastLayoutSig;
 
     /// <summary>One finger-sized row, in canvas units.
     ///
@@ -1145,7 +1145,29 @@ public class MobileBuilderUI : MonoBehaviour
             partScrollRt.offsetMin = new Vector2(0f, R + 4f);
             partScrollRt.offsetMax = new Vector2(0f, -(R + 2f));
         }
-        if (partGrid != null) partGrid.cellSize = new Vector2(112f, R);
+        if (partGrid != null)
+        {
+            // R7b: the cell WIDTH was a literal 112, chosen so ten columns fit
+            // the phone's canvas - and the note above it already records that
+            // 128 was measured wrong once. Measured again on the iPad: content
+            // 1182 units against a 1097 viewport, 85 over, so the last column
+            // (Wheel and Hook) hung off the edge. The canvas is NARROWER in
+            // units on the bigger device, which is the sort of thing that makes
+            // a hand-fitted number a trap rather than a shortcut.
+            //
+            // Derived from the viewport instead: whatever ten columns is, make
+            // it fit. Floored so a freak narrow screen gets a scroll rather
+            // than unreadable slivers.
+            float vw = partScrollRt != null ? partScrollRt.rect.width : 0f;
+            if (vw < 50f && canvas != null)
+            {
+                var cw0 = canvas.GetComponent<RectTransform>();
+                if (cw0 != null) vw = cw0.rect.width - 12f;
+            }
+            int cols = Mathf.Max(1, Mathf.CeilToInt((bm != null ? bm.PaletteCount : 19) / 2f));
+            float cellW = vw > 50f ? (vw - 8f - (cols - 1) * 6f) / cols : 112f;
+            partGrid.cellSize = new Vector2(Mathf.Max(84f, cellW), R);
+        }
         if (handleRt != null) handleRt.sizeDelta = new Vector2(300f, R);
         ApplyDockH();
     }
@@ -2126,10 +2148,22 @@ public class MobileBuilderUI : MonoBehaviour
     void Update()
     {
         if (bm == null) { bm = Object.FindFirstObjectByType<BuilderManager>(); if (bm == null) return; }
-        if (canvas != null && Mathf.Abs(canvas.scaleFactor - lastScaleFactor) > 0.001f)
+        // Watch the canvas SIZE as well as the scale factor. Switching the
+        // simulated device changes both, but a rotation changes only the size,
+        // and the palette's column width is derived from the viewport width -
+        // so keying off scaleFactor alone would leave the tiles fitted to the
+        // previous screen.
+        if (canvas != null)
         {
-            lastScaleFactor = canvas.scaleFactor;
-            ApplyTouchSizes();
+            var crt0 = canvas.GetComponent<RectTransform>();
+            float sig = canvas.scaleFactor * 1000f
+                      + (crt0 != null ? crt0.rect.width + crt0.rect.height * 7f : 0f);
+            if (Mathf.Abs(sig - lastLayoutSig) > 0.5f)
+            {
+                lastLayoutSig = sig;
+                lastScaleFactor = canvas.scaleFactor;
+                ApplyTouchSizes();
+            }
         }
         bool fighting = Object.FindFirstObjectByType<FightManager>() != null
                      || bm.mode == BuilderManager.Mode.Test   // fix: dock stayed up over TEST DRIVE
