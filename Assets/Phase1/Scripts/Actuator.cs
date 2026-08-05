@@ -529,6 +529,18 @@ public class Actuator : MonoBehaviour
     public float travel;
     /// <summary>rad/s or m/s.</summary>
     public float rate;
+
+    // P4c (2026-07-29): moving-target balance-pass counters, summed over ALL
+    // actuators, reset by the measurement harness.
+    public static int statBites;
+    public static float statBiteDmg;
+    // R2-CRITIC FIX (finding 2): the critic could not tell WHOSE limb was
+    // landing — the tipper's flipper and the player's hammer fed the same
+    // totals. Split by playerControlled. Units are RAW energy fed to
+    // ApplyHit (pre DMG_K 0.045): 12,480 raw ≈ 561 HP — the "15x
+    // disconnect" the critic flagged was these units, not a damage bug.
+    public static int statBitesPlayer, statBitesAI;
+    public static float statBiteDmgPlayer, statBiteDmgAI;
     /// <summary>kg.m^2 about the axis (Pivot/Spindle) or kg (Ram). Recomputed
     /// live - a limb part sheared off mid-swing must change the weapon.</summary>
     public float inertia = 0.001f;
@@ -1393,6 +1405,8 @@ public class Actuator : MonoBehaviour
         if (lastBite.TryGetValue(other, out t) && Time.time - t < HIT_COOLDOWN) { fnCool++; return; }
         lastBite[other] = Time.time;
         fnApply++;
+        statBites++;
+        if (playerControlled) statBitesPlayer++; else statBitesAI++;
 
         float drain = DRAIN_FRAC * E;
         Vector3 pos = other.ClosestPoint(robot.parts[limbPartIdx].go.transform.position);
@@ -1406,6 +1420,8 @@ public class Actuator : MonoBehaviour
         string sid = robot.parts[limbPartIdx].spec.id;
         float hardness = robot.parts[limbPartIdx].spec.edgeHardness;
         if (hardness <= 0f) hardness = 1f;
+        statBiteDmg += drain + linImp;
+        if (playerControlled) statBiteDmgPlayer += drain + linImp; else statBiteDmgAI += drain + linImp;
         DamageResolver.ApplyHit(robot, victim, vIdx, drain + linImp, hardness, pos,
                                 DamageResolver.SRC_LIMB);
 

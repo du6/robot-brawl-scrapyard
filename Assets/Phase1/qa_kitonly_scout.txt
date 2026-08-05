@@ -1,0 +1,23 @@
+# build KIT_ONLY_vs_SCOUT parts=9 policy=charge runs=8
+# LIVE CONSTANTS  tipSpeedCap m/s: ABS=9.00 Aluminum=9.68 Steel=12.50 Titanium=14.79 CarbonFiber=13.11 Tungsten=13.69  | MotorKW 0/1/2/3 eng 1.0/2.5/4.0/5.5  | DRIVE_KW_PER_TONNE 1.25 | LIFT_EFFICIENCY 0.85 | REACTION_FRAC 0.60 | GROUND_CLEAR 0.020 | BITE_RATE_FRAC 0.45 | EXPOSED_MULT 1.75 | STEP_DISP_CAP 0.25
+# LIVE CONSTANTS (cycle) WIND_RELEASE_FRAC 0.995 | WIND_TIMEOUT_S 2.00 | BITE_TIP_SPEED_MS 4.00 | RECOVER_S 0.10 | PIVOT_RETURN_DPS 500 | MIN_BITE_E 40 | DRAIN_FRAC 0.40 | LIN_IMP_CAP 600 | EFFICIENCY 0.35 | RECUP_FRAC 0.90 | REACTION_STALL_MUL 3.0
+# LIVE CONSTANTS (damage/judging) DMG_K 0.045 | HP_K 6000 | SHOVE_CAP 500 | PART_IMMUNITY 0.50 | RAM_MIN_J 150 | RAM_J_CAP 900 | STRUCT_BAND 0.060 | MIN_STRUCT_PARTS 2.0 | DRAW_BAND_FRAC 0.080 | CONTROL_BAND 0.100 | MATCH_TIME 90 | CREDIT_BUDGET 0
+# SOURCE REGIME d3c91516 (62 scripts, newest 2026-08-02 17:01:09Z)
+# fixedDeltaTime 0.0200  timeScale 6.0  debugFire True  (trigger HELD for the scripted player)
+run 0: PlayerWin at 90.1s  dealt 97 taken 27  pieces 8/9 vs 10/11  flipped self 2.8s enemy 0.4s  | Judges' decision — damage 97 vs 27 (72.5% margin your way) · pieces 8/9 vs 10/11 · aggression 96% vs 99% · on its back 3% vs 0% — structure even, decided on damage
+   src: ram 97/2 · limb 0/0 (max hit 0.0) · disc[retired] 0/0   packSeam 0.46
+run 1: PlayerWin at 90.1s  dealt 97 taken 27  pieces 8/9 vs 10/11  flipped self 3.1s enemy 0.6s  | Judges' decision — damage 97 vs 27 (72.5% margin your way) · pieces 8/9 vs 10/11 · aggression 95% vs 98% · on its back 3% vs 1% — structure even, decided on damage
+   src: ram 97/2 · limb 0/0 (max hit 0.0) · disc[retired] 0/0   packSeam 0.45
+run 2: PlayerWin at 90.1s  dealt 97 taken 27  pieces 8/9 vs 10/11  flipped self 8.0s enemy 0.4s  | Judges' decision — damage 97 vs 27 (72.5% margin your way) · pieces 8/9 vs 10/11 · aggression 93% vs 99% · on its back 9% vs 0% — structure even, decided on damage
+   src: ram 97/2 · limb 0/0 (max hit 0.0) · disc[retired] 0/0   packSeam 0.45
+run 3: PlayerWin at 90.1s  dealt 97 taken 27  pieces 8/9 vs 10/11  flipped self 1.1s enemy 0.5s  | Judges' decision — damage 97 vs 27 (72.5% margin your way) · pieces 8/9 vs 10/11 · aggression 97% vs 98% · on its back 1% vs 1% — structure even, decided on damage
+   src: ram 97/2 · limb 0/0 (max hit 0.0) · disc[retired] 0/0   packSeam 0.45
+run 4: PlayerWin at 90.1s  dealt 97 taken 27  pieces 8/9 vs 10/11  flipped self 4.4s enemy 1.0s  | Judges' decision — damage 97 vs 27 (72.5% margin your way) · pieces 8/9 vs 10/11 · aggression 98% vs 98% · on its back 5% vs 1% — structure even, decided on damage
+   src: ram 97/2 · limb 0/0 (max hit 0.0) · disc[retired] 0/0   packSeam 0.45
+run 5: PlayerWin at 90.1s  dealt 97 taken 27  pieces 8/9 vs 10/11  flipped self 4.7s enemy 0.1s  | Judges' decision — damage 97 vs 27 (72.5% margin your way) · pieces 8/9 vs 10/11 · aggression 93% vs 98% · on its back 5% vs 0% — structure even, decided on damage
+   src: ram 97/2 · limb 0/0 (max hit 0.0) · disc[retired] 0/0   packSeam 0.45
+run 6: PlayerWin at 90.0s  dealt 97 taken 27  pieces 8/9 vs 10/11  flipped self 6.0s enemy 0.5s  | Judges' decision — damage 97 vs 27 (72.5% margin your way) · pieces 8/9 vs 10/11 · aggression 98% vs 99% · on its back 7% vs 1% — structure even, decided on damage
+   src: ram 97/2 · limb 0/0 (max hit 0.0) · disc[retired] 0/0   packSeam 0.45
+run 7: PlayerWin at 90.0s  dealt 97 taken 27  pieces 8/9 vs 10/11  flipped self 1.9s enemy 1.7s  | Judges' decision — damage 97 vs 27 (72.5% margin your way) · pieces 8/9 vs 10/11 · aggression 98% vs 98% · on its back 2% vs 2% — structure even, decided on damage
+   src: ram 97/2 · limb 0/0 (max hit 0.0) · disc[retired] 0/0   packSeam 0.45
+KIT_ONLY_vs_SCOUT|charge  n=8  W8/L0/D0  flips=0  len 90.0-90.1s spread=1.00x  worst single-step piece loss: player 1 enemy 1  [CONVERGED] (122s wall)

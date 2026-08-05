@@ -1,0 +1,15 @@
+PASS  A: the core's +X face is reachable by pointer
+PASS  A: the spindle itself is accepted ()
+PASS  A: spindle placed (2 parts)
+PASS  A: the spindle's outer face is reachable with a rotor held
+PASS  A: THE GHOST IS RED for a rotor that would saw the core
+PASS  A: and the ghost says why -> "Rotor would sweep through Core (controller) — clear its circle, or turn the Spindle (axle)"
+PASS  A: the ghost is still SHOWN, so the player can see what is refused
+PASS  A: clicking a red ghost places nothing (2 parts)
+PASS  A: the refused click says why in the status channel -> "Rotor would sweep through Core (controller) — clear its circle, or turn the Spindle (axle)"
+PASS  B: the core's roof is reachable
+PASS  B: the spindle's top face is reachable with a rotor held
+PASS  B CONTROL: a rotor that clears the machine is still GREEN ()
+PASS  B CONTROL: and it places (3 parts, msg="")
+screenshot state: ghostShown=True valid=False reason="Rotor would sweep through Core (controller) — clear its circle, or turn the Spindle (axle)" reached=True
+RESULT: 13 checks, 0 failures - ALL GREEN

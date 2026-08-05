@@ -134,7 +134,26 @@ public class RaycastWheelDrive : MonoBehaviour
             var vis = new GameObject("wheel_visual_" + i);
             vis.transform.SetParent(transform, false);
             // Frame zero already looks right; FixedUpdate then owns it.
+            // POSITION: the mount point IS the resting wheel centre (see
+            // RestExtension), so the anchor is already the right place.
+            // ROTATION: this line used to be missing, and the comment above was
+            // a lie for every viewer that never reaches FixedUpdate. A fresh
+            // wheel_visual carries IDENTITY rotation, and the tire cylinder is
+            // thin along its LOCAL Y - so an unrotated wheel lies FLAT in the
+            // ground plane. In a fight nobody could see it: FixedUpdate assigns
+            // baseRot on the first physics step, ~8 ms later. But
+            // BuilderManager.StartScout DESTROYS this component immediately
+            // after SpawnBot (the preview must not drive), so the correction
+            // never ran and every scouted opponent was displayed with four
+            // horizontal wheels. MEASURED, same recipe, same SpawnBot:
+            //   scout preview  wheel axle = (0.00, 1.00, 0.00)  -> flat
+            //   arena fight    wheel axle = (0.99, 0.00, 0.10)  -> upright
+            // baseRot is the single source of truth for this and it was already
+            // computed above; frame zero just has to USE it. Any other frozen
+            // viewer (a paused spawn, a photo rig, a future showcase screen)
+            // is fixed by the same line.
             vis.transform.localPosition = anchors[i];
+            vis.transform.localRotation = w.baseRot;
             // Axle stub toward the body (-axis side) when we know the mount
             // side; symmetric stubs otherwise (Phase 0 hard-coded bots).
             PartVisualFactory.BuildWheel(vis.transform, radius, radius * 0.78f, axes != null ? -1 : 0);

@@ -33,10 +33,33 @@ public class GyroStabilizer : MonoBehaviour
     public static float ARM_PER_GYRO = 0.45f;
     /// <summary>Diminishing returns: total arm is capped at this.</summary>
     public static float ARM_CAP = 0.75f;
-    /// <summary>Round-5 fix 3: baseline righting moment EVERY chassis has, gyro
-    /// or not. It exceeds the worst-case gravity moment (~0.30 m arm) so it can
-    /// actually roll a hull back over — but see BASE_SPOOL.</summary>
-    public static float BASE_ARM = 0.40f;
+    /// <summary>SELF-RIGHTING IS HARDWARE AGAIN (owen, 2026-08-02).
+    ///
+    /// owen: "the robot automatically reset after being flipped over, which
+    /// doesn't look realistic. shall we remove that to encourage users design
+    /// their own flip over component?" Yes — this is now 0.
+    ///
+    /// WHAT THIS OVERTURNS, STATED HONESTLY. Round-5 fix 3 set this to 0.40
+    /// against a real measurement: 35% of all matches then ended on the same
+    /// no-gyro count-out sentence, and 45% of the palette's build space was
+    /// non-viable for want of one 0.24 m cube. That was true, and it is the
+    /// risk being accepted here.
+    ///
+    /// WHY IT IS THE RIGHT CALL NOW ANYWAY. That fix predates Phase 4 giving
+    /// the player actuators. A free baseline made the gyro a SPEED upgrade over
+    /// something you already got — the same trap shape the engine had, where
+    /// you pay for a faster version of a free thing. Self-righting is supposed
+    /// to be the enabling part (§7.1), and the game already has every piece of
+    /// the real discipline: a flipper doubles as a srimech (Actuator.ApplyTopple,
+    /// which the victim's own gyro deliberately does not fight mid-roll), the
+    /// judges already score time on your back, and the starter kit ships a gyro
+    /// so nobody is stranded on match one.
+    ///
+    /// "Flipped" now means flipped. You right yourself with a gyro, with an arm
+    /// you built, or with a hull shape that does not stay over — or you lose the
+    /// clock. If the count-out rate climbs back toward that 35%, the lever to
+    /// pull is this constant, and the note above is why.</summary>
+    public static float BASE_ARM = 0f;
     /// <summary>...and it takes this long of continuous effort to reach full
     /// strength, which is what makes the gyro an upgrade instead of a tax: a
     /// bare chassis lies there for a couple of seconds first, a gyro applies
@@ -78,8 +101,12 @@ public class GyroStabilizer : MonoBehaviour
     {
         active = false;
         liveGyros = LiveGyros();
-        // Round-5 fix 3: no early-out on liveGyros == 0 any more — a gyro-less
-        // build still gets the spooling baseline arm below.
+        // No gyro, no righting (2026-08-02). The early-out is back: with
+        // BASE_ARM at 0 the torque below would be exactly zero anyway, and
+        // running the grounded probe regardless would leave `active` reporting
+        // true for a machine that is doing nothing — a lie to every harness and
+        // HUD that reads it.
+        if (liveGyros <= 0 && BASE_ARM <= 0f) { activeSince = -1f; epoch = -1; return; }
         if (self == null || self.rb == null || self.dead) { activeSince = -1f; epoch = -1; return; }
 
         Rigidbody rb = self.rb;
@@ -116,11 +143,10 @@ public class GyroStabilizer : MonoBehaviour
         int e = (int)((Time.time - activeSince) / EPOCH);
         if (e != epoch) { epoch = e; dir = (e % 2 == 0 ? 1f : -1f) * sgn; }
 
-        // Round-5 fix 3 (critic finding 3: the gyro was a mandatory tax — 35%
-        // of all measured matches ended on the same no-gyro count-out sentence,
-        // and 45% of the palette's build space was non-viable for one 0.24 m
-        // cube). Gyro arm applies instantly; the baseline spools in. So the
-        // decision is "how fast do I get back up", not "do I get to play".
+        // Gyro arm applies instantly; the baseline (now 0 by default — see
+        // BASE_ARM) spools in if anyone ever restores it. The decision this
+        // presents to the player is once again "can I get back up at all",
+        // which is what makes a self-righting design worth building.
         float spool = Mathf.Clamp01((Time.time - activeSince) / BASE_SPOOL);
         float arm = Mathf.Min(ARM_CAP, ARM_PER_GYRO * liveGyros + BASE_ARM * spool);
         rb.AddTorque(axis * (dir * rb.mass * 9.81f * arm), ForceMode.Force);

@@ -48,6 +48,8 @@ public class AIController : MonoBehaviour
     /// <summary>ROUND-2-DEV FIX 1. Fraction of the weapon-avoidance layer this
     /// bot runs. See EnemyRoster.WeaponRespect for the measurement.</summary>
     public float rtAvoid = 1f;
+    /// <summary>C3A: hazard repulsion gates on tier - Rookies blunder in.</summary>
+    public AiTier tier = AiTier.Rookie;
     /// <summary>TEST HOOK ONLY (RB2Dev). &lt; 0 = use the tier's value, which is
     /// what the game always does. Set >= 0 to force one value for both arms of
     /// a controlled sweep so the shipped behaviour and the new one can be
@@ -61,6 +63,7 @@ public class AIController : MonoBehaviour
         rtOpeningThrottle = EnemyRoster.OpeningThrottle(t);
         rtAggression = EnemyRoster.Aggression(t);
         rtAvoid = EnemyRoster.WeaponRespect(t);
+        tier = t;
     }
     public static float BACKOFF_TIME = 1.5f;       // s of disengage after a hard hit
     public static float BACKOFF_DMG = 8f;          // dmg (dealt+taken) that counts as "hard"
@@ -180,6 +183,12 @@ public class AIController : MonoBehaviour
 
     float nextDecision;
     float backoffUntil;
+    float pinTimer;
+    /// <summary>Fix 2026-07-29 (playtest): mutual standstill in contact range
+    /// for this long is a wall-pin grind, not a fight — break off like a hard
+    /// hit does. Three playtest matches read 79-85% player immobility while
+    /// the AI ground the player against a wall.</summary>
+    public static float PIN_TIME = 2.5f;
     float lastDealt, lastTaken;
     float stuckTimer;
     float unstickUntil;
@@ -271,6 +280,20 @@ public class AIController : MonoBehaviour
             backoffUntil = Time.time + BACKOFF_TIME * (dTaken >= BACKOFF_DMG ? 1.5f : 1f);
         lastDealt = dealt; lastTaken = taken;
 
+        // Fix 2026-07-29 (playtest): wall-pin relief. If BOTH bots have been
+        // near-stationary in contact range for PIN_TIME, break the engagement
+        // exactly like a hard hit does.
+        if (target != null && !target.dead && self.rb != null && target.rb != null)
+        {
+            float pSpd = VelUtil.GetLinearVelocity(self.rb).magnitude;
+            float tSpd = VelUtil.GetLinearVelocity(target.rb).magnitude;
+            float tDist = Vector3.Distance(self.rb.position, target.rb.position);
+            if (pSpd < 0.6f && tSpd < 0.4f && tDist < 1.6f) pinTimer += rtDecision;
+            else pinTimer = 0f;
+            if (pinTimer >= PIN_TIME && Time.time > backoffUntil)
+            { backoffUntil = Time.time + BACKOFF_TIME; pinTimer = 0f; }
+        }
+
         // --- layer 1: self-preservation ---
         // Covers fully-flipped hulls AND the beached case (tilted ~50° against
         // the enemy or debris, wheels off the ground). Tilted-and-immobile
@@ -295,6 +318,24 @@ public class AIController : MonoBehaviour
             drive.aiThrottle = 0f;
             drive.aiSteer = 0f;
             return;
+        }
+
+        // --- C3A layer 1.5: hazard repulsion (Veteran and up). A live or
+        // telegraphing hazard nearby overrides pursuit for this decision
+        // tick; Rookies blunder straight in - honest tier content.
+        if (tier != AiTier.Rookie)
+        {
+            Vector3 hAway;
+            if (ArenaHazards.Near(self.rb.position, 2.2f, out hAway))
+            {
+                state = "hazard-avoid";
+                Vector3 hzFwd = transform.TransformDirection(forwardLocal);
+                float hSide = Vector3.Dot(transform.right, hAway);
+                float hFwd = Vector3.Dot(hzFwd, hAway);
+                drive.aiThrottle = hFwd >= -0.3f ? 0.8f : -0.6f;
+                drive.aiSteer = Mathf.Clamp(hSide * 2f, -1f, 1f) * Mathf.Sign(drive.aiThrottle);
+                return;
+            }
         }
 
         // --- layer 2: unstick (wall-pinned / high-centered while trying) ---
@@ -360,6 +401,42 @@ public class AIController : MonoBehaviour
         bool desperate = fm != null && fm.state == FightManager.State.Fighting
                       && fm.timer < DESPERATION_WINDOW
                       && target.damageDealt - self.damageDealt > DESPERATION_DEFICIT;
+
+        // --- C6.2 layer 2.7: WARY (Veteran and up) - the authored counter-play
+        // for the lesson bots, living in the AI where it belongs (owner call).
+        // (a) A target that is TILTING nearby is about to fall on someone:
+        // give it room until it rights itself or finishes falling - a downed
+        // hull is a target, a FALLING one is a hazard (the tipper's lesson).
+        // (b) A spun-up disc on a charged pack is unapproachable: hold range
+        // and make the pack pay for the spin, then move in (the widowmaker's
+        // lesson). Rookies blunder straight in - honest tier content.
+        if (!desperate && tier != AiTier.Rookie && target != null && !target.dead)
+        {
+            Vector3 wTo = tpos - selfPos; wTo.y = 0f;
+            float wDist = wTo.magnitude;
+            float tUp = Vector3.Dot(target.transform.up, Vector3.up);
+            // TALL targets only (CoM still high while tilting): a bot lifted
+            // on your own wedge also tilts, and backing off at the moment of
+            // advantage cost floor L4 a third of its wins in the C6 matrix.
+            bool towerFalling = tUp < 0.75f && tUp > 0.35f && wDist < 3.5f
+                             && target.rb.worldCenterOfMass.y > 0.85f;
+            // ROUND-2 (C6.2): the wary-disc branch is GONE - a front-mounted
+            // disc is already handled by the threat-arc/flank layer below, and
+            // holding the player in FRONT at range measured strictly worse
+            // (Ptaken 280-566 -> 287-772). Wariness of discs = don't approach
+            // into the arc, which is the flank layer's whole job.
+            if (towerFalling)
+            {
+                state = "wary-topple";
+                Vector3 wAway = wDist > 0.01f ? -wTo / wDist : transform.forward;
+                Vector3 wFw = transform.TransformDirection(forwardLocal); wFw.y = 0f;
+                float wF = wFw.sqrMagnitude > 1e-4f ? Vector3.Dot(wFw.normalized, wAway) : 1f;
+                float wS = Vector3.Dot(transform.right, wAway);
+                drive.aiThrottle = wF >= -0.2f ? 1f : -1f;
+                drive.aiSteer = Mathf.Clamp(wS * 2f, -1f, 1f) * Mathf.Sign(drive.aiThrottle);
+                return;
+            }
+        }
 
         // --- layer 3: back-off after a hard exchange (skipped when desperate) ---
         float gov = 1f / (1f + rtSteerAggr * spd * spd);

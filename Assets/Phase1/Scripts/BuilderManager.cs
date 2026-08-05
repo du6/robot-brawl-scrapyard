@@ -150,7 +150,51 @@ public class BuilderManager : MonoBehaviour
     }
 
     const float SNAP = 0.1f;
-    const float PANEL_W = 280f;
+    /// <summary>R2 (critic finding 1). Was 280 RAW pixels on a 2640 px back
+    /// buffer - 10.6% of the frame - which cut "NEW ROBOT" to "NEW ROBO",
+    /// "· re-entry" to "· re-en" and pushed the third garage slot off the
+    /// right edge. Now measured in SCALED units (see GuiScale), so the real
+    /// width is PANEL_W * GuiScale.</summary>
+    const float PANEL_W = 340f;
+
+    /// <summary>R2 (critic finding 1), and the critic's root cause was WRONG in
+    /// a way that matters. The four IMGUI paths that "already scale" - ShearHud
+    /// (3372), ScoutHud (4187), MobileTestHud (4222), ModeSelect.OnGUI (5053) -
+    /// all use `Screen.dpi > 250 ? min(2.5, dpi/160) : 1`. Probed live in this
+    /// editor, Screen.dpi reports **72**, so that expression evaluates to
+    /// exactly 1 and scales NOTHING. Copying it into the career panel, as the
+    /// finding asked, would have shipped a no-op that screenshots could not
+    /// tell apart from the bug. The back-buffer height is the signal that is
+    /// actually available here, so the dpi rule is kept (it is right on a real
+    /// device that reports dpi) and a height rule is taken alongside it,
+    /// whichever is larger. 1656 px tall -> 1.84x, so IMGUI's ~11 px default
+    /// type reads at ~20 px.
+    ///
+    /// R4 (critic finding 3) - THE ROOT CAUSE OF A THREE-ROUND ARGUMENT. The
+    /// dpi expression existed in SEVEN copies and R2 fixed exactly ONE (this
+    /// one), so at the dpi this editor actually reports the career panel scaled
+    /// and the scout screen, the fight HUD, the whole results screen, the
+    /// TEST DRIVE HUD, the dev banner, ModeSelect and the touch overlay all
+    /// rendered at 1x. Screen.dpi has measured 72, 266 and 108 in this one
+    /// editor across four sessions - it tracks the Game view, not the project,
+    /// so it is the wrong thing to scale UI by on its own. This property is now
+    /// the SINGLE SOURCE OF TRUTH: the six duplicates are deleted and every
+    /// call site reads GuiScale. Do not re-inline the expression anywhere.
+    /// Call sites: ScoutHud, MobileTestHud, the dev/draft banner,
+    /// ModeSelect.OnGUI, FightManager.UIS, Phase5Mobile PerfHUD + S.</summary>
+    public static float GuiScale
+    {
+        get
+        {
+            float dpiS = Screen.dpi > 250f ? Mathf.Min(2.5f, Screen.dpi / 160f) : 1f;
+            float hS   = Mathf.Clamp(Screen.height / 900f, 1f, 2.2f);
+            return Mathf.Max(dpiS, hS);
+        }
+    }
+    /// <summary>The panel's width in REAL pixels. Every mouse gate must use
+    /// this, not PANEL_W, or the click-blocking region desyncs from the drawn
+    /// panel by the scale factor.</summary>
+    public static float PanelPixelW { get { return PANEL_W * GuiScale; } }
 
     public Mode mode = Mode.Build;
     public readonly List<PlacedPart> placed = new List<PlacedPart>();
@@ -183,6 +227,7 @@ public class BuilderManager : MonoBehaviour
     GameObject ghost;                 // the REAL compound part model, mouse-following
     string ghostBuiltKey = "";        // partId_yaw the current ghost was built for
     readonly List<Material> ghostMats = new List<Material>();
+    readonly List<Color> ghostBaseCols = new List<Color>();   // original tints, for re-tinting
     bool ghostTintValid = true;
     bool ghostValid;
     string ghostReason = "";          // why the ghost is red (panel hint)
@@ -264,7 +309,35 @@ public class BuilderManager : MonoBehaviour
     public CompoundRobot testRobot;
     public RaycastWheelDrive testDrive;
     FollowCamera followCam;
-    string message = "";
+    /// <summary>ROUND-3 FIX (critic MAJOR 3, the half of it round 3 owns):
+    /// the desktop transient message had NO lifetime. A LoadSnapshot warning
+    /// wall ("this build uses parts you don't own: 6x Aluminum Beam, ...")
+    /// wrapped to six lines, sat at the top of the pinned band forever and was
+    /// never re-evaluated - it was still on screen after every missing part had
+    /// been granted and the fight started normally. MobileBuilderUI.cs got
+    /// MSG_LIFE = 7f in round 2; this is the same rule on the desktop path.
+    /// Implemented as a property rather than 40 assignment sites: every write
+    /// to `message` anywhere in this file now stamps its own expiry, and
+    /// `message +=` (LoadSnapshot does that twice) still works because the
+    /// getter runs first and both writes land in the same frame.</summary>
+    const float MSG_LIFE = 7f;
+    string _message = "";
+    float messageAt = -999f;
+    string message
+    {
+        get { return (_message == null || Time.unscaledTime - messageAt > MSG_LIFE) ? "" : _message; }
+        set { _message = value; messageAt = Time.unscaledTime; }
+    }
+    /// <summary>C2: palette index armed for a confirmed in-use sell, and the
+    /// MATERIAL of that armed row - the shop lists every legal material at once
+    /// now, so the index alone would arm all six of a part's rows together.</summary>
+    int desktopArmSell = -1;
+    string desktopArmSellMat = "";
+    /// <summary>C4: desktop stable UI buffers.</summary>
+    string stableNameBuf = "";
+    int retireArm = -1;
+    /// <summary>Blueprint index armed for deletion (arm-then-confirm).</summary>
+    int bpDelArm = -1;
 
     // Round-1 combat fixes: builder-click grace after any full-screen UI /
     // mode transition (results buttons must never leak a placement click into
@@ -339,6 +412,7 @@ public class BuilderManager : MonoBehaviour
 
         var floor = GameObject.CreatePrimitive(PrimitiveType.Plane);
         floor.name = "builder_floor";
+        FloorBoxCollider(floor);
         floor.transform.SetParent(buildRoot.transform, false);
         floor.transform.localScale = new Vector3(1.5f, 1f, 1.5f);
         floor.GetComponent<Renderer>().sharedMaterial = PartVisualFactory.Mat(new Color(0.35f, 0.35f, 0.37f), 0.3f, 0.35f);
@@ -413,12 +487,27 @@ public class BuilderManager : MonoBehaviour
         rim.color = new Color(0.55f, 0.65f, 1f);
 
         // Emissive ceiling light strips.
+        //
+        // R5 (critic finding 1 - ROOT CAUSE). Four rounds of this review filed
+        // "hard diagonal bands lie across the Workshop floor corresponding to
+        // NO OBJECT in the scene", and diagnosed it as URP shadow bias/cascade
+        // acne. It is not. These three 5.0 x 0.3 m emissive strips sit at
+        // y = 4.35 directly above the build platform with shadowCastingMode ON,
+        // and the key light is a directional at (50, 330), so the room's own
+        // LIGHT FIXTURES cast three hard parallel diagonal bars onto the floor.
+        // The bands do correspond to an object - one nobody looked up at.
+        //
+        // A light fixture casting a shadow is wrong on its own terms, so this is
+        // the fix rather than a bias tweak: an emissive strip that IS the light
+        // must not also block it.
         for (int i = 0; i < 3; i++)
         {
             float z = (i - 1) * 1.8f;
-            PartVisualFactory.Deco(PrimitiveType.Cube, buildRoot.transform,
+            var strip = PartVisualFactory.Deco(PrimitiveType.Cube, buildRoot.transform,
                 new Vector3(0f, 4.35f, z), new Vector3(5f, 0.05f, 0.3f), Vector3.zero,
                 PartVisualFactory.CeilingStrip, "ceiling_strip_" + i);
+            var sr = strip.GetComponent<Renderer>();
+            if (sr != null) sr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
         }
 
         var s = GameObject.CreatePrimitive(PrimitiveType.Sphere);
@@ -555,6 +644,7 @@ public class BuilderManager : MonoBehaviour
         placed.Add(part);
         byCollider[box] = part;
         doomDirty = true;      // the tree changed; any cascade preview is stale
+        foulDirty = true;      // and the rotor-sweep baseline is stale with it
         // A part placed while the audit lens is up must be born wearing it.
         if (matView) ApplyMatView();
         return part;
@@ -614,6 +704,7 @@ public class BuilderManager : MonoBehaviour
     void DeleteOne(PlacedPart p)
     {
         placed.Remove(p);
+        foulDirty = true;
         foreach (var kv in new List<Collider>(byCollider.Keys))
             if (byCollider[kv] == p) byCollider.Remove(kv);
         Destroy(p.go);
@@ -717,6 +808,28 @@ public class BuilderManager : MonoBehaviour
                 if (!seen.Contains(other) && Touching(cur, other)) { seen.Add(other); stack.Push(other); }
         }
         return seen.Count == parts.Count;
+    }
+
+    /// <summary>R1-CRITIC FIX (finding 6): "Structure has floating parts" named
+    /// nothing — a spike four trial placements from flush got the same message
+    /// every time. Same flood as AllConnected, returns the first part the
+    /// flood cannot reach so the message can point at it.</summary>
+    string FirstOrphanLabel(List<PlacedPart> parts)
+    {
+        if (parts.Count == 0) return "";
+        var seen = new HashSet<PlacedPart> { parts[0] };
+        var stack = new Stack<PlacedPart>();
+        stack.Push(parts[0]);
+        while (stack.Count > 0)
+        {
+            var cur = stack.Pop();
+            foreach (var other in parts)
+                if (!seen.Contains(other) && Touching(cur, other)) { seen.Add(other); stack.Push(other); }
+        }
+        foreach (var p in parts)
+            if (!seen.Contains(p))
+                return string.Format("{0} at ({1:F2}, {2:F2}, {3:F2})", p.def.label, p.pos.x, p.pos.y, p.pos.z);
+        return "";
     }
 
     bool Touching(PlacedPart a, PlacedPart b)
@@ -857,9 +970,234 @@ public class BuilderManager : MonoBehaviour
             }
             return;
         }
+        PumpBuildMusic();
+        PumpUiFraming();
         if (mode == Mode.Build) UpdateBuild();
         else if (mode == Mode.Test) UpdateTest();
         else UpdateFight();
+    }
+
+    // ---- BUILD-mode music (OWEN 2026-08-02) --------------------------------
+    /// <summary>owen: "Use this music as the background music in BUILD model".
+    /// His Steel Atrium.wav, transcoded to mp3 and dropped in Resources beside
+    /// FightTheme so it ships in device builds - a 34 MB 48 kHz stereo WAV in
+    /// Resources would be carried into every build and into git, where the
+    /// whole repo is currently 3.3 MB.
+    ///
+    /// Driven by ONE rule here rather than by hooks in StartFight, StartTest,
+    /// BackToBuild, StartCareerFight and EndScout. That is five call sites
+    /// today and a sixth would eventually be added without the music hook -
+    /// the same class of defect as a button whose look drifts from what it
+    /// does. `mode` is the truth; the music simply follows it.
+    ///
+    /// PAUSE, not Stop, on leaving Build: coming back from a fight resumes the
+    /// track where it left off instead of restarting a three-minute piece from
+    /// the top every single time you return to the workshop.</summary>
+    public static float BUILD_MUSIC_VOL = 0.40f;
+
+    /// <summary>OWEN 2026-08-04: "Adding two new songs for the build mode too.
+    /// Similar as fighting mode, randomly shuffle the three songs in build mode
+    /// and play them one by one."
+    ///
+    /// Note the word ONE BY ONE - this is deliberately NOT what fight mode
+    /// does. A fight draws one track at random and loops it, because a fight is
+    /// two minutes long and ends. The workshop is where the hours go, so a
+    /// single track on repeat is the thing you eventually mute. This is a
+    /// PLAYLIST: shuffle the three, play them through in that order, reshuffle
+    /// and go again.
+    ///
+    /// Resources names, so they ship in device builds. Adding a fourth track is
+    /// one line here plus the file - nothing else in this class counts to
+    /// three.</summary>
+    public static readonly string[] BUILD_THEMES =
+    { "BuildTheme", "BuildTheme_NeonAtriumDrift", "BuildTheme_CircuitGarden" };
+
+    /// <summary>What is playing right now, by Resources name - "" when the
+    /// workshop is silent. Exposed for the smoke suite and for a probe, which
+    /// otherwise has no way to ask.</summary>
+    public static string buildTrackNow = "";
+
+    AudioSource buildMusic;
+    bool buildMusicMissing;
+
+    /// <summary>Indices into BUILD_THEMES, in the order this pass will play
+    /// them. buildPos is the one currently sounding.</summary>
+    readonly List<int> buildOrder = new List<int>();
+    int buildPos = -1;
+
+    /// <summary>Did WE pause it (left the workshop), as opposed to the track
+    /// simply having ended? AudioSource.isPlaying is false in both cases and
+    /// the old code conflated them - fine when the source looped forever, but
+    /// with a playlist "not playing" has to mean two different things, and
+    /// calling UnPause on a finished clip does nothing at all. That would have
+    /// presented as the music stopping for good after the first song.</summary>
+    bool buildMusicPaused;
+
+    /// <summary>Fisher-Yates over the whole list, then one fix-up: if the new
+    /// first track is the one that just finished, swap it away. Without that,
+    /// a fresh shuffle can legally put the same song back-to-back across the
+    /// seam between passes - which sounds exactly like the bug this replaced.</summary>
+    void ShuffleBuildOrder()
+    {
+        int last = (buildPos >= 0 && buildPos < buildOrder.Count) ? buildOrder[buildPos] : -1;
+        buildOrder.Clear();
+        for (int i = 0; i < BUILD_THEMES.Length; i++) buildOrder.Add(i);
+        for (int i = buildOrder.Count - 1; i > 0; i--)
+        {
+            int j = UnityEngine.Random.Range(0, i + 1);
+            int t = buildOrder[i]; buildOrder[i] = buildOrder[j]; buildOrder[j] = t;
+        }
+        if (buildOrder.Count > 1 && buildOrder[0] == last)
+        {
+            int k = UnityEngine.Random.Range(1, buildOrder.Count);
+            int t = buildOrder[0]; buildOrder[0] = buildOrder[k]; buildOrder[k] = t;
+        }
+        buildPos = -1;
+    }
+
+    /// <summary>Advance to the next track and start it. Reshuffles at the end
+    /// of a pass.
+    ///
+    /// A clip that will not load is SKIPPED rather than fatal: one missing mp3
+    /// used to mean a silent workshop, and now it just means a shorter
+    /// playlist. Returns false only when none of them load, which is the one
+    /// case worth a log line.</summary>
+    bool NextBuildTrack()
+    {
+        for (int guard = 0; guard < BUILD_THEMES.Length + 1; guard++)
+        {
+            if (buildOrder.Count == 0 || buildPos + 1 >= buildOrder.Count) ShuffleBuildOrder();
+            buildPos++;
+            if (buildPos >= buildOrder.Count) break;   // nothing to play at all
+            string name = BUILD_THEMES[buildOrder[buildPos]];
+            var clip = Resources.Load<AudioClip>(name);
+            if (clip == null)
+            {
+                CompoundRobot.Log("build track missing from Resources: " + name + " - skipping it");
+                buildOrder.RemoveAt(buildPos);
+                buildPos--;
+                if (buildOrder.Count == 0) break;
+                continue;
+            }
+            buildMusic.clip = clip;
+            buildMusic.time = 0f;
+            buildMusic.Play();
+            buildMusicPaused = false;
+            buildTrackNow = name;
+            return true;
+        }
+        buildTrackNow = "";
+        return false;
+    }
+
+    /// <summary>Smoke hook: advance the playlist by hand and report what came
+    /// up. The suite asserts against the REAL shuffle rather than a copy of it,
+    /// because a re-implemented shuffle in the test proves only that the test
+    /// can shuffle.</summary>
+    public string DebugNextBuildTrack()
+    {
+        if (buildMusic == null)
+        {
+            buildMusic = gameObject.AddComponent<AudioSource>();
+            buildMusic.loop = false;
+            buildMusic.spatialBlend = 0f;
+            buildMusic.playOnAwake = false;
+        }
+        NextBuildTrack();
+        return buildTrackNow;
+    }
+
+    /// <summary>How far into the current pass we are; 0 is the first track of a
+    /// freshly shuffled pass. The suite needs this to line its window up with a
+    /// pass BOUNDARY - by the time it runs, the workshop has been open for
+    /// minutes and the playlist is somewhere in the middle of a pass, so six
+    /// advances from wherever-we-are straddle two passes and "every track once
+    /// per pass" is not even a meaningful claim about them.</summary>
+    public int DebugBuildPos { get { return buildPos; } }
+
+    void PumpBuildMusic()
+    {
+        if (buildMusicMissing) return;
+        if (buildMusic == null)
+        {
+            buildMusic = gameObject.AddComponent<AudioSource>();
+            buildMusic.loop = false;          // a playlist, not one track on repeat
+            buildMusic.spatialBlend = 0f;     // 2D: same in both ears, everywhere
+            buildMusic.playOnAwake = false;
+        }
+        buildMusic.volume = BUILD_MUSIC_VOL;   // live-tunable from a probe
+
+        if (mode == Mode.Build)
+        {
+            if (buildMusicPaused) { buildMusic.UnPause(); buildMusicPaused = false; }
+            // Covers both "nothing has started yet" and "the last one ended".
+            else if (!buildMusic.isPlaying && !NextBuildTrack())
+            {
+                buildMusicMissing = true;
+                CompoundRobot.Log("no build theme found in Resources - the build screen is silent");
+            }
+        }
+        else if (buildMusic.isPlaying)
+        {
+            // PAUSE, not Stop: coming back from a fight resumes the track where
+            // it left off instead of restarting a three-minute piece from the
+            // top every single time you return to the workshop.
+            buildMusic.Pause();
+            buildMusicPaused = true;
+        }
+    }
+
+    bool camShifted;
+
+    /// <summary>Frame the robot in the part of the screen you can actually SEE.
+    ///
+    /// OWEN 2026-08-04: "Looks like the menu partially blocks the building
+    /// area." The dock's height was half the story; the other half is that this
+    /// camera aimed at the centre of the full viewport, which on a phone is a
+    /// point underneath the dock. The machine was being deliberately posed
+    /// behind the furniture.
+    ///
+    /// This is a LENS SHIFT, not a camera move. Moving the camera down would
+    /// also frame the robot higher, but it changes the angle you view it from -
+    /// you would start seeing the underside, and near the floor it would clip
+    /// through. An off-centre frustum slides the framing without touching the
+    /// eye position, which is what a tilt-shift lens does and exactly what is
+    /// wanted: same shot, different part of the film.
+    ///
+    /// TRAP worth knowing: overriding projectionMatrix can desynchronise
+    /// ScreenPointToRay, and ScreenPointToRay is how parts get placed - a
+    /// silent version of this bug would leave the robot looking right and
+    /// dropping parts a few centimetres from the finger. Verified by
+    /// round-tripping a known world point through WorldToScreenPoint and back;
+    /// see the R1 evidence in the critic-loop doc.
+    ///
+    /// Driven by `mode` in one place, like the music, so a future mode cannot
+    /// forget to reset it.</summary>
+    void PumpUiFraming()
+    {
+        float below = 0f, above = 0f;
+        if (mode == Mode.Build && MobileBuilderUI.Active)
+        {
+            below = MobileBuilderUI.coverBottom;
+            above = MobileBuilderUI.coverTop;
+        }
+
+        // Centre of the visible band, as an offset from the centre of the screen.
+        float delta = (below - above) * 0.5f;
+
+        if (Mathf.Abs(delta) < 0.002f)
+        {
+            if (camShifted) { cam.ResetProjectionMatrix(); camShifted = false; }
+            return;
+        }
+
+        float t = cam.nearClipPlane * Mathf.Tan(cam.fieldOfView * 0.5f * Mathf.Deg2Rad);
+        float aspect = cam.pixelHeight > 0 ? (float)cam.pixelWidth / cam.pixelHeight : 1.777f;
+        float r = t * aspect;
+        float s = 2f * t * delta;   // shift the window DOWN so the subject rides UP
+        cam.projectionMatrix = Matrix4x4.Frustum(-r, r, -t - s, t - s,
+                                                 cam.nearClipPlane, cam.farClipPlane);
+        camShifted = true;
     }
 
     void UpdateBuild()
@@ -896,7 +1234,23 @@ public class BuilderManager : MonoBehaviour
             // all four states, starting from "follow the mount face" so the
             // first press is a visible change from the legacy default.
             bool act = selected >= 0 && palette[selected].actuator;
-            if (act) ghostYaw = (ghostYaw + 90) % 360;
+            if (act)
+            {
+                // Fix 2026-07-29 (playtest): on a top face, yaw 0 (follow the
+                // face = Y) and yaw 180 (Y axle) are the SAME axis, so one R
+                // press per cycle read as a dead key. Step until the drive axis
+                // actually changes; at most one full turn.
+                var adef = palette[selected];
+                Vector3 a0 = new PlacedPart { def = adef, yaw = ghostYaw, wheelAxis = ghostNormal }.DriveAxis();
+                int gy = ghostYaw;
+                for (int i = 0; i < 4; i++)
+                {
+                    gy = (gy + 90) % 360;
+                    Vector3 a1 = new PlacedPart { def = adef, yaw = gy, wheelAxis = ghostNormal }.DriveAxis();
+                    if ((a1 - a0).sqrMagnitude > 1e-4f) break;
+                }
+                ghostYaw = gy;
+            }
             else if (!full) ghostYaw = (ghostYaw == 0 ? 90 : 0);
             else
             {
@@ -935,7 +1289,7 @@ public class BuilderManager : MonoBehaviour
             }
         }
         if (Phase0Input.TestDown()) { StartTest(); return; }
-        if (Phase0Input.FlipDown()) { StartFight(); return; }  // F = FIGHT
+        if (Phase0Input.FlipDown()) { Progression.activeRungIndex = -1; Progression.activeChallengeIdx = -1; StartFight(); return; }  // F = exhibition FIGHT
         // Esc = drop the selected part / ghost. Round-2 fix 5: ALSO handled
         // through the IMGUI event pipeline in OnGUI — in the editor the input
         // backends can swallow Escape (it doubles as the cursor-release key),
@@ -945,7 +1299,7 @@ public class BuilderManager : MonoBehaviour
         UpdateGhost();
 
         Vector3 m = Phase0Input.MousePos();
-        bool overPanel = m.x < PANEL_W;
+        bool overPanel = uiPointerBlocked || (!MobileBuilderUI.Active && m.x < PanelPixelW);   // Phase 5: also block under mobile UI. R2: PanelPixelW, not PANEL_W - the panel is drawn scaled.
         // Hover readout: one raycast a frame answers "what is THAT part made
         // of" with no click, no mode change and no selection side effects.
         hoverPart = overPanel ? null : PartUnderMouse();
@@ -984,7 +1338,16 @@ public class BuilderManager : MonoBehaviour
 
         if (Phase0Input.UndoDown() && clicksLive) Undo();
 
-        if (down0 && !overPanel && clicksLive && selected >= 0 && ghostValid)
+        if (down0 && !overPanel && clicksLive && selected >= 0 && ghostValid && !CareerAllows(selected))
+        {
+            // C1: the placement is legal but the shelf is empty - refuse in the
+            // same amber channel every other refusal uses.
+            var cdef = palette[selected];
+            message = "No " + MatDB.Get(cdef.EffectiveMat(activeMat)).name + " " + cdef.label
+                    + " left \u2014 shop or sell-back.";
+            SfxSynth.Deny();
+        }
+        else if (down0 && !overPanel && clicksLive && selected >= 0 && ghostValid)
         {
             PushUndo();
             AddPart(palette[selected], ghostPos, ghostYaw,
@@ -992,6 +1355,27 @@ public class BuilderManager : MonoBehaviour
                     ghostTarget, activeMat);
             message = "";
             RefreshOverlay();
+            SfxSynth.Place();
+        }
+        else if (down0 && !overPanel && clicksLive && selected >= 0 && !ghostValid)
+        {
+            SfxSynth.Deny();   // clicked, but the ghost is red - say no out loud
+            // ...and say WHY, in words, on every UI (owen, 2026-08-05).
+            //
+            // ghostReason had exactly ONE reader: an IMGUI label in the desktop
+            // panel. The touch UI pumps `message` and has never read ghostReason
+            // at all, so on a phone EVERY red-ghost refusal - "Too low", "No
+            // socket on this face", "Over budget", and now the rotor sweep - was
+            // a red shape and a buzz with no words anywhere. Found by hovering
+            // the real ghost rather than by asking the rule whether it fired;
+            // the same blind spot that shipped four defects on 2026-08-04.
+            //
+            // The rotor rule is the one that needed this most: "why is it red?"
+            // has a genuinely invisible answer - a circle that is not drawn.
+            // Routing it through `message` reuses the channel the empty-shelf
+            // refusal two branches up already uses, so the touch status bar and
+            // the desktop panel now say the same thing for the same click.
+            if (ghostReason.Length > 0) message = ghostReason;
         }
         if (down1 && !overPanel && clicksLive)
         {
@@ -1001,6 +1385,7 @@ public class BuilderManager : MonoBehaviour
                 // Push BEFORE the edit and only if the edit can actually happen,
                 // so Z never burns a step on a refused core click.
                 if (hitPart != placed[0]) PushUndo();
+                if (hitPart != placed[0]) SfxSynth.Remove();
                 RemovePart(hitPart);
             }
         }
@@ -1023,6 +1408,14 @@ public class BuilderManager : MonoBehaviour
         string want = p.def.EffectiveMat(mat);
         if (want == p.MatName()) return false;
         if (!placed.Contains(p)) return false;
+        if (!CareerAllowsMat(p, want))
+        {
+            // C1: repaint is a transmute - it needs a spare of the target
+            // material in stock, or Steel could be conjured from Aluminium.
+            message = "No " + MatDB.Get(want).name + " " + p.def.label + " in stock \u2014 shop or sell-back.";
+            SfxSynth.Deny();
+            return false;
+        }
 
         p.matName = want;
 
@@ -1571,6 +1964,200 @@ public class BuilderManager : MonoBehaviour
         return worst;
     }
 
+    // ---- ROTOR SWEEP LEGALITY (owen, 2026-08-05) --------------------------
+
+    /// <summary>A spindle's rotor must not sweep through a part it is not part
+    /// of. This is the build-time legality rule for it, and it sits alongside
+    /// "Needs at least 1 wheel."
+    ///
+    /// WHY THE BUILDER AND NOT THE ARENA. A rotor's hit volume is a TRIGGER,
+    /// not a solid collider: it reports overlaps so it can bite, and nothing
+    /// ever pushes it back out of anything. That is CORRECT for combat - a
+    /// solid blade at 900 rpm would launch both machines instead of cutting
+    /// one - so a disc passes through its own chassis by exactly the mechanism
+    /// that lets it pass through an opponent, and making it solid would wreck
+    /// the damage model to fix what is really a build error. The defect was
+    /// never in the arena: it is that the BUILDER let you bolt on a rotor whose
+    /// swept circle runs through your own machine and then said nothing at all.
+    ///
+    /// (For anyone who goes looking: SpinnerWeapon.cs also sets isTrigger and
+    /// is the file this was first written up against. It has been DEAD CODE
+    /// since 2026-07-27 - spinners are unpowered rotor edges now and Actuator
+    /// drives them, so Actuator's trigger is the live one.)
+    ///
+    /// EXACT, NOT CONSERVATIVE - which is why, unlike ArcClearance and
+    /// RotorFloorDip, it does not step the sweep at all. Every part in build
+    /// space is an axis-aligned box (PlacedPart.Half()) and every drive axis is
+    /// cardinal (PlacedPart.DriveAxis()), so the volume a member sweeps over a
+    /// full turn is precisely an annular cylinder: a radial band about the axle
+    /// and an axial band along it. With a cardinal axle those two coordinates
+    /// are INDEPENDENT - the axial one is a single component of the box, the
+    /// radial one a function of the other two - so the (radius, axial) set a
+    /// box occupies is a true rectangle and the rectangle-overlap test below is
+    /// an equality, not an approximation. The other two sweeps ask about
+    /// HEIGHT, which a rotation does change, so they have to march; this one
+    /// asks about distance from the axle, which a rotation cannot change.
+    ///
+    /// The spindle itself is exempt: it is what the rotor is bolted to, and a
+    /// rotor resting against its face cannot rotate INTO that face.</summary>
+    public struct RotorFoul
+    {
+        public PlacedPart act;   // the spindle
+        public PlacedPart hit;   // the part its rotor sweeps through
+    }
+
+    /// <summary>1 mm - the same float-tie tolerance FloorPlane uses. Parts snap
+    /// face to face and therefore TOUCH; only real overlap is a foul.</summary>
+    const float SWEEP_EPS = 0.001f;
+
+    static int CardinalIndex(Vector3 v)
+    {
+        int ax = 0;
+        float b = Mathf.Abs(v.x);
+        if (Mathf.Abs(v.y) > b) { ax = 1; b = Mathf.Abs(v.y); }
+        if (Mathf.Abs(v.z) > b) ax = 2;
+        return ax;
+    }
+
+    /// <summary>The radial band [rMin,rMax] and axial band [aMin,aMax] that an
+    /// axis-aligned box occupies about a cardinal axle through `hub`.</summary>
+    static void SweepBands(Vector3 c, Vector3 h, Vector3 hub, int ax,
+                           out float rMin, out float rMax, out float aMin, out float aMax)
+    {
+        aMin = c[ax] - h[ax] - hub[ax];
+        aMax = c[ax] + h[ax] - hub[ax];
+        int u = (ax + 1) % 3, v = (ax + 2) % 3;
+        float u0 = c[u] - h[u] - hub[u], u1 = c[u] + h[u] - hub[u];
+        float v0 = c[v] - h[v] - hub[v], v1 = c[v] + h[v] - hub[v];
+        // Nearest point of that footprint to the axle is 0 when the footprint
+        // straddles the axle; the farthest is always one of its corners.
+        float du = Mathf.Max(0f, Mathf.Max(u0, -u1));
+        float dv = Mathf.Max(0f, Mathf.Max(v0, -v1));
+        rMin = Mathf.Sqrt(du * du + dv * dv);
+        float fu = Mathf.Max(Mathf.Abs(u0), Mathf.Abs(u1));
+        float fv = Mathf.Max(Mathf.Abs(v0), Mathf.Abs(v1));
+        rMax = Mathf.Sqrt(fu * fu + fv * fv);
+    }
+
+    static bool BandsOverlap(float a0, float a1, float b0, float b1)
+    {
+        return Mathf.Min(a1, b1) - Mathf.Max(a0, b0) > SWEEP_EPS;
+    }
+
+    /// <summary>Every (spindle, part-its-rotor-saws) pair in the CURRENT build.
+    /// The limb partition is LimbReport's own, not a second copy of it, so this
+    /// rule and the build panel can never disagree about what a limb is.</summary>
+    void CollectRotorFouls(List<RotorFoul> into)
+    {
+        into.Clear();
+        var limbs = LimbReport();
+        for (int i = 0; i < limbs.Count; i++)
+        {
+            var li = limbs[i];
+            if (li.memberParts == null || li.memberParts.Count == 0) continue;
+            if (Actuator.KindOfId(li.act.def.id) != ActuatorKind.Spindle) continue;
+            Vector3 axis = li.act.DriveAxis();
+            if (axis.sqrMagnitude < 0.01f) continue;   // no recorded axis: say nothing
+            int ax = CardinalIndex(axis);
+            for (int m = 0; m < li.memberParts.Count; m++)
+            {
+                var mem = li.memberParts[m];
+                float mr0, mr1, ma0, ma1;
+                SweepBands(mem.pos, mem.Half(), li.act.pos, ax, out mr0, out mr1, out ma0, out ma1);
+                for (int o = 0; o < placed.Count; o++)
+                {
+                    var other = placed[o];
+                    if (other == li.act || li.memberParts.Contains(other)) continue;
+                    float or0, or1, oa0, oa1;
+                    SweepBands(other.pos, other.Half(), li.act.pos, ax, out or0, out or1, out oa0, out oa1);
+                    if (!BandsOverlap(mr0, mr1, or0, or1)) continue;
+                    if (!BandsOverlap(ma0, ma1, oa0, oa1)) continue;
+                    var f = new RotorFoul();
+                    f.act = li.act;
+                    f.hit = other;
+                    into.Add(f);
+                }
+            }
+        }
+    }
+
+    readonly List<RotorFoul> foulBase = new List<RotorFoul>();
+    readonly List<RotorFoul> foulTest = new List<RotorFoul>();
+    /// <summary>The baseline is only rebuilt when the build actually changes -
+    /// UpdateGhost asks this question every frame the pointer is over a face.
+    /// Set beside doomDirty at all three sites that mutate `placed`.</summary>
+    bool foulDirty = true;
+
+    static bool HasFoul(List<RotorFoul> set, RotorFoul f)
+    {
+        for (int i = 0; i < set.Count; i++)
+            if (set[i].act == f.act && set[i].hit == f.hit) return true;
+        return false;
+    }
+
+    /// <summary>Why `probe` cannot be placed, or null.
+    ///
+    /// PLACEMENT-TIME ONLY, AND BASELINED (owen, 2026-08-05). The rule refuses
+    /// the placement that CREATES a foul; it never audits a build that already
+    /// has one. Validate() is deliberately untouched, so nothing already saved
+    /// is retroactively made illegal - spinner1 still loads and still fights.
+    ///
+    /// The baseline is the second half of that promise and the less obvious
+    /// one. A save that already violates the rule has to stay EDITABLE: you can
+    /// keep bolting parts onto it, you just cannot add a NEW pair of sawn
+    /// parts. Without baselining, the first such build would have gone
+    /// permanently read-only the moment you touched it - which is the same
+    /// retroactive punishment wearing a different hat.</summary>
+    public string RotorSweepRefusal(PlacedPart probe)
+    {
+        if (probe == null || probe.def == null) return null;
+        if (foulDirty) { CollectRotorFouls(foulBase); foulDirty = false; }
+        placed.Add(probe);
+        try { CollectRotorFouls(foulTest); }
+        finally { placed.Remove(probe); }
+        for (int i = 0; i < foulTest.Count; i++)
+        {
+            var f = foulTest[i];
+            if (HasFoul(foulBase, f)) continue;   // already true before this part
+            return f.hit == probe
+                 ? "That sits inside the " + f.act.def.label + "'s swept circle"
+                 : "Rotor would sweep through " + f.hit.def.label
+                   + " \u2014 clear its circle, or turn the " + f.act.def.label;
+        }
+        return null;
+    }
+
+    /// <summary>Every rotor foul in the build as it stands, "" for none.
+    ///
+    /// DIAGNOSTIC ONLY - nothing in the game consults it. It exists because
+    /// "placement-time only" is a promise about EXISTING builds, and a promise
+    /// about existing builds that nobody ever measured is a guess. This is what
+    /// answers "does spinner1 actually violate the rule?" using the rule's own
+    /// code instead of arithmetic done by hand on the side.
+    ///
+    /// It is also the hook if the answer ever turns out to be yes and a
+    /// non-blocking panel warning is wanted - the same channel rotorDip already
+    /// uses. That would be a separate decision, and it has not been made.</summary>
+    public string RotorFoulReport()
+    {
+        var found = new List<RotorFoul>();
+        CollectRotorFouls(found);
+        string s = "";
+        for (int i = 0; i < found.Count; i++)
+            s += (s.Length > 0 ? "; " : "") + found[i].act.def.label
+               + " saws " + found[i].hit.def.label;
+        return s;
+    }
+
+    /// <summary>Palette index of a part id, or -1, so tests and tools do not
+    /// have to hard-code the palette order.</summary>
+    public int PaletteIndexOf(string id)
+    {
+        if (palette == null) return -1;
+        for (int i = 0; i < palette.Length; i++) if (palette[i].id == id) return i;
+        return -1;
+    }
+
     /// <summary>Exact vertical support of a box of half-extents h under
     /// rotation r. Identical to Actuator.VertExtent - see that comment for why
     /// it must not be a bounding sphere.</summary>
@@ -1592,7 +2179,7 @@ public class BuilderManager : MonoBehaviour
     {
         Vector3 m = Phase0Input.MousePos();
         Ray ray = cam.ScreenPointToRay(m);
-        RaycastHit hit;
+        RaycastHit hit = default(RaycastHit);
         if (Physics.Raycast(ray, out hit, 60f) && byCollider.ContainsKey(hit.collider))
             return byCollider[hit.collider];
         return null;
@@ -1614,6 +2201,7 @@ public class BuilderManager : MonoBehaviour
         if (ghost != null && ghostBuiltKey == key) return;
         if (ghost != null) Destroy(ghost);
         ghostMats.Clear();
+        ghostBaseCols.Clear();
 
         ghost = new GameObject("ghost");
         // ROUND-UP3 FIX A: the ghost probe carries the MOUNT AXIS. It did not
@@ -1642,12 +2230,17 @@ public class BuilderManager : MonoBehaviour
                 MatDB.Get(def.EffectiveMat(activeMat)).metallic,
                 MatDB.Get(def.EffectiveMat(activeMat)).smoothness);
 
+        // Ghost look v2 (owen): keep the REAL part appearance - per-renderer
+        // material instances - and blend a strong green/red tint over it in
+        // TintGhost, so the texture stays visible while validity is still
+        // unmissable on a phone (the original emission-only glow was not).
         foreach (var r in ghost.GetComponentsInChildren<Renderer>(true))
         {
             var inst = new Material(r.sharedMaterial);
             inst.EnableKeyword("_EMISSION");
             r.sharedMaterial = inst;
             ghostMats.Add(inst);
+            ghostBaseCols.Add(inst.color);
         }
         ghostBuiltKey = key;
         ghostTintValid = true;
@@ -1658,9 +2251,15 @@ public class BuilderManager : MonoBehaviour
     {
         if (ghostTintValid == valid) return;
         ghostTintValid = valid;
-        // Subtle green glow = will attach here; red glow = can't place.
-        Color e = valid ? new Color(0.04f, 0.45f, 0.10f) : new Color(0.55f, 0.05f, 0.03f);
-        foreach (var m in ghostMats) m.SetColor("_EmissionColor", e);
+        // Strong tint OVER the real material (owen): the part keeps its
+        // texture but reads clearly green (will attach) or red (can't place).
+        Color tint = valid ? new Color(0.20f, 1.00f, 0.30f) : new Color(1.00f, 0.15f, 0.10f);
+        for (int i = 0; i < ghostMats.Count; i++)
+        {
+            Color b = i < ghostBaseCols.Count ? ghostBaseCols[i] : Color.white;
+            ghostMats[i].color = Color.Lerp(b, tint, 0.45f);
+            ghostMats[i].SetColor("_EmissionColor", tint * 0.35f);
+        }
     }
 
     void UpdateGhost()
@@ -1670,7 +2269,7 @@ public class BuilderManager : MonoBehaviour
         bool isWheelSel = def.category == P1Category.Mobility;
 
         Vector3 m = Phase0Input.MousePos();
-        if (m.x < PANEL_W) { HideGhost(); return; }
+        if (uiPointerBlocked || (!MobileBuilderUI.Active && m.x < PanelPixelW)) { HideGhost(); return; }   // Phase 5. R2: scaled width.
         // The ghost must EXIST before the raycast (the free-follow branch below
         // draws it), so this first call uses the normal we are already standing
         // on. The authoritative rebuild happens once the face is resolved.
@@ -1678,8 +2277,29 @@ public class BuilderManager : MonoBehaviour
         ghost.SetActive(true);
 
         Ray ray = cam.ScreenPointToRay(m);
-        RaycastHit hit;
-        bool onFace = Physics.Raycast(ray, out hit, 60f) && byCollider.ContainsKey(hit.collider);
+        RaycastHit hit = default(RaycastHit);
+        bool onFace = false;
+        // Fix 2026-07-29 (playtest): the nearest-hit ray let a wheel parked in
+        // front of a mount face swallow the hover — a ground-level front wedge
+        // was unreachable because the wheels flank the chassis nose. Nothing
+        // attaches to a wheel or a bare weapon, so the aiming ray now passes
+        // through them to the first attachable face; if ONLY they are hit, the
+        // old behaviour (target it, show the reason) stands.
+        {
+            RaycastHit hAtt = default(RaycastHit), hAny = default(RaycastHit);
+            float dAtt = float.MaxValue, dAny = float.MaxValue;
+            foreach (var h in Physics.RaycastAll(ray, 60f))
+            {
+                if (!byCollider.ContainsKey(h.collider)) continue;
+                if (h.distance < dAny) { dAny = h.distance; hAny = h; }
+                var tpp = byCollider[h.collider];
+                bool through = tpp.def.category == P1Category.Mobility
+                            || (tpp.def.category == P1Category.Weapon && !tpp.def.actuator);
+                if (!through && h.distance < dAtt) { dAtt = h.distance; hAtt = h; }
+            }
+            if (dAtt < float.MaxValue) { hit = hAtt; onFace = true; }
+            else if (dAny < float.MaxValue) { hit = hAny; onFace = true; }
+        }
         bool grazed = false;
 
         if (!onFace)
@@ -1695,7 +2315,42 @@ public class BuilderManager : MonoBehaviour
             if (found) { hit = near; onFace = true; grazed = true; }
         }
 
-        if (!onFace)
+        // 2026-07-30 (owen: end-to-end beams hard to aim): a ray aimed just
+        // past a beam's tip flies on and hits whatever sits BEHIND it - the
+        // ghost jumped to the core or the floor. Tip capture: if the ray
+        // passes within 10 cm of an elongated part's end-face centre, and
+        // that tip is no farther than what the ray actually hit, the end
+        // face wins. End faces are single-socket, so the snap self-centres.
+        PlacedPart capPart = null;
+        Vector3 capNormal = Vector3.zero;
+        {
+            float bestD = 0.10f;
+            foreach (var pp in placed)
+            {
+                Vector3 th2 = pp.Half();
+                int la2 = 0;
+                if (th2.y > th2[la2]) la2 = 1;
+                if (th2.z > th2[la2]) la2 = 2;
+                float other2 = Mathf.Max(th2[(la2 + 1) % 3], th2[(la2 + 2) % 3]);
+                if (th2[la2] < 2f * other2) continue;   // beams and long beams only
+                for (int sgn = -1; sgn <= 1; sgn += 2)
+                {
+                    Vector3 axisV = Vector3.zero;
+                    axisV[la2] = sgn;
+                    Vector3 e = pp.pos + axisV * th2[la2];
+                    float t = Vector3.Dot(e - ray.origin, ray.direction);
+                    if (t <= 0f) continue;
+                    float d = (ray.origin + ray.direction * t - e).magnitude;
+                    if (d >= bestD) continue;
+                    if (onFace && t > hit.distance + 0.05f) continue;   // tip is behind what we hit
+                    bestD = d;
+                    capPart = pp;
+                    capNormal = axisV;
+                }
+            }
+        }
+
+        if (!onFace && capPart == null)
         {
             // Free-follow: the real part model tracks the mouse across the
             // build plane until a snap face is hovered. Not placeable here.
@@ -1720,8 +2375,18 @@ public class BuilderManager : MonoBehaviour
             return;
         }
 
-        ghostTarget = byCollider[hit.collider];
-        ghostNormal = hit.normal;
+        if (onFace)
+        {
+            ghostTarget = byCollider[hit.collider];
+            ghostNormal = hit.normal;
+        }
+        if (capPart != null)
+        {
+            // Tip capture overrides: aim just past a beam tip = end-mount.
+            ghostTarget = capPart;
+            ghostNormal = capNormal;
+            grazed = false;
+        }
         if (grazed)
         {
             // A grazing sphere-cast reports edge/diagonal normals, which made
@@ -1731,12 +2396,24 @@ public class BuilderManager : MonoBehaviour
             // normalized by the part's half extents.
             Vector3 off = hit.point - ghostTarget.pos;
             Vector3 th = ghostTarget.Half();
+            // 2026-07-30 (owen: end-to-end beams hard to aim): the old pick
+            // used |off|/half per axis, which biased a BEAM's tip grazes 3:1
+            // toward its side faces - aiming just past the tip flipped the
+            // ghost sideways. Use OVERSHOOT (distance outside the box per
+            // axis, the true nearest-face metric), plus a tip-preference
+            // band on elongated parts: anything at or beyond the last 2 cm
+            // resolves to the END face.
             int ga = 0;
-            float gb = Mathf.Abs(off.x) / Mathf.Max(th.x, 0.01f);
-            float gy = Mathf.Abs(off.y) / Mathf.Max(th.y, 0.01f);
+            float gb = Mathf.Abs(off.x) - th.x;
+            float gy = Mathf.Abs(off.y) - th.y;
             if (gy > gb) { ga = 1; gb = gy; }
-            float gz = Mathf.Abs(off.z) / Mathf.Max(th.z, 0.01f);
+            float gz = Mathf.Abs(off.z) - th.z;
             if (gz > gb) ga = 2;
+            int la = 0;
+            if (th.y > th[la]) la = 1;
+            if (th.z > th[la]) la = 2;
+            float laOther = Mathf.Max(th[(la + 1) % 3], th[(la + 2) % 3]);
+            if (th[la] >= 2f * laOther && Mathf.Abs(off[la]) > th[la] - 0.02f) ga = la;
             Vector3 derived = Vector3.zero;
             derived[ga] = off[ga] >= 0f ? 1f : -1f;
             ghostNormal = derived;
@@ -1811,6 +2488,37 @@ public class BuilderManager : MonoBehaviour
         ghostMated = MatedCount(tu, nu, du) * MatedCount(tv, nv, dv);
         ghostSockets = Mathf.Max(1, ghostMated);
 
+        // Fix 2026-07-29 (playtest): hovering LOW on a side face picked a
+        // floor-clipping candidate even when a valid socket sat higher on the
+        // SAME face — a red ghost at exactly the spot a new player aims. If the
+        // vertical tangent has a candidate that clears the floor, take the
+        // nearest such candidate instead of refusing.
+        int vt = t1 == 1 ? 1 : t2 == 1 ? 2 : 0;
+        if (vt != 0 && pos.y - newHalf.y < FloorPlane(isWheel) - 1e-4f)
+        {
+            float minD = FloorPlane(isWheel) + newHalf.y - ghostTarget.pos[1];
+            float[] tt = vt == 1 ? tu : tv;
+            float[] nn = vt == 1 ? nu : nv;
+            float wantV = hit.point[1] - ghostTarget.pos[1];
+            float bestD = float.NaN; float bErr = float.MaxValue;
+            foreach (float toff in tt)
+                foreach (float noff in nn)
+                {
+                    float d = toff - noff;
+                    if (d < minD - 1e-4f) continue;
+                    float e = Mathf.Abs(d - wantV);
+                    if (e < bErr) { bErr = e; bestD = d; }
+                }
+            if (!float.IsNaN(bestD))
+            {
+                if (vt == 1) du = bestD; else dv = bestD;
+                pos[t1] = ghostTarget.pos[t1] + du;
+                pos[t2] = ghostTarget.pos[t2] + dv;
+                ghostMated = MatedCount(tu, nu, du) * MatedCount(tv, nv, dv);
+                ghostSockets = Mathf.Max(1, ghostMated);
+            }
+        }
+
         ghostValid = true;
         ghostReason = "";
         // Both mating faces must actually carry a socket: SocketOffsets is
@@ -1870,6 +2578,25 @@ public class BuilderManager : MonoBehaviour
             foreach (var c in Physics.OverlapBox(pos, newHalf * 0.92f, Quaternion.identity))
                 if (byCollider.ContainsKey(c))
                 { ghostValid = false; ghostReason = "Blocked by another part"; break; }
+        }
+
+        // ROTOR SWEEP (owen, 2026-08-05). Last of the placement rules, because
+        // it is the only one that has to reason about the whole machine rather
+        // than about this part's own box - and because there is no point asking
+        // it about a placement the cheap rules have already refused.
+        //
+        // The probe must be what AddPart is ABOUT to build, not an
+        // approximation of it: same pos, same yaw, same mount axis, same
+        // material as the commit a few lines up in Update(). A probe that
+        // disagrees with the placement is a rule that polices a machine the
+        // player is not building.
+        if (ghostValid)
+        {
+            var swProbe = new PlacedPart { def = def, pos = pos, yaw = ghostYaw,
+                                           wheelAxis = NeedsAxis(def) ? ghostNormal : Vector3.zero,
+                                           matName = activeMat };
+            string swWhy = RotorSweepRefusal(swProbe);
+            if (swWhy != null) { ghostValid = false; ghostReason = swWhy; }
         }
 
         ghostPos = pos;
@@ -2070,6 +2797,407 @@ public class BuilderManager : MonoBehaviour
     public int TestDoomCount { get { return doomCount; } }
     public float TestOrbitYaw { get { return orbitYaw; } set { orbitYaw = value; } }
     public float TestOrbitPitch { get { return orbitPitch; } set { orbitPitch = value; } }
+
+    // ---- Phase 5: public API for the touch-native builder (MobileBuilderUI) ----
+    /// <summary>Set true by the mobile UI when a touch is over one of its
+    /// panels, so the placement raycast doesn't fire under the UI (the phone
+    /// analogue of the old PANEL_W gate).</summary>
+    public static bool uiPointerBlocked;
+    // OWEN 2026-08-02 save dialog, desktop half. Both front ends or neither -
+    // a rule that lives in one front end is not a rule.
+    public const string NAME_GATE_HINT = "Type a name in the box first \u2014 every robot and draft needs one.";
+    bool deskSaveDlg, deskSaveFocus;
+    /// <summary>Desktop twin of MobileBuilderUI's confirm face.</summary>
+    bool deskSaveConfirm;
+    string deskSaveBuf = "", deskSaveErr = "", deskSaveNote = "";
+    public bool TestDesktopSaveDialogOpen { get { return deskSaveDlg; } }
+    public float TestOrbitDist { get { return orbitDist; } set { orbitDist = Mathf.Clamp(value, 2.2f, 9f); } }
+    public int PaletteCount { get { return palette != null ? palette.Length : 0; } }
+    public string PartLabel(int i) { return (i >= 0 && i < PaletteCount) ? palette[i].label : ""; }
+    public string PartCategory(int i) { return (i >= 0 && i < PaletteCount) ? palette[i].category.ToString() : ""; }
+    public bool PartIsActuator(int i) { return i >= 0 && i < PaletteCount && palette[i].actuator; }
+    public int PartCost(int i) { if (i < 0 || i >= PaletteCount) return 0; var d = palette[i]; return d.CostOf(d.EffectiveMat(activeMat)); }
+    public int PartMass(int i) { if (i < 0 || i >= PaletteCount) return 0; return Mathf.RoundToInt(palette[i].MassOf(activeMat)); }
+    // ---- C1: career inventory. DERIVED accounting: the inventory is never
+    // mutated by building - remaining = owned minus used - so place / remove /
+    // undo / load can never drift the counts.
+    //
+    // OWEN 2026-08-05: "used" means used BY THE BUILD THAT IS LOADED, and by
+    // nothing else. R4 briefly made it mean used by the whole stable (doc
+    // section 7's shared pool); that made keeping a second design cost the
+    // hardware to build it, so the only way to try an idea was to retire the
+    // robot that works. See Career.SnapshotShortfall for the full reasoning.
+    // Saved designs are blueprints; the loaded one is the machine.
+    /// <summary>Remaining stock of palette part i in the ACTIVE material.
+    /// -1 = unlimited (career off, dev free-build, or the core).</summary>
+    public int CareerRemaining(int i)
+    {
+        if (!Career.active || Career.FreeParts) return -1;
+        if (i <= 0 || i >= PaletteCount) return -1;
+        var d = palette[i];
+        string mat = d.EffectiveMat(activeMat);
+        int rem = Career.CountOf(d.id, mat) - CareerUsed(d.id, mat);
+        // Clamp: a shortfall build (loaded with more parts than owned) reads
+        // as 0 in stock - a negative here would collide with the -1
+        // 'unlimited' sentinel and open the gate exactly one part short.
+        return rem < 0 ? 0 : rem;
+    }
+    int CareerUsed(string id, string mat)
+    {
+        string cm = MatDB.Canon(mat);
+        int u = 0;
+        for (int k = 1; k < placed.Count; k++)
+            if (placed[k].def.id == id && MatDB.Canon(placed[k].MatName()) == cm) u++;
+        // Nothing else consumes. Other saved robots are DESIGNS, not machines
+        // holding hardware, so they make no claim on this number (owen,
+        // 2026-08-05). Whether each of THEM could be built is answered per-row
+        // in the stable list by Career.RobotReady, not by taxing this one.
+        return u;
+    }
+    /// <summary>C1 placement gate. Negative remaining (a shortfall build was
+    /// loaded) refuses further placement too.</summary>
+    public bool CareerAllows(int i) { int r = CareerRemaining(i); return r == -1 || r > 0; }
+    bool CareerAllowsMat(PlacedPart pp, string newMat)
+    {
+        if (!Career.active || Career.FreeParts) return true;
+        if (placed.Count > 0 && pp == placed[0]) return true;
+        return Career.CountOf(pp.def.id, newMat) - CareerUsed(pp.def.id, newMat) > 0;
+    }
+    /// <summary>C1: "N× Material Label" for every line this build uses beyond
+    /// what the career inventory owns. Empty = fully owned.</summary>
+    public List<string> CareerShortfall()
+    {
+        var lack = new List<string>();
+        if (!Career.active || Career.FreeParts) return lack;
+        var seen = new List<string>();
+        for (int k = 1; k < placed.Count; k++)
+        {
+            string id = placed[k].def.id, mat = placed[k].MatName();
+            string key2 = id + "|" + MatDB.Canon(mat);
+            if (seen.Contains(key2)) continue;
+            seen.Add(key2);
+            int miss = CareerUsed(id, mat) - Career.CountOf(id, mat);
+            if (miss > 0) lack.Add(miss + "× " + MatDB.Get(mat).name + " " + placed[k].def.label);
+        }
+        return lack;
+    }
+    // PoolWarning() lived here. It warned that "the stable is over the parts
+    // pool ... buy them, or retire a robot to free its parts" - a sentence that
+    // is now false in both halves: the stable has no pool to be over, and
+    // retiring frees nothing because nothing was held. Deleted rather than
+    // reworded; the honest version of this warning is the per-robot readiness
+    // badge in the stable list, which says it about the right object and says
+    // it before you commit rather than after (owen, 2026-08-05).
+    public string PartId(int i) { return (i >= 0 && i < PaletteCount) ? palette[i].id : ""; }
+    /// <summary>R2 (critic finding 2): the material part i is PINNED to, or null
+    /// when the picker actually applies to it. The six chips on the BUILD row
+    /// are the only material filter the player has, and for wheel/battery/gyro
+    /// they do nothing at all - which is why "Wheel  14 kg  ×0" on the default
+    /// Aluminum chip read as a bug instead of as "wheels are Rubber".</summary>
+    public string PartPinnedMat(int i) { return (i >= 0 && i < PaletteCount && !palette[i].materialChoice) ? palette[i].matName : null; }
+    public string PartMatKey(int i) { return (i >= 0 && i < PaletteCount) ? palette[i].EffectiveMat(activeMat) : activeMat; }
+    /// <summary>SHOP CATALOG (owen 2026-08-01: "how to shop parts with
+    /// different materials?" - he tried and could not work it out, because
+    /// material was a GLOBAL MODE set by chips on the BUILD tab which the shop
+    /// silently inherited). Every material palette part i may legally be BOUGHT
+    /// in, in picker order. A pinned part (materialChoice == false) has exactly
+    /// one - its own - and allowedMats restricts the rest, so the catalog can
+    /// never offer a carbon-fibre engine block or a titanium wheel.</summary>
+    public string[] PartLegalMats(int i)
+    {
+        var outl = new List<string>();
+        if (i < 0 || i >= PaletteCount) return outl.ToArray();
+        var d = palette[i];
+        if (!d.materialChoice) { outl.Add(d.matName); return outl.ToArray(); }
+        var src = d.allowedMats != null ? d.allowedMats : MatDB.Order;
+        foreach (var k in src) if (d.Accepts(k) && !outl.Contains(k)) outl.Add(k);
+        if (outl.Count == 0) outl.Add(d.matName);
+        return outl.ToArray();
+    }
+    /// <summary>True when part i's material is a permanent property of the part
+    /// (wheel to Rubber, battery, gyro) and not a choice at the counter.</summary>
+    public bool PartMatFixed(int i) { return i >= 0 && i < PaletteCount && !palette[i].materialChoice; }
+
+    /// <summary>The part's one-line explanation. OWEN 2026-08-05: "where do I
+    /// see the introduction of each part?" - nowhere, on touch. These strings
+    /// have always existed and rendered in exactly ONE place, a GUILayout.Label
+    /// in the desktop IMGUI panel, which the Device Simulator cannot even
+    /// dispatch a click to. MobileBuilderUI did not mention `desc` once. So the
+    /// game shipped a written explanation of every part that a player on a
+    /// phone could not reach.</summary>
+    public string PartDesc(int i)
+    { return (i >= 0 && i < PaletteCount && palette[i].desc != null) ? palette[i].desc : ""; }
+
+    /// <summary>Durability of part i in `mat`: DamageResolver's own formula,
+    /// HP_K x strengthRel x volume. Not a second copy of the rule - the two
+    /// numbers below are read straight off the same inputs the arena uses.
+    ///
+    /// WHY THE SHOP SHOWS HP PER KG AND NOT JUST HP. Both HP and mass are
+    /// linear in volume, so WITHIN one material HP is a fixed multiple of the
+    /// kg already on the row - measured at 1.3 HP/kg for every structural part
+    /// in Aluminium, so a bare HP column would repeat the mass column in
+    /// different units. The number that actually decides a purchase is HP per
+    /// kg, which is HP_K x strengthRel / density and varies ELEVEN-FOLD across
+    /// the table (CarbonFiber 4.1, Tungsten 0.4). Section 3b says weight caps
+    /// make strength per kilogram the whole question; this is where that
+    /// question gets answered.</summary>
+    public float PartHP(int i, string mat)
+    {
+        if (i < 0 || i >= PaletteCount) return 0f;
+        Vector3 sz = palette[i].size;
+        return DamageResolver.HP_K * MatDB.Get(mat).strengthRel * sz.x * sz.y * sz.z;
+    }
+    // SwapSourceFor / CheapestSwapSource lived here and are gone with the
+    // REWORK button (owen, 2026-08-05: "Let's remove rework"). Both existed
+    // only to answer "which material would this be reworked FROM", which is
+    // now a question nothing asks. CheapestSwapSource had already lost its
+    // last caller when the shop went per-material and was dead before this.
+    //
+    // Changing a part's material is SELL + BUY now, and the measurements say
+    // that was usually the better trade anyway: sell-back is 50% of the SOURCE
+    // while the rework fee was 10% of the TARGET, so rework only won while the
+    // target cost under 5x the source. Beam Aluminium -> Titanium is exactly
+    // 5x and came out 292 against 293 - a one-scrap difference sitting on the
+    // formula's own boundary. Every downgrade was strictly worse: reworking a
+    // Tungsten beam to Aluminium cost 6 scrap where selling and rebuying paid
+    // 1325, and nothing on screen said so.
+
+    /// <summary>Free units of part i in a SPECIFIC material (owned minus used by
+    /// the build being edited). -1 = unlimited. The shop's sell guard rail needs
+    /// this per material now that every material is on screen at once.</summary>
+    public int CareerRemainingMat(int i, string mat)
+    {
+        if (!Career.active || Career.FreeParts) return -1;
+        if (i <= 0 || i >= PaletteCount) return -1;
+        var d = palette[i];
+        int rem = Career.CountOf(d.id, mat) - CareerUsed(d.id, mat);
+        return rem < 0 ? 0 : rem;
+    }
+    /// <summary>Harness seam: the desktop panel's scroll offset, so a capture
+    /// can photograph the shop block instead of the top of the panel.</summary>
+    public float PanelScrollY { get { return panelScroll.y; } set { panelScroll.y = value; } }
+    /// <summary>C3: the build's summed catalog value - the number the
+    /// underdog multiplier compares against the opponent's.</summary>
+    public int BuildValueCareer()
+    {
+        int v = 0;
+        foreach (var p2 in placed) v += CareerDB.PartPrice(p2.def.id, p2.MatName());
+        return v;
+    }
+    /// <summary>C3: union AABB of the placed build (world axes).</summary>
+    public Vector3 BuildAabbSize()
+    {
+        bool got = false; Bounds b = new Bounds();
+        foreach (var p2 in placed)
+        {
+            if (p2.go == null) continue;
+            foreach (var r2 in p2.go.GetComponentsInChildren<Renderer>())
+            {
+                if (!got) { b = r2.bounds; got = true; }
+                else b.Encapsulate(r2.bounds);
+            }
+        }
+        return got ? b.size : Vector3.zero;
+    }
+    // ---- onboarding tips (OWEN 2026-08-03) -----------------------------
+    /// <summary>OWEN 2026-08-03: "should we add a tutorial to teach new users
+    /// how to play the game?"
+    ///
+    /// There was one, and it had rotted into misinformation: it opened with
+    /// "open the ROBOTS tab -> found your stable" and told you to "SAVE on
+    /// ROBOTS", both of which describe the UI as it was that MORNING. SAVE had
+    /// moved to the build bar and founding-first stopped being required the
+    /// moment SAVE learned to name its own build. A tutorial that narrates a
+    /// flow you deliberately deleted is worse than none - it sends a first-time
+    /// player to a tab to hunt for a button that is not there.
+    ///
+    /// It also only ever taught NAVIGATION. Nothing said what makes a machine
+    /// legal, what the six materials are for, where scrap comes from, or that
+    /// the core is the thing you lose by. All four are things this code knows
+    /// and the player was left to infer.
+    ///
+    /// ONE list, both front ends, because two copies of onboarding is how the
+    /// desktop half ends up a version behind - which is exactly what had
+    /// happened to the strip in OnGUI.</summary>
+    public const int TIP_COUNT = 7;
+
+    /// <summary>Which tip the player is actually on, derived from real state so
+    /// it can never sit there telling you to do something you have done.
+    /// Returns TIP_COUNT when there is nothing left to say.</summary>
+    public int CareerTipStep()
+    {
+        if (!Career.active || Career.Data == null || Career.Data.tipsOff) return TIP_COUNT;
+        int ts = Career.Data.tutorialStep;
+        // Derive forward from what actually exists, not just the stored step -
+        // a save edited or carried across a version should not strand anyone.
+        var st = Career.Data.stable;
+        if (st != null && st.Count > 0)
+        {
+            if (ts < 1) ts = 1;
+            for (int i = 0; i < st.Count; i++)
+                if (st[i] != null && !string.IsNullOrEmpty(st[i].snapshot)) { if (ts < 2) ts = 2; break; }
+        }
+        if (ts >= 3)
+        {
+            // Past the first fight the rest are the SYSTEMS tips, paced one per
+            // fight rather than arriving as a wall of text nobody reads before
+            // they have felt the problem it describes.
+            int after = 4 + Mathf.Max(0, Career.Data.fights - 1);
+            return after >= TIP_COUNT ? TIP_COUNT : after;
+        }
+        if (placed.Count <= 1) return 0;      // core only
+        if (Validate() != null) return 1;     // placed, but it cannot fight yet
+        if (ts < 2) return 2;                 // legal and unsaved
+        return 3;
+    }
+
+    /// <summary>ctx is the front end's current surface: "build", "league", or
+    /// anything else. Desktop passes "" because its whole panel is on screen at
+    /// once, so "go to the X tab" would be nonsense there.</summary>
+    public string CareerTip(int i, string ctx)
+    {
+        bool onBuild  = ctx == "build"  || ctx == "";
+        bool onLeague = ctx == "league" || ctx == "";
+        string n = "TIP " + (i + 1) + "/" + TIP_COUNT + "  \u00b7  ";
+        if (i <= 0)
+            return n + (onBuild ? "pick a part below, then tap the robot to bolt it on"
+                                : "open the BUILD tab to start your machine");
+        if (i == 1)
+        {
+            // The LIVE reason, not a paraphrase. Validate() is what the FIGHT
+            // button consults, so quoting it means the tip and the refusal can
+            // never say different things.
+            string v = Validate();
+            return n + "to fight, a machine needs a wheel, a battery, and every part touching another"
+                     + (v != null ? "  \u2014  " + v : "");
+        }
+        if (i == 2)
+            return n + (onBuild ? "SAVE names this build and founds it in your stable"
+                                : "open BUILD and press SAVE to name your machine");
+        if (i == 3)
+            return n + (onLeague ? "SCOUT is free \u2014 study the opponent, then FIGHT"
+                                 : "open the LEAGUE tab to enter your first contest");
+        if (i == 4)
+            return n + "materials: the same beam is 7\u00d7 heavier in Tungsten than Aluminium, and twice as strong \u2014 spend that weight where you hit, not everywhere";
+        if (i == 5)
+            return n + "scrap: SHOP buys parts and SELL returns half \u2014 to change a part's material, sell it and buy the one you want";
+        return n + "the core is the KO target \u2014 lose it and you lose the fight. Armour it, and bolt the battery across two seams so one break cannot take it";
+    }
+
+    /// <summary>C3 enrollment validation: weight cap, refusals specific enough
+    /// to act on. Null = fits.
+    ///
+    /// OWEN 2026-08-03: "we already have the weight limit. why do we also need
+    /// size limit?" The size box is gone - one rule, mass. Worth knowing what
+    /// that costs, because it is not nothing: mass = volume x density, and the
+    /// density spread here is 18x (ABS 1.05 -> Tungsten 19.3). A 1500 kg cap
+    /// therefore buys 3 Tungsten beams or 59 ABS ones, so a light material now
+    /// bounds nothing but the wallet. If ultralight structure starts reading
+    /// as strictly correct, the lever to pull is density or a reach cap - NOT
+    /// this function.</summary>
+    public string CareerValidate(CareerDB.League lg)
+    {
+        var lack = CareerShortfall();
+        if (lack.Count > 0)
+            return "Build uses parts you don't own: " + string.Join(", ", lack.ToArray()) + " \u2014 shop or sell-back first.";
+        int mass = BuildMassInt;
+        if (mass > lg.weightCap)
+            return string.Format("{0} kg over the {1} cap ({2} kg limit, build is {3} kg).",
+                mass - Mathf.RoundToInt(lg.weightCap), lg.name, Mathf.RoundToInt(lg.weightCap), mass);
+        return null;
+    }
+
+    /// <summary>OWEN 2026-08-02: "why clicking fight doesn't trigger anything
+    /// in this view".
+    ///
+    /// It WAS triggering. StartCareerFight refused, set `message` and played
+    /// Deny() - and the bar that carries `message` lives at the TOP of the
+    /// screen for 7 s, while the button he tapped is at the bottom right of a
+    /// contest list. Reproduced on his own save: career scrap 0, inventory =
+    /// the starter kit (no engine, no spinner blade), build named "Spinner1"
+    /// -> CareerShortfall listed three missing parts and the fight was refused
+    /// before a FightManager ever existed. Confirmed msgtext still held the
+    /// full explanation and had simply expired.
+    ///
+    /// The real defect is an asymmetry. Career legality has TWO rules and the
+    /// UI treated them completely differently: the weight cap is printed in the
+    /// status bar continuously ("799/1500 kg Scrapyard Open"), while
+    /// parts-you-own only ever appeared as a 7-second flash AFTER you failed.
+    /// One rule you can answer before committing; the other you could only
+    /// discover by being refused. This makes both answerable before the tap.
+    ///
+    /// ONE set of checks, two renderings. StartCareerFight calls this, so a
+    /// button's appearance can never drift from what the button actually does -
+    /// that drift is how you ship a live-looking button that refuses, or a
+    /// greyed one that would have worked.
+    ///
+    /// Returns null when the contest can be entered right now. Otherwise it
+    /// returns the LONG message (what the message bar shows) and hands back a
+    /// row-sized restatement in `shortTag`.</summary>
+    public string CareerFightBlocker(int li, int ci, out string shortTag)
+    {
+        shortTag = null;
+        if (!Career.active) return null;
+        if (li < 0 || li >= CareerDB.Leagues.Length) { shortTag = "unavailable"; return "Contest unavailable."; }
+        var blg = CareerDB.Leagues[li];
+        if (ci < 0 || ci >= blg.contests.Length) { shortTag = "unavailable"; return "Contest unavailable."; }
+        var bc = blg.contests[ci];
+
+        if (!Career.LeagueUnlocked(li))
+        {
+            shortTag = "league locked";
+            return blg.name + " is locked \u2014 beat every " + CareerDB.Leagues[li - 1].name + " contest first.";
+        }
+
+        // OWEN 2026-08-02, found while fixing the overlapping banner: that
+        // banner has been promising "can't enroll" since C6.5 and NOTHING
+        // enforced it. CareerShortfall returns empty while devFreeBuild is on,
+        // so a draft sailed through CareerValidate and could be entered into a
+        // contest with parts the player does not own - the exact thing the
+        // whole inventory system exists to prevent. A UI that asserts a rule
+        // the code does not implement is worse than no rule; the claim is now
+        // true, and it is stated on the row that refuses.
+        if (Career.Drafting)
+        {
+            shortTag = "draft \u2014 CONVERT to enroll";
+            return "This is a DRAFT \u2014 parts are unlimited, so it cannot be entered. "
+                 + "CONVERT buys the parts it is missing and leaves draft mode.";
+        }
+
+        // THE GATE - exactly the checks StartCareerFight runs, in its order.
+        string err = Validate();
+        if (err == null) err = CareerValidate(blg);
+        if (err == null && Career.Data.scrap < bc.entryFee)
+            err = "Entry fee is " + bc.entryFee + " scrap \u2014 you hold " + Career.Data.scrap + ".";
+        if (err == null) return null;
+
+        // Row-sized restatement of the SAME failure. Falls back to the long
+        // text, so a new rule added to CareerValidate can never make the button
+        // lie - at worst the row label gets verbose.
+        var lack = CareerShortfall();
+        if (lack.Count > 0) shortTag = "needs " + string.Join(", ", lack.ToArray());
+        else if (BuildMassInt > blg.weightCap)
+            shortTag = (BuildMassInt - Mathf.RoundToInt(blg.weightCap)) + " kg over cap";
+        else if (Career.Data.scrap < bc.entryFee)
+            shortTag = "needs " + bc.entryFee + " scrap entry fee";
+        else shortTag = err;
+        return err;
+    }
+
+    public string CareerFightBlocker(int li, int ci)
+    { string t; return CareerFightBlocker(li, ci, out t); }
+
+    public void SelectPart(int i) { selected = (selected == i) ? -1 : i; }
+    public int SelectedPart { get { return selected; } }
+    public bool HasSelection { get { return selected >= 0; } }
+    public string ActiveMatKey { get { return activeMat; } set { if (MatDB.Has(value)) activeMat = value; } }
+    public int BuildMassInt { get { int m = 0; foreach (var p in placed) m += Mathf.RoundToInt(p.Mass()); return m; } }
+    public int CreditBudgetNow { get { return CREDIT_BUDGET; } }
+    /// <summary>C5: the build's canonical drive direction (also the spawned
+    /// bot's local drive axis) - the bench gives its AI driver this.</summary>
+    public Vector3 DriveDirNow { get { return driveDir; } }
+    public int PlacedCount { get { return placed.Count; } }
+    public string LastMessage { get { return message; } }   // Phase 5: surfaced in the touch UI status bar
     /// <summary>Bounds of the ghost's rendered mesh, for checking that a rotate
     /// moves the DRAWING and not just the collision box. The blade bug was
     /// exactly this: box rotated, mesh did not.</summary>
@@ -2088,6 +3216,7 @@ public class BuilderManager : MonoBehaviour
         selected = -1;
         if (ghost != null) { Destroy(ghost); ghost = null; }
         ghostMats.Clear();
+        ghostBaseCols.Clear();
         ghostBuiltKey = "";
         ghostValid = false;
         ghostReason = "";
@@ -2386,7 +3515,7 @@ public class BuilderManager : MonoBehaviour
     ///
     /// Static rather than const so a tuning pass, a sweep or a future
     /// difficulty/campaign tier can move it without a recompile.</summary>
-    public static int CREDIT_BUDGET = 4000;
+    public static int CREDIT_BUDGET = 0;   // Phase 5: credit limit removed — 0 = unlimited (every guard tests > 0)
 
     /// <summary>Total credits this build spends. Same per-part Cost() the panel
     /// and the hover readout already show, so the three numbers can never
@@ -2408,7 +3537,9 @@ public class BuilderManager : MonoBehaviour
         }
         if (wheels < 1) return "Needs at least 1 wheel.";
         if (power < 1) return "Needs an engine or battery.";
-        if (!AllConnected(placed)) return "Structure has floating parts.";
+        if (!AllConnected(placed))
+            return "Structure has floating parts — " + FirstOrphanLabel(placed)
+                 + " isn't flush with anything. Faces must touch; sockets must mate.";
         // Budget last, so a half-finished machine complains about being
         // half-finished before it complains about being expensive.
         int cost = BuildCost();
@@ -2420,12 +3551,20 @@ public class BuilderManager : MonoBehaviour
 
     // ------------------------------------------------------------- test mode
 
-    public const float ARENA_HALF = 7f;
+    /// <summary>Phase 4: no longer const — ladder rungs may shrink the arena
+    /// (StartFight sets it per fight; StartTest resets to the standard 7 m).</summary>
+    public static float ARENA_HALF = 7f;
 
     public void StartTest()
     {
         string err = Validate();
         if (err != null) { message = err; return; }
+
+        ARENA_HALF = 7f;   // Phase 4: the test box is always the standard arena
+        ArenaHazards.Clear();   // C3A: test drives stay hazard-free
+        TouchControls.Ensure();
+        TouchControls.fightActive = true;   // Phase 5
+        if (Progression.Data.tutorialStep == 1) { Progression.Data.tutorialStep = 2; Progression.Save(); }
 
         Deselect();      // round-1 fix 3 / round-2 fix 7: no stale selection or ghost object
         // The lens is a build-mode tool; drop it before the build root is
@@ -2462,6 +3601,7 @@ public class BuilderManager : MonoBehaviour
 
         testRobot = SpawnBot(placed, "PlayerBuild", new Vector3(0f, 0f, -4f),
                              Quaternion.identity, driveDir, out testDrive);
+        TouchControls.hasFire = testRobot != null && testRobot.GetComponentInChildren<Actuator>() != null;
         // Spawn protection (round-1 fix 1, test-drive parity): both bodies
         // settle onto their suspension for 1 s before damage/shear arms.
         combatArmAt = Time.time + 1.0f;
@@ -2507,12 +3647,51 @@ public class BuilderManager : MonoBehaviour
     /// FIGHT reuses the exact same 14x14 m box, walls, posts and markings.
     /// Also mounts the floating-damage-number spawner (subscribed to
     /// DamageResolver.OnHit) for the arena's lifetime.</summary>
+    /// <summary>iPad fix (2026-07-30): a Plane's zero-thickness MeshCollider
+    /// let heavy bodies tunnel straight through under device frame pacing -
+    /// robots fell out of the arena while the camera chased them down. Every
+    /// floor keeps its Plane visual but collides as a solid 1 m deep box.</summary>
+    public static void FloorBoxCollider(GameObject floor)
+    {
+        var mc = floor.GetComponent<MeshCollider>();
+        if (mc != null) Object.Destroy(mc);
+        var box = floor.AddComponent<BoxCollider>();
+        box.size = new Vector3(10f, 1f, 10f);    // plane footprint is 10x10 local
+        box.center = new Vector3(0f, -0.5f, 0f); // top flush with the surface
+    }
+
+    /// <summary>Last-ditch floor net (2026-07-30): if a machine still ends up
+    /// under the arena, lift it back and kill its velocity instead of letting
+    /// the chase camera follow it into the void.</summary>
+    static void FloorNet(CompoundRobot r)
+    {
+        if (r == null) return;
+        Transform t = r.transform;
+        Vector3 p = t.position;
+        float m = ARENA_HALF + 0.3f;
+        bool below = p.y < -3f;
+        bool outside = Mathf.Abs(p.x) > m || Mathf.Abs(p.z) > m;
+        if (!below && !outside) return;
+        Vector3 target = new Vector3(
+            Mathf.Clamp(p.x, -(ARENA_HALF - 1.2f), ARENA_HALF - 1.2f),
+            1.2f,
+            Mathf.Clamp(p.z, -(ARENA_HALF - 1.2f), ARENA_HALF - 1.2f));
+        t.position += target - p;
+        foreach (var rb in r.GetComponentsInChildren<Rigidbody>())
+        {
+            rb.linearVelocity = Vector3.zero;
+            rb.angularVelocity = Vector3.zero;
+        }
+        CompoundRobot.Log("FloorNet: machine returned to the arena");
+    }
+
     void BuildArena()
     {
-        const float HALF = ARENA_HALF;
+        float HALF = ARENA_HALF;   // Phase 4: arena size is per-fight now
         sandboxRoot = new GameObject("sandbox");
         var floor = GameObject.CreatePrimitive(PrimitiveType.Plane);
         floor.name = "arena_floor";
+        FloorBoxCollider(floor);
         floor.transform.SetParent(sandboxRoot.transform, false);
         floor.transform.localScale = new Vector3(HALF / 5f, 1f, HALF / 5f);
         floor.GetComponent<Renderer>().sharedMaterial = PartVisualFactory.Mat(new Color(0.34f, 0.34f, 0.36f), 0.2f, 0.35f);
@@ -2525,6 +3704,16 @@ public class BuilderManager : MonoBehaviour
             wall.transform.position = alongX ? new Vector3(0f, 0.75f, sign * HALF) : new Vector3(sign * HALF, 0.75f, 0f);
             wall.transform.localScale = alongX ? new Vector3(2f * HALF + 0.5f, 1.5f, 0.5f) : new Vector3(0.5f, 1.5f, 2f * HALF + 0.5f);
             wall.GetComponent<Renderer>().sharedMaterial = PartVisualFactory.Mat(new Color(0.22f, 0.22f, 0.25f), 0.5f, 0.4f);
+
+            // iPad bug fix (2026-07-30): the 1.5 m visual wall was low enough
+            // to beach a rammed bot on its flat top or throw it clean out of
+            // the arena. Invisible barrier continues the wall up to 6 m.
+            var barrier = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            barrier.name = "wall_barrier_" + i;
+            barrier.transform.SetParent(sandboxRoot.transform, false);
+            barrier.transform.position = alongX ? new Vector3(0f, 3f, sign * HALF) : new Vector3(sign * HALF, 3f, 0f);
+            barrier.transform.localScale = alongX ? new Vector3(2f * HALF + 0.5f, 6f, 0.5f) : new Vector3(0.5f, 6f, 2f * HALF + 0.5f);
+            Object.Destroy(barrier.GetComponent<MeshRenderer>());
 
             // Hazard-striped wall tops (decorative, collider-free).
             for (int k = 0; k < 7; k++)
@@ -2587,8 +3776,11 @@ public class BuilderManager : MonoBehaviour
             lamp.transform.localPosition = dDir * 0.16f + Vector3.up * 0.06f;
             lamp.transform.localRotation = Quaternion.LookRotation(dDir);
             lamp.transform.localScale = new Vector3(0.16f, 0.05f, 0.02f);
-            lamp.GetComponent<Renderer>().sharedMaterial = PartVisualFactory.Emissive(
+            var lr = lamp.GetComponent<Renderer>();
+            lr.sharedMaterial = PartVisualFactory.Emissive(
                 new Color(0.15f, 0.95f, 0.25f), new Color(0.1f, 2.0f, 0.25f), 0f, 0.5f);
+            // R5 finding 1, same rule: a light does not cast a shadow.
+            lr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
             break;
         }
     }
@@ -2749,10 +3941,10 @@ public class BuilderManager : MonoBehaviour
         var gyroIdx = new List<int>();
         for (int i = 0; i < body.Count; i++)
             if (body[i].def.id == "gyro") gyroIdx.Add(i);
-        // Round-5 fix 3: EVERY build gets the stabilizer now, gyro or not. With
-        // no gyro parts it runs on the slow spooling baseline arm
-        // (GyroStabilizer.BASE_ARM) so a flip costs seconds rather than the
-        // match; gyros make righting instant and stronger.
+        // Every build still gets the component, but as of 2026-08-02 it does
+        // NOTHING without a gyro (GyroStabilizer.BASE_ARM = 0). It is attached
+        // unconditionally so that fitting or shearing a gyro is a live change
+        // mid-fight rather than something fixed at spawn.
         var gs = robot.gameObject.AddComponent<GyroStabilizer>();
         gs.self = robot;
         gs.gyroParts = gyroIdx.ToArray();
@@ -2795,13 +3987,659 @@ public class BuilderManager : MonoBehaviour
     /// </summary>
     /// <summary>§8: which roster bot to fight, and at what tier. Both are
     /// panel choices; the tier defaults to the entry's own rating.</summary>
-    public string opponentId = "mauler";
-    public AiTier opponentTier = AiTier.Veteran;
+    public string opponentId = "scout";   // Fix 2026-07-29 (playtest): the first fight must be winnable — three straight 100-0 Mauler shutouts. Was "mauler".
+    public AiTier opponentTier = AiTier.Rookie;
+
+    // Fix 2026-07-29 (playtest, QHD): scroll state for the builder panel and the
+    // height reserved for the always-visible aim-feedback + fight controls band.
+    Vector2 panelScroll;
+    const float FIGHT_BAND_H = 540f;   // Phase 4: + ladder & scrap rows in the pinned band
+
+    /// <summary>P4c: why the CURRENT build cannot attempt challenge `c`, or
+    /// null if it qualifies. Pinned-material parts (core, battery, gyro,
+    /// wheels) are exempt from material constraints — the player cannot
+    /// choose their material, so it cannot disqualify them.</summary>
+    public string ChallengeBlocker(Progression.Challenge c)
+    {
+        int m = 0;
+        foreach (var p in placed) m += Mathf.RoundToInt(p.Mass());
+        if (c.maxMass > 0 && m > c.maxMass)
+            return string.Format("build is {0} kg — needs ≤ {1} kg", m, c.maxMass);
+        if (c.maxCost > 0 && BuildCost() > c.maxCost)
+            return string.Format("build costs {0} scrap — needs ≤ {1} scrap", BuildCost(), c.maxCost);
+        if (c.noWeapons)
+            foreach (var p in placed)
+                // R2-CRITIC FIX (finding 1): a strictly-bare shover CANNOT win —
+                // bumps deal zero by owen's rule, so the judges' damage column
+                // always ruled against it (measured: 0 dealt, 100% margin loss).
+                // Real "unarmed" combat robots ARE wedges: the wedge (near-zero
+                // damage, throws upward) is the one legal edge, making the win
+                // path flips and count-outs, as intended.
+                if (p.def.category == P1Category.Weapon && !p.def.id.StartsWith("wedge"))
+                    return p.def.label + " is a weapon part — wedges only in this one";
+        if (c.onlyMat != null)
+            foreach (var p in placed)
+            {
+                string pid = p.def.id;
+                if (pid.StartsWith("core") || pid.StartsWith("battery")
+                    || pid.StartsWith("gyro") || pid.StartsWith("wheel")) continue;
+                if (MatDB.Canon(p.MatName()) != c.onlyMat)
+                    return p.def.label + " is " + MatDB.Get(p.MatName()).name
+                         + " — everything choosable must be " + MatDB.Get(c.onlyMat).name;
+            }
+        return null;
+    }
+
+    /// <summary>P4c: start a build-constraint challenge fight (validated
+    /// against the current build at the click).</summary>
+    public void StartChallenge(int i)
+    {
+        if (i < 0 || i >= Progression.Challenges.Length) return;
+        var c = Progression.Challenges[i];
+        string blocked = ChallengeBlocker(c);
+        if (blocked != null) { message = "Challenge " + c.label + ": " + blocked; return; }
+        opponentId = c.oppId;
+        opponentTier = c.tier;
+        Progression.activeRungIndex = -1;
+        Progression.activeChallengeIdx = i;
+        StartFight();
+    }
+
+    /// <summary>Phase 4: fight the current ladder rung — sets opponent/tier
+    /// from the rung and marks the fight for the reward pass.</summary>
+    public void StartLadderFight()
+    {
+        var r = Progression.CurrentRung();
+        if (r == null)
+        {
+            // R2-CRITIC FIX (finding 3): after LADDER COMPLETE there was no
+            // repeatable income beyond ~350-max exhibitions, starving the
+            // 10.5k budget sinks. The champion now defends the title: replay
+            // the final rung at full purse, no advancement.
+            if (Progression.Data.rung >= Progression.Ladder.Length)
+            {
+                var last = Progression.Ladder[Progression.Ladder.Length - 1];
+                opponentId = last.oppId;
+                opponentTier = last.tier;
+                Progression.activeRungIndex = Progression.Ladder.Length - 1;
+                Progression.activeChallengeIdx = -1;
+                StartFight();
+                return;
+            }
+            Progression.activeRungIndex = -1; Progression.activeChallengeIdx = -1; StartFight(); return;
+        }
+        opponentId = r.oppId;
+        opponentTier = r.tier;
+        if (Progression.Data.tutorialStep == 2) { Progression.Data.tutorialStep = 3; Progression.Save(); }
+        Progression.activeRungIndex = Progression.Data.rung;
+        Progression.activeChallengeIdx = -1;
+        StartFight();
+    }
+
+    // ---- C3: career contests -------------------------------------------
+    GameObject scoutRoot;
+    string scoutTitle = "", scoutStats = "", scoutBlurb = "";
+    // R5 (critic finding 5): the contest being scouted, so the screen can end
+    // in a decision. Scouting that cannot say "yes" sends the player back to
+    // re-find the row they just came from.
+    int scoutLi = -1, scoutCi = -1;
+    float scoutSaveYaw, scoutSavePitch, scoutSaveDist;
+    GUIStyle scoutHeadStyle, scoutBodyStyle; Texture2D scoutBgTex;
+    public bool Scouting { get { return scoutRoot != null; } }
+
+    /// <summary>The scouting card's three lines and the contest it refers to,
+    /// for whoever is drawing the card.
+    ///
+    /// OWEN 2026-08-04: "when I click FIGHT or BACK button at the scout page,
+    /// nothing happens." Same root cause as the boot chooser fixed in d1f08e4:
+    /// Unity's Device Simulator disables the mouse device and substitutes a
+    /// simulated touchscreen, and IMGUI dispatches from mouse events - so every
+    /// GUI.Button in this game renders in the simulator and none of them can be
+    /// pressed. ScoutHud was the last IMGUI screen still reachable from the
+    /// touch UI, and it is a dead end: the only way out of scouting is those
+    /// two buttons.
+    ///
+    /// The touch UI draws the card in uGUI now, which receives the simulated
+    /// touches. These accessors are how it gets the text without duplicating
+    /// the formatting.</summary>
+    public string ScoutTitle { get { return scoutTitle; } }
+    public string ScoutStats { get { return scoutStats; } }
+    public string ScoutBlurb { get { return scoutBlurb; } }
+    public int ScoutLeague { get { return scoutLi; } }
+    public int ScoutContest { get { return scoutCi; } }
+
+    /// <summary>C3: enroll and fight a league contest. Validates build +
+    /// league rules, debits the entry fee, captures both sides' value for
+    /// the underdog multiplier, then runs the normal fight path.</summary>
+    public void StartCareerFight(int li, int ci)
+    {
+        if (!Career.active || li < 0 || li >= CareerDB.Leagues.Length) return;
+        var lg = CareerDB.Leagues[li];
+        if (ci < 0 || ci >= lg.contests.Length) return;
+        var c = lg.contests[ci];
+        Career.targetLeagueIdx = li;
+        // Crowd size follows the league: The Yard is a handful of people in a
+        // scrapyard, The Crucible is section 4b's "full broadcast kit". The
+        // crowd is progression feedback you can hear. (StartScout deliberately
+        // does NOT set it - a scouting turntable has no audience.)
+        CrowdAudio.SetVenue(li);
+        EndScout();
+        // Single gate - the same call the FIGHT buttons use to decide whether
+        // they look available. See CareerFightBlocker.
+        string blocked = CareerFightBlocker(li, ci);
+        if (blocked != null) { message = blocked; SfxSynth.Deny(); return; }
+        if (c.entryFee > 0) Career.Txn(-c.entryFee, "entry fee " + c.id);
+        Career.fightBuildValue = BuildValueCareer();
+        var recipe = EnemyRoster.Recipe(c.oppId, palette, c.armourMat);
+        int ov = 0;
+        foreach (var p2 in recipe) ov += CareerDB.PartPrice(p2.def.id, p2.MatName());
+        Career.fightOppValue = ov;
+        Career.activeLeague = lg.id;
+        Career.activeContest = c.id;
+        if (Career.autosave) Career.Save();
+        opponentId = c.oppId;
+        opponentTier = c.tier;
+        Progression.activeRungIndex = -1;
+        Progression.activeChallengeIdx = -1;
+        StartFight();
+        // StartFight re-validates and can refuse; if the fight never started,
+        // hand the fee back and clear the contest context.
+        if (mode != Mode.Fight && Career.activeContest != null)
+        {
+            if (c.entryFee > 0) Career.Txn(c.entryFee, "entry fee refund " + c.id);
+            Career.activeLeague = null; Career.activeContest = null;
+        }
+    }
+
+    /// <summary>C3 scouting: the opponent's real build on a turntable, with
+    /// value / mass / weapon / flavor. Same recipe + spawn path the fight
+    /// uses - what you scout is what you meet.</summary>
+    public void StartScout(int li, int ci)
+    {
+        if (li < 0 || li >= CareerDB.Leagues.Length) return;
+        var lg = CareerDB.Leagues[li];
+        if (ci < 0 || ci >= lg.contests.Length) return;
+        var c = lg.contests[ci];
+        Career.targetLeagueIdx = li;
+        EndScout();
+        scoutLi = li; scoutCi = ci;
+        // R5 (critic finding 5): the scout camera inherited whatever the build
+        // orbit happened to be, which is how the opponent ended up photographed
+        // from almost straight overhead at 2.3% of the frame - you could not
+        // read the silhouette and the weapon named in the text was not
+        // identifiable in the image at all, which is the whole job of this
+        // screen. Frame it: low three-quarter angle, close in.
+        scoutSaveYaw = orbitYaw; scoutSavePitch = orbitPitch; scoutSaveDist = orbitDist;
+        orbitYaw = 35f; orbitPitch = 16f; orbitDist = 2.6f;
+        var entry = EnemyRoster.Find(c.oppId);
+        var recipe = EnemyRoster.Recipe(c.oppId, palette, c.armourMat);
+        float smass = 0f; int sval = 0; string weapon = "none";
+        foreach (var p2 in recipe)
+        {
+            smass += p2.Mass();
+            sval += CareerDB.PartPrice(p2.def.id, p2.MatName());
+            if (p2.def.category == P1Category.Weapon) weapon = p2.def.label;
+        }
+        RaycastWheelDrive sdrv;
+        var bot = SpawnBot(recipe, "scout_display", new Vector3(0f, 0.9f, 0f),
+                           Quaternion.identity, Vector3.forward, out sdrv);
+        scoutRoot = bot.gameObject;
+        if (sdrv != null) Destroy(sdrv);
+        foreach (var rb in scoutRoot.GetComponentsInChildren<Rigidbody>()) rb.isKinematic = true;
+        scoutRoot.AddComponent<ScoutSpin>();
+        buildRoot.SetActive(false);
+        scoutTitle = string.Format("SCOUTING \u2014 {0} ({1}) \u00b7 {2} \u00b7 {3} \u00b7 hazards: {4}",
+            entry.label, c.tier, lg.name, lg.arenaName, ArenaHazards.Summary(lg.arenaId));
+        scoutStats = string.Format("mass {0} kg \u00b7 value {1} scrap \u00b7 weapon: {2} \u00b7 purse {3} scrap \u00b7 entry fee {4} scrap",
+            Mathf.RoundToInt(smass), sval, weapon, c.purse, c.entryFee);
+        scoutBlurb = entry.blurb;
+    }
+
+    public void EndScout()
+    {
+        if (scoutRoot != null)
+        {
+            Destroy(scoutRoot);
+            orbitYaw = scoutSaveYaw; orbitPitch = scoutSavePitch; orbitDist = scoutSaveDist;
+        }
+        scoutRoot = null;
+        scoutLi = -1; scoutCi = -1;
+        if (buildRoot != null && mode == Mode.Build) buildRoot.SetActive(true);
+    }
+
+    void ScoutHud()
+    {
+        float sc2 = GuiScale;   // R4 finding 3: one rule, one place
+        Matrix4x4 saved = GUI.matrix;
+        GUI.matrix = Matrix4x4.Scale(new Vector3(sc2, sc2, 1f));
+        float w = Screen.width / sc2;
+        // R5 (critic finding 2): GuiScale was already being applied here - the
+        // remaining problem was that everything INSIDE the scaled matrix used
+        // the stock IMGUI skin size, so the three lines a player reads before
+        // spending an entry fee were the smallest type in the game AND grey on
+        // the lightest pixels of a default GUI.Box gradient. Explicit styles,
+        // near-white on the dock's own near-opaque panel colour.
+        if (scoutBgTex == null)
+        {
+            // Linear texture: the project renders in LINEAR colour space, so a
+            // default (sRGB) 1x1 would draw this near-black panel at about sRGB
+            // 0.28 - a mid grey, which is most of what made the old GUI.Box
+            // header grey-on-grey in the first place.
+            scoutBgTex = new Texture2D(1, 1, TextureFormat.RGBA32, false, true);
+            scoutBgTex.hideFlags = HideFlags.HideAndDontSave;
+            scoutBgTex.SetPixel(0, 0, new Color(0.06f, 0.07f, 0.09f, 0.96f));
+            scoutBgTex.Apply();
+        }
+        if (scoutHeadStyle == null)
+        {
+            scoutHeadStyle = new GUIStyle(GUI.skin.label);
+            scoutHeadStyle.fontSize = 22; scoutHeadStyle.fontStyle = FontStyle.Bold; scoutHeadStyle.wordWrap = true;
+            scoutHeadStyle.normal.textColor = new Color(0.82f, 0.90f, 1f);
+            scoutBodyStyle = new GUIStyle(GUI.skin.label);
+            scoutBodyStyle.fontSize = 19; scoutBodyStyle.wordWrap = true;
+            scoutBodyStyle.normal.textColor = new Color(0.94f, 0.95f, 0.98f);
+        }
+        // OWEN 2026-08-04, with a screenshot of the scouting card: the header
+        // ran off the right edge ("hazards: 2 floor" cut mid-phrase) and BACK
+        // sat half under the notch.
+        //
+        // This screen is IMGUI, so every bit of the safe-area and physical-size
+        // work done on the touch UI passed it by - and so does the legibility
+        // sweep in CareerSmoke, which walks uGUI Text components and therefore
+        // cannot see a single pixel drawn here. It was the one screen with no
+        // check of any kind pointed at it.
+        //
+        // Screen.width is also the wrong width twice over: under the simulator
+        // it reports the editor WINDOW, and even on a real device it counts the
+        // pixels behind the notch as usable.
+        var sa = UnityEngine.Device.Screen.safeArea;
+        float dw = UnityEngine.Device.Screen.width, dhh = UnityEngine.Device.Screen.height;
+        if (dw < 1f || sa.width < 1f) { dw = Screen.width; dhh = Screen.height; sa = new Rect(0f, 0f, dw, dhh); }
+        float insL = Mathf.Max(0f, sa.x) / sc2;
+        float insR = Mathf.Max(0f, dw - (sa.x + sa.width)) / sc2;
+        float insT = Mathf.Max(0f, dhh - (sa.y + sa.height)) / sc2;
+        float x0 = insL + 10f;
+        float x1 = (dw / sc2) - insR - 10f;
+        float avail = Mathf.Max(120f, x1 - x0);
+
+        // R5 (critic finding 5): the header used to span the full width while
+        // its content ended at 30% of it. Size the panel to what is in it.
+        float need = Mathf.Max(scoutHeadStyle.CalcSize(new GUIContent(scoutTitle)).x,
+                     Mathf.Max(scoutBodyStyle.CalcSize(new GUIContent(scoutStats)).x,
+                               scoutBodyStyle.CalcSize(new GUIContent(scoutBlurb)).x));
+        float bw = Mathf.Min(avail, need + 44f);
+
+        // Wrap rather than clip. The old rects were fixed 28-30 units tall with
+        // wordWrap off, so a title longer than the box simply lost its end -
+        // and the end is where the hazards live, which is the whole reason you
+        // paid to scout. Heights come from the styles so the panel is as tall
+        // as its content needs, whatever the arena is called.
+        float tw = bw - 30f;
+        float h1 = scoutHeadStyle.CalcHeight(new GUIContent(scoutTitle), tw);
+        float h2 = scoutBodyStyle.CalcHeight(new GUIContent(scoutStats), tw);
+        float h3 = scoutBodyStyle.CalcHeight(new GUIContent(scoutBlurb), tw);
+        float panelY = insT + 8f;
+        float panelH = 12f + h1 + 6f + h2 + 4f + h3 + 12f;
+
+        GUI.DrawTexture(new Rect(x0, panelY, bw, panelH), scoutBgTex);
+        float ly = panelY + 12f;
+        GUI.Label(new Rect(x0 + 14f, ly, tw, h1), scoutTitle, scoutHeadStyle); ly += h1 + 6f;
+        GUI.Label(new Rect(x0 + 14f, ly, tw, h2), scoutStats, scoutBodyStyle); ly += h2 + 4f;
+        GUI.Label(new Rect(x0 + 14f, ly, tw, h3), scoutBlurb, scoutBodyStyle);
+
+        int fs2 = GUI.skin.button.fontSize;
+        GUI.skin.button.fontSize = 18;
+        float by = panelY + panelH + 10f;
+        bool back = GUI.Button(new Rect(x1 - 96f, by, 96f, 44f), "BACK");
+        // R5 (critic finding 5): scouting must end in a decision. Having paid
+        // to look, the player used to have to go back and re-find the row.
+        bool fight = false;
+        Color bgOld = GUI.backgroundColor;
+        if (scoutLi >= 0)
+        {
+            GUI.backgroundColor = new Color(1f, 0.62f, 0.24f);
+            fight = GUI.Button(new Rect(x1 - 96f - 10f - 126f, by, 126f, 44f), "FIGHT \u25b8");
+            GUI.backgroundColor = bgOld;
+        }
+        GUI.skin.button.fontSize = fs2;
+        GUI.matrix = saved;
+        if (fight) { int fl = scoutLi, fc = scoutCi; EndScout(); StartCareerFight(fl, fc); return; }
+        if (back) EndScout();
+    }
+
+    /// <summary>C4: UI-side refusals surface through the same amber
+    /// message channel everything else uses.</summary>
+    public void Toast(string msg)
+    { if (!string.IsNullOrEmpty(msg)) { message = msg; SfxSynth.Deny(); } }
+
+    // ---- C4: the stable + the Drafting Table ---------------------------
+    public string ActiveRobotName()
+    {
+        int a = Career.active ? Career.Data.activeRobot : -1;
+        return a >= 0 && a < Career.Data.stable.Count ? Career.Data.stable[a].name : null;
+    }
+    public string StableCreate(string name)
+    {
+        if (!Career.active) return "Career is off.";
+        // OWEN 2026-08-02: founding a MACHINE out of a DESIGN is the category
+        // error that fills a stable with robots that refuse at the LEAGUE tab -
+        // they look real, carry a 0-0 record, and only fail once you are trying
+        // to enter a contest. A stable robot is a machine you own.
+        if (Career.Drafting)
+            return "You are editing a draft \u2014 CONVERT to buy the missing parts first, "
+                 + "then found it as a robot.";
+        // OWEN 2026-08-02: "we should force user to provide a name when
+        // creating a new robot". It used to invent "ROBOT 1", "ROBOT 2"... and
+        // that is how a stable fills with machines nobody can tell apart -
+        // exactly the same failure as the blueprints that all came out "DRAFT n".
+        // Enforced HERE, not only in the touch UI, because desktop IMGUI calls
+        // this too and a rule that lives in one front end is not a rule.
+        if (string.IsNullOrEmpty(name) || name.Trim().Length == 0)
+            return "Name the robot first \u2014 type a name in the box above.";
+        name = name.Trim();
+        foreach (var r in Career.Data.stable) if (r.name == name) return "A robot named " + name + " already exists.";
+        Career.Data.stable.Add(new CareerRobot { name = name, snapshot = SnapshotString() });
+        Career.Data.activeRobot = Career.Data.stable.Count - 1;
+        Career.Data.activeBlueprint = -1;
+        if (Career.Data.tutorialStep == 0) Career.Data.tutorialStep = 1;
+        if (Career.autosave) Career.Save();
+        message = name + " founded \u2014 it holds the current build. SAVE keeps it current.";
+        return null;
+    }
+    /// <summary>OWEN 2026-08-02: "The UI of saving/loading robot is not very
+    /// intuitive." True, and the reason is that the OBJECT you are editing and
+    /// the TOOLS that edit it lived on different tabs: ROBOTS -> EDIT -> find
+    /// BUILD -> work -> find ROBOTS -> SAVE. Five moves for one edit.
+    ///
+    /// This is the state the build screen was missing to close that loop. It
+    /// already knew WHICH robot was being edited (the header prints its name);
+    /// it just could not tell you whether you owed it a save.</summary>
+    public bool ActiveEditDirty()
+    {
+        if (!Career.active) return false;
+        int b = Career.Data.activeBlueprint;
+        if (b >= 0 && b < Career.Data.blueprints.Count)
+            return Career.Data.blueprints[b].snapshot != SnapshotString();
+        int a = Career.Data.activeRobot;
+        if (a < 0 || a >= Career.Data.stable.Count) return false;
+        return Career.Data.stable[a].snapshot != SnapshotString();
+    }
+
+    /// <summary>Name of whatever is open - robot or draft - or null.</summary>
+    public string ActiveEditName()
+    {
+        if (!Career.active) return null;
+        int b = Career.Data.activeBlueprint;
+        if (b >= 0 && b < Career.Data.blueprints.Count) return Career.Data.blueprints[b].name;
+        int a = Career.Data.activeRobot;
+        return a >= 0 && a < Career.Data.stable.Count ? Career.Data.stable[a].name : null;
+    }
+
+    public bool ActiveEditIsDraft
+    {
+        get
+        {
+            return Career.active && Career.Data.activeBlueprint >= 0
+                   && Career.Data.activeBlueprint < Career.Data.blueprints.Count;
+        }
+    }
+
+    /// <summary>OWEN 2026-08-02: "consider merging to one save button. depending
+    /// on what user is editing, save to the corresponding robot or blueprint."
+    ///
+    /// One commit verb. Which object it lands on is state the game already has
+    /// to track anyway - it prints the name in the header - so making the
+    /// player choose the button was making them restate something the game
+    /// knew. activeRobot and activeBlueprint are mutually exclusive by
+    /// construction; every method that opens one clears the other.</summary>
+    public string SaveActive()
+    {
+        if (!Career.active) return "Career is off.";
+        int b = Career.Data.activeBlueprint;
+        if (b >= 0 && b < Career.Data.blueprints.Count)
+        {
+            Career.Data.blueprints[b].snapshot = SnapshotString();
+            if (Career.autosave) Career.Save();
+            message = "Draft " + Career.Data.blueprints[b].name + " saved.";
+            return null;
+        }
+        int a = Career.Data.activeRobot;
+        if (a < 0 || a >= Career.Data.stable.Count)
+            return "Nothing open to save \u2014 name this build first.";
+        return StableSave();
+    }
+
+    /// <summary>OWEN 2026-08-02: "The SAVE button on the build tab is disabled
+    /// by default, and requires the user to create a new robot or draft from
+    /// the ROBOT tab first. I think we should allow the user to save directly
+    /// under BUILD."
+    ///
+    /// He is right, and the shape of the bug is familiar: SAVE was a commit
+    /// verb that only worked once you had already performed the real creation
+    /// step somewhere else. So the first build a player ever makes - the one
+    /// they care most about - is the one SAVE refuses. The naming step was
+    /// never the hard part; making them go and find it was.
+    ///
+    /// True when SAVE has nothing to commit to and should ask for a name.</summary>
+    public bool NothingOpen
+    {
+        get
+        {
+            if (!Career.active) return false;
+            int b = Career.Data.activeBlueprint;
+            if (b >= 0 && b < Career.Data.blueprints.Count) return false;
+            int a = Career.Data.activeRobot;
+            return a < 0 || a >= Career.Data.stable.Count;
+        }
+    }
+
+    /// <summary>Would a fresh save keep this build as a DRAFT rather than
+    /// found a robot? A robot is a machine you OWN; a build leaning on parts
+    /// you have not bought is a design, and calling it a robot is how a stable
+    /// fills with machines that only fail at the LEAGUE tab.</summary>
+    public bool SaveWouldDraft { get { return CareerShortfallItems().Count > 0; } }
+
+    /// <summary>The one line the dialog shows, so the player knows which of
+    /// the two they are about to make BEFORE they commit - and why. The
+    /// robot/draft distinction is then a consequence of what they built
+    /// rather than a quiz they have to pass.</summary>
+    public string SaveAsNewNote()
+    {
+        if (!Career.active) return "";
+        var need = CareerShortfallItems();
+        if (need.Count == 0)
+            return "Founds a robot \u2014 you own every part in this build ("
+                 + Mathf.Max(0, placed.Count - 1) + ").";
+        var bits = new List<string>();
+        foreach (var it in need) bits.Add(it.count + "\u00d7 " + it.mat + " " + it.partId);
+        return "Keeps a draft \u2014 you do not own " + string.Join(", ", bits.ToArray())
+             + ". CONVERT buys them when you are ready.";
+    }
+
+    /// <summary>Name a build that has no object behind it yet. Robot when every
+    /// part is owned, draft when it is not - the same rule StableCreate and the
+    /// LEAGUE gate already enforce, just applied at creation time instead of
+    /// sprung on the player later.</summary>
+    public string SaveAsNew(string name)
+    {
+        if (!Career.active) return "Career is off.";
+        if (string.IsNullOrEmpty(name) || name.Trim().Length == 0)
+            return "Name it first \u2014 type a name in the box above.";
+        if (SaveWouldDraft) return BlueprintSave(name);
+        // OWEN 2026-08-03 (SAVE AS): founding a robot while a DESIGN is open
+        // used to hit StableCreate's draft guard - "CONVERT to buy the missing
+        // parts first" - which is the wrong sentence when there are no missing
+        // parts. That guard exists to stop a machine being minted from parts
+        // you do not own, and SaveWouldDraft above has already established
+        // that you own all of them. So close the design and found the machine:
+        // this IS a convert, with nothing left to buy.
+        Career.Data.activeBlueprint = -1;
+        return StableCreate(name);
+    }
+
+    public string StableSave()
+    {
+        int a = Career.Data.activeRobot;
+        if (a < 0 || a >= Career.Data.stable.Count) return "No robot selected \u2014 NEW ROBOT first, or LOAD one.";
+        Career.Data.stable[a].snapshot = SnapshotString();
+        if (Career.Data.tutorialStep == 1 && Validate() == null) Career.Data.tutorialStep = 2;
+        if (Career.autosave) Career.Save();
+        message = Career.Data.stable[a].name + " saved.";
+        return null;
+    }
+    /// <summary>Open stable slot i: make it the active robot and load its
+    /// snapshot into the builder. The button that calls this is labelled LOAD
+    /// (owen, 2026-08-05); the method keeps its name because every caller and
+    /// every test already says StableEdit, and renaming it would churn four
+    /// files to relabel one button.</summary>
+    public string StableEdit(int i)
+    {
+        if (i < 0 || i >= Career.Data.stable.Count) return "No such robot.";
+        Career.Data.activeRobot = i;
+        Career.Data.activeBlueprint = -1;   // a machine is open, so not drafting
+        LoadSnapshot(Career.Data.stable[i].snapshot);
+        if (Career.autosave) Career.Save();
+        return null;
+    }
+    public string StableRename(int i, string name)
+    {
+        if (i < 0 || i >= Career.Data.stable.Count) return "No such robot.";
+        if (string.IsNullOrEmpty(name)) return "Type the new name first.";
+        message = Career.Data.stable[i].name + " is now " + name.Trim() + ".";
+        Career.Data.stable[i].name = name.Trim();
+        if (Career.autosave) Career.Save();
+        return null;
+    }
+    public string StableRetire(int i)
+    {
+        if (i < 0 || i >= Career.Data.stable.Count) return "No such robot.";
+        message = Career.Data.stable[i].name + " retired.";
+        Career.Data.stable.RemoveAt(i);
+        if (Career.Data.activeRobot == i) Career.Data.activeRobot = -1;
+        else if (Career.Data.activeRobot > i) Career.Data.activeRobot--;
+        if (Career.autosave) Career.Save();
+        return null;
+    }
+    public string BlueprintSave(string name)
+    {
+        // OWEN 2026-08-02: "the naming requirements for 'new robot' and 'new
+        // draft' should be consistent." They sit side by side in the same row;
+        // one demanding a name while the other quietly invented "DRAFT 3" was
+        // an inconsistency you could see without reading any code.
+        //
+        // Both now require one, and this is the auto-namer that produced the
+        // DRAFT 2 / DRAFT 3 owen actually had in his stable - names that tell
+        // you nothing about which design is which. Same argument as ROBOT 1 /
+        // ROBOT 2 in StableCreate.
+        if (string.IsNullOrEmpty(name) || name.Trim().Length == 0)
+            return "Name the draft first \u2014 type a name in the box above.";
+        name = name.Trim();
+        Career.Data.blueprints.Add(new CareerBlueprint { name = name, snapshot = SnapshotString() });
+        // The draft you just made is the one you are now editing, so a second
+        // SAVE updates it instead of making another copy.
+        Career.Data.activeBlueprint = Career.Data.blueprints.Count - 1;
+        Career.Data.activeRobot = -1;
+        if (Career.autosave) Career.Save();
+        message = "Draft " + name + " saved.";
+        return null;
+    }
+    /// <summary>OWEN 2026-08-02: "How do I delete drafts" - you could not.
+    /// BlueprintSave and BlueprintEdit shipped without a counterpart, so the
+    /// list could only ever grow: every SAVE BP with an empty name box added
+    /// another "DRAFT n" and nothing in the game could remove it. Stable robots
+    /// had RETIRE from the start; blueprints had nothing, which is the same
+    /// asymmetry in miniature as the one the FIGHT gate fixed this morning.
+    ///
+    /// Mirrors StableRetire exactly, including the arm-then-confirm both UIs
+    /// wrap it in: deleting a design is not undoable and must not be a mis-tap.</summary>
+    public string BlueprintDelete(int i)
+    {
+        if (!Career.active) return "Career is off.";
+        if (i < 0 || i >= Career.Data.blueprints.Count) return "No such blueprint.";
+        message = "Blueprint " + Career.Data.blueprints[i].name + " deleted.";
+        Career.Data.blueprints.RemoveAt(i);
+        // Same index bookkeeping StableRetire does, for the same reason: the
+        // list shifted under the pointer.
+        if (Career.Data.activeBlueprint == i) Career.Data.activeBlueprint = -1;
+        else if (Career.Data.activeBlueprint > i) Career.Data.activeBlueprint--;
+        if (Career.autosave) Career.Save();
+        return null;
+    }
+    public string BlueprintEdit(int i)
+    {
+        if (i < 0 || i >= Career.Data.blueprints.Count) return "No such blueprint.";
+        // No flag to set any more - opening a design IS drafting.
+        Career.Data.activeBlueprint = i;
+        Career.Data.activeRobot = -1;
+        LoadSnapshot(Career.Data.blueprints[i].snapshot);
+        message = "Drafting " + Career.Data.blueprints[i].name + " \u2014 everything unlocked. CONVERT buys the missing parts.";
+        return null;
+    }
+    /// <summary>C4: the shortfall as data (part, material, missing count).
+    /// Unlike CareerShortfall it does NOT gate on devFreeBuild - the convert
+    /// quote is computed while draft mode is on.</summary>
+    public List<CareerItem> CareerShortfallItems()
+    {
+        var need = new List<CareerItem>();
+        if (!Career.active) return need;
+        var seen = new List<string>();
+        for (int k = 1; k < placed.Count; k++)
+        {
+            string id = placed[k].def.id, mat = MatDB.Canon(placed[k].MatName());
+            string key2 = id + "|" + mat;
+            if (seen.Contains(key2)) continue;
+            seen.Add(key2);
+            int miss = CareerUsed(id, mat) - Career.CountOf(id, mat);
+            if (miss > 0) need.Add(new CareerItem { partId = id, mat = mat, count = miss });
+        }
+        return need;
+    }
+    public int ConvertQuote()
+    {
+        int q = 0;
+        foreach (var it in CareerShortfallItems()) q += CareerDB.PartPrice(it.partId, it.mat) * it.count;
+        return q;
+    }
+    /// <summary>One-tap draft conversion: buy exactly the missing parts,
+    /// leave draft mode. Null on success, else the amber refusal.</summary>
+    public string ConvertDraft()
+    {
+        var need = CareerShortfallItems();
+        int quote = 0;
+        foreach (var it in need) quote += CareerDB.PartPrice(it.partId, it.mat) * it.count;
+        if (Career.Data.scrap < quote)
+            return "Converting needs " + quote + " scrap for missing parts \u2014 you hold " + Career.Data.scrap + ".";
+        foreach (var it in need)
+            for (int n = 0; n < it.count; n++) Career.TryBuy(it.partId, it.mat);
+        Career.devFreeBuild = false;
+        // The build is a real machine now, not a design, so SAVE must not write
+        // it back over the draft it came from.
+        Career.Data.activeBlueprint = -1;
+        message = need.Count == 0 ? "Draft converted \u2014 everything was already owned."
+                : "Draft converted \u2014 bought the missing parts for " + quote + " scrap.";
+        return null;
+    }
 
     public void StartFight()
     {
         string err = Validate();
         if (err != null) { message = err; return; }
+
+        // Phase 5 fix: a fight must never stack on top of a live test drive
+        // (the touch dock used to stay tappable during TEST DRIVE).
+        if (mode == Mode.Test) BackToBuild();
+
+        // ---- Phase 4: fight context. A ladder fight (StartLadderFight) has
+        // already set activeRungIndex; every other entry point is an
+        // exhibition. The rung may shrink the arena — honest content variety:
+        // the box changes, the bots never do.
+        var p4r = Progression.activeRungIndex >= 0 && Progression.activeRungIndex < Progression.Ladder.Length
+                ? Progression.Ladder[Progression.activeRungIndex] : null;
+        ARENA_HALF = p4r != null ? p4r.arenaHalf : 7f;
+        Progression.rewarded = false;
+        Progression.lastRewardLine = "";
+        TouchControls.Ensure();
+        TouchControls.fightActive = true;   // Phase 5: virtual stick + FIRE on touchscreens
 
         Deselect();      // round-1 fix 3 / round-2 fix 7: no stale selection or ghost object
         // The lens is a build-mode tool; drop it before the build root is
@@ -2812,12 +4650,21 @@ public class BuilderManager : MonoBehaviour
         mode = Mode.Fight;
         message = "";
         BuildArena();
+        // C3A: per-contest hazard arenas - career contests only; exhibitions
+        // and the ladder keep the clean box.
+        ArenaHazards.Clear();
+        if (Career.active && Career.activeContest != null)
+        {
+            var lgH = Career.FindLeague(Career.activeLeague);
+            if (lgH != null) ArenaHazards.Build(lgH.arenaId, ARENA_HALF);
+        }
 
         // Engagement axis = the player build's drive direction, so W always
         // means "toward the enemy" on the opening exchange.
         Vector3 axis = driveDir;
         testRobot = SpawnBot(placed, "PlayerBuild", -axis * 4f,
                              Quaternion.identity, driveDir, out testDrive);
+        TouchControls.hasFire = testRobot != null && testRobot.GetComponentInChildren<Actuator>() != null;
         hudWheelMassInt = WheelMassInt(placed);
         // Input isolation, same contract as RaycastWheelDrive.useAI: only the
         // player's actuators ever read Phase0Input. The AI's are driven by
@@ -2931,6 +4778,8 @@ public class BuilderManager : MonoBehaviour
 
     void UpdateFight()
     {
+        FloorNet(testRobot);
+        FloorNet(aiRobot);
         if (Phase0Input.BackDown()) { BackToBuild(); return; }
         // R = restart the fight (rematch), same builds — also the REMATCH
         // button on the results screen.
@@ -3009,6 +4858,8 @@ public class BuilderManager : MonoBehaviour
 
     void UpdateTest()
     {
+        FloorNet(testRobot);
+        FloorNet(dummyRobot);
         if (Phase0Input.BackDown()) { BackToBuild(); return; }
         // R = full arena reset (critic fix: no recovery after a wreck).
         // Reuses the two existing paths so there is exactly one lifecycle.
@@ -3073,6 +4924,8 @@ public class BuilderManager : MonoBehaviour
 
     public void BackToBuild()
     {
+        ArenaHazards.Clear();   // C3A: hazards never outlive the fight
+        TouchControls.fightActive = false;   // Phase 5
         CompoundRobot.ClearAll();
         // Arena litter sweep (critic fix): severed debris chunks
         // ("<robot>_debris" roots from CompoundRobot.SpawnDebris) and any
@@ -3153,6 +5006,12 @@ public class BuilderManager : MonoBehaviour
         // defaults keep every existing 4-arg call byte-identical.
         pos[(axis + 1) % 3] += offU;
         pos[(axis + 2) % 3] += offV;
+        // The programmatic path answers to the same rotor-sweep rule the
+        // pointer does, or a test could build a machine the player cannot -
+        // which is the whole reason this API exists in the first place.
+        probe.pos = pos;
+        string swWhy = RotorSweepRefusal(probe);
+        if (swWhy != null) { message = swWhy; return false; }
         AddPart(def, pos, yaw, NeedsAxis(def) ? normal : Vector3.zero, target);
         RefreshOverlay();
         return true;
@@ -3306,7 +5165,7 @@ public class BuilderManager : MonoBehaviour
             done++;
             if (notes != null)
                 notes.Add(string.Format(
-                    "{0} moved {1:F2} m out and a spindle fitted behind it (+{2} cr)",
+                    "{0} moved {1:F2} m out and a spindle fitted behind it",
                     dDef.label, 2f * hs, spDef.CostOf(spDef.EffectiveMat(null))));
         }
         return done;
@@ -3340,6 +5199,7 @@ public class BuilderManager : MonoBehaviour
         foreach (var p in placed) if (p.go != null) Destroy(p.go);
         placed.Clear();
         byCollider.Clear();
+        foulDirty = true;
         var badMats = new List<string>();
         foreach (var raw in text.Split('\n'))
         {
@@ -3419,6 +5279,19 @@ public class BuilderManager : MonoBehaviour
                     + " - those parts loaded on their DEFAULT material, not the one written.";
             CompoundRobot.Log("LoadSnapshot: " + message);
         }
+        // ---- C1: career reconciliation. A loaded build may use parts the
+        // inventory does not own (saved pre-career, or sold since). Flag the
+        // shortfall - never silently duplicate; the placement gate stays shut
+        // while remaining is negative.
+        var lack = CareerShortfall();
+        if (lack.Count > 0)
+        {
+            message += (message.Length > 0 ? "  " : "")
+                    + "\u26a0 This build uses parts you don't own: "
+                    + string.Join(", ", lack.ToArray())
+                    + " \u2014 shop or sell-back before fighting.";
+            CompoundRobot.Log("LoadSnapshot: " + message);
+        }
         RefreshOverlay();
         return placed.Count;
     }
@@ -3429,8 +5302,105 @@ public class BuilderManager : MonoBehaviour
     /// is stated exactly one time instead of sixty times a second.</summary>
     bool warnedUnbuilt;
 
+    /// <summary>Minimal touch HUD for TEST DRIVE (Phase 5 fix): BACK / RESET
+    /// as tappable buttons plus the shear/wreck callouts. IMGUI on purpose -
+    /// it must draw while the uGUI builder canvas is hidden.</summary>
+    void MobileTestHud()
+    {
+        float s = GuiScale;   // R4 finding 3: one rule, one place
+        Matrix4x4 saved = GUI.matrix;
+        GUI.matrix = Matrix4x4.Scale(new Vector3(s, s, 1f));
+        float w = Screen.width / s;
+        int fs = GUI.skin.button.fontSize;
+        GUI.skin.button.fontSize = 16;
+        bool back  = GUI.Button(new Rect(w - 96f, 10f, 86f, 40f), "BACK");
+        bool reset = GUI.Button(new Rect(w - 192f, 10f, 86f, 40f), "RESET");
+        GUI.skin.button.fontSize = fs;
+        if (shearTimer > 0f && !string.IsNullOrEmpty(shearText))
+        {
+            var st = new GUIStyle(GUI.skin.label);
+            st.fontSize = 20; st.fontStyle = FontStyle.Bold; st.alignment = TextAnchor.MiddleCenter;
+            st.normal.textColor = new Color(1f, 0.5f, 0.3f);
+            GUI.Label(new Rect(0f, 60f, w, 30f), shearText, st);
+        }
+        GUI.matrix = saved;
+        if (back) { BackToBuild(); return; }
+        if (reset) ResetTest();
+    }
+
+    // ---- C6.5: mode banners. The dev sandbox and the Drafting Table both
+    // grant everything - the only thing separating them from the career, for
+    // a player, is KNOWING which one they are looking at. So say it, loudly,
+    // every frame, above both UI stacks (IMGUI draws over the touch canvas).
+    // bannerNow is the harness seam: "dev" / "draft" / "".
+    public static string bannerNow = "";
+    void ModeBanner()
+    {
+        bool dev = !Career.active;
+        bool draft = Career.active && Career.Drafting;
+        bannerNow = dev ? "dev" : draft ? "draft" : "";
+        if (!dev && !draft) return;
+        // OWEN 2026-08-02: "The draft banner overlaps with other text."
+        //
+        // It did, and it always would have. This is IMGUI drawn OVER a uGUI
+        // screen at a GUESSED fraction of screen height (0.075), so it knew
+        // nothing about where the touch UI's bars actually end - and the bar
+        // stack is variable: the message bar and the tip bar come and go. Any
+        // constant here is wrong for some combination of them.
+        //
+        // The floating overlay is not the right instrument on a screen that
+        // owns its own layout. When the touch UI is up it now prints the mode
+        // in its STATUS LINE instead (MobileBuilderUI, ModeTag) - present on
+        // every tab, and part of the layout, so it cannot overlap anything by
+        // construction. bannerNow is still set above, because it is the state
+        // seam CareerSmoke asserts on and that is independent of who draws it.
+        //
+        // Desktop keeps the banner: IMGUI is the whole UI there, and it has no
+        // status line to put this in.
+        if (MobileBuilderUI.Active) return;
+        var prevM = GUI.matrix;
+        var prevC = GUI.color;
+        float sc = GuiScale;   // R4 finding 3: one rule, one place
+        GUI.matrix = Matrix4x4.Scale(new Vector3(sc, sc, 1f));
+        float bw = dev ? 430f : 350f;
+        // Below the mobile stats bar, never behind it - R1 critic caught the
+        // banner rendering tiny under the onboarding hint text.
+        float by = MobileBuilderUI.Active ? Screen.height / sc * 0.075f : 4f;
+        var r = new Rect((Screen.width / sc - bw) * 0.5f, by, bw, 30f);
+        var bst = new GUIStyle(GUI.skin.box);
+        bst.fontSize = 15; bst.fontStyle = FontStyle.Bold;
+        GUI.color = dev ? new Color(1f, 0.35f, 0.3f, 0.95f) : new Color(1f, 0.8f, 0.25f, 0.95f);
+        GUI.Box(r, dev ? "DEV SANDBOX \u2014 nothing here touches your career"
+                       : "DRAFT \u2014 parts unlimited, can't enroll", bst);
+        GUI.color = prevC;
+        GUI.matrix = prevM;
+    }
+
     void OnGUI()
     {
+        // Read LAST frame's hover and clear. Doing it here rather than at the
+        // end means the several early returns below cannot skip it, and only
+        // re-toasting on CHANGE stops a resting cursor from pinning the message
+        // bar and clobbering everything else that wants to speak.
+        if (Event.current.type == EventType.Repaint)
+        {
+            if (gateHoverWhy == null) gateHoverShown = null;
+            else if (gateHoverWhy != gateHoverShown) { message = gateHoverWhy; gateHoverShown = gateHoverWhy; }
+            gateHoverWhy = null;
+        }
+        ModeBanner();
+        if (MobileBuilderUI.Active)
+        {
+            // Phase 5 fix: the touch UI replaces the builder panel, but TEST
+            // DRIVE still needs a HUD - without these buttons a touch player
+            // has no way back (B and R are keyboard-only).
+            // The touch UI owns the scouting card now - it can actually be
+            // tapped. Drawing both would double the text and put an unclickable
+            // BACK on top of a working one.
+            if (scoutRoot != null) { if (!MobileBuilderUI.ScoutCardLive) ScoutHud(); return; }
+            if (mode == Mode.Test) MobileTestHud();
+            return;
+        }
         // A BuilderManager that SURVIVES A DOMAIN RELOAD comes back with a null
         // palette - Unity re-creates the component but not the state Start()
         // built - and every line below dereferences it. The result was an NRE
@@ -3452,6 +5422,7 @@ public class BuilderManager : MonoBehaviour
             }
             return;
         }
+        if (scoutRoot != null) { ScoutHud(); return; }   // C3: scouting overlay
         if (mode == Mode.Fight) return;  // FightManager draws the fight HUD/results
         if (mode == Mode.Test)
         {
@@ -3499,10 +5470,312 @@ public class BuilderManager : MonoBehaviour
             Deselect();
             ev.Use();
         }
-        GUI.Box(new Rect(0, 0, PANEL_W, Screen.height), "");
-        GUILayout.BeginArea(new Rect(14, 14, PANEL_W - 28, Screen.height - 24));
+        // ---- Phase 5: first-run tutorial strip ----------------------------
+        int tut = Progression.Data.tutorialStep;
+        // R4 (critic finding 4, desktop half): two onboarding systems, neither
+        // aware of the other - the Phase-5 sandbox strip was still telling a
+        // career player to "Press T" while MobileBuilderUI ran its own career
+        // tips. Career mode owns onboarding when it is active.
+        if (tut < 3 && !Career.active)
+        {
+            if (tut == 0 && placed.Count >= 2)
+            { Progression.Data.tutorialStep = tut = 1; Progression.Save(); }
+            string tmsg = tut == 0 ? "Click a part in the panel, then click a glowing socket on the robot to bolt it on."
+                        : tut == 1 ? "It's alive. Press T (or TEST DRIVE) to take it for a spin — WASD drives, R resets."
+                        : "Ready to fight? The LADDER button (bottom of the panel) starts your first ranked match.";
+            float tw = 620f;
+            GUILayout.BeginArea(new Rect(PanelPixelW + Mathf.Max(8f, (Screen.width - PanelPixelW - tw) * 0.5f), 10f, tw, 60f), GUI.skin.box);
+            GUILayout.BeginHorizontal();
+            GUILayout.Label(string.Format("TUTORIAL {0}/3 — {1}", tut + 1, tmsg), bodyStyle);
+            if (GUILayout.Button("skip", matStyle, GUILayout.Width(46f)))
+            { Progression.Data.tutorialStep = 3; Progression.Save(); }
+            GUILayout.EndHorizontal();
+            GUILayout.EndArea();
+        }
+        // OWEN 2026-08-03: career mode got NO onboarding on desktop at all -
+        // the strip above is gated on !Career.active, and career IS the game
+        // (design doc v1.4). The comment up there says "career mode owns
+        // onboarding when it is active", which was true of the intent and
+        // false of the code: career owned it only on the touch UI, so a
+        // desktop player was handed a builder and no words whatsoever.
+        if (Career.active)
+        {
+            int ct = CareerTipStep();
+            if (ct < TIP_COUNT)
+            {
+                float cw = 760f;
+                GUILayout.BeginArea(new Rect(PanelPixelW + Mathf.Max(8f, (Screen.width - PanelPixelW - cw) * 0.5f), 10f, cw, 60f), GUI.skin.box);
+                GUILayout.BeginHorizontal();
+                GUILayout.Label(CareerTip(ct, ""), bodyStyle);
+                if (GUILayout.Button("skip", matStyle, GUILayout.Width(46f)))
+                { Career.Data.tipsOff = true; if (Career.autosave) Career.Save(); }
+                GUILayout.EndHorizontal();
+                GUILayout.EndArea();
+            }
+        }
+        // R2 (critic finding 1): the career panel was the ONLY IMGUI path in
+        // this file drawing in raw back-buffer pixels. Everything from here to
+        // the matching EndArea is now in scaled units, so Screen.height has to
+        // be divided by the same factor or the panel runs off the bottom.
+        Matrix4x4 panelSavedMatrix = GUI.matrix;
+        float panelScale = GuiScale;
+        GUI.matrix = Matrix4x4.Scale(new Vector3(panelScale, panelScale, 1f));
+        float panelH = Screen.height / panelScale;
+        GUI.Box(new Rect(0, 0, PANEL_W, panelH), "");
+        GUILayout.BeginArea(new Rect(14, 14, PANEL_W - 28, panelH - 24));
+        // Fix 2026-07-29 (playtest, QHD): with a part selected the panel grew past
+        // the bottom of the screen and took the opponent picker and FIGHT with it
+        // — fights were only startable by hotkey, always against the default.
+        // Everything above the aim feedback now scrolls; the rest stays pinned.
+        panelScroll = GUILayout.BeginScrollView(panelScroll, false, true,
+            GUILayout.Height(Mathf.Max(200f, panelH - 24f - FIGHT_BAND_H)));
 
-        GUILayout.Label("ROBOT BUILDER — Phase 3", headStyle);
+        GUILayout.Label("ROBOT BUILDER — Phase 4", headStyle);
+        CREDIT_BUDGET = Progression.BudgetFor();   // Phase 4: the budget rides the profile
+        // ---- Phase 4: garage — three persistent build slots on the profile,
+        // plus the two scrap sinks (budget upgrades, dev unlock toggle).
+        // R2 (critic finding 1): this is Progression.Data's economy and four
+        // rows below it the CAREER line prints Career.Data's. In career mode the
+        // player was told "scrap 0 / record 0-0" and "scrap 640 / record 3-3" in
+        // the same 120 px. One economy on screen at a time.
+        if (!Career.active)
+            GUILayout.Label(string.Format("Garage   ·   scrap {0}   ·   record {1}-{2}",
+                Progression.Data.scrap, Progression.Data.fightsWon,
+                Progression.Data.fightsFought - Progression.Data.fightsWon), bodyStyle);
+        else
+            GUILayout.Label("Garage · build slots", bodyStyle);
+        GUILayout.BeginHorizontal();
+        for (int gi = 0; gi < 3; gi++)
+        {
+            var slot = Progression.Data.garage[gi];
+            bool has = slot.snapshot != null && slot.snapshot.Length > 0;
+            if (GUILayout.Button(has ? "Load " + (char)('A' + gi) : "· " + (char)('A' + gi) + " ·", matStyle) && has)
+            { LoadSnapshot(slot.snapshot); message = "Garage " + (char)('A' + gi) + " loaded."; }
+        }
+        GUILayout.EndHorizontal();
+        GUILayout.BeginHorizontal();
+        for (int gi = 0; gi < 3; gi++)
+            if (GUILayout.Button("Save " + (char)('A' + gi), matStyle))
+            {
+                Progression.Data.garage[gi].snapshot = SnapshotString();
+                Progression.Save();
+                message = "Build saved to garage slot " + (char)('A' + gi) + ".";
+            }
+        GUILayout.EndHorizontal();
+        if (Progression.Data.budgetLevel < 4
+            && GUILayout.Button(string.Format("Expand build budget {0} → {1} — costs {2} scrap",
+                CREDIT_BUDGET, CREDIT_BUDGET + 500, Progression.BudgetUpgradeCost()), matStyle))
+            message = Progression.TryBuyBudget()
+                ? "Budget expanded to " + Progression.BudgetFor() + " scrap."
+                : "Not enough scrap for the budget upgrade.";
+        if (GUILayout.Button(Progression.Data.devUnlockAll
+                ? "DEV unlock-all: ON" : "DEV unlock-all: off", matStyle))
+        { Progression.Data.devUnlockAll = !Progression.Data.devUnlockAll; Progression.Save(); }
+
+        // ---- C3: career league board ---------------------------------------
+        if (Career.active)
+        {
+            // R2 (critic finding 4): the doc's §3b weight budget was
+            // unimplemented on the desktop path - this line printed a bare mass
+            // with no cap, no ratio and no amber, so a desktop player had no way
+            // to know they were over the contest limit until the entry was
+            // refused. Same readout the mobile status line carries, against the
+            // same targeted league.
+            var tlg4 = CareerDB.Leagues[Mathf.Clamp(Career.targetLeagueIdx, 0, CareerDB.Leagues.Length - 1)];
+            bool over4 = BuildMassInt > tlg4.weightCap;
+            Color savedCol4 = GUI.color;
+            if (over4) GUI.color = new Color(1f, 0.82f, 0.25f);
+            GUILayout.Label(string.Format("CAREER \u00b7 scrap {0} \u00b7 record {1}-{2}\nBUILD {3} / {4} kg \u00b7 {5}{6}",
+                Career.Data.scrap, Career.Data.fightWins,
+                Mathf.Max(0, Career.Data.fights - Career.Data.fightWins),
+                BuildMassInt, Mathf.RoundToInt(tlg4.weightCap), tlg4.name,
+                over4 ? " \u2014 OVER" : ""), bodyStyle);
+            GUI.color = savedCol4;
+            // ---- C4: the stable ----
+            GUILayout.BeginHorizontal();
+            stableNameBuf = GUILayout.TextField(stableNameBuf ?? "", GUILayout.Width(110f));   // R2: 150 left no room for NEW ROBOT
+            // Desktop half of the same gate: reads unavailable while the name
+            // box is empty, but still clickable so the click explains itself.
+            bool noName = string.IsNullOrEmpty(stableNameBuf) || stableNameBuf.Trim().Length == 0;
+            if (GatedButton("NEW ROBOT", matStyle, noName ? NAME_GATE_HINT : null))
+            { string e4 = StableCreate(stableNameBuf); if (e4 != null) { message = e4; SfxSynth.Deny(); } stableNameBuf = ""; }
+            // OWEN 2026-08-03: "pop up a confirmation window when clicking
+            // save to confirm overwrite vs save a new robot." Nothing open ->
+            // nothing to overwrite, so that case goes straight to naming
+            // rather than asking a question with only one answer.
+            if (GUILayout.Button("SAVE", matStyle))
+            {
+                if (NothingOpen) OpenDesktopSaveDialog();
+                else { deskSaveConfirm = true; deskSaveErr = ""; }
+            }
+            GUILayout.EndHorizontal();
+            for (int ri = 0; ri < Career.Data.stable.Count; ri++)
+            {
+                var rob = Career.Data.stable[ri];
+                GUILayout.BeginHorizontal();
+                // MEDALS (2026-08-02): titles are one-per-league-campaign now,
+                // so name the championship instead of printing a bare count.
+                // Mirrors the mobile ROBOTS card - this project's signature bug
+                // is the one-side-only fix.
+                string champD = "";
+                foreach (var h in rob.leagueHistory)
+                    if (h.EndsWith(" champion")) champD += (champD.Length > 0 ? ", " : "") + h.Substring(0, h.Length - 9);
+                // READINESS (owen, 2026-08-05). Designs no longer hold parts,
+                // so any row here may or may not be buildable out of what is in
+                // the box right now. Printing that on the row is the whole
+                // point: without it "which robot can I field?" is answerable
+                // only by loading each one and being refused - the exact
+                // asymmetry the 2026-08-02 FIGHT-button fix removed. Amber
+                // beats gold here; a champion you cannot bolt together is
+                // still a champion you cannot enter.
+                var lackD = Career.SnapshotShortfall(rob.snapshot);
+                Color savedRob = GUI.color;
+                if (rob.titles > 0) GUI.color = new Color(1f, 0.87f, 0.46f);
+                if (lackD.Count > 0) GUI.color = new Color(1f, 0.82f, 0.25f);
+                GUILayout.Label(string.Format("{0}{1} \u00b7 {2}-{3}{4}{5} \u00b7 {6}",
+                    ri == Career.Data.activeRobot ? "\u25b8 " : "", rob.name, rob.wins, rob.losses,
+                    rob.titles > 0 ? " \u00b7 \u2605\u00d7" + rob.titles : "",
+                    champD.Length > 0 ? " \u00b7 " + champD + " champion" : "",
+                    lackD.Count > 0 ? "\u26a0 needs " + Career.ShortfallText(lackD) : "\u2713 ready"),
+                    descStyle);
+                GUI.color = savedRob;
+                if (GUILayout.Button("load", matStyle, GUILayout.Width(46f))) StableEdit(ri);
+                if (GUILayout.Button("retire", matStyle, GUILayout.Width(56f)))
+                {
+                    if (retireArm == ri) { retireArm = -1; StableRetire(ri); }
+                    else { retireArm = ri; message = "Retire " + rob.name + "? Click retire again."; }
+                }
+                GUILayout.EndHorizontal();
+            }
+            GUILayout.BeginHorizontal();
+            // The Drafting Table toggle is gone: drafting is now derived from
+            // whether a design is open (Career.Drafting), so there is no
+            // independent switch that could contradict it.
+            if (Career.Drafting) GUILayout.Label("DRAFTING \u2014 parts unlimited, cannot enrol", descStyle);
+            if (Career.Drafting && GUILayout.Button("CONVERT \u2014 " + ConvertQuote() + " scrap", matStyle))
+            { string e4 = ConvertDraft(); if (e4 != null) { message = e4; SfxSynth.Deny(); } }
+            GUILayout.EndHorizontal();
+            // ---- blueprints (OWEN 2026-08-02) ----------------------------
+            // Desktop could not even SEE a blueprint. BlueprintSave/Edit
+            // existed but ONLY MobileBuilderUI called them, so IMGUI showed the
+            // Drafting Table toggle and a CONVERT quote with nothing to apply
+            // them to, and a design saved on the touch UI was invisible here.
+            // Mobile uGUI and IMGUI are two separate paths and the
+            // one-side-only fix is this project's signature bug.
+            GUILayout.BeginHorizontal();
+            // Same gate and same dimming as NEW ROBOT above.
+            if (GatedButton("NEW DRAFT", matStyle, noName ? NAME_GATE_HINT : null, GUILayout.Width(96f)))
+            { string e5 = BlueprintSave(stableNameBuf); if (e5 != null) { message = e5; SfxSynth.Deny(); } stableNameBuf = ""; }
+            GUILayout.Label("blueprints \u2014 designs you do not own the parts for yet", descStyle);
+            GUILayout.EndHorizontal();
+            // Deletion is DEFERRED to after the loop. Removing a row mid-loop
+            // changes the control count between the Layout and Repaint passes
+            // of the same OnGUI, which is exactly what throws "GUILayout:
+            // Mismatched LayoutGroup".
+            int bpKill = -1;
+            for (int bi = 0; bi < Career.Data.blueprints.Count; bi++)
+            {
+                var bpd = Career.Data.blueprints[bi];
+                GUILayout.BeginHorizontal();
+                GUILayout.Label("\u270e " + bpd.name, descStyle);
+                if (GUILayout.Button("draft it", matStyle, GUILayout.Width(66f))) BlueprintEdit(bi);
+                bool armedB = bpDelArm == bi;
+                Color savedBp = GUI.color;
+                if (armedB) GUI.color = new Color(1f, 0.55f, 0.45f);
+                if (GUILayout.Button(armedB ? "confirm \u2715" : "delete", matStyle, GUILayout.Width(72f)))
+                {
+                    if (armedB) { bpDelArm = -1; bpKill = bi; }
+                    else { bpDelArm = bi; message = "Delete blueprint " + bpd.name + "? Click delete again \u2014 this cannot be undone."; }
+                }
+                GUI.color = savedBp;
+                GUILayout.EndHorizontal();
+            }
+            if (bpKill >= 0) { string e5 = BlueprintDelete(bpKill); if (e5 != null) message = e5; }
+            for (int li = 0; li < CareerDB.Leagues.Length; li++)
+            {
+                var clg2 = CareerDB.Leagues[li];
+                bool open = Career.LeagueUnlocked(li);
+                GUILayout.Label(string.Format("{0}{1} \u00b7 {2} \u00b7 cap {3} kg \u00b7 {4}",
+                    open ? "" : "[locked] ", clg2.name, clg2.arenaName, Mathf.RoundToInt(clg2.weightCap),
+                    ArenaHazards.Summary(clg2.arenaId)), descStyle);
+                if (!open) continue;
+                for (int ci3 = 0; ci3 < clg2.contests.Length; ci3++)
+                {
+                    var cc = clg2.contests[ci3];
+                    bool cdone = Career.Data.doneContests.Contains(cc.id);
+                    GUILayout.BeginHorizontal();
+                    // R5 (critic finding 8): SCOUT reads first here too - the
+                    // free, reversible action, matching the hint that tells the
+                    // player to scout before committing an entry fee.
+                    if (GUILayout.Button("SCOUT", matStyle, GUILayout.Width(72f)))
+                        StartScout(li, ci3);
+                    // OWEN 2026-08-02: the row now answers "can I actually
+                    // enter this?" BEFORE the click. Desktop IMGUI and the
+                    // mobile uGUI board are two separate code paths and this
+                    // project's signature bug is the one-side-only fix, so both
+                    // get it, from the same CareerFightBlocker call.
+                    string cTag; string cWhy = CareerFightBlocker(li, ci3, out cTag);
+                    bool cBlocked = cWhy != null;
+                    if (GatedButton(string.Format("{0} {1} ({2}) \u00b7 {3} scrap{4}{5}{6}",
+                        cdone ? "\u2713" : "\u25b8", EnemyRoster.Find(cc.oppId).label, cc.tier,
+                        cdone ? Mathf.RoundToInt(cc.purse * 0.4f) : cc.purse,
+                        cdone ? " (re-entry)" : "",
+                        cc.entryFee > 0 ? " \u00b7 fee " + cc.entryFee + " scrap" : "",
+                        cBlocked ? "   \u2014   " + cTag : ""), matStyle, cWhy))
+                        StartCareerFight(li, ci3);
+                    GUILayout.EndHorizontal();
+                }
+            }
+            // ---- MEDALS (2026-08-02, owen): the trophy case ------------------
+            // The desktop twin of MobileBuilderUI's TROPHIES tab. Same content,
+            // same rule that every league is listed whether or not it has been
+            // won, because the gaps are the motivation. Desktop is NOT optional
+            // here: mobile uGUI and IMGUI are two separate code paths and this
+            // project's signature bug is the one-side-only fix.
+            GUILayout.Space(6);
+            Color savedTr = GUI.color;
+            GUI.color = Career.Data.medals.Count > 0 ? new Color(1f, 0.87f, 0.46f) : Color.white;
+            GUILayout.Label(string.Format("TROPHIES \u00b7 {0} of {1} league campaigns won",
+                Career.Data.medals.Count, CareerDB.Leagues.Length), bodyStyle);
+            GUI.color = savedTr;
+            if (Career.Data.medals.Count == 0)
+                GUILayout.Label("   No medals yet \u2014 win EVERY contest in a league and its champion medal lands here.", descStyle);
+            for (int mi = 0; mi < CareerDB.Leagues.Length; mi++)
+            {
+                var mlg = CareerDB.Leagues[mi];
+                var med = Career.MedalFor(mi);
+                bool mopen = Career.LeagueUnlocked(mi);
+                int mdone = 0;
+                foreach (var mc in mlg.contests) if (Career.Data.doneContests.Contains(mc.id)) mdone++;
+                Color savedM = GUI.color;
+                if (med != null) GUI.color = new Color(1f, 0.87f, 0.46f);
+                else if (!mopen) GUI.color = new Color(0.62f, 0.66f, 0.74f);
+                string mline = med != null
+                    ? string.Format("\u2605 {0} CHAMPION \u00b7 {1} \u00b7 {2} {3}-{4} \u00b7 {5} contest{6} swept \u00b7 {7}",
+                        med.leagueName.ToUpper(), med.arenaName, med.robot, med.wins, med.losses,
+                        med.contests, med.contests == 1 ? "" : "s", med.when)
+                    : !mopen
+                    ? string.Format("\u25cb {0} \u2014 LOCKED \u00b7 {1} \u00b7 win the {2} first",
+                        mlg.name.ToUpper(), mlg.arenaName, CareerDB.Leagues[mi - 1].name)
+                    : string.Format("\u25cb {0} \u2014 NOT YET WON \u00b7 {1} \u00b7 {2} of {3} contests beaten \u00b7 sweep them all for the medal",
+                        mlg.name.ToUpper(), mlg.arenaName, mdone, mlg.contests.Length);
+                GUILayout.Label(mline, descStyle);
+                GUI.color = savedM;
+            }
+            GUILayout.Space(6);
+        }
+        // ---- P4c: build-constraint challenges (§9) -------------------------
+        GUILayout.Label("Challenges — one-time purses for constrained builds:", bodyStyle);
+        for (int ci = 0; ci < Progression.Challenges.Length; ci++)
+        {
+            var ch = Progression.Challenges[ci];
+            bool done = Progression.ChallengeDone(ch.id);
+            string blocked2 = done ? null : ChallengeBlocker(ch);
+            if (GUILayout.Button((done ? "✓ " : blocked2 != null ? "✗ " : "▸ ")
+                + ch.label + " — " + ch.reward + " scrap" + (done ? " (complete)" : ""), matStyle) && !done)
+                StartChallenge(ci);
+            GUILayout.Label("   " + ch.desc + (blocked2 != null && !done ? "   [" + blocked2 + "]" : ""), descStyle);
+        }
         GUILayout.Space(6);
         GUILayout.Label("Click a part, then click a socket (gray dot) on the robot:", bodyStyle);
         GUILayout.Space(2);
@@ -3519,7 +5792,16 @@ public class BuilderManager : MonoBehaviour
                 string key = MatDB.Order[row * 3 + k];
                 var md = MatDB.Get(key);
                 string sel = activeMat == key ? "• " : "";
-                if (GUILayout.Button(sel + md.name, matStyle)) activeMat = key;
+                // Phase 4: the premium three are gated on the profile (§10).
+                // A locked chip explains itself and offers the early-buy.
+                bool unlocked = Progression.MatUnlocked(key);
+                if (GUILayout.Button(unlocked ? sel + md.name : "[LOCKED] " + md.name, matStyle))
+                {
+                    if (unlocked) activeMat = key;
+                    else if (Progression.TryBuyMat(key))
+                    { activeMat = key; message = md.name + " unlocked with scrap."; }
+                    else message = Progression.LockHint(key);
+                }
             }
             GUILayout.EndHorizontal();
         }
@@ -3554,9 +5836,18 @@ public class BuilderManager : MonoBehaviour
             // the mass and read as a bug - is answered by the "cr" unit and by
             // the budget line at the foot of the panel giving it somewhere to
             // go. Choosing Tungsten now visibly costs 8x the same beam.
-            if (GUILayout.Button(string.Format("{0}{1}  ·  {2} kg  ·  {3} cr", tag, d.label,
+            // C1: stock badge - owned minus used in the active material. -1 =
+            // unlimited (career off / dev free-build); 0 dims the row but keeps
+            // it clickable so the amber message can still explain itself.
+            int stock = CareerRemaining(i);
+            Color rowCol = GUI.color;
+            if (stock == 0) GUI.color = new Color(1f, 1f, 1f, 0.45f);
+            bool rowClick = GUILayout.Button(string.Format("{0}{1}  ·  {2} kg  ·  {3} cr{4}", tag, d.label,
                                  Mathf.RoundToInt(d.MassOf(activeMat)),
-                                 d.CostOf(activeMat)), btnStyle))
+                                 d.CostOf(activeMat),
+                                 stock < 0 ? "" : "  ·  " + Mathf.Max(0, stock) + " free"), btnStyle);
+            GUI.color = rowCol;
+            if (rowClick)
             {
                 bool off = selected == i;
                 selected = off ? -1 : i;
@@ -3596,6 +5887,60 @@ public class BuilderManager : MonoBehaviour
                 if (d.materialChoice && d.allowedMats != null)
                     GUILayout.Label("accepts: " + string.Join(" / ",
                         System.Array.ConvertAll(d.allowedMats, k => MatDB.Get(k).name)), descStyle);
+                // ---- C2 SHOP: the material CATALOG for this part ----------
+                // owen 2026-08-01: "how to shop parts with different
+                // materials?" The old block priced exactly ONE material - the
+                // global chip on the BUILD row above - so buying a titanium
+                // beam meant leaving the shop, changing a mode, and coming
+                // back, and nothing on screen said so. Design doc 7 asks for
+                // ONE catalog: every part x every legal material, priced by the
+                // physics data, compared side by side at the counter. Section
+                // 3b is why it matters - weight caps make strength per kilogram
+                // the whole question, and that comparison was invisible at the
+                // point of purchase.
+                if (Career.active)
+                {
+                    GUILayout.Label("SHOP \u00b7 scrap " + Career.Data.scrap
+                        + " \u00b7 sell-back 50% \u00b7 to change a material, SELL and BUY", descStyle);
+                    bool pinnedMat = !d.materialChoice;
+                    foreach (var mk in PartLegalMats(i))
+                    {
+                        int mprice = CareerDB.PartPrice(d.id, mk);
+                        int mown = Career.CountOf(d.id, mk);
+                        if (GUILayout.Button(string.Format("BUY {0} cr  \u00b7  {1}{2}  \u00b7  {3} kg  \u00b7  own {4}",
+                                mprice, MatDB.Get(mk).name, pinnedMat ? " (fixed)" : "",
+                                Mathf.RoundToInt(d.MassOf(mk)), mown), matStyle))
+                        {
+                            desktopArmSell = -1;
+                            if (Career.TryBuy(d.id, mk)) message = MatDB.Get(mk).name + " " + d.label + " bought \u2014 " + Career.CountOf(d.id, mk) + " owned.";
+                            else { message = Career.shopMsg; SfxSynth.Deny(); }
+                        }
+                        if (mown > 0)
+                        {
+                            GUILayout.BeginHorizontal();
+                            GUILayout.Space(18f);
+                            if (mown > 0 && GUILayout.Button("SELL " + CareerDB.SellPrice(d.id, mk) + " scrap", matStyle))
+                            {
+                                // Guard rail: every owned unit of THIS material is
+                                // bolted to the current build - a second click.
+                                bool inUse = CareerRemainingMat(i, mk) == 0;
+                                if (inUse && (desktopArmSell != i || desktopArmSellMat != mk))
+                                {
+                                    desktopArmSell = i; desktopArmSellMat = mk;
+                                    message = "Every " + MatDB.Get(mk).name + " " + d.label + " is in use by this build \u2014 click SELL again to sell anyway.";
+                                    SfxSynth.Deny();
+                                }
+                                else
+                                {
+                                    desktopArmSell = -1; desktopArmSellMat = "";
+                                    if (Career.TrySell(d.id, mk)) message = MatDB.Get(mk).name + " " + d.label + " sold.";
+                                    else { message = Career.shopMsg; SfxSynth.Deny(); }
+                                }
+                            }
+                            GUILayout.EndHorizontal();
+                        }
+                    }
+                }
             }
         }
 
@@ -3632,12 +5977,15 @@ public class BuilderManager : MonoBehaviour
         // decoration; the whole reason Tungsten read as strictly dominant is
         // that nothing on this panel ever pushed back on the price.
         Color oldC = GUI.color;
-        GUI.color = cost > BuilderManager.CREDIT_BUDGET ? new Color(1f, 0.42f, 0.30f)
-                  : cost > BuilderManager.CREDIT_BUDGET * 0.85f ? new Color(1f, 0.82f, 0.25f)
+        bool hasBudget = BuilderManager.CREDIT_BUDGET > 0;   // Phase 5: unlimited when <= 0
+        GUI.color = hasBudget && cost > BuilderManager.CREDIT_BUDGET ? new Color(1f, 0.42f, 0.30f)
+                  : hasBudget && cost > BuilderManager.CREDIT_BUDGET * 0.85f ? new Color(1f, 0.82f, 0.25f)
                   : Color.white;
-        GUILayout.Label(string.Format("Parts: {0}   Mass: {1} kg   Credits: {2} / {3}{4}",
-                        placed.Count, massInt, cost, BuilderManager.CREDIT_BUDGET,
-                        cost > BuilderManager.CREDIT_BUDGET ? "   ✗ OVER BUDGET" : ""), bodyStyle);
+        GUILayout.Label(hasBudget
+            ? string.Format("Parts: {0}   Mass: {1} kg   Credits: {2} / {3}{4}",
+                placed.Count, massInt, cost, BuilderManager.CREDIT_BUDGET,
+                cost > BuilderManager.CREDIT_BUDGET ? "   ✗ OVER BUDGET" : "")
+            : string.Format("Parts: {0}   Mass: {1} kg", placed.Count, massInt), bodyStyle);
         GUI.color = oldC;
         // ROUND-2-DEV (critic CRITICAL 1, "a dataset must announce its own
         // regime"). The build number is on the screen the player and the next
@@ -3763,6 +6111,25 @@ public class BuilderManager : MonoBehaviour
                     li.rateMax * (k2 == ActuatorKind.Ram ? 1f : li.tipRadius), mkw,
                     Actuator.CycleSeconds(k2, li.inertia, li.tipRadius, mkw, li.tipSpeedCap)),
                     bodyStyle);
+                // Fix 2026-07-29 (playtest): adding a Blade bar DROPPED "J a hit"
+                // (3747 -> 2581) with no explanation. It is the tip-speed cap: the
+                // tip may not exceed the tunneling-safe speed, so a longer arm
+                // turns slower and stores less energy. True, but it must be said,
+                // or the number reads as a bug.
+                if (k2 != ActuatorKind.Ram
+                    && li.rateMax * li.tipRadius >= li.tipSpeedCap - 0.05f)
+                    GUILayout.Label("   tip-speed capped: a longer arm swings slower and stores less energy — shorten the arm or fit more engines", descStyle);
+                // Fix 2026-07-29 (playtest): a pivot arm that RESTS over the nose
+                // sweeps up and BACKWARD (the arc sign avoids the floor), so the
+                // power stroke lands behind the bot. Say so while it can be fixed.
+                if (k2 == ActuatorKind.Pivot && li.memberParts != null && li.memberParts.Count > 0)
+                {
+                    Vector3 rest = Vector3.zero;
+                    foreach (var mp in li.memberParts) rest += mp.pos - li.act.pos;
+                    rest /= li.memberParts.Count;
+                    if (rest.z > 0.15f)
+                        GUILayout.Label("⚠ arm rests over the NOSE — this swing fires up and backward. For a forward hammer, bolt the arm to the pivot's rear face so it rests behind.", warnStyle);
+                }
             }
         }
 
@@ -3800,7 +6167,7 @@ public class BuilderManager : MonoBehaviour
         float demandKW = driveKW + spinKW;
         float endur = demandKW > 0.01f ? capKJ / demandKW : 999f;
         GUILayout.Label(string.Format("Power: {0:F0} kJ · {1:F0} kW draw ceiling", capKJ, peakKW), bodyStyle);
-        GUILayout.Label(string.Format("   drive {0:F1} kW · discs {1:F1} kW steady ({2:F0} kJ to spin up)",
+        GUILayout.Label(string.Format("   drive {0:F1} kW · weapons {1:F1} kW steady ({2:F0} kJ to wind up)",
                         driveKW, spinKW, spinUpKJ), descStyle);
         // Round-6 fix 4c. A power part bolted on a SINGLE seam is a hidden
         // instant loss: it is the densest small part on the machine, its own
@@ -3891,6 +6258,10 @@ public class BuilderManager : MonoBehaviour
             GUILayout.Label("⚠ " + floatingWheels + " wheel(s) can't reach the ground — the chassis will drag", warnStyle);
         if (mixedRoll)
             GUILayout.Label("⚠ Wheels disagree on direction — the bot will fight itself", warnStyle);
+        GUILayout.EndScrollView();
+        // Aim feedback and the fight controls below stay PINNED (Fix 2026-07-29):
+        // the red-ghost reason was being pushed below the screen edge by the very
+        // overflow it was meant to explain.
         if (ghost != null && ghost.activeSelf && !ghostValid && ghostReason.Length > 0)
             GUILayout.Label("✗ " + ghostReason, warnStyle);
         // ACTUATOR DRIVE AXIS: R used to be a dead key on these three parts, and
@@ -3960,12 +6331,187 @@ public class BuilderManager : MonoBehaviour
             : "wary of your weapon, but still closes"), descStyle);
 
         GUILayout.Space(4);
+        // ---- Phase 4: the challenge ladder (§9) — the structured path. The
+        // opponent picker above stays as free exhibition.
+        var p4rung = Progression.CurrentRung();
+        if (p4rung != null)
+        {
+            if (GUILayout.Button(string.Format(
+                "LADDER {0}/{1} — {2} ({3}) · win {4} scrap{5}",
+                Progression.Data.rung + 1, Progression.Ladder.Length, p4rung.label, p4rung.tier,
+                p4rung.reward,
+                p4rung.unlockMat != null ? " + " + MatDB.Get(p4rung.unlockMat).name : ""), btnStyle))
+                StartLadderFight();
+            if (p4rung.arenaHalf < 6.9f)
+                GUILayout.Label(string.Format("   this rung fights in a tighter {0:F0} m box", p4rung.arenaHalf * 2f), descStyle);
+        }
+        else if (GUILayout.Button(string.Format(
+                     "LADDER COMPLETE — defend the title vs {0} ({1} purse)",
+                     Progression.Ladder[Progression.Ladder.Length - 1].label,
+                     Progression.Ladder[Progression.Ladder.Length - 1].reward), btnStyle))
+            StartLadderFight();
         if (GUILayout.Button("TEST DRIVE  (T)", btnStyle)) StartTest();
-        if (GUILayout.Button("FIGHT  (F)", btnStyle)) StartFight();
+        if (GUILayout.Button("EXHIBITION FIGHT  (F)", btnStyle))
+        { Progression.activeRungIndex = -1; Progression.activeChallengeIdx = -1; StartFight(); }
 
         GUILayout.Space(10);
         GUILayout.Label("Aim at a face — it lights up with its sockets.\nParts snap to sockets only. Green dots = the\nsockets that will mate; more mated = stronger\njoint.\nR rotate part (beams/plates stand up too)\nright-click removes a part AND everything it\ncarries — red markers show what goes · Z undo\nQ/E orbit · scroll zoom\nGreen arrow = FRONT (W drives that way)\nRed dot = center of mass\nBlue rect = wheel support\n(dot outside rect → it tips)", descStyle);
         GUILayout.EndArea();
+        GUI.matrix = panelSavedMatrix;   // R2: restore before anything else draws
+        // LAST. IMGUI paints in call order, so a modal drawn any earlier ends
+        // up underneath the panel it is supposed to be blocking.
+        SaveDialogGUI();
+    }
+
+    /// <summary>OWEN 2026-08-03: "whenever a button is disabled, it should show
+    /// hint to user on why it is disabled when hovering or being clicked."
+    ///
+    /// IMGUI has no hover events, so this is the desktop half: draw the button
+    /// dim when `why` is non-null, catch the pointer resting on it during the
+    /// Repaint pass, and refuse the click with the reason instead of running
+    /// the action. The caller writes the condition ONCE and gets all three.
+    ///
+    /// Returns true only when the button was pressed AND is live, so callers
+    /// read exactly like a plain GUILayout.Button.</summary>
+    string gateHoverWhy, gateHoverShown;
+    bool GatedButton(string label, GUIStyle st, string why, params GUILayoutOption[] opt)
+    {
+        Color sv = GUI.color;
+        if (why != null) GUI.color = new Color(0.60f, 0.60f, 0.64f);
+        bool hit = GUILayout.Button(label, st, opt);
+        GUI.color = sv;
+        // GetLastRect is only meaningful once layout has been resolved, and
+        // mousePosition is already in the scaled GUI space this panel draws in.
+        if (why != null && Event.current.type == EventType.Repaint
+            && GUILayoutUtility.GetLastRect().Contains(Event.current.mousePosition))
+            gateHoverWhy = why;
+        if (hit && why != null) { message = why; SfxSynth.Deny(); return false; }
+        return hit;
+    }
+
+    /// <summary>"Did you mean to replace it, or to keep it and start a copy?"
+    /// Both front ends ask the same question in the same words - a rule that
+    /// lives in one front end is not a rule.</summary>
+    void SaveConfirmGUI()
+    {
+        if (MobileBuilderUI.Active) { deskSaveConfirm = false; return; }
+        string open = ActiveEditName();
+        if (open == null) { deskSaveConfirm = false; return; }
+        EnsureStyles();
+        var prevM = GUI.matrix;
+        var prevC = GUI.color;
+        float sc = GuiScale;
+        GUI.matrix = Matrix4x4.Scale(new Vector3(sc, sc, 1f));
+        float sw = Screen.width / sc, sh = Screen.height / sc;
+        GUI.color = new Color(0f, 0f, 0f, 0.55f);
+        GUI.DrawTexture(new Rect(0f, 0f, sw, sh), Texture2D.whiteTexture);
+        GUI.color = prevC;
+
+        float w = 470f, h = 210f;
+        var r = new Rect((sw - w) * 0.5f, (sh - h) * 0.5f, w, h);
+        GUI.Box(r, "");
+        GUILayout.BeginArea(new Rect(r.x + 16f, r.y + 14f, r.width - 32f, r.height - 28f));
+        GUILayout.Label("SAVE", headStyle);
+        GUILayout.Space(4f);
+        GUILayout.Label("OVERWRITE replaces " + open + " with what is on the bench now.  "
+                      + "SAVE AS NEW keeps " + open + " as it was and starts a copy.", descStyle);
+        GUILayout.FlexibleSpace();
+        if (GUILayout.Button("OVERWRITE " + open, matStyle, GUILayout.Height(30f)))
+        {
+            string e = SaveActive();
+            if (e != null) { message = e; SfxSynth.Deny(); }
+            deskSaveConfirm = false;
+        }
+        if (GUILayout.Button("SAVE AS NEW\u2026", matStyle, GUILayout.Height(30f)))
+        {
+            deskSaveConfirm = false;
+            OpenDesktopSaveDialog();
+        }
+        GUILayout.Space(4f);
+        if (GUILayout.Button("CANCEL", matStyle, GUILayout.Height(26f))) deskSaveConfirm = false;
+        GUILayout.EndArea();
+        GUI.matrix = prevM;
+        GUI.color = prevC;
+    }
+
+    void OpenDesktopSaveDialog()
+    {
+        deskSaveDlg = true; deskSaveFocus = true;
+        deskSaveBuf = ""; deskSaveErr = "";
+        deskSaveNote = SaveAsNewNote();
+        uiPointerBlocked = true;   // modal: no placing parts through the window
+    }
+    void CloseDesktopSaveDialog()
+    {
+        deskSaveDlg = false;
+        uiPointerBlocked = false;
+    }
+
+    /// <summary>Desktop twin of MobileBuilderUI's savedlg.</summary>
+    void SaveDialogGUI()
+    {
+        if (deskSaveConfirm) { SaveConfirmGUI(); return; }
+        if (!deskSaveDlg) return;
+        if (MobileBuilderUI.Active) { CloseDesktopSaveDialog(); return; }
+        EnsureStyles();
+        var prevM = GUI.matrix;
+        var prevC = GUI.color;
+        float sc = GuiScale;
+        GUI.matrix = Matrix4x4.Scale(new Vector3(sc, sc, 1f));
+        float sw = Screen.width / sc, sh = Screen.height / sc;
+        GUI.color = new Color(0f, 0f, 0f, 0.55f);
+        GUI.DrawTexture(new Rect(0f, 0f, sw, sh), Texture2D.whiteTexture);
+        GUI.color = prevC;
+
+        float w = 470f, h = 240f;
+        var r = new Rect((sw - w) * 0.5f, (sh - h) * 0.5f, w, h);
+        GUI.Box(r, "");
+        GUILayout.BeginArea(new Rect(r.x + 16f, r.y + 14f, r.width - 32f, r.height - 28f));
+        GUILayout.Label("NAME THIS BUILD", headStyle);
+        GUILayout.Space(4f);
+        GUI.SetNextControlName("desksavename");
+        deskSaveBuf = GUILayout.TextField(deskSaveBuf ?? "", GUILayout.Height(22f));
+        if (deskSaveFocus) { GUI.FocusControl("desksavename"); deskSaveFocus = false; }
+        GUILayout.Space(4f);
+        GUILayout.Label(deskSaveNote, descStyle);
+        // Drawn UNCONDITIONALLY, empty string and all. A label that appears
+        // only when there is an error changes the control count between the
+        // Layout and Repaint passes of the very frame the error is set -
+        // "GUILayout: Mismatched LayoutGroup", the same trap the blueprint
+        // list hit when it deleted a row mid-loop.
+        GUI.color = new Color(1f, 0.78f, 0.30f);
+        GUILayout.Label(deskSaveErr, bodyStyle);
+        GUI.color = prevC;
+        GUILayout.FlexibleSpace();
+        GUILayout.BeginHorizontal();
+        GUILayout.FlexibleSpace();
+        if (GUILayout.Button("CANCEL", matStyle, GUILayout.Width(96f))) CloseDesktopSaveDialog();
+        bool noName = string.IsNullOrEmpty(deskSaveBuf) || deskSaveBuf.Trim().Length == 0;
+        // The window has its own error lane an inch away, so the reason goes
+        // THERE rather than to the message bar behind the modal. Same gate,
+        // nearer surface - a toast under a dimmed backdrop is worse than no
+        // toast, and this is the one place on screen that already has a better
+        // place to put it.
+        Color svSave = GUI.color;
+        if (noName) GUI.color = new Color(0.60f, 0.60f, 0.64f);
+        bool saveHit = GUILayout.Button("SAVE", matStyle, GUILayout.Width(110f));
+        GUI.color = svSave;
+        if (noName && Event.current.type == EventType.Repaint
+            && GUILayoutUtility.GetLastRect().Contains(Event.current.mousePosition))
+            deskSaveErr = NAME_GATE_HINT;
+        if (saveHit)
+        {
+            string e = SaveAsNew(deskSaveBuf);
+            // A refusal keeps the window open with the reason in it - closing
+            // would drop the name they typed and hide why it did not take.
+            if (e != null) { deskSaveErr = e; SfxSynth.Deny(); }
+            else CloseDesktopSaveDialog();
+        }
+        GUI.color = prevC;
+        GUILayout.EndHorizontal();
+        GUILayout.EndArea();
+        GUI.matrix = prevM;
+        GUI.color = prevC;
     }
 
     void EnsureStyles()
@@ -3998,22 +6544,111 @@ public class BuilderManager : MonoBehaviour
 /// <summary>Tiny startup menu: choose the Phase 0 sandbox or the Phase 1 builder.</summary>
 public class ModeSelect : MonoBehaviour
 {
+    /// <summary>OWEN 2026-08-03: "for a mobile user, it doesn't make sense to
+    /// see the desktop option, and vice versa. can we detect the device type
+    /// and skip the first screen?"
+    ///
+    /// Yes - and the screen was worse than redundant. MobileBuilderUI already
+    /// auto-detected, so on an iPad "START CAREER - Desktop" handed you the
+    /// touch UI regardless. The chooser asked a question the game then
+    /// overruled; both buttons landed in the same place.
+    ///
+    /// A build now boots straight into career in the detected mode. The EDITOR
+    /// keeps the chooser, so testing touch-on-desktop and the dev sandbox
+    /// stays one click away - the dev sandbox was always a dev door anyway,
+    /// and this is the honest place for it.</summary>
+    /// <summary>Should we skip the chooser and boot straight in?
+    ///
+    /// OWEN 2026-08-04: "I'm using the device simulator in unity to test
+    /// running on iphone. But when i click the 'start career' button there is
+    /// no response."
+    ///
+    /// Nothing was wrong with the button. Unity's Device Simulator DISABLES the
+    /// mouse and substitutes a simulated touchscreen - measured, with this
+    /// project's Input System-only handling:
+    ///
+    ///     devices: Keyboard[on] Mouse[off] Pen[off] Touchscreen[on]
+    ///
+    /// IMGUI wants mouse events, so with no mouse device every OnGUI screen in
+    /// the game RENDERS in the simulator and none of them can be clicked. That
+    /// includes this chooser, which is why it was a dead end rather than a
+    /// cosmetic annoyance.
+    ///
+    /// "Application.isEditor" was the wrong question all along. The real one is
+    /// "is a human going to drive the DESKTOP builder here", and under a
+    /// simulated phone the answer is no - the same as in a build, which is
+    /// exactly the thing the simulator exists to imitate. So the simulator now
+    /// boots like a build: past this screen, into the touch UI, which is uGUI
+    /// and does receive the simulated touches.
+    ///
+    /// A real editor on a real desktop still gets the chooser, so the dev
+    /// sandbox door stays one click away.</summary>
+    public static bool ShouldAutoBoot()
+    {
+        if (!Application.isEditor) return true;
+        return MobileBuilderUI.DeviceWantsTouch();
+    }
+
+    void Start()
+    {
+        if (!ShouldAutoBoot()) return;
+        StartCareer(MobileBuilderUI.DeviceWantsTouch());
+        Destroy(gameObject);
+    }
+
+    /// <summary>One path in, so the two buttons and the auto-boot cannot drift.
+    /// forceMobileUI is set EXPLICITLY either way rather than only on the touch
+    /// branch - it is a static that survives a play-mode restart in the editor,
+    /// so "not setting it" quietly meant "keep whatever the last run chose".</summary>
+    public static void StartCareer(bool touch)
+    {
+        // C4: the game IS the career now (owner decision 2026-07-31, no
+        // sandbox split). Load grants the starter kit on first run.
+        Career.active = true;
+        Career.Load();
+        MobileBuilderUI.forceMobileUI = touch;
+        new GameObject("BuilderManager").AddComponent<BuilderManager>();
+    }
+
     void OnGUI()
     {
-        float w = 320f, h = 130f;
-        float x = (Screen.width - w) * 0.5f, y = (Screen.height - h) * 0.5f;
-        GUI.Box(new Rect(x, y, w, h), "ROBOT BRAWL — prototypes");
-        if (GUI.Button(new Rect(x + 20, y + 34, w - 40, 36), "PHASE 1 — Robot Builder"))
+        // Builds never draw this, and neither does a simulated device - Start()
+        // has already booted past it. Destroy is deferred to the end of the
+        // frame and OnGUI runs before that, so without this guard the chooser
+        // would flash over the game for one frame on the way through.
+        if (ShouldAutoBoot()) return;
+        // Critic round 1 (mobile): raw pixels made these buttons thumbnail
+        // sized on a 264-dpi iPad. Same DPI scale as the rest of the HUD.
+        float s = BuilderManager.GuiScale;   // R4 finding 3: one rule, one place
+        GUI.matrix = Matrix4x4.Scale(new Vector3(s, s, 1f));
+        // R2 critic: the first screen a player sees was a thumbnail-sized
+        // default-skin box floating in a void. Bigger, bolder, same skin.
+        float w = 440f, h = 200f;
+        float x = (Screen.width / s - w) * 0.5f, y = (Screen.height / s - h) * 0.5f;
+        var tst = new GUIStyle(GUI.skin.box);
+        tst.fontSize = 26; tst.fontStyle = FontStyle.Bold; tst.alignment = TextAnchor.UpperCenter; tst.padding.top = 16;
+        GUI.Box(new Rect(x, y, w, h), "ROBOT BRAWL", tst);
+        var mbst = new GUIStyle(GUI.skin.button); mbst.fontSize = 17;
+        // C6.5: five taps on the title reveal the dev sandbox entry - players
+        // never see a mode choice; the career IS the game (design doc v1.4).
+        if (GUI.Button(new Rect(x, y, w, 30), "", GUIStyle.none)) devTaps++;
+        // The detected default is marked, so the editor chooser doubles as a
+        // readout of what a real build would have done on this machine.
+        bool wantsTouch = MobileBuilderUI.DeviceWantsTouch();
+        if (GUI.Button(new Rect(x + 24, y + 64, w - 48, 44),
+                       "START CAREER \u2014 Desktop" + (wantsTouch ? "" : "   (detected)"), mbst))
+        { StartCareer(false); Destroy(gameObject); }
+        if (GUI.Button(new Rect(x + 24, y + 118, w - 48, 44),
+                       "START CAREER \u2014 Touch" + (wantsTouch ? "   (detected)" : ""), mbst))
+        { StartCareer(true); Destroy(gameObject); }
+        if (devTaps >= 5 && GUI.Button(new Rect(x + 24, y + h + 8, w - 48, 32), "DEV SANDBOX"))
         {
+            Career.active = false;   // free-build test mode: loud banner, no career file
             new GameObject("BuilderManager").AddComponent<BuilderManager>();
             Destroy(gameObject);
         }
-        if (GUI.Button(new Rect(x + 20, y + 78, w - 40, 36), "PHASE 0 — Physics Sandbox"))
-        {
-            new GameObject("Phase0Manager").AddComponent<Phase0Manager>();
-            Destroy(gameObject);
-        }
     }
+    int devTaps;
 }
 
 }

@@ -66,9 +66,9 @@ public static class Phase0Input
         if (!dClick) return false; dClick = false; return true;
     }
     static bool TakeClick()  { return TakeClick(0); }
-    static bool TakeRotate() { if (!debugPointer || !dRotate) return false; dRotate = false; return true; }
-    static bool TakeUndo()   { if (!debugPointer || !dUndo)   return false; dUndo   = false; return true; }
-    static bool TakeEsc()    { if (!debugPointer || !dEsc) return false;    dEsc = false;    return true; }
+    static bool TakeRotate() { if (!dRotate) return false; dRotate = false; return true; }
+    static bool TakeUndo()   { if (!dUndo)   return false; dUndo   = false; return true; }
+    static bool TakeEsc()    { if (!dEsc) return false;    dEsc = false;    return true; }
 
 #if ENABLE_LEGACY_INPUT_MANAGER
     public static float Throttle()
