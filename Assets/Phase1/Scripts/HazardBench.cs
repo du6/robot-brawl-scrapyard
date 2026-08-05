@@ -64,15 +64,14 @@ public class HazardBench : MonoBehaviour
             CompoundRobot enemyBot = null;
             foreach (var cr in Object.FindObjectsByType<CompoundRobot>(FindObjectsSortMode.None))
                 if (cr != bm.testRobot) enemyBot = cr;
-            bm.testDrive.useAI = true;
+            // P0: declared once on the fight instance (see CareerBench).
+            fm.playerSource = ControlSource.AI;
             var pai = bm.testRobot.gameObject.AddComponent<AIController>();
             pai.self = bm.testRobot; pai.drive = bm.testDrive; pai.target = enemyBot;
             pai.forwardLocal = Vector3.forward;
             pai.power = bm.testRobot.GetComponent<PowerPlant>();
             pai.ApplyTier(AiTier.Veteran);
-            pai.fm = fm;   // parity with the enemy AI (see CareerBench BELL FIX)
-            foreach (var act in bm.testRobot.GetComponentsInChildren<Actuator>(true))
-                act.playerControlled = false;
+            pai.fm = fm;   // parity with the enemy AI (see CareerBench)
 
             Time.timeScale = 5f;
             float minY = 99f;
@@ -82,11 +81,8 @@ public class HazardBench : MonoBehaviour
             {
                 if (bm.testRobot != null && bm.testRobot.rb != null) minY = Mathf.Min(minY, bm.testRobot.rb.position.y);
                 if (enemyBot != null && enemyBot.rb != null) minY = Mathf.Min(minY, enemyBot.rb.position.y);
-                // BELL FIX (ported from CareerBench): FightManager hands the
-                // player drive back to the keyboard at the bell - re-assert AI
-                // control every frame or the 'AI-vs-AI' fight runs half parked
-                // (C6 finding: env == taken exactly, all three bench runs).
-                if (bm.testDrive != null && !bm.testDrive.useAI) bm.testDrive.useAI = true;
+                // (P0 deleted the ported per-frame BELL FIX reassert — the
+                // fight's playerSource makes the bell honest now.)
                 yield return null;
             }
             if (fm != null && fm.state != FightManager.State.Ended)

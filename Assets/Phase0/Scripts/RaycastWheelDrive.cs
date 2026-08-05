@@ -28,6 +28,7 @@ public class RaycastWheelDrive : MonoBehaviour
         public Vector3 rollLocal;  // rolling direction in body space (drive direction)
         public int mountIdx = -1;  // CompoundRobot part this wheel is bolted to (-1 = none tracked)
         public float mass;         // wheel mass (leaves the body when the wheel falls off)
+        public int idx;            // P0: command-channel index (placement order, stable)
         // Mount-tracking BACKSTOP (fix 3): body-space distance from this
         // anchor to the nearest ATTACHED part's surface, measured at spawn
         // plus SUPPORT_MARGIN. Once no attached part is within this radius
@@ -53,6 +54,37 @@ public class RaycastWheelDrive : MonoBehaviour
     /// below where it was bolted; on a 0.20 m beam it hung clear underneath.</summary>
     public float RestExtension { get { return travel * (1f - STATIC_COMP_FRAC); } }
     public float maxSteerDeg = 35f;
+
+    /// <summary>DIFFERENTIAL STEER ASSIST (owen, 2026-08-05: "it is hard to
+    /// make a turn"). How much of full drive command the steering may add to
+    /// one side and take off the other.
+    ///
+    /// MEASURED PROBLEM. Driving the shipped 911 kg spindle build through the
+    /// real control path at FULL LOCK, held from a standstill:
+    ///     t 0.5s  1.51 m/s   0.1 deg/s
+    ///     t 1.0s  4.30 m/s   0.1 deg/s
+    ///     t 1.6s  7.17 m/s   0.2 deg/s   -> then hit the wall, dead straight
+    /// The same machine at 1.67 m/s turns at 114 deg/s (0.84 m radius). So it
+    /// turns beautifully below about 2 m/s and essentially not at all above 4,
+    /// which is precisely the speed you are doing when you need to turn.
+    ///
+    /// WHY. steerScale below shrinks the lock as v^2, leaving ~10 degrees at
+    /// 7 m/s; and lateral force only exists once the tyre is ALREADY slipping
+    /// (latF is proportional to latVel), so a small lock makes a small slip
+    /// makes a small force and the machine washes straight on. The steer curve
+    /// is not the villain - it stops tall builds barrel-rolling, which is a
+    /// real failure it was written for - so this does not touch it.
+    ///
+    /// WHAT THIS DOES INSTEAD. Yaw the machine with the DRIVE forces it
+    /// already has: add to the outside wheels, subtract from the inside, the
+    /// way every real combat robot turns. That costs no lateral grip at all,
+    /// so the rollover threshold the steer curve protects is unchanged - and
+    /// it gives the thing a driver reaches for most, a pivot on the spot,
+    /// which measured 0.0 deg/s before this existed.
+    ///
+    /// Mixer mode only. A programmable robot drives its wheels directly and
+    /// must keep getting exactly the commands it asked for.</summary>
+    public float diffSteer = 0.8f;
     public float frictionCoeff = 1.3f;   // μ — clamps drive + lateral force per wheel
     public float maxSpeed = 10f;         // m/s
     /// <summary>Extra clearance (m) added to each wheel's MEASURED spawn-time
@@ -65,7 +97,60 @@ public class RaycastWheelDrive : MonoBehaviour
     // control freeze at match end) so the AI bot never reads the keyboard —
     // and Phase0Input (keyboard + debugThrottle test override) drives ONLY
     // the player's bot.
-    public bool useAI = false;
+    //
+    // P0 (Programmable Robots, 2026-08-05): useAI is now a COMPATIBILITY
+    // PROPERTY over the robot's single control authority. When this drive
+    // belongs to a CompoundRobot (every SpawnBot machine), reads and writes
+    // route through owner.controlSource — so an old-style `d.useAI = true`
+    // in a probe still works, but there is exactly one place the truth lives
+    // and the bell-bug class (three writers fighting over a boolean) is dead.
+    // Owner-less drives (Phase 0 sandbox bots) keep the legacy field.
+    // Scheduled for deletion once every caller writes controlSource directly.
+    public bool useAI
+    {
+        get { return owner != null ? owner.controlSource != ControlSource.Keyboard : useAILegacy; }
+        set
+        {
+            if (owner != null) owner.controlSource = value ? ControlSource.AI : ControlSource.Keyboard;
+            else useAILegacy = value;
+        }
+    }
+    bool useAILegacy = false;
+
+    // ---- P0: per-wheel command channels. Channel index = placement order at
+    // Init, stable for the life of the body (a wheel that falls off keeps its
+    // index and simply stops consuming its channel). The classic throttle/steer
+    // pair is the MIXER: with directWheelCmd false — every existing mode —
+    // each wheel's drive command IS CurrentThrottle(), byte-identical to the
+    // old single-throttle path. A Program (P2) or a dev demo writes channels
+    // directly and flips directWheelCmd. Steering geometry is untouched:
+    // differential drive comes from opposing wheel commands, not steer angle.
+    public bool directWheelCmd = false;
+    float[] wheelCmd;
+    public int ChannelCount { get { return wheelCmd != null ? wheelCmd.Length : 0; } }
+    public void SetWheelCmd(int channel, float v)
+    { if (wheelCmd != null && channel >= 0 && channel < wheelCmd.Length) wheelCmd[channel] = Mathf.Clamp(v, -1f, 1f); }
+    public float GetWheelCmd(int channel)
+    { return (wheelCmd != null && channel >= 0 && channel < wheelCmd.Length) ? wheelCmd[channel] : 0f; }
+    public void ClearWheelCmd()
+    { if (wheelCmd != null) for (int i = 0; i < wheelCmd.Length; i++) wheelCmd[i] = 0f; }
+    /// <summary>Mean SIGNED command across channels — the honest "how hard is
+    /// this machine driving forward" number: a tank-turn (+1/−1) nets ~0.</summary>
+    float MeanCmd()
+    {
+        if (wheelCmd == null || wheelCmd.Length == 0) return 0f;
+        float s = 0f; for (int i = 0; i < wheelCmd.Length; i++) s += wheelCmd[i];
+        return s / wheelCmd.Length;
+    }
+    /// <summary>Mean |command| — the energy-demand number: 2 of 4 wheels
+    /// pushing costs half a 4-wheel push (§3.1 of the design doc).</summary>
+    float MeanAbsCmd()
+    {
+        if (wheelCmd == null || wheelCmd.Length == 0) return 0f;
+        float s = 0f; for (int i = 0; i < wheelCmd.Length; i++) s += Mathf.Abs(wheelCmd[i]);
+        return s / wheelCmd.Length;
+    }
+
     public float aiThrottle = 0f;
     /// <summary>§6.2. Null = unmetered (the Phase 0 sandbox). When set, the
     /// throttle that actually reaches the wheels is scaled by what the power
@@ -79,7 +164,13 @@ public class RaycastWheelDrive : MonoBehaviour
     /// it still reads 1.0 while the machine sits motionless, which is how the
     /// referee came to blame a player's mass budget for an empty battery.</summary>
     public float DeliveredThrottle()
-    { return CurrentThrottle() * (power != null ? power.supplyFrac : 1f); }
+    {
+        // P0: under direct per-wheel commands the "throttle" a referee should
+        // see is the mean signed command — full-forward reads 1.0 exactly as
+        // before, a tank-turn reads ~0 (spinning in place is not a ram).
+        float req = directWheelCmd ? MeanCmd() : CurrentThrottle();
+        return req * (power != null ? power.supplyFrac : 1f);
+    }
     public float CurrentSteer() { return useAI ? aiSteer : Phase0Input.Steer(); }
 
     Rigidbody rb;
@@ -99,6 +190,7 @@ public class RaycastWheelDrive : MonoBehaviour
         rb = body;
         owner = ownerRobot;
         int n = anchors.Length;
+        wheelCmd = new float[n];   // P0: one command channel per placed wheel
 
         for (int i = 0; i < n; i++)
         {
@@ -127,6 +219,7 @@ public class RaycastWheelDrive : MonoBehaviour
                 rollLocal = roll,
                 mountIdx = mounts != null ? mounts[i] : -1,
                 mass = wheelMasses != null ? wheelMasses[i] : 0f,
+                idx = i,
             };
             // Compound wheel visual (fat tire + hub + lugs + axle); every
             // child primitive's collider is destroyed inside the factory —
@@ -266,11 +359,15 @@ public class RaycastWheelDrive : MonoBehaviour
         float throttle = CurrentThrottle();
         // §6.2: driving costs energy, continuously, in proportion to what you
         // are pushing. A flat battery is not a slow bot, it is a stopped one.
+        // P0: under direct per-wheel commands the demand is the mean |command|
+        // (2 of 4 wheels pushing costs half a 4-wheel push); the mixer path is
+        // untouched and byte-identical.
         if (power != null)
         {
-            power.Draw(PowerPlant.DriveKW(rb.mass, throttle));
+            power.Draw(PowerPlant.DriveKW(rb.mass, directWheelCmd ? MeanAbsCmd() : throttle));
             throttle *= power.supplyFrac;
         }
+        float cmdScale = power != null ? power.supplyFrac : 1f;
         float steerTarget = CurrentSteer();
         steerCur = Mathf.MoveTowards(steerCur, steerTarget, 3.5f * Time.fixedDeltaTime);
 
@@ -282,6 +379,11 @@ public class RaycastWheelDrive : MonoBehaviour
         // (their threshold is far lower) — stability stays a design outcome.
         float vMag = VelUtil.GetLinearVelocity(rb).magnitude;
         float steerScale = 1f / (1f + 0.045f * vMag * vMag);
+
+        // One normaliser for the whole machine, so both sides scale together
+        // and the straight-line case (steer 0) is untouched at exactly 1.
+        float diffPeak = Mathf.Abs(throttle) + Mathf.Abs(steerCur * diffSteer * cmdScale);
+        float diffNorm = diffPeak > 1f ? 1f / diffPeak : 1f;
 
         Vector3 up = transform.up;
         float dt = Time.fixedDeltaTime;
@@ -352,11 +454,35 @@ public class RaycastWheelDrive : MonoBehaviour
             float latF = Mathf.Clamp(-latVel * rb.mass * 1.4f / wheels.Count, -maxFriction, maxFriction);
 
             // Drive / rolling drag, also clamped by μ·N.
-            float driveF;
-            if (Mathf.Abs(throttle) > 0.01f)
+            // P0: each wheel consumes ITS OWN command. Mixer mode (every
+            // existing control path) expands throttle to all wheels — cmd is
+            // exactly the old throttle value. Direct mode reads the channel.
+            // Differential assist: body +X is the machine's right (the spawn
+            // yaws the build so its drive direction is +Z), so localAnchor.x
+            // is which side this wheel is on. Wheels on the centreline get
+            // nothing, which is what keeps a three-wheeler from spinning on
+            // its nose wheel.
+            float cmd;
+            if (directWheelCmd) cmd = wheelCmd[w.idx] * cmdScale;
+            else
             {
-                driveF = throttle * drivePerWheel;
-                if (Mathf.Abs(fwdVel) > maxSpeed && Mathf.Sign(fwdVel) == Mathf.Sign(throttle))
+                float side = w.localAnchor.x;
+                float diff = Mathf.Abs(side) > 0.02f
+                           ? -Mathf.Sign(side) * steerCur * diffSteer * cmdScale : 0f;
+                // NORMALISE, do not clip. Clamping each side independently was
+                // measured to throw away most of the effect: at full throttle
+                // the OUTSIDE wheel is already at 1.0, so clamping could only
+                // subtract from the inside - half the couple, and the machine
+                // merely slowed down. 3.4 deg/s at 6.7 m/s. Scaling both sides
+                // by the peak keeps the DIFFERENCE, which is the only part
+                // that yaws anything.
+                cmd = (throttle + diff) * diffNorm;
+            }
+            float driveF;
+            if (Mathf.Abs(cmd) > 0.01f)
+            {
+                driveF = cmd * drivePerWheel;
+                if (Mathf.Abs(fwdVel) > maxSpeed && Mathf.Sign(fwdVel) == Mathf.Sign(cmd))
                     driveF = 0f; // top speed reached
             }
             else

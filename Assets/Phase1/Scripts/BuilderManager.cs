@@ -3618,6 +3618,10 @@ public class BuilderManager : MonoBehaviour
         // and nothing else in test mode reads Phase0Input.
         foreach (var act in testRobot.GetComponentsInChildren<Actuator>(true))
             act.playerControlled = true;
+        // P0: test drive has no FightManager to grant controls, so the spawn
+        // path is the writer here. SpawnBot machines default to AI (fail
+        // closed); the one machine the human drives is granted Keyboard.
+        testRobot.controlSource = ControlSource.Keyboard;
         hudWheelMassInt = WheelMassInt(placed);
 
         followCam = cam.gameObject.AddComponent<FollowCamera>();
@@ -4671,6 +4675,9 @@ public class BuilderManager : MonoBehaviour
         // AIController writing aiFire.
         foreach (var act in testRobot.GetComponentsInChildren<Actuator>(true))
             act.playerControlled = true;
+        // P0: in a fight the FightManager owns control routing from Setup()
+        // (Protect → AI freeze, Bell → its playerSource). No grant here — the
+        // AI spawn default carries the pre-bell freeze on its own.
         AddHeadlight(testRobot, driveDir);
 
         // §8: the chosen roster bot, spawned through the SAME path as the
@@ -4682,7 +4689,7 @@ public class BuilderManager : MonoBehaviour
         aiRobot = SpawnBot(recipe, entry.label, axis * 4f,
                            Quaternion.LookRotation(-axis), Vector3.forward, out drv);
         aiDrive = drv;
-        aiDrive.useAI = true;   // input isolation: never reads Phase0Input
+        aiRobot.controlSource = ControlSource.AI;   // input isolation: never reads Phase0Input (spawn default, said explicitly)
         aiCtrl = aiRobot.gameObject.AddComponent<AIController>();
         aiCtrl.self = aiRobot;
         aiCtrl.drive = aiDrive;

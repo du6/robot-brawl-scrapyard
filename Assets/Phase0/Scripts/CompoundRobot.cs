@@ -42,8 +42,23 @@ public struct PartSpec
 /// rigidbodies inheriting velocity (linear + ω×r), and the survivor's
 /// mass/center-of-mass are recomputed (so losing a chunk changes handling).
 /// </summary>
+/// <summary>P0 (Programmable Robots, 2026-08-05): the single source of truth
+/// for who commands a robot. Replaces the scattered useAI / playerControlled
+/// booleans whose hidden handoff at the bell (FightManager, "keyboard back")
+/// silently paralyzed harness-driven player bots in TWO benches (the C5 "bell
+/// bug"). Writers: FightManager (Protect/Bell/Freeze, via its per-instance
+/// playerSource) and the spawn/prep paths in BuilderManager. Everything else —
+/// RaycastWheelDrive, Actuator, benches, probes — READS.
+/// Program is reserved for the P2 ProgramRunner; until that exists it routes
+/// exactly like AI (aiThrottle/aiFire, which nothing then writes).</summary>
+public enum ControlSource { Keyboard, AI, Program }
+
 public class CompoundRobot : MonoBehaviour
 {
+    /// <summary>See ControlSource. Fail-closed default: a robot never reads
+    /// the keyboard unless a spawn/prep path explicitly grants Keyboard.</summary>
+    public ControlSource controlSource = ControlSource.AI;
+
     // ------------------------------------------------------------------ tuning
     // Static (not const) so scripted tuning passes can iterate live; values
     // below are the round-2 MEASURED calibration (see dev notes): a ~5-6 m/s

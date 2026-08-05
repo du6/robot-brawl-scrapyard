@@ -111,6 +111,17 @@ public class FightManager : MonoBehaviour
     /// as a velocity change, never as a contact impulse, so it cannot shear.</summary>
     public static float SHOVE_PUSH = 2.2f;
 
+    /// <summary>P0 (2026-08-05): who drives the PLAYER side when the bell
+    /// hands controls back. Keyboard for every human fight; a bench sets this
+    /// to AI on the fight INSTANCE right after starting the fight (and a P2+
+    /// Autonomy League fight will set Program for both sides). Per-instance on
+    /// purpose: it dies with the fight, so a crashed bench can never leak AI
+    /// control into a human's next match — the static-leak hazard the old
+    /// per-frame useAI reasserts existed to fight. This field plus
+    /// Protect/Bell/Freeze below are THE ONLY writers of
+    /// CompoundRobot.controlSource during a fight.</summary>
+    public ControlSource playerSource = ControlSource.Keyboard;
+
     public BuilderManager bm;
     AudioSource music;   // fight theme, started in Setup, stopped in End
     public Side player = new Side();
@@ -211,9 +222,11 @@ public class FightManager : MonoBehaviour
     {
         if (s.bot != null) s.bot.combatEnabled = false;
         if (s.ai != null) s.ai.enabled = false;
+        // P0: control freeze = route to the AI path with zeroed inputs, said
+        // once through the single authority instead of the old useAI boolean.
+        if (s.bot != null) s.bot.controlSource = ControlSource.AI;
         if (s.drive != null)
         {
-            s.drive.useAI = true;   // zeroed AI inputs = control freeze
             s.drive.aiThrottle = 0f;
             s.drive.aiSteer = 0f;
         }
@@ -237,7 +250,10 @@ public class FightManager : MonoBehaviour
         }
         // The house comes up on the bell and goes quiet at the verdict.
         CrowdAudio.Begin();
-        if (player.drive != null) player.drive.useAI = false;  // keyboard back
+        // P0: the historic bell-bug line. The player side now gets whatever
+        // this FIGHT says it gets — Keyboard for humans, AI for a bench,
+        // Program for an Autonomy League bout — through the single authority.
+        if (player.bot != null) player.bot.controlSource = playerSource;
         if (enemy.ai != null) enemy.ai.enabled = true;
         state = State.Fighting;
         bellFlash = 1.0f;
@@ -801,9 +817,9 @@ public class FightManager : MonoBehaviour
     void Freeze(Side s)
     {
         if (s.ai != null) s.ai.enabled = false;
+        if (s.bot != null) s.bot.controlSource = ControlSource.AI;   // P0: single authority
         if (s.drive != null)
         {
-            s.drive.useAI = true;
             s.drive.aiThrottle = 0f;
             s.drive.aiSteer = 0f;
         }

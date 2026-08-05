@@ -149,18 +149,20 @@ public class CareerBench : MonoBehaviour
         CompoundRobot enemyBot = null;
         foreach (var cr in Object.FindObjectsByType<CompoundRobot>(FindObjectsSortMode.None))
             if (cr != bm.testRobot) enemyBot = cr;
-        bm.testDrive.useAI = true;
+        // P0 (2026-08-05): declared ONCE, on the fight instance. The bell now
+        // hands the player side to whatever the fight's playerSource says —
+        // the per-frame useAI reassert and the playerControlled stripping
+        // below are deleted, and the benches staying green without them is the
+        // acceptance proof for the ControlSource refactor.
+        fm.playerSource = ControlSource.AI;
         var pai = bm.testRobot.gameObject.AddComponent<AIController>();
         pai.self = bm.testRobot; pai.drive = bm.testDrive; pai.target = enemyBot;
         pai.forwardLocal = bm.DriveDirNow;
         pai.power = bm.testRobot.GetComponent<PowerPlant>();
         pai.ApplyTier(AiTier.Veteran);
         pai.fm = fm;   // parity: StartFight wires fm into the enemy AI (desperation reads the clock)
-        // ROUND-2 FIX: StartFight marks the player's actuators playerControlled
-        // (they read Phase0Input and IGNORE aiFire) - the round-1 matrix ran
-        // every player weapon dead and lost 0/18. Hand them to the AI.
-        foreach (var act in bm.testRobot.GetComponentsInChildren<Actuator>(true))
-            act.playerControlled = false;
+        // (ROUND-2's playerControlled stripping is gone: Actuator.Fire routes
+        // by controlSource now, and the flag is only the stats side tag.)
         PowerPlant enemyPP = enemyBot != null ? enemyBot.GetComponent<PowerPlant>() : null;
         bool counterplay = patience && enemyBot != null
             && (enemyBot.name.Contains("TIPPER") || enemyBot.name.Contains("WIDOW"));
@@ -171,10 +173,10 @@ public class CareerBench : MonoBehaviour
         while (fm != null && fm.state != FightManager.State.Ended
                && Time.realtimeSinceStartup - t0 < 25f)
         {
-            // BELL FIX (root cause of the 0/10 mirror): FightManager hands the
-            // player drive back to the keyboard at the bell (useAI=false, line
-            // ~174) AFTER the bench set it - re-assert AI control every tick.
-            if (bm.testDrive != null && !bm.testDrive.useAI) bm.testDrive.useAI = true;
+            // (The historic per-frame BELL FIX reassert lived here. P0 deleted
+            // it: fm.playerSource = AI above makes the bell itself do the
+            // right thing. If the mirror ever drifts from ~50% again, suspect
+            // a NEW writer of CompoundRobot.controlSource, not this loop.)
             if (counterplay && bm.testRobot != null && enemyBot != null
                 && bm.testRobot.rb != null && bm.testDrive != null)
             {
@@ -209,10 +211,6 @@ public class CareerBench : MonoBehaviour
                 if (bm.testRobot.combatEnabled) dgCbP = true;
                 if (enemyBot.combatEnabled) dgCbE = true;
             }
-            // Per-frame: at 10x timescale a 0.25s realtime poll left the
-            // player paralyzed up to 2.5 game-seconds after the bell (the bell
-            // sets useAI=false; the reassert above is the bench's undo). That
-            // head start decided light fast fights in the small L1/L2 arenas.
             yield return null;
         }
         if (fm != null && fm.state != FightManager.State.Ended)

@@ -957,13 +957,22 @@ public class Actuator : MonoBehaviour
                          STEP_DISP_CAP / dt / Mathf.Max(tipRadius, 0.05f));
     }
 
-    /// <summary>Set by BuilderManager on the player's machine only. Input
-    /// isolation, exactly as RaycastWheelDrive.useAI does it: an AI actuator
-    /// never reads Phase0Input.</summary>
+    /// <summary>Set by BuilderManager on the player's machine only. P0
+    /// (2026-08-05): no longer consulted for input routing — Fire() reads the
+    /// robot's single control authority (CompoundRobot.controlSource). The
+    /// flag survives purely as the SIDE TAG for the bite stats below, which
+    /// also fixes a bench distortion: an AI-driven player bot now still books
+    /// its bites as the player side's. Scheduled for rename/deletion once the
+    /// stats key off the fight Side instead.</summary>
     public bool playerControlled;
     /// <summary>Written by AIController.</summary>
     public bool aiFire;
-    bool Fire() { return playerControlled ? Phase0Input.FireHeld() : aiFire; }
+    bool Fire()
+    {
+        if (robot != null)
+            return robot.controlSource == ControlSource.Keyboard ? Phase0Input.FireHeld() : aiFire;
+        return playerControlled ? Phase0Input.FireHeld() : aiFire;   // ownerless: legacy routing
+    }
 
     /// <summary>Drive every limb part's transform from `travel`. Colliders come
     /// along, so a raised hammer is genuinely in the way.</summary>
