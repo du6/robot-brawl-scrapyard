@@ -307,8 +307,10 @@ public class ProgramRunner : MonoBehaviour
             case POp.MoveRel:
             {
                 float bear; bool sig = TargetSignal(b.target, out bear);
-                float drive, steer; RelDrive(b.arg, bear, sig, out drive, out steer);
-                WriteSteered(drive, steer);
+                float basePct = Mathf.Abs(b.arg);
+                float err = b.arg >= 0f ? bear : Mathf.DeltaAngle(0f, bear + 180f);
+                float steer = sig ? Mathf.Clamp(err * STEER_GAIN, -1f, 1f) : 0f;
+                WriteSteered(basePct * 0.01f, steer);
                 break;
             }
             case POp.FaceSide:
@@ -390,42 +392,7 @@ public class ProgramRunner : MonoBehaviour
         foreach (var i in rightCh) if (i < wheelState.Length) wheelState[i] = -p;
     }
 
-    /// <summary>The drive+steer pair for a relative move. ONE copy: this math
-    /// lived TWICE — StepTick's blocking flavour and ApplyChannels' live SET
-    /// mode — and both copies carried the same defect, so they get one
-    /// definition now.
-    ///
-    /// THE BUG (owen, 2026-08-07): AWAY FROM was "rotate 180 degrees, then
-    /// drive FORWARD" — the base was Mathf.Abs() and never went negative, so
-    /// the robot NEVER reversed, at any bearing. Nose-on to a wall is the
-    /// worst case in that scheme: the heading error is exactly 180, the
-    /// BALANCE POINT of the steer controller, whose sign flips on a hundredth
-    /// of a degree of jitter. Measured: +0.40 net thrust INTO the wall while
-    /// twitching left-right. The machine ground itself into the wall and the
-    /// WALL! safety hat — the one that exists to prevent exactly that — was
-    /// what held it there.
-    ///
-    /// AWAY now means what it says: INCREASE THE DISTANCE. The drive term is
-    /// -cos(bearing) — full reverse with the target dead ahead, full forward
-    /// with it dead astern, a pure pivot abeam — and the steer comes off the
-    /// LATERAL component (-sin), which is zero both dead ahead and dead
-    /// astern, so there is no balance point anywhere on the circle. Reversing
-    /// mirrors which way the nose swings, hence the sign flip on a negative
-    /// drive. TOWARD is untouched: same bearing error, same forward base.</summary>
-    static void RelDrive(float argPct, float bearingDeg, bool signal,
-                         out float drive01, out float steer)
-    {
-        bool away = argPct < 0f;
-        float rad = bearingDeg * Mathf.Deg2Rad;
-        float errDeg = away ? -Mathf.Sin(rad) * 90f : bearingDeg;
-        steer = signal ? Mathf.Clamp(errDeg * STEER_GAIN, -1f, 1f) : 0f;
-        // no signal: we cannot know where it is, so drive on as before
-        float fwd = (away && signal) ? -Mathf.Cos(rad) : 1f;
-        drive01 = Mathf.Abs(argPct) * 0.01f * fwd;
-        if (drive01 < 0f) steer = -steer;
-    }
-
-    /// <summary>SIGNED base with differential steer (steer>0 turns right).</summary>
+    /// <summary>Forward base with differential steer (steer>0 turns right).</summary>
     void WriteSteered(float base01, float steer)
     {
         relTarget = -1;
@@ -526,7 +493,9 @@ public class ProgramRunner : MonoBehaviour
         if (relTarget >= 0)
         {
             float bear; bool sig = TargetSignal(relTarget, out bear);
-            float baseP, st; RelDrive(relPct, bear, sig, out baseP, out st);
+            float baseP = Mathf.Abs(relPct) * 0.01f;
+            float err = relPct >= 0f ? bear : Mathf.DeltaAngle(0f, bear + 180f);
+            float st = sig ? Mathf.Clamp(err * STEER_GAIN, -1f, 1f) : 0f;
             foreach (var i in leftCh) if (i < wheelState.Length)
                 wheelState[i] = Mathf.Clamp(baseP + st, -1f, 1f);
             foreach (var i in rightCh) if (i < wheelState.Length)

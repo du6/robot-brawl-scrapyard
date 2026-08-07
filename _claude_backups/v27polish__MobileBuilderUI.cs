@@ -1270,59 +1270,6 @@ public class MobileBuilderUI : MonoBehaviour
         if (car) RefreshCareerBoard();
     }
 
-    // P4 polish (V2.7): the autonomy mark is DRAWN now. LegacyRuntime.ttf
-    // has no gear glyph, which is why the row used to say "[AUTO]" in ASCII -
-    // the bench's Contains() check passed while the SCREEN showed nothing.
-    // This rasterizes a 6-tooth gear ONCE; every row shares the one sprite.
-    static Sprite autoMarkSprite;
-    static Sprite AutoMarkSprite()
-    {
-        if (autoMarkSprite != null) return autoMarkSprite;
-        const int N = 64;
-        var tex = new Texture2D(N, N, TextureFormat.RGBA32, false);
-        tex.filterMode = FilterMode.Bilinear;
-        tex.wrapMode = TextureWrapMode.Clamp;
-        var px = new Color[N * N];
-        float c = (N - 1) * 0.5f;
-        float aa = 2.2f / N;            // ~2px of edge softening, in 0..1 units
-        for (int y = 0; y < N; y++)
-            for (int x = 0; x < N; x++)
-            {
-                float dx = (x - c) / c, dy = (y - c) / c;
-                float r = Mathf.Sqrt(dx * dx + dy * dy);
-                float ang = Mathf.Atan2(dy, dx);
-                // 6 teeth: the rim breathes between 0.66 and 0.96
-                float t = (Mathf.Cos(ang * 6f) + 1f) * 0.5f;
-                float rim = 0.66f + 0.30f * Mathf.SmoothStep(0f, 1f, t);
-                float a = Mathf.Min(Mathf.Clamp01((rim - r) / aa),
-                                    Mathf.Clamp01((r - 0.30f) / aa));
-                px[y * N + x] = new Color(1f, 1f, 1f, a);
-            }
-        tex.SetPixels(px);
-        tex.Apply();
-        autoMarkSprite = Sprite.Create(tex, new Rect(0f, 0f, N, N), new Vector2(0.5f, 0.5f));
-        return autoMarkSprite;
-    }
-
-    /// <summary>The gear badge on a contest row: you have won this one with
-    /// the robot driving itself. Named automark_&lt;id&gt; so a bench asserts
-    /// on the OBJECT, not on label text that may or may not have pixels.</summary>
-    GameObject AutoMark(Transform parent, string id)
-    {
-        var go = new GameObject("automark_" + id, typeof(RectTransform), typeof(Image));
-        go.transform.SetParent(parent, false);
-        var img = go.GetComponent<Image>();
-        img.sprite = AutoMarkSprite();
-        img.color = new Color(1f, 0.82f, 0.34f, 1f);
-        img.preserveAspect = true;
-        img.raycastTarget = false;
-        var le = go.AddComponent<LayoutElement>();
-        float s = TouchRow() * 0.54f;
-        le.minWidth = s; le.preferredWidth = s;
-        le.minHeight = s; le.preferredHeight = s;
-        return go;
-    }
-
     void RefreshCareerBoard()
     {
         if (careerBoardContent == null || bm == null) return;
@@ -1352,10 +1299,12 @@ public class MobileBuilderUI : MonoBehaviour
                 var row = MkPanel("contest_" + c.id, careerBoardContent, new Color(0.10f,0.11f,0.14f,1f));
                 var rle = row.AddComponent<LayoutElement>(); rle.minHeight = TouchRow(); rle.preferredHeight = TouchRow();
                 var rh = row.AddComponent<HorizontalLayoutGroup>(); rh.spacing = 4f; rh.childForceExpandHeight = true; rh.childForceExpandWidth = false; rh.padding = new RectOffset(6,4,2,2);
-                if (autoDone) AutoMark(row.transform, c.id);
                 var lbl = MkText("lbl", row.transform,
-                    string.Format("{0}{1} ({2}) \u00b7 {3} scrap{4}{5}",
-                        done ? "\u2713 " : "", EnemyRoster.Find(c.oppId).label, c.tier,
+                    // "[AUTO]", not \u2699: LegacyRuntime.ttf has no gear glyph \u2014
+                    // the bench's Contains() check passed while the SCREEN
+                    // showed nothing (data-vs-pixels, caught by the shot).
+                    string.Format("{0}{1}{2} ({3}) \u00b7 {4} scrap{5}{6}",
+                        done ? "\u2713 " : "", autoDone ? "[AUTO] " : "", EnemyRoster.Find(c.oppId).label, c.tier,
                         done ? Mathf.RoundToInt(c.purse * 0.4f) : c.purse,
                         done ? " (re-entry)" : "",
                         c.entryFee > 0 ? " \u00b7 fee " + c.entryFee + " scrap" : ""),
@@ -3163,31 +3112,14 @@ public class MobileBuilderUI : MonoBehaviour
             // the loop would be nicer \u2014 but the 0.25 s pump timer already
             // bounds the cost and per-row keeps the code shaped like the
             // manual gate beside it.
-            // V2.8 (critic loop 7, F2): the autonomy gate now speaks on its
-            // OWN terms and is never overwritten by the manual one. The line
-            // that used to sit here was `if (blocked) aTag = tag;` — so any
-            // bay that also failed the manual gate swallowed the autonomy
-            // reason whole. On owen's save that hid "needs a saved program"
-            // behind "Needs at least 1 wheel" on all nine rows, and no bench
-            // could see it: AutonomyBench asks the blocker directly, and a
-            // test that goes through the API cannot notice that nothing on
-            // screen says the API exists (critic loop 6's rule).
             string aTag;
-            bool aOwn = bm.AutonomyBlocker(out aTag) != null;   // autonomy's OWN refusal
-            bool aBlocked = aOwn || blocked;
-            string want = g.baseLabel;
-            if (blocked) want += "   \u2014   " + tag;
-            // V2.8b (critic loop 7 R2, finding 6): ELSE, not a second clause.
-            // AutonomyBlocker reads the bay, not the contest, so its sentence
-            // is identical on all nine rows; appending it alongside the manual
-            // one pushed every label onto two lines in a one-line box and
-            // clipped both. The autonomy reason now shows exactly when it is
-            // the ONLY thing in the way - which is when it is actionable.
-            else if (aOwn) want += "   \u2014   auto: " + aTag;
+            bool aBlocked = bm.AutonomyBlocker(out aTag) != null || blocked;
+            if (blocked) aTag = tag;
+            string want = blocked ? g.baseLabel + "   \u2014   " + tag
+                        : aBlocked ? g.baseLabel + "   \u2014   auto: " + aTag
+                        : g.baseLabel;
             if (g.lbl.text != want) g.lbl.text = want;
-            // amber for EITHER refusal - a row only autonomy refuses used to
-            // print its refusal in ready-white.
-            g.lbl.color = (blocked || aOwn) ? new Color(1f, 0.72f, 0.36f) : Color.white;
+            g.lbl.color = blocked ? new Color(1f, 0.72f, 0.36f) : Color.white;
             if (g.img != null) g.img.color = blocked ? FIGHT_DEAD : FIGHT_OK;
             if (g.aimg != null) g.aimg.color = aBlocked ? FIGHT_DEAD : AUTO_OK;
             var face = g.btn.GetComponentInChildren<Text>();

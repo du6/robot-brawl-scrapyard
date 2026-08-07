@@ -3177,17 +3177,9 @@ public class MobileBuilderUI : MonoBehaviour
             bool aBlocked = aOwn || blocked;
             string want = g.baseLabel;
             if (blocked) want += "   \u2014   " + tag;
-            // V2.8b (critic loop 7 R2, finding 6): ELSE, not a second clause.
-            // AutonomyBlocker reads the bay, not the contest, so its sentence
-            // is identical on all nine rows; appending it alongside the manual
-            // one pushed every label onto two lines in a one-line box and
-            // clipped both. The autonomy reason now shows exactly when it is
-            // the ONLY thing in the way - which is when it is actionable.
-            else if (aOwn) want += "   \u2014   auto: " + aTag;
+            if (aOwn) want += "   \u2014   auto: " + aTag;
             if (g.lbl.text != want) g.lbl.text = want;
-            // amber for EITHER refusal - a row only autonomy refuses used to
-            // print its refusal in ready-white.
-            g.lbl.color = (blocked || aOwn) ? new Color(1f, 0.72f, 0.36f) : Color.white;
+            g.lbl.color = blocked ? new Color(1f, 0.72f, 0.36f) : Color.white;
             if (g.img != null) g.img.color = blocked ? FIGHT_DEAD : FIGHT_OK;
             if (g.aimg != null) g.aimg.color = aBlocked ? FIGHT_DEAD : AUTO_OK;
             var face = g.btn.GetComponentInChildren<Text>();

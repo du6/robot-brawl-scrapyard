@@ -283,25 +283,13 @@ public class TestDebugBench : MonoBehaviour
             p = pc.TestProg;
             Check(p.hats[0].body[0].op == POp.Wait && p.hats[0].body[1].op == POp.Move,
                   "by hand: drag reorders the blocks");
-            // V2.6 SPLIT WHAT "SAVE" MEANS and this bench had not been re-run
-            // since: the top-row SAVE chip (prog_save) now writes the program
-            // to the LIBRARY, and LOAD TO ROBOT (prog_load) is what arms it on
-            // the machine - which is what this whole section is about. The old
-            // Tap("SAVE") matched a LABEL whose job changed underneath it (and
-            // the BUILD tab has a SAVE chip of its own to collide with).
-            // Target the canvas's widgets BY NAME, the rule OpChipOf follows.
-            var libBtn = FindRT(pc, "prog_save");
-            Check(libBtn != null, "by hand: the library SAVE chip is findable by name");
-            var loadBtn = FindRT(pc, "prog_load");
-            Check(loadBtn != null, "by hand: LOAD TO ROBOT is findable by name");
-            if (loadBtn != null) loadBtn.GetComponent<Button>().onClick.Invoke();
-            yield return null;
+            Tap("SAVE"); yield return null;
             var saved = RobotProgram.FromJson(Career.Data.stable[0].program);
             Check(saved != null && saved.hats.Count == 1 && saved.hats[0].body.Count == 2
                   && saved.hats[0].body[0].op == POp.Wait,
-                  "by hand: LOAD TO ROBOT writes the program to the robot");
+                  "by hand: SAVE writes the program to the robot");
             Check(pc.TestStatus.Contains("TEST DRIVE"),
-                  "LOAD TO ROBOT status points at TEST DRIVE (the payoff hint)");
+                  "SAVE status points at TEST DRIVE (the payoff hint)");
 
             // ---- F2. V2.2 step highlight: the sequencer's program counter
             // (lastFiredHat + activeStep) carries into the canvas. Injection

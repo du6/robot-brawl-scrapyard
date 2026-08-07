@@ -1,0 +1,16 @@
+build loaded, parts=9
+PLACED nose-on: wallDist=0.406  wallBearing=3.4
+  t=0.25  dist=0.410  bearing=4.8
+  t=0.50  dist=0.410  bearing=4.7
+  t=0.75  dist=0.409  bearing=4.6
+  t=1.00  dist=0.409  bearing=4.6
+  t=1.25  dist=0.409  bearing=4.6
+  t=1.50  dist=0.409  bearing=4.6
+  t=1.75  dist=0.409  bearing=4.6
+  t=2.00  dist=0.409  bearing=4.6
+  t=2.25  dist=0.409  bearing=4.6
+  t=2.50  dist=0.409  bearing=4.6
+  t=2.75  dist=0.409  bearing=4.6
+  t=3.00  dist=0.409  bearing=4.6
+RESULT start=0.406  end=0.409  max=0.410  gained=0.003
+VERDICT: STUCK

@@ -436,30 +436,6 @@ public static class Career
         if (autosave) Save();
     }
 
-    /// <summary>V2.8c (critic loop 7 R3) — the crate as a flat id set, so a
-    /// refusal can say "bolt on" instead of "buy". ONE source: ProgramCanvas
-    /// and AutonomyBlocker both read this, because R2 shipped the crate-aware
-    /// message on the PROGRAM tab only and the FIGHT tab kept handing out a
-    /// bare "— SHOP" for parts the player already had.
-    /// KNOWN LIMIT (R3 critic F4): material-blind, and it does not subtract
-    /// units already bolted on — so it can say "you own one" about a line
-    /// whose material this build will not take. SnapshotShortfall is the exact
-    /// accounting; this is the cheap one, and it only has to decide which of
-    /// BUILD-tab / SHOP the sentence should point at.</summary>
-    public static List<string> OwnedPartIds()
-    {
-        var ids = new List<string>();
-        if (Data == null || Data.inventory == null) return ids;
-        foreach (var it in Data.inventory)
-        {
-            if (it.count <= 0) continue;
-            if (!ids.Contains(it.partId)) ids.Add(it.partId);
-            if (Actuator.IsActuatorId(it.partId) && !ids.Contains("actuator"))
-                ids.Add("actuator");
-        }
-        return ids;
-    }
-
     public static void Save()
     { System.IO.File.WriteAllText(PathFile, JsonUtility.ToJson(Data)); }
 

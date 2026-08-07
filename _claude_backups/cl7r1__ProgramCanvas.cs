@@ -496,12 +496,6 @@ public class ProgramCanvas : MonoBehaviour
     static bool HasDurChip(POp o) { return o == POp.RunMotor || o == POp.Wait; }
 
     // ---- build availability ----------------------------------------------
-    /// <summary>V2.8b (critic loop 7 R2, finding 1) — what the player OWNS
-    /// but has not bolted on. BuildIds() is the BAY; this is the CRATE. A
-    /// refusal that cannot tell them apart sends a fresh career shopping for
-    /// the four wheels it was already granted.</summary>
-    List<string> OwnedIds() { return Career.OwnedPartIds(); }   // R3: one source, in Career
-
     List<string> BuildIds()
     {
         var ids = new List<string>();
@@ -732,34 +726,16 @@ public class ProgramCanvas : MonoBehaviour
         openDlg.SetActive(false);
     }
 
-    /// <summary>V2.8 — one switch-list row for a built-in program, carrying
-    /// its own shortfall. A row that cannot run on this bay says so on its
-    /// face and reads amber instead of green.</summary>
-    void AddPresetRow(string name, string label, RobotProgram p, List<string> ids)
-    {
-        var row = MkRow(openListContent);
-        string shop = p.MissingPartsLine(ids, OwnedIds());
-        var b = MkChip(name, row.transform,
-            label + (shop == null ? "" : "   ·   " + shop), 11f,
-            shop == null ? new Color(0.18f, 0.30f, 0.22f, 0.95f)
-                         : new Color(0.30f, 0.24f, 0.16f, 0.95f), () =>
-        { openDlg.SetActive(false); InstallPreset(p); }, 200f);
-        b.GetComponent<LayoutElement>().flexibleWidth = 1f;
-    }
-
     void RefreshOpenList()
     {
         for (int i = openListContent.childCount - 1; i >= 0; i--)
             Destroy(openListContent.GetChild(i).gameObject);
         // V2.6: the preset leads the switch list; library rows follow.
-        // V2.8 (critic loop 7, F1a/F1c): TWO presets now, and each row states
-        // its own hardware price ON ITS FACE, before the canvas is replaced.
-        // The old list offered one sensor-heavy program to a career whose
-        // granted parts crate (CareerDB.StarterKit) holds no sensor at all —
-        // and you found that out only after LOAD had overwritten the canvas.
-        var presetIds = BuildIds();
-        AddPresetRow("open_first", "FIRST STEPS  (preset)", RobotProgram.FirstSteps(), presetIds);
-        AddPresetRow("open_preset", "STARTER KIT  (preset)", RobotProgram.StarterKit(), presetIds);
+        var prow = MkRow(openListContent);
+        var pb = MkChip("open_preset", prow.transform, "STARTER KIT  (preset)", 11f,
+            new Color(0.18f, 0.30f, 0.22f, 0.95f), () =>
+            { openDlg.SetActive(false); InstallPreset(RobotProgram.StarterKit()); }, 200f);
+        pb.GetComponent<LayoutElement>().flexibleWidth = 1f;
         var lib = Career.Data != null ? Career.Data.programs : null;
         if (lib == null || lib.Count == 0)
         {
@@ -839,14 +815,6 @@ public class ProgramCanvas : MonoBehaviour
             progDropLabel.text = (string.IsNullOrEmpty(prog.title) ? "PROGRAMS" : prog.title.ToUpper()) + "  ▾";
         RebuildList();
         RefreshLockedHint();
-        // V2.8 (critic loop 7, F3): an empty canvas used to say NOTHING —
-        // blank status, and four of its five controls are document
-        // operations on a document that does not exist yet. Point at the door.
-        if (prog.hats.Count == 0 && string.IsNullOrEmpty(status.text))
-        {
-            status.text = "no program yet — tap PROGRAMS ▾ and pick a preset to start";
-            status.color = new Color(0.6f, 0.9f, 1f);
-        }
     }
 
     void MarkDirty()
@@ -873,21 +841,7 @@ public class ProgramCanvas : MonoBehaviour
         { status.text = "no robot open — SAVE the build as a robot first"; status.color = new Color(1f, 0.6f, 0.4f); return; }
         string err = prog.Validate(BuildIds());
         if (err != null)
-        {
-            // V2.8 (critic loop 7, F1b): when the refusal is about missing
-            // hardware, name ALL of it at once — one shopping trip, not three.
-            // V2.8b (critic loop 7 R2, finding 2): ONLY hardware refusals get
-            // swapped for the whole shopping list. Round 1 wrote `shop ?? err`
-            // unconditionally, so "the sequence is empty — add a step" or an
-            // unbalanced IF was silently replaced by a parts list: the player
-            // bought the parts, came back, and only THEN met the real problem.
-            // Two trips pointing the other way — the exact defect round 1 set
-            // out to remove.
-            bool hardware = err.EndsWith("— SHOP") || err.Contains("on the build");
-            string shop = hardware ? prog.MissingPartsLine(BuildIds(), OwnedIds()) : null;
-            status.text = shop ?? err;
-            status.color = new Color(1f, 0.6f, 0.4f); return;
-        }
+        { status.text = err; status.color = new Color(1f, 0.6f, 0.4f); return; }
         r.program = prog.ToJson();
         if (Career.autosave) Career.Save();
         dirty = false;

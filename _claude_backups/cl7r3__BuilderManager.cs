@@ -4197,17 +4197,7 @@ public class BuilderManager : MonoBehaviour
         // sensor the program ACTUALLY references, which is the honest gate:
         // perception is required of the PROGRAM, not of the chassis.
         string err = prog.Validate(ids);
-        if (err != null)
-        {
-            // V2.8c (critic loop 7 R3, F1): the FIGHT tab is the ONLY place a
-            // player meets an autonomy refusal, and it was still handing out
-            // Validate's raw first-failure with a bare "— SHOP" — the exact
-            // message R2 replaced everywhere else. Same sentence, same crate
-            // awareness, on the surface that actually greys the button.
-            string shop = prog.MissingPartsLine(ids, Career.OwnedPartIds());
-            shortTag = shop != null ? "parts missing" : "program invalid";
-            return shop ?? err;
-        }
+        if (err != null) { shortTag = "program invalid"; return err; }
         return null;
     }
 
@@ -4235,22 +4225,7 @@ public class BuilderManager : MonoBehaviour
         // Single gate - the same call the FIGHT buttons use to decide whether
         // they look available. See CareerFightBlocker.
         string blocked = CareerFightBlocker(li, ci);
-        if (blocked != null)
-        {
-            // V2.8c (critic loop 7 R3, F2): when the manual gate ALSO refuses,
-            // a greyed AUTONOMY FIGHT used to have no reason anywhere on the
-            // device — the row label carries the manual one (R2 made it
-            // single-line on purpose to stop it clipping) and this early return
-            // meant tapping the button just repeated that. So the autonomy
-            // requirement was unreachable from the one screen that gates on it.
-            message = blocked;
-            if (autonomy)
-            {
-                string bTag; string bWhy = AutonomyBlocker(out bTag);
-                if (bWhy != null) message += "   ·   and " + bWhy;
-            }
-            SfxSynth.Deny(); return;
-        }
+        if (blocked != null) { message = blocked; SfxSynth.Deny(); return; }
         // P4: the autonomy gate stacks ON TOP of the manual gate, and it
         // refuses BEFORE the entry fee is debited — a fee taken for a fight
         // the program can't start is a refund bug waiting to happen.

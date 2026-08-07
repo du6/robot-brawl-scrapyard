@@ -207,19 +207,8 @@ public class ProgramCanvas : MonoBehaviour
     // macro vocabulary on the first tap.
     static readonly POp[] PLAYER_OPS = {
         POp.Move, POp.TurnLR, POp.TurnBy, POp.Weapon, POp.MoveRel, POp.FaceSide,
-        POp.Wait, POp.StopAll };
-
-    // V2.7 - STRUCTURE LEFT THE CHIP CYCLE. IF/ELSE/END IF/REPEAT/FOREVER/END
-    // used to sit in this list, so one stray tap on a working block turned it
-    // into an unmatched marker (Validate: IF without END IF) and walking back
-    // cost six more taps. Structure now arrives BALANCED from the + IF and
-    // + REPEAT palette chips, and CycleOp refuses to convert between
-    // structure and action in either direction.
-    static bool IsStructural(POp o)
-    {
-        return o == POp.If || o == POp.Else || o == POp.EndIf
-            || o == POp.Repeat || o == POp.Forever || o == POp.End;
-    }
+        POp.Wait, POp.StopAll, POp.If, POp.Else, POp.EndIf,
+        POp.Repeat, POp.Forever, POp.End };
 
     // per-kind value chips cycle through these (no free text, §6)
     static readonly float[] V_RANGE = { 0.5f, 1f, 1.5f, 2f, 2.2f, 3f, 4f, 6f, 8f, 12f };
@@ -434,16 +423,7 @@ public class ProgramCanvas : MonoBehaviour
     /// don't appear — the §5 gate). Internal ops enter the cycle at MOVE.</summary>
     void CycleOp(PBlock b, List<string> ids)
     {
-        // V2.7: structure never cycles into action - that orphans its partner
-        // marker. REPEAT<->FOREVER is the one legal swap: both close on END,
-        // so the span stays balanced through it.
-        if (IsStructural(b.op))
-        {
-            if (b.op == POp.Repeat) { b.op = POp.Forever; b.arg = 0f; }
-            else if (b.op == POp.Forever) { b.op = POp.Repeat; b.arg = 3f; }
-            return;
-        }
-        int i = System.Array.IndexOf(PLAYER_OPS, b.op);   // internal ops: -1
+        int i = System.Array.IndexOf(PLAYER_OPS, b.op);   // −1 for internal ops
         for (int step = 1; step <= PLAYER_OPS.Length; step++)
         {
             var cand = PLAYER_OPS[(i + step + PLAYER_OPS.Length) % PLAYER_OPS.Length];
@@ -496,12 +476,6 @@ public class ProgramCanvas : MonoBehaviour
     static bool HasDurChip(POp o) { return o == POp.RunMotor || o == POp.Wait; }
 
     // ---- build availability ----------------------------------------------
-    /// <summary>V2.8b (critic loop 7 R2, finding 1) — what the player OWNS
-    /// but has not bolted on. BuildIds() is the BAY; this is the CRATE. A
-    /// refusal that cannot tell them apart sends a fresh career shopping for
-    /// the four wheels it was already granted.</summary>
-    List<string> OwnedIds() { return Career.OwnedPartIds(); }   // R3: one source, in Career
-
     List<string> BuildIds()
     {
         var ids = new List<string>();
@@ -634,24 +608,16 @@ public class ProgramCanvas : MonoBehaviour
 
     void BuildSaveAsDlg()
     {
-        // V2.7 polish: this is a real MODAL now. It used to be a 0.98-alpha
-        // card floating over a live canvas - the program rows ghosted through
-        // it (owen's catch), and a tap anywhere OUTSIDE the card still reached
-        // the chips underneath, so 'tap away to dismiss' quietly cycled an op
-        // instead. The root is a full-bleed scrim that eats those taps; the
-        // card inside it is opaque.
-        saveAsDlg = MkPanel("saveas_dlg", transform, new Color(0.02f, 0.02f, 0.03f, 0.72f));
+        saveAsDlg = MkPanel("saveas_dlg", transform, new Color(0.07f, 0.08f, 0.11f, 0.98f));
         saveAsDlg.AddComponent<LayoutElement>().ignoreLayout = true;   // overlay, not a row
-        Stretch((RectTransform)saveAsDlg.transform);
-        var card = MkPanel("saveas_card", saveAsDlg.transform, new Color(0.07f, 0.08f, 0.11f, 1f));
-        var rt = (RectTransform)card.transform;
+        var rt = (RectTransform)saveAsDlg.transform;
         rt.anchorMin = new Vector2(0.04f, 0.30f); rt.anchorMax = new Vector2(0.96f, 0.70f);
         rt.offsetMin = Vector2.zero; rt.offsetMax = Vector2.zero;
-        var v = card.AddComponent<VerticalLayoutGroup>();
+        var v = saveAsDlg.AddComponent<VerticalLayoutGroup>();
         v.spacing = 6f; v.padding = new RectOffset(10, 10, 10, 10);
         v.childForceExpandWidth = true; v.childForceExpandHeight = false;
-        MkText("t", card.transform, "SAVE PROGRAM AS", 12f, TextAnchor.MiddleLeft);
-        var ig = MkPanel("saveas_name", card.transform, new Color(0.13f, 0.14f, 0.18f, 1f));
+        MkText("t", saveAsDlg.transform, "SAVE PROGRAM AS", 12f, TextAnchor.MiddleLeft);
+        var ig = MkPanel("saveas_name", saveAsDlg.transform, new Color(0.13f, 0.14f, 0.18f, 1f));
         var ile = ig.AddComponent<LayoutElement>();
         ile.minHeight = TouchRow() * 0.9f; ile.preferredHeight = TouchRow() * 0.9f;
         saveAsInput = ig.AddComponent<InputField>();
@@ -665,9 +631,9 @@ public class ProgramCanvas : MonoBehaviour
         ph.rectTransform.offsetMin = new Vector2(8f, 2f); ph.rectTransform.offsetMax = new Vector2(-8f, -2f);
         saveAsInput.textComponent = itxt; saveAsInput.placeholder = ph;
         saveAsInput.characterLimit = 24;
-        saveAsErr = MkText("saveas_err", card.transform, "", 10f, TextAnchor.MiddleLeft);
+        saveAsErr = MkText("saveas_err", saveAsDlg.transform, "", 10f, TextAnchor.MiddleLeft);
         saveAsErr.color = new Color(1f, 0.6f, 0.4f);
-        var row = MkRow(card.transform);
+        var row = MkRow(saveAsDlg.transform);
         MkChip("saveas_ok", row.transform, "SAVE", 12f,
                new Color(0.16f, 0.34f, 0.18f, 0.95f), SaveAsConfirm, 84f);
         MkChip("saveas_cancel", row.transform, "CANCEL", 12f,
@@ -699,19 +665,16 @@ public class ProgramCanvas : MonoBehaviour
 
     void BuildOpenDlg()
     {
-        // V2.7: modal, same reasoning as the SAVE AS dialog above.
-        openDlg = MkPanel("open_dlg", transform, new Color(0.02f, 0.02f, 0.03f, 0.72f));
+        openDlg = MkPanel("open_dlg", transform, new Color(0.07f, 0.08f, 0.11f, 0.98f));
         openDlg.AddComponent<LayoutElement>().ignoreLayout = true;   // overlay
-        Stretch((RectTransform)openDlg.transform);
-        var card = MkPanel("open_card", openDlg.transform, new Color(0.07f, 0.08f, 0.11f, 1f));
-        var rt = (RectTransform)card.transform;
+        var rt = (RectTransform)openDlg.transform;
         rt.anchorMin = new Vector2(0.04f, 0.12f); rt.anchorMax = new Vector2(0.96f, 0.88f);
         rt.offsetMin = Vector2.zero; rt.offsetMax = Vector2.zero;
-        var v = card.AddComponent<VerticalLayoutGroup>();
+        var v = openDlg.AddComponent<VerticalLayoutGroup>();
         v.spacing = 6f; v.padding = new RectOffset(10, 10, 10, 10);
         v.childForceExpandWidth = true; v.childForceExpandHeight = false;
-        MkText("t", card.transform, "SWITCH PROGRAM", 12f, TextAnchor.MiddleLeft);
-        var scGO = MkPanel("open_scroll", card.transform, new Color(0f, 0f, 0f, 0.25f));
+        MkText("t", openDlg.transform, "SWITCH PROGRAM", 12f, TextAnchor.MiddleLeft);
+        var scGO = MkPanel("open_scroll", openDlg.transform, new Color(0f, 0f, 0f, 0.25f));
         var sle2 = scGO.AddComponent<LayoutElement>(); sle2.flexibleHeight = 1f; sle2.minHeight = 60f;
         var sr2 = scGO.AddComponent<ScrollRect>(); sr2.horizontal = false; sr2.vertical = true;
         var vpGO = MkPanel("open_vp", scGO.transform, new Color(0f, 0f, 0f, 0f));
@@ -726,25 +689,10 @@ public class ProgramCanvas : MonoBehaviour
         cGO.AddComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.PreferredSize;
         sr2.viewport = vprt; sr2.content = crt2;
         openListContent = cGO.transform;
-        var row = MkRow(card.transform);
+        var row = MkRow(openDlg.transform);
         MkChip("open_cancel", row.transform, "CANCEL", 12f,
                new Color(0.24f, 0.24f, 0.30f, 0.9f), () => openDlg.SetActive(false), 92f);
         openDlg.SetActive(false);
-    }
-
-    /// <summary>V2.8 — one switch-list row for a built-in program, carrying
-    /// its own shortfall. A row that cannot run on this bay says so on its
-    /// face and reads amber instead of green.</summary>
-    void AddPresetRow(string name, string label, RobotProgram p, List<string> ids)
-    {
-        var row = MkRow(openListContent);
-        string shop = p.MissingPartsLine(ids, OwnedIds());
-        var b = MkChip(name, row.transform,
-            label + (shop == null ? "" : "   ·   " + shop), 11f,
-            shop == null ? new Color(0.18f, 0.30f, 0.22f, 0.95f)
-                         : new Color(0.30f, 0.24f, 0.16f, 0.95f), () =>
-        { openDlg.SetActive(false); InstallPreset(p); }, 200f);
-        b.GetComponent<LayoutElement>().flexibleWidth = 1f;
     }
 
     void RefreshOpenList()
@@ -752,14 +700,11 @@ public class ProgramCanvas : MonoBehaviour
         for (int i = openListContent.childCount - 1; i >= 0; i--)
             Destroy(openListContent.GetChild(i).gameObject);
         // V2.6: the preset leads the switch list; library rows follow.
-        // V2.8 (critic loop 7, F1a/F1c): TWO presets now, and each row states
-        // its own hardware price ON ITS FACE, before the canvas is replaced.
-        // The old list offered one sensor-heavy program to a career whose
-        // granted parts crate (CareerDB.StarterKit) holds no sensor at all —
-        // and you found that out only after LOAD had overwritten the canvas.
-        var presetIds = BuildIds();
-        AddPresetRow("open_first", "FIRST STEPS  (preset)", RobotProgram.FirstSteps(), presetIds);
-        AddPresetRow("open_preset", "STARTER KIT  (preset)", RobotProgram.StarterKit(), presetIds);
+        var prow = MkRow(openListContent);
+        var pb = MkChip("open_preset", prow.transform, "STARTER KIT  (preset)", 11f,
+            new Color(0.18f, 0.30f, 0.22f, 0.95f), () =>
+            { openDlg.SetActive(false); InstallPreset(RobotProgram.StarterKit()); }, 200f);
+        pb.GetComponent<LayoutElement>().flexibleWidth = 1f;
         var lib = Career.Data != null ? Career.Data.programs : null;
         if (lib == null || lib.Count == 0)
         {
@@ -839,14 +784,6 @@ public class ProgramCanvas : MonoBehaviour
             progDropLabel.text = (string.IsNullOrEmpty(prog.title) ? "PROGRAMS" : prog.title.ToUpper()) + "  ▾";
         RebuildList();
         RefreshLockedHint();
-        // V2.8 (critic loop 7, F3): an empty canvas used to say NOTHING —
-        // blank status, and four of its five controls are document
-        // operations on a document that does not exist yet. Point at the door.
-        if (prog.hats.Count == 0 && string.IsNullOrEmpty(status.text))
-        {
-            status.text = "no program yet — tap PROGRAMS ▾ and pick a preset to start";
-            status.color = new Color(0.6f, 0.9f, 1f);
-        }
     }
 
     void MarkDirty()
@@ -873,21 +810,7 @@ public class ProgramCanvas : MonoBehaviour
         { status.text = "no robot open — SAVE the build as a robot first"; status.color = new Color(1f, 0.6f, 0.4f); return; }
         string err = prog.Validate(BuildIds());
         if (err != null)
-        {
-            // V2.8 (critic loop 7, F1b): when the refusal is about missing
-            // hardware, name ALL of it at once — one shopping trip, not three.
-            // V2.8b (critic loop 7 R2, finding 2): ONLY hardware refusals get
-            // swapped for the whole shopping list. Round 1 wrote `shop ?? err`
-            // unconditionally, so "the sequence is empty — add a step" or an
-            // unbalanced IF was silently replaced by a parts list: the player
-            // bought the parts, came back, and only THEN met the real problem.
-            // Two trips pointing the other way — the exact defect round 1 set
-            // out to remove.
-            bool hardware = err.EndsWith("— SHOP") || err.Contains("on the build");
-            string shop = hardware ? prog.MissingPartsLine(BuildIds(), OwnedIds()) : null;
-            status.text = shop ?? err;
-            status.color = new Color(1f, 0.6f, 0.4f); return;
-        }
+        { status.text = err; status.color = new Color(1f, 0.6f, 0.4f); return; }
         r.program = prog.ToJson();
         if (Career.autosave) Career.Save();
         dirty = false;
@@ -1037,25 +960,10 @@ public class ProgramCanvas : MonoBehaviour
                 AddHandle(bh.gameObject, ProgramDragHandle.BLOCK, hi, bi);
             }
             MkChip("bx", row.transform, "✕", 11f, new Color(0.3f, 0.16f, 0.16f, 0.9f), () =>
-            { DeleteBlock(hat, biC); MarkDirty(); }, 34f);
-            // V2.7: a structural marker's op chip no longer cycles into an
-            // action verb (IsStructural). REPEAT/FOREVER keeps a live chip -
-            // it swaps between those two, both of which close on END - and
-            // reads amber; the pure markers (IF/ELSE/END IF/END) go grey and
-            // inert, because there is nothing safe for a tap to do to them.
-            bool struc = IsStructural(b.op);
-            bool swapLoop = b.op == POp.Repeat || b.op == POp.Forever;
+            { hat.body.RemoveAt(biC); MarkDirty(); }, 34f);
             MkChip("bop", row.transform, OpName(b.op), 11f,
-                   struc ? (swapLoop ? new Color(0.30f, 0.24f, 0.16f, 0.95f)
-                                     : new Color(0.22f, 0.22f, 0.27f, 0.95f))
-                         : new Color(0.17f, 0.28f, 0.22f, 0.95f), () =>
-            { if (!struc || swapLoop) { CycleOp(b, BuildIds()); MarkDirty(); } }, 96f);
-            // V2.7: an IF with no ELSE yet offers one, inserted at its OWN
-            // matching END IF - balanced by construction, like + IF itself.
-            if (b.op == POp.If && !SpanHasElse(hat, bi))
-                MkChip("belse", row.transform, "+ ELSE", 10f,
-                       new Color(0.20f, 0.26f, 0.34f, 0.95f), () =>
-                { InsertElse(hat, biC); MarkDirty(); }, 70f);
+                   new Color(0.17f, 0.28f, 0.22f, 0.95f), () =>
+            { CycleOp(b, BuildIds()); MarkDirty(); }, 96f);
             if (b.op == POp.If && b.cond != null)
             {
                 var c = b.cond;
@@ -1213,11 +1121,7 @@ public class ProgramCanvas : MonoBehaviour
                         MarkDirty();
                     }, 62f);
             }
-            // V2.7: ELSE dedents to its IF above, and then the ELSE BRANCH
-            // BODY has to re-indent. Without this the two arms of one IF drew
-            // at different depths and the else arm read as code AFTER the IF.
-            if (b.op == POp.If || b.op == POp.Repeat || b.op == POp.Forever
-                || b.op == POp.Else) depth++;
+            if (b.op == POp.If || b.op == POp.Repeat || b.op == POp.Forever) depth++;
         }
 
         if (prog.BlockCount() < RobotProgram.MAX_BLOCKS)
@@ -1230,30 +1134,6 @@ public class ProgramCanvas : MonoBehaviour
             // P3b: + BLOCK is a palette source too — drag it to the exact row
             // (any hat, any depth) the new block should occupy.
             AddHandle(ab.gameObject, ProgramDragHandle.NEW_BLOCK, hi, -1);
-            // V2.7: structure arrives as a MATCHED SPAN with a body already
-            // inside it - three blocks, balanced, runnable the moment it
-            // lands. Before this the only door to an IF was cycling a chip
-            // through the op list, which meant authoring your way back out of
-            // an invalid program every single time.
-            if (prog.BlockCount() + 3 <= RobotProgram.MAX_BLOCKS)
-            {
-                MkChip("addif", addRow.transform, "+ IF", 11f,
-                       new Color(0.18f, 0.24f, 0.32f, 0.9f), () =>
-                {
-                    hat.body.Add(PBlock.MkIf(PCondTerm.Always()));
-                    hat.body.Add(PBlock.MkMove(70f, 1f, 0));
-                    hat.body.Add(PBlock.MkEndIf());
-                    MarkDirty();
-                }, 66f);
-                MkChip("addrep", addRow.transform, "+ REPEAT", 11f,
-                       new Color(0.30f, 0.24f, 0.16f, 0.9f), () =>
-                {
-                    hat.body.Add(PBlock.MkRepeat(3));
-                    hat.body.Add(PBlock.MkMove(70f, 1f, 0));
-                    hat.body.Add(PBlock.MkEnd());
-                    MarkDirty();
-                }, 96f);
-            }
         }
     }
 
@@ -1495,75 +1375,6 @@ public class ProgramCanvas : MonoBehaviour
             }
         }
         return h.body.Count - 1;
-    }
-
-    /// <summary>V2.7 - inclusive START of the span index `i` belongs to: a
-    /// closer or an ELSE resolves back to its opener; anything else is its
-    /// own span. An orphan marker resolves to itself.</summary>
-    static int SpanStart(PHat h, int i)
-    {
-        var op = h.body[i].op;
-        bool toIf = op == POp.Else || op == POp.EndIf;
-        bool toLoop = op == POp.End;
-        if (!toIf && !toLoop) return i;
-        int depth = 0;
-        for (int k = i - 1; k >= 0; k--)
-        {
-            var o = h.body[k].op;
-            if (toIf)
-            {
-                if (o == POp.EndIf) depth++;
-                else if (o == POp.If) { if (depth == 0) return k; depth--; }
-            }
-            else
-            {
-                if (o == POp.End) depth++;
-                else if (o == POp.Repeat || o == POp.Forever)
-                { if (depth == 0) return k; depth--; }
-            }
-        }
-        return i;
-    }
-
-    /// <summary>V2.7 - what the row's X means now. Deleting one marker used
-    /// to leave its partner orphaned somewhere off-screen; X on ANY part of a
-    /// C-block now takes the whole span, exactly like the off-list drag has
-    /// always done. ELSE is the exception - it can leave alone and the IF is
-    /// still valid without it.</summary>
-    public void DeleteBlock(PHat h, int i)
-    {
-        if (h == null || i < 0 || i >= h.body.Count) return;
-        if (h.body[i].op == POp.Else) { h.body.RemoveAt(i); return; }
-        int a = SpanStart(h, i);
-        int e = SpanEnd(h, a);
-        if (e < a) e = a;
-        h.body.RemoveRange(a, e - a + 1);
-    }
-
-    /// <summary>V2.7 - does the IF opening at `open` already carry an ELSE at
-    /// its OWN level? (a nested IF's ELSE does not count)</summary>
-    static bool SpanHasElse(PHat h, int open)
-    {
-        int end = SpanEnd(h, open);
-        int depth = 0;
-        for (int k = open + 1; k <= end && k < h.body.Count; k++)
-        {
-            var o = h.body[k].op;
-            if (o == POp.If) depth++;
-            else if (o == POp.EndIf) depth--;
-            else if (o == POp.Else && depth == 0) return true;
-        }
-        return false;
-    }
-
-    /// <summary>V2.7 - drop an ELSE in just before the IF's own END IF.</summary>
-    public void InsertElse(PHat h, int open)
-    {
-        if (h == null || open < 0 || open >= h.body.Count) return;
-        if (h.body[open].op != POp.If || SpanHasElse(h, open)) return;
-        int end = SpanEnd(h, open);
-        if (end >= h.body.Count || h.body[end].op != POp.EndIf) return;
-        h.body.Insert(end, PBlock.MkElse());
     }
 
     public void MoveHat(int from, int to)

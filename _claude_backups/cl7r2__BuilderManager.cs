@@ -4188,26 +4188,18 @@ public class BuilderManager : MonoBehaviour
         if (prog == null || prog.hats.Count == 0)
         { shortTag = "no program"; return "autonomy needs a saved program — PROGRAM tab"; }
         var ids = new List<string>();
-        foreach (var p in placed) ids.Add(p.def.id);
-        // V2.8b (critic loop 7 R2, finding 3): the blanket "autonomy needs a
-        // sensor on the build" refusal that used to sit here locked the
-        // sensor-free FIRST STEPS preset out of the very mode presets exist
-        // to feed — a day-one career could load it, be told it was ready, and
-        // then be refused at every contest. Validate() below already names any
-        // sensor the program ACTUALLY references, which is the honest gate:
-        // perception is required of the PROGRAM, not of the chassis.
-        string err = prog.Validate(ids);
-        if (err != null)
+        bool sensor = false;
+        foreach (var p in placed)
         {
-            // V2.8c (critic loop 7 R3, F1): the FIGHT tab is the ONLY place a
-            // player meets an autonomy refusal, and it was still handing out
-            // Validate's raw first-failure with a bare "— SHOP" — the exact
-            // message R2 replaced everywhere else. Same sentence, same crate
-            // awareness, on the surface that actually greys the button.
-            string shop = prog.MissingPartsLine(ids, Career.OwnedPartIds());
-            shortTag = shop != null ? "parts missing" : "program invalid";
-            return shop ?? err;
+            ids.Add(p.def.id);
+            // V2.2: def-driven — the sensor split (and any future sensor)
+            // flows through the part table instead of a second list here.
+            if (p.def.sensor) sensor = true;
         }
+        if (!sensor)
+        { shortTag = "no sensor"; return "autonomy needs a sensor on the build — SHOP"; }
+        string err = prog.Validate(ids);
+        if (err != null) { shortTag = "program invalid"; return err; }
         return null;
     }
 
@@ -4235,22 +4227,7 @@ public class BuilderManager : MonoBehaviour
         // Single gate - the same call the FIGHT buttons use to decide whether
         // they look available. See CareerFightBlocker.
         string blocked = CareerFightBlocker(li, ci);
-        if (blocked != null)
-        {
-            // V2.8c (critic loop 7 R3, F2): when the manual gate ALSO refuses,
-            // a greyed AUTONOMY FIGHT used to have no reason anywhere on the
-            // device — the row label carries the manual one (R2 made it
-            // single-line on purpose to stop it clipping) and this early return
-            // meant tapping the button just repeated that. So the autonomy
-            // requirement was unreachable from the one screen that gates on it.
-            message = blocked;
-            if (autonomy)
-            {
-                string bTag; string bWhy = AutonomyBlocker(out bTag);
-                if (bWhy != null) message += "   ·   and " + bWhy;
-            }
-            SfxSynth.Deny(); return;
-        }
+        if (blocked != null) { message = blocked; SfxSynth.Deny(); return; }
         // P4: the autonomy gate stacks ON TOP of the manual gate, and it
         // refuses BEFORE the entry fee is debited — a fee taken for a fight
         // the program can't start is a refund bug waiting to happen.

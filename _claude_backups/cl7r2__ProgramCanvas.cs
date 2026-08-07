@@ -496,12 +496,6 @@ public class ProgramCanvas : MonoBehaviour
     static bool HasDurChip(POp o) { return o == POp.RunMotor || o == POp.Wait; }
 
     // ---- build availability ----------------------------------------------
-    /// <summary>V2.8b (critic loop 7 R2, finding 1) — what the player OWNS
-    /// but has not bolted on. BuildIds() is the BAY; this is the CRATE. A
-    /// refusal that cannot tell them apart sends a fresh career shopping for
-    /// the four wheels it was already granted.</summary>
-    List<string> OwnedIds() { return Career.OwnedPartIds(); }   // R3: one source, in Career
-
     List<string> BuildIds()
     {
         var ids = new List<string>();
@@ -738,7 +732,7 @@ public class ProgramCanvas : MonoBehaviour
     void AddPresetRow(string name, string label, RobotProgram p, List<string> ids)
     {
         var row = MkRow(openListContent);
-        string shop = p.MissingPartsLine(ids, OwnedIds());
+        string shop = p.MissingPartsLine(ids);
         var b = MkChip(name, row.transform,
             label + (shop == null ? "" : "   ·   " + shop), 11f,
             shop == null ? new Color(0.18f, 0.30f, 0.22f, 0.95f)
@@ -876,15 +870,7 @@ public class ProgramCanvas : MonoBehaviour
         {
             // V2.8 (critic loop 7, F1b): when the refusal is about missing
             // hardware, name ALL of it at once — one shopping trip, not three.
-            // V2.8b (critic loop 7 R2, finding 2): ONLY hardware refusals get
-            // swapped for the whole shopping list. Round 1 wrote `shop ?? err`
-            // unconditionally, so "the sequence is empty — add a step" or an
-            // unbalanced IF was silently replaced by a parts list: the player
-            // bought the parts, came back, and only THEN met the real problem.
-            // Two trips pointing the other way — the exact defect round 1 set
-            // out to remove.
-            bool hardware = err.EndsWith("— SHOP") || err.Contains("on the build");
-            string shop = hardware ? prog.MissingPartsLine(BuildIds(), OwnedIds()) : null;
+            string shop = prog.MissingPartsLine(BuildIds());
             status.text = shop ?? err;
             status.color = new Color(1f, 0.6f, 0.4f); return;
         }

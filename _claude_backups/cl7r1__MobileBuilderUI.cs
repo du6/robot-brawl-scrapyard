@@ -3163,31 +3163,14 @@ public class MobileBuilderUI : MonoBehaviour
             // the loop would be nicer \u2014 but the 0.25 s pump timer already
             // bounds the cost and per-row keeps the code shaped like the
             // manual gate beside it.
-            // V2.8 (critic loop 7, F2): the autonomy gate now speaks on its
-            // OWN terms and is never overwritten by the manual one. The line
-            // that used to sit here was `if (blocked) aTag = tag;` — so any
-            // bay that also failed the manual gate swallowed the autonomy
-            // reason whole. On owen's save that hid "needs a saved program"
-            // behind "Needs at least 1 wheel" on all nine rows, and no bench
-            // could see it: AutonomyBench asks the blocker directly, and a
-            // test that goes through the API cannot notice that nothing on
-            // screen says the API exists (critic loop 6's rule).
             string aTag;
-            bool aOwn = bm.AutonomyBlocker(out aTag) != null;   // autonomy's OWN refusal
-            bool aBlocked = aOwn || blocked;
-            string want = g.baseLabel;
-            if (blocked) want += "   \u2014   " + tag;
-            // V2.8b (critic loop 7 R2, finding 6): ELSE, not a second clause.
-            // AutonomyBlocker reads the bay, not the contest, so its sentence
-            // is identical on all nine rows; appending it alongside the manual
-            // one pushed every label onto two lines in a one-line box and
-            // clipped both. The autonomy reason now shows exactly when it is
-            // the ONLY thing in the way - which is when it is actionable.
-            else if (aOwn) want += "   \u2014   auto: " + aTag;
+            bool aBlocked = bm.AutonomyBlocker(out aTag) != null || blocked;
+            if (blocked) aTag = tag;
+            string want = blocked ? g.baseLabel + "   \u2014   " + tag
+                        : aBlocked ? g.baseLabel + "   \u2014   auto: " + aTag
+                        : g.baseLabel;
             if (g.lbl.text != want) g.lbl.text = want;
-            // amber for EITHER refusal - a row only autonomy refuses used to
-            // print its refusal in ready-white.
-            g.lbl.color = (blocked || aOwn) ? new Color(1f, 0.72f, 0.36f) : Color.white;
+            g.lbl.color = blocked ? new Color(1f, 0.72f, 0.36f) : Color.white;
             if (g.img != null) g.img.color = blocked ? FIGHT_DEAD : FIGHT_OK;
             if (g.aimg != null) g.aimg.color = aBlocked ? FIGHT_DEAD : AUTO_OK;
             var face = g.btn.GetComponentInChildren<Text>();

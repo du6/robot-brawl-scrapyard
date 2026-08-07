@@ -134,28 +134,8 @@ public class AutonomyBench : MonoBehaviour
         bm.StartCareerFight(0, 0, true);
         yield return null;
         Check(bm.mode == BuilderManager.Mode.Build
-              && bm.LastMessage != null && bm.LastMessage.Contains("Compass"),
-              "a program that NEEDS a sensor is refused on a sensor-less body,"
-              + " and the refusal names it ('" + bm.LastMessage + "')");
-
-        // V2.8b (critic loop 7 R2, finding 3): the CONTRACT CHANGED. Autonomy
-        // used to demand a sensor on the chassis unconditionally, which locked
-        // the sensor-free FIRST STEPS preset out of the only mode presets
-        // exist to feed. Perception is now required of the PROGRAM, not of the
-        // build: a program that references no sensor may fight without one.
-        Career.Data.stable[0].program = RobotProgram.FirstSteps().ToJson();
-        yield return null;
-        string aTag2;
-        string block2 = bm.AutonomyBlocker(out aTag2);
-        Check(block2 == null,
-              "a sensor-FREE program passes the gate on a sensor-less body ('"
-              + (block2 ?? "allowed") + "')");
-        // ...and put the sensor-using program back: section C below fights
-        // with it, and leaving FIRST STEPS installed made the runner carry the
-        // wrong program. A bench that mutates shared fixture state has to put
-        // it back before the next section reads it.
-        Career.Data.stable[0].program = RobotProgram.Brawler().ToJson();
-        yield return null;
+              && bm.LastMessage != null && bm.LastMessage.Contains("sensor"),
+              "no sensor → refused, amber names the SHOP ('" + bm.LastMessage + "')");
 
         // ---- C. the autonomy fight ------------------------------------------
         bm.LoadSnapshot(BODY + SENSORS);
@@ -236,13 +216,8 @@ public class AutonomyBench : MonoBehaviour
         Check(row != null, "L1C1 contest row present on the board");
         if (row != null)
         {
-            // V2.7: the mark is a DRAWN gear now, not ASCII inside the label.
-            // Assert on the OBJECT and on its sprite - the old text check was
-            // exactly the kind that passes while the screen shows nothing.
-            var mark = FindRT(row, "automark_L1C1");
-            var mimg = mark != null ? mark.GetComponent<Image>() : null;
-            Check(mark != null && mimg != null && mimg.sprite != null,
-                  "row carries the drawn autonomy mark");
+            var lbl = row.GetComponentInChildren<Text>();
+            Check(lbl != null && lbl.text.Contains("[AUTO]"), "row carries the [AUTO] autonomy mark");
             bool manualBtn = FindRT(row, "cfight_L1C1") != null;
             bool autoBtn = FindRT(row, "cauto_L1C1") != null;
             Check(manualBtn && autoBtn, "row offers MANUAL FIGHT and AUTONOMY FIGHT");
@@ -250,7 +225,8 @@ public class AutonomyBench : MonoBehaviour
         var row2 = FindRTGlobal("contest_L1C2");
         if (row2 != null)
         {
-            Check(FindRT(row2, "automark_L1C2") == null,
+            var lbl2 = row2.GetComponentInChildren<Text>();
+            Check(lbl2 != null && !lbl2.text.Contains("[AUTO]"),
                   "manually-won contest shows NO autonomy mark");
         }
 

@@ -577,15 +577,6 @@ public class RobotProgram
     /// collects EVERY part the program references that the bay lacks, so the
     /// list arrives whole. First-reference order; duplicates collapse.</summary>
     public List<string> MissingParts(List<string> partIds)
-    { var ids = MissingPartIds(partIds);
-      var outp = new List<string>();
-      foreach (var id in ids) outp.Add(PartWord(id));
-      return outp; }
-
-    /// <summary>The shortfall as PART IDS, so a caller can ask whether the
-    /// player already owns one. Labels are for reading; ids are for looking
-    /// things up, and the crate check needs the latter.</summary>
-    public List<string> MissingPartIds(List<string> partIds)
     {
         int wheels = 0, acts = 0;
         var have = new HashSet<string>();
@@ -602,67 +593,46 @@ public class RobotProgram
             foreach (var t in h.when)
             {
                 string s = SensorIdOf(t.kind);
-                if (s != null && !have.Contains(s) && !need.Contains(s)) need.Add(s);
+                if (s != null && !have.Contains(s) && !need.Contains(SensorLabel(s)))
+                    need.Add(SensorLabel(s));
             }
             foreach (var b in h.body)
             {
                 if (b.op == POp.If && b.cond != null)
                 {
                     string s = SensorIdOf(b.cond.kind);
-                    if (s != null && !have.Contains(s) && !need.Contains(s)) need.Add(s);
+                    if (s != null && !have.Contains(s) && !need.Contains(SensorLabel(s)))
+                        need.Add(SensorLabel(s));
                 }
                 if (b.op == POp.TurnToward && !have.Contains("compass")
-                    && !need.Contains("compass")) need.Add("compass");
+                    && !need.Contains(SensorLabel("compass"))) need.Add(SensorLabel("compass"));
                 if (b.op == POp.MoveRel || b.op == POp.FaceSide)
                 {
                     string s = SensorIdOfTarget(b.target);
-                    if (s != null && !have.Contains(s) && !need.Contains(s)) need.Add(s);
+                    if (s != null && !have.Contains(s) && !need.Contains(SensorLabel(s)))
+                        need.Add(SensorLabel(s));
                 }
                 bool drives = b.op == POp.Move || b.op == POp.TurnLR || b.op == POp.TurnBy
                            || b.op == POp.MoveRel || b.op == POp.FaceSide
                            || ((b.op == POp.SetMotor || b.op == POp.RunMotor) && IsWheelTarget(b.part));
-                if (wheels == 0 && drives && !need.Contains("wheel")) need.Add("wheel");
+                if (wheels == 0 && drives && !need.Contains("a wheel")) need.Add("a wheel");
                 bool arms = b.op == POp.Weapon || b.op == POp.Fire
                          || ((b.op == POp.SetMotor || b.op == POp.RunMotor) && !IsWheelTarget(b.part));
-                if (acts == 0 && arms && !need.Contains("actuator")) need.Add("actuator");
+                if (acts == 0 && arms && !need.Contains("a weapon")) need.Add("a weapon");
             }
         }
         return need;
     }
 
-    /// <summary>One part, named the way a player would say it — WITH the
-    /// article. R2 critic: the old line joined bare SensorLabel values to
-    /// hand-written "a wheel" literals and produced "needs Wall sensor, a
-    /// wheel, Compass tracker" — one list, two grammars.</summary>
-    public static string PartWord(string id)
+    /// <summary>The shortfall as ONE amber line, or null when the bay already
+    /// carries everything. Used by the LOAD refusal and by the picker row, so
+    /// the price is known BEFORE the canvas is replaced.</summary>
+    public string MissingPartsLine(List<string> partIds)
     {
-        if (id == "wheel") return "a wheel";
-        if (id == "actuator") return "a weapon";
-        return "a " + SensorLabel(id);
-    }
-
-    /// <summary>V2.8b (critic loop 7 R2, finding 1) — OWNING AND MOUNTING ARE
-    /// DIFFERENT FACTS. Every refusal used to read the BAY and end in
-    /// "— SHOP", so a fresh career holding four granted wheels in its crate
-    /// was told to go buy a wheel. `ownedIds` is the crate; parts in it need
-    /// bolting on, not buying, and the sentence has to say which.</summary>
-    public string MissingPartsLine(List<string> partIds, List<string> ownedIds)
-    {
-        var need = MissingPartIds(partIds);
+        var need = MissingParts(partIds);
         if (need.Count == 0) return null;
-        var bolt = new List<string>(); var buy = new List<string>();
-        foreach (var id in need)
-        {
-            if (ownedIds != null && ownedIds.Contains(id)) bolt.Add(PartWord(id));
-            else buy.Add(PartWord(id));
-        }
-        string s = "";
-        if (bolt.Count > 0) s = "bolt on " + string.Join(", ", bolt.ToArray()) + " — BUILD tab";
-        if (buy.Count > 0)
-            s += (s.Length > 0 ? "; " : "") + "buy " + string.Join(", ", buy.ToArray()) + " — SHOP";
-        return s;
+        return "needs " + string.Join(", ", need.ToArray()) + " — SHOP";
     }
-    public string MissingPartsLine(List<string> partIds) { return MissingPartsLine(partIds, null); }
 
     /// <summary>V2.8 (critic loop 7, F1c) — the preset that runs on the parts
     /// the game GAVE you. CareerDB.StarterKit() grants beams, a chassis, a
