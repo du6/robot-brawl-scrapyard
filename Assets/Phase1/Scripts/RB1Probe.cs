@@ -234,7 +234,7 @@ public class RB1Probe : MonoBehaviour
     {
         var d = fm.player.drive;
         if (d == null || fm.player.bot == null) return;
-        d.useAI = true;
+        fm.player.bot.controlSource = ControlSource.AI;   // P2: direct, the compat property is gone
         Vector3 self = fm.player.bot.rb.worldCenterOfMass;
         Vector3 tgt = fm.enemy.bot != null ? fm.enemy.bot.rb.worldCenterOfMass : Vector3.zero;
         Vector3 to = tgt - self; to.y = 0f;

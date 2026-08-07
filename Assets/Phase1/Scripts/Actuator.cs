@@ -860,7 +860,11 @@ public class Actuator : MonoBehaviour
                 {
                     travel = Mathf.MoveTowards(travel, 0f, ReturnRate() * dt);
                     rate = 0f;
-                    if (travel <= 0.0001f) { phase = Phase.Recovering; recoverT = RECOVER_S; }
+                    if (travel <= 0.0001f)
+                    {
+                        phase = Phase.Recovering; recoverT = RECOVER_S;
+                        cyclesDone++;   // V2: one full swing-and-return = one cycle
+                    }
                 }
                 break;
 
@@ -909,7 +913,11 @@ public class Actuator : MonoBehaviour
             // Round-2-critic CRITICAL 2: the swing STOPS at the deck. Posing a
             // solid collider through a static floor is what was flipping the
             // player's own machine - see GROUND_CLEAR for the measurement.
-            float next = travel + rate * dt;
+            // V2: a program can spin a SPINDLE either way; the sign only
+            // steers the travel direction (|rate| still carries the energy
+            // and the damage). Pivots/rams keep their built arc.
+            float next = travel + rate * dt
+                       * (kind == ActuatorKind.Spindle ? Mathf.Sign(aiSpinSign) : 1f);
             if (GroundBlocked(next))
             {
                 // The arm hit the floor. That energy went into the arena, not
@@ -967,6 +975,16 @@ public class Actuator : MonoBehaviour
     public bool playerControlled;
     /// <summary>Written by AIController.</summary>
     public bool aiFire;
+    /// <summary>V2 (programmable robots): signed spin direction for
+    /// SPINDLES under program control, +1 CW / −1 CCW. Flips only the
+    /// direction the rotor travels (pose + reaction follow through the
+    /// travel delta); the damage model reads |rate| and is unchanged.
+    /// Pivots/rams ignore it — their arc direction stays the build's.</summary>
+    public float aiSpinSign = 1f;
+    /// <summary>V2: completed fire cycles this spawn (pivot/ram: counted at
+    /// the return-to-rest transition). The program runtime's FIRE-n-cycles
+    /// blocks read the delta.</summary>
+    public int cyclesDone;
     bool Fire()
     {
         if (robot != null)

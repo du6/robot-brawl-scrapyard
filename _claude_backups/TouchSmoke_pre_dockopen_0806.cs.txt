@@ -79,22 +79,6 @@ public class TouchSmoke : MonoBehaviour
         var ui = MobileBuilderUI.inst;
         yield return null; yield return null;
 
-        // Layout pass P2 (2026-08-06): at PHONE size the dock STARTS CLOSED
-        // (the 08-04 inches rule) — every dock control is INACTIVE until the
-        // dock opens, which is why this smoke's sandbox section read as 15
-        // "missing" controls on the iPhone sim (probe showed them all present
-        // once open; the product was fine, the smoke predates the rule).
-        // Open it the way a finger would: the always-active handle chip.
-        if (ui != null && !ui.DockOpen)
-        {
-            var dhGO = GameObject.Find("dockhandle");
-            var dhb = dhGO != null ? dhGO.GetComponent<Button>() : null;
-            Check(dhb != null, "phone-size closed dock shows its handle");
-            if (dhb != null) { dhb.onClick.Invoke(); yield return null; }
-            Check(ui.DockOpen, "tapping the handle opens the dock");
-            yield return null;
-        }
-
         Check(Btn("BUILD") != null && Btn("FIGHT") != null && Btn("GARAGE") != null, "three tab buttons present");
 
         // BENCH REPAIR 2026-08-05: the chips moved into a SHEET over the
@@ -209,29 +193,8 @@ public class TouchSmoke : MonoBehaviour
         // not enough at editor frame rates.
         yield return new WaitForSeconds(0.6f);
         yield return null; yield return null;
-        // Layout pass P2 (v2): corePos was captured back in the SANDBOX
-        // phase — after the career fixture swap it no longer holds a valid
-        // ghost at every window geometry, and clicks on an invalid ghost
-        // are the ordinary silent deny. Hunt a valid spot FIRST (the same
-        // pattern the refusal probe below already uses), then click until
-        // the placement lands (the click-grace window can still swallow
-        // the first tap at editor frame rates).
-        bool preValid = false;
-        for (int attempt = 0; attempt < 24 && !preValid; attempt++)
-        {
-            Vector3 cand = attempt % 2 == 0 ? PartOnScreen(true) : PartOnScreen(false);
-            if (cand == Vector3.zero) { yield return null; continue; }
-            cand.x += (attempt / 4) * 8f * (attempt % 4 < 2 ? 1f : -1f);
-            Phase0Input.debugMousePos = cand;
-            yield return null; yield return null;
-            preValid = bm.TestGhostValid;
-        }
-        for (int pAttempt = 0; pAttempt < 4 && bm.PlacedCount != nc + 1; pAttempt++)
-        {
-            Phase0Input.DebugClick(0);
-            yield return new WaitForSeconds(0.25f);
-            yield return null; yield return null;
-        }
+        Phase0Input.DebugClick(0);
+        yield return null; yield return null;
         bool placedOne = bm.PlacedCount == nc + 1;
         // The stock gate only speaks on a PLACEABLE spot - an invalid ghost
         // is the ordinary deny (no message). Hunt a valid ghost first: the

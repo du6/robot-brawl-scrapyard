@@ -308,6 +308,13 @@ public class BuilderManager : MonoBehaviour
 
     public CompoundRobot testRobot;
     public RaycastWheelDrive testDrive;
+    /// <summary>P3c: test-drive autopilot. StartTest arms the SAVED program
+    /// of the active stable robot (if it validates against the bay) on a
+    /// ProgramRunner; the AUTO/MANUAL toggle hands the machine to it and
+    /// back through the single-authority enum. Null = nothing armable.</summary>
+    public ProgramRunner testRunner;
+    public bool testAutopilot;
+    public string testProgramTitle = "";
     FollowCamera followCam;
     /// <summary>ROUND-3 FIX (critic MAJOR 3, the half of it round 3 owns):
     /// the desktop transient message had NO lifetime. A LoadSnapshot warning
@@ -2457,7 +2464,11 @@ public class BuilderManager : MonoBehaviour
         // (Mobility or Weapon) and is already what SpawnBot uses to decide which
         // parts carry an axis code into the arena. Using it here makes the two
         // agree, which is what they should always have done.
-        bool oriented = NeedsAxis(def);
+        // P1: sensors also store their mount-face normal — the rangefinder's
+        // look direction IS the face you bolt it to (design doc §4.1). Their
+        // Half() ignores wheelAxis (plain box), so storing it moves nothing
+        // else.
+        bool oriented = NeedsAxis(def) || def.sensor;
         // Probes carry the candidate axle so Half() returns the part's
         // EFFECTIVE extents (half-width along the axle, radius tangentially) —
         // wheels/weapons sit flush on the face AND the overlap box matches
@@ -2593,7 +2604,7 @@ public class BuilderManager : MonoBehaviour
         if (ghostValid)
         {
             var swProbe = new PlacedPart { def = def, pos = pos, yaw = ghostYaw,
-                                           wheelAxis = NeedsAxis(def) ? ghostNormal : Vector3.zero,
+                                           wheelAxis = (NeedsAxis(def) || def.sensor) ? ghostNormal : Vector3.zero,
                                            matName = activeMat };
             string swWhy = RotorSweepRefusal(swProbe);
             if (swWhy != null) { ghostValid = false; ghostReason = swWhy; }
@@ -3622,6 +3633,33 @@ public class BuilderManager : MonoBehaviour
         // path is the writer here. SpawnBot machines default to AI (fail
         // closed); the one machine the human drives is granted Keyboard.
         testRobot.controlSource = ControlSource.Keyboard;
+        // P1: the compass needs something to track in test drive — the dummy.
+        var tBus = testRobot.GetComponent<SensorBus>();
+        if (tBus != null) tBus.target = dummyRobot;
+        // P3c: arm the robot's SAVED program if it validates against this
+        // bay — TEST DRIVE is where the player watches it think (§6 live
+        // debug). The program rides with the ACTIVE STABLE ROBOT; unsaved
+        // canvas edits deliberately do not arm (SAVE is the contract).
+        // Autopilot starts OFF: the toggle is the player's, every run.
+        testRunner = null; testAutopilot = false; testProgramTitle = "";
+        if (Career.active && Career.Data != null)
+        {
+            int ari = Career.Data.activeRobot;
+            var ar = (ari >= 0 && ari < Career.Data.stable.Count) ? Career.Data.stable[ari] : null;
+            var tProg = ar != null ? RobotProgram.FromJson(ar.program) : null;
+            if (tProg != null && tProg.hats.Count > 0)
+            {
+                var tIds = new List<string>();
+                foreach (var tp in placed) tIds.Add(tp.def.id);
+                if (tProg.Validate(tIds) == null)
+                {
+                    testRunner = testRobot.gameObject.AddComponent<ProgramRunner>();
+                    testRunner.Init(testRobot, testDrive);
+                    testRunner.program = tProg;
+                    testProgramTitle = string.IsNullOrEmpty(tProg.title) ? ar.name : tProg.title;
+                }
+            }
+        }
         hudWheelMassInt = WheelMassInt(placed);
 
         followCam = cam.gameObject.AddComponent<FollowCamera>();
@@ -3967,6 +4005,23 @@ public class BuilderManager : MonoBehaviour
         var pp = robot.gameObject.AddComponent<PowerPlant>();
         pp.Init(robot, pIdx.ToArray(), pKJ.ToArray(), pKW.ToArray());
         if (drv != null) drv.power = pp;
+
+        // P1 (Programmable Robots): register any sensor parts with a bus.
+        // body index == robot.parts index (Build takes specs in body order) —
+        // the same identity PowerPlant's cellIdx relies on above.
+        var sIdx = new List<int>(); var sKind = new List<string>();
+        var sAxis = new List<Vector3>(); var sKw = new List<float>();
+        for (int si = 0; si < body.Count; si++)
+        {
+            var sp = body[si];
+            if (sp.def == null || !sp.def.sensor) continue;
+            sIdx.Add(si); sKind.Add(sp.def.id);
+            sAxis.Add(sp.wheelAxis.sqrMagnitude > 0.01f ? sp.wheelAxis : dDir);
+            sKw.Add(sp.def.sensorKW);
+        }
+        if (sIdx.Count > 0)
+            robot.gameObject.AddComponent<SensorBus>().Init(robot, sIdx, sKind, sAxis, sKw, dDir);
+
         return robot;
     }
 
@@ -4115,8 +4170,49 @@ public class BuilderManager : MonoBehaviour
     /// <summary>C3: enroll and fight a league contest. Validates build +
     /// league rules, debits the entry fee, captures both sides' value for
     /// the underdog multiplier, then runs the normal fight path.</summary>
-    public void StartCareerFight(int li, int ci)
+    /// <summary>P4: can the ACTIVE ROBOT fight this contest autonomously?
+    /// null = yes. Otherwise ONE amber message naming the first problem in
+    /// shop-hint form (the CareerValidate / CareerFightBlocker pattern), with
+    /// a short tag for the board rows. Checks, in order: a robot is open and
+    /// saved, it carries a saved program, the bay has ≥1 sensor (owen's
+    /// confirmed gate), and the program validates against the bay.</summary>
+    public string AutonomyBlocker(out string shortTag)
     {
+        shortTag = null;
+        if (!Career.active || Career.Data == null) { shortTag = "career"; return "autonomy fights are a career feature"; }
+        int ari = Career.Data.activeRobot;
+        var ar = (ari >= 0 && ari < Career.Data.stable.Count) ? Career.Data.stable[ari] : null;
+        if (ar == null)
+        { shortTag = "no robot"; return "autonomy needs a SAVED robot — SAVE the build first"; }
+        var prog = RobotProgram.FromJson(ar.program);
+        if (prog == null || prog.hats.Count == 0)
+        { shortTag = "no program"; return "autonomy needs a saved program — PROGRAM tab"; }
+        var ids = new List<string>();
+        bool sensor = false;
+        foreach (var p in placed)
+        {
+            ids.Add(p.def.id);
+            // V2.2: def-driven — the sensor split (and any future sensor)
+            // flows through the part table instead of a second list here.
+            if (p.def.sensor) sensor = true;
+        }
+        if (!sensor)
+        { shortTag = "no sensor"; return "autonomy needs a sensor on the build — SHOP"; }
+        string err = prog.Validate(ids);
+        if (err != null) { shortTag = "program invalid"; return err; }
+        return null;
+    }
+
+    public void StartCareerFight(int li, int ci) { StartCareerFight(li, ci, false); }
+
+    /// <summary>P4: autonomy=true fights the SAME contest with the autopilot
+    /// driving — playerSource=Program at the bell (keyboard dead, the P0
+    /// single authority), a ProgramRunner carrying the robot's SAVED program,
+    /// the P3c ARMED banner, and the autonomy mark on a win. The opponent is
+    /// untouched (roster AI). Same fee, purse, settlement, medals.</summary>
+    public void StartCareerFight(int li, int ci, bool autonomy)
+    {
+        Career.fightAutonomous = false;   // explicit every fight; set true only below
         if (!Career.active || li < 0 || li >= CareerDB.Leagues.Length) return;
         var lg = CareerDB.Leagues[li];
         if (ci < 0 || ci >= lg.contests.Length) return;
@@ -4132,6 +4228,16 @@ public class BuilderManager : MonoBehaviour
         // they look available. See CareerFightBlocker.
         string blocked = CareerFightBlocker(li, ci);
         if (blocked != null) { message = blocked; SfxSynth.Deny(); return; }
+        // P4: the autonomy gate stacks ON TOP of the manual gate, and it
+        // refuses BEFORE the entry fee is debited — a fee taken for a fight
+        // the program can't start is a refund bug waiting to happen.
+        RobotProgram autoProg = null;
+        if (autonomy)
+        {
+            string aTag; string aWhy = AutonomyBlocker(out aTag);
+            if (aWhy != null) { message = aWhy; SfxSynth.Deny(); return; }
+            autoProg = RobotProgram.FromJson(Career.Data.stable[Career.Data.activeRobot].program);
+        }
         if (c.entryFee > 0) Career.Txn(-c.entryFee, "entry fee " + c.id);
         Career.fightBuildValue = BuildValueCareer();
         var recipe = EnemyRoster.Recipe(c.oppId, palette, c.armourMat);
@@ -4152,6 +4258,23 @@ public class BuilderManager : MonoBehaviour
         {
             if (c.entryFee > 0) Career.Txn(c.entryFee, "entry fee refund " + c.id);
             Career.activeLeague = null; Career.activeContest = null;
+            return;
+        }
+        // P4: hand the player's side to the program. The bell reads
+        // playerSource (single writer, P0); the ProgramRunner sits armed and
+        // silent until the enum grants it. Enemy stays whatever StartFight
+        // made it (AI) — opponents are not programs (owen, v1.2).
+        if (autonomy && mode == Mode.Fight && testRobot != null)
+        {
+            var afm = Object.FindFirstObjectByType<FightManager>();
+            if (afm != null)
+            {
+                afm.playerSource = ControlSource.Program;
+                var apr = testRobot.gameObject.AddComponent<ProgramRunner>();
+                apr.Init(testRobot, testDrive);
+                apr.program = autoProg;
+                Career.fightAutonomous = true;
+            }
         }
     }
 
@@ -4196,6 +4319,10 @@ public class BuilderManager : MonoBehaviour
             entry.label, c.tier, lg.name, lg.arenaName, ArenaHazards.Summary(lg.arenaId));
         scoutStats = string.Format("mass {0} kg \u00b7 value {1} scrap \u00b7 weapon: {2} \u00b7 purse {3} scrap \u00b7 entry fee {4} scrap",
             Mathf.RoundToInt(smass), sval, weapon, c.purse, c.entryFee);
+        // P1 (design doc \u00a74.2): the opponent's sensor loadout is scoutable \u2014
+        // what its program CAN know is the counter-design read.
+        string sensLine = SensorBus.LoadoutLine(recipe);
+        scoutStats += "\nsensors: " + (sensLine.Length > 0 ? sensLine : "none");
         scoutBlurb = entry.blurb;
     }
 
@@ -4923,6 +5050,27 @@ public class BuilderManager : MonoBehaviour
         stuck = stuckTimer > 1.5f;
     }
 
+    /// <summary>P3c: hand the test robot to its program (autopilot) or back
+    /// to the keyboard. The single-authority enum is the ONLY switch —
+    /// ProgramRunner gates on it every tick — and the actuators follow
+    /// (playerControlled reads the trigger, aiFire is the program's channel).
+    /// Public: the HUD button and the bench both come through here.</summary>
+    public void SetTestAutopilot(bool on)
+    {
+        if (mode != Mode.Test || testRobot == null) return;
+        testAutopilot = on && testRunner != null;
+        testRobot.controlSource = testAutopilot ? ControlSource.Program : ControlSource.Keyboard;
+        foreach (var act in testRobot.GetComponentsInChildren<Actuator>(true))
+            act.playerControlled = !testAutopilot;
+        if (!testAutopilot && testDrive != null)
+        {
+            // Hand back CLEANLY: the runner writes per-wheel commands and
+            // flips the drive to direct mode; going manual must restore the
+            // throttle/steer mixer or the keyboard is dead on a parked bot.
+            testDrive.directWheelCmd = false;
+        }
+    }
+
     public void ResetTest()
     {
         BackToBuild();
@@ -5214,6 +5362,9 @@ public class BuilderManager : MonoBehaviour
             if (line.Length == 0) continue;
             var f = line.Split('|');
             if (f.Length < 4) continue;
+            // V2.2 sensor split migration: a placed edge sentinel loads as
+            // the WALL sensor (same footprint half, same socket).
+            if (f[0] == "edgesentinel") f[0] = "wallsensor";
             P1PartDef def = null;
             foreach (var d in palette) if (d.id == f[0]) { def = d; break; }
             if (def == null) continue;
@@ -5322,6 +5473,11 @@ public class BuilderManager : MonoBehaviour
         GUI.skin.button.fontSize = 16;
         bool back  = GUI.Button(new Rect(w - 96f, 10f, 86f, 40f), "BACK");
         bool reset = GUI.Button(new Rect(w - 192f, 10f, 86f, 40f), "RESET");
+        // P3c: the autopilot toggle rides beside BACK/RESET (same IMGUI
+        // precedent: tappable on device; the sim harness uses the
+        // SetTestAutopilot seam because the simulator kills IMGUI buttons).
+        bool apTap = testRunner != null
+            && GUI.Button(new Rect(w - 288f, 10f, 86f, 40f), testAutopilot ? "MANUAL" : "AUTO");
         GUI.skin.button.fontSize = fs;
         if (shearTimer > 0f && !string.IsNullOrEmpty(shearText))
         {
@@ -5330,9 +5486,85 @@ public class BuilderManager : MonoBehaviour
             st.normal.textColor = new Color(1f, 0.5f, 0.3f);
             GUI.Label(new Rect(0f, 60f, w, 30f), shearText, st);
         }
+        // P1: sensor telemetry strip, display-only (IMGUI is fine to READ in
+        // the simulator — it is BUTTONS the disabled mouse device kills).
+        var mbus = testRobot != null ? testRobot.GetComponent<SensorBus>() : null;
+        if (mbus != null)
+        {
+            var mst = new GUIStyle(GUI.skin.label);
+            mst.fontSize = 14;
+            mst.normal.textColor = new Color(0.75f, 0.95f, 1f);
+            var mls = mbus.TelemetryLines();
+            for (int mi = 0; mi < mls.Count; mi++)
+                GUI.Label(new Rect(10f, 56f + 20f * mi, 320f, 20f), mls[mi], mst);
+        }
+        // P3c: the live program debug — armed banner + the hat strip with
+        // the FIRING hat highlighted (ProgramRunner.lastFiredHat), drawn
+        // beside the sensor telemetry: the Scratch "see it think" moment.
+        DrawProgramDebug(w, 56f);
         GUI.matrix = saved;
         if (back) { BackToBuild(); return; }
         if (reset) ResetTest();
+        if (apTap) SetTestAutopilot(!testAutopilot);
+    }
+
+    /// <summary>P3c: shared by the mobile and desktop TEST DRIVE HUDs (both
+    /// already run inside a GuiScale matrix). Amber ARMED banner centered at
+    /// the top, hat strip right-aligned under the buttons; the firing hat is
+    /// bright with a ▶, idle hats dim, "—" when no hat fires (all its WHENs
+    /// false). Display-only IMGUI — simulator-safe by the P1 telemetry rule.</summary>
+    void DrawProgramDebug(float w, float y0)
+    {
+        if (testRunner == null || testRunner.program == null) return;
+        if (!testAutopilot)
+        {
+            // Critic (first shot): bare labels vanished against the bright
+            // sky — everything this HUD says sits on a dark backing box now.
+            GUI.Box(new Rect(w - 318f, y0 - 2f, 312f, 24f), "");
+            var hint = new GUIStyle(GUI.skin.label);
+            hint.fontSize = 13; hint.alignment = TextAnchor.MiddleRight;
+            hint.normal.textColor = new Color(0.75f, 0.85f, 0.95f);
+            GUI.Label(new Rect(w - 314f, y0, 300f, 20f),
+                      "program “" + testProgramTitle + "” saved — AUTO to watch it", hint);
+            return;
+        }
+        var bst = new GUIStyle(GUI.skin.box);
+        bst.fontSize = 15; bst.fontStyle = FontStyle.Bold;
+        var pc0 = GUI.color;
+        GUI.color = new Color(1f, 0.8f, 0.25f, 0.95f);
+        // Portrait-probe critic: a fixed 480 centered on a NARROW view clips
+        // both ends. Clamp to the screen; the text truncates before the box
+        // ever leaves it.
+        float bw = Mathf.Min(480f, w - 24f);
+        GUI.Box(new Rect(Mathf.Max((w - bw) * 0.5f, 12f), y0, bw, 28f),
+                "PROGRAM ARMED — autopilot is driving · " + testProgramTitle, bst);
+        GUI.color = pc0;
+        var prog = testRunner.program;
+        int fh = testRunner.lastFiredHat;
+        // Critic (first shot): the hat strip's dim labels were unreadable on
+        // the sky. Same cure as the desktop telemetry strip: a backing box.
+        int hatRows = prog.hats.Count + (fh < 0 ? 1 : 0);
+        GUI.Box(new Rect(w - 318f, y0 + 24f, 312f, 22f * hatRows + 8f), "");
+        var hs = new GUIStyle(GUI.skin.label);
+        hs.fontSize = 14; hs.alignment = TextAnchor.MiddleRight;
+        for (int hi = 0; hi < prog.hats.Count; hi++)
+        {
+            var hat = prog.hats[hi];
+            string nm = string.IsNullOrEmpty(hat.name) ? "hat " + (hi + 1) : hat.name;
+            bool firing = hi == fh;
+            hs.fontStyle = firing ? FontStyle.Bold : FontStyle.Normal;
+            hs.normal.textColor = firing ? new Color(1f, 0.9f, 0.35f)
+                                         : new Color(0.55f, 0.62f, 0.72f);
+            GUI.Label(new Rect(w - 310f, y0 + 4f + 22f * (hi + 1), 300f, 20f),
+                      (firing ? "▶ " : "") + (hi + 1) + " · " + nm, hs);
+        }
+        if (fh < 0)
+        {
+            hs.fontStyle = FontStyle.Normal;
+            hs.normal.textColor = new Color(0.85f, 0.6f, 0.3f);
+            GUI.Label(new Rect(w - 310f, y0 + 4f + 22f * (prog.hats.Count + 1), 300f, 20f),
+                      "— no hat firing", hs);
+        }
     }
 
     // ---- C6.5: mode banners. The dev sandbox and the Drafting Table both
@@ -5448,6 +5680,26 @@ public class BuilderManager : MonoBehaviour
                     testRobot.damageDealt, testRobot.damageTaken));
             }
             GUILayout.EndArea();
+            // P1: live sensor telemetry — the "see it think" strip, shipped
+            // before the program runtime so sensors verify in isolation.
+            var tbus = testRobot != null ? testRobot.GetComponent<SensorBus>() : null;
+            if (tbus != null)
+            {
+                var tls = tbus.TelemetryLines();
+                if (tls.Count > 0)
+                {
+                    GUI.Box(new Rect(10, 60, 250, 20f * tls.Count + 10f), "");
+                    for (int ti = 0; ti < tls.Count; ti++)
+                        GUI.Label(new Rect(18, 64 + 20 * ti, 238, 20), tls[ti]);
+                }
+            }
+            // P3c: autopilot toggle + live program debug (desktop mirror of
+            // the mobile HUD; DrawProgramDebug is shared).
+            if (testRunner != null
+                && GUI.Button(new Rect(Screen.width - 190f, 10f, 180f, 30f),
+                              testAutopilot ? "MANUAL DRIVE" : "AUTOPILOT"))
+                SetTestAutopilot(!testAutopilot);
+            DrawProgramDebug(Screen.width, 60f);
             // Center-screen event toasts. Shear and wrecked/stuck STACK —
             // the shear callout must survive even when the wreck line shows.
             float ty = 0.34f;
@@ -5723,13 +5975,22 @@ public class BuilderManager : MonoBehaviour
                     // get it, from the same CareerFightBlocker call.
                     string cTag; string cWhy = CareerFightBlocker(li, ci3, out cTag);
                     bool cBlocked = cWhy != null;
-                    if (GatedButton(string.Format("{0} {1} ({2}) \u00b7 {3} scrap{4}{5}{6}",
-                        cdone ? "\u2713" : "\u25b8", EnemyRoster.Find(cc.oppId).label, cc.tier,
+                    // P4: the autonomy mark rides the row (\u2699 = ever won
+                    // autonomously), and both fight modes are offered here
+                    // too \u2014 desktop IMGUI and mobile uGUI are two code paths
+                    // and this project's signature bug is the one-side fix.
+                    bool cAuto = Career.Data.autoDoneContests.Contains(cc.id);
+                    if (GatedButton(string.Format("{0}{1} {2} ({3}) \u00b7 {4} scrap{5}{6}{7}",
+                        cdone ? "\u2713" : "\u25b8", cAuto ? "[AUTO]" : "", EnemyRoster.Find(cc.oppId).label, cc.tier,
                         cdone ? Mathf.RoundToInt(cc.purse * 0.4f) : cc.purse,
                         cdone ? " (re-entry)" : "",
                         cc.entryFee > 0 ? " \u00b7 fee " + cc.entryFee + " scrap" : "",
                         cBlocked ? "   \u2014   " + cTag : ""), matStyle, cWhy))
                         StartCareerFight(li, ci3);
+                    string dTag; string dWhy = AutonomyBlocker(out dTag);
+                    if (dWhy == null) dWhy = cWhy;   // manual blockers gate autonomy too
+                    if (GatedButton("AUTO", matStyle, dWhy, GUILayout.Width(58f)))
+                        StartCareerFight(li, ci3, true);
                     GUILayout.EndHorizontal();
                 }
             }

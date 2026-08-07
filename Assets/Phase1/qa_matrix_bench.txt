@@ -1,0 +1,23 @@
+PASS  BuilderManager present
+PASS  fixture loads (14 parts, got 14)
+PASS  all three presets validate on the matrix body
+      FLOOR Brawler L1C1 scout-R  W5/L0/D0  dealt~426 taken~38
+      FLOOR Brawler L1C2 tipper-R  W5/L0/D0  dealt~465 taken~48
+PASS  FLOOR: Brawler clears the L1 sample 10/10 (need >=7/10)
+      UPPER Brawler L3C2 mauler-V/Steel  W0/L3/D0  dealt~169 taken~389
+      UPPER Brawler L4C1 widowmaker-V/Ti  W0/L3/D0  dealt~61 taken~749
+      UPPER Brawler L4C4 bastion-C/Ti  W1/L2/D0  dealt~78 taken~196
+      UPPER Brawler L5C1 widowmaker-C/Ti  W0/L3/D0  dealt~60 taken~450
+PASS  SWEEP: Brawler does not sweep the upper sample (0/4 cells, 1/12 fights)
+      UPPER Wall-shy Brawler L3C2 mauler-V/Steel  W1/L2/D0  dealt~89 taken~72
+      UPPER Wall-shy Brawler L4C1 widowmaker-V/Ti  W0/L3/D0  dealt~61 taken~627
+      UPPER Wall-shy Brawler L4C4 bastion-C/Ti  W1/L2/D0  dealt~75 taken~128
+      UPPER Wall-shy Brawler L5C1 widowmaker-C/Ti  W0/L3/D0  dealt~57 taken~277
+PASS  SWEEP: Wall-shy Brawler does not sweep the upper sample (0/4 cells, 2/12 fights)
+      UPPER Matador L3C2 mauler-V/Steel  W2/L1/D0  dealt~202 taken~115  [cell won]
+      UPPER Matador L4C1 widowmaker-V/Ti  W1/L2/D0  dealt~296 taken~191
+      UPPER Matador L4C4 bastion-C/Ti  W2/L1/D0  dealt~482 taken~116  [cell won]
+      UPPER Matador L5C1 widowmaker-C/Ti  W1/L2/D0  dealt~199 taken~467
+PASS  SWEEP: Matador does not sweep the upper sample (2/4 cells, 6/12 fights)
+PASS  every scheduled fight started (0 no-starts)
+PASS  player controlSource==Program held during sampled frames (0 violations)

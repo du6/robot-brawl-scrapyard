@@ -230,7 +230,7 @@ public class RepeatHarness : MonoBehaviour
     {
         var d = fm.player.drive;
         if (d == null || fm.player.bot == null) return;
-        d.useAI = true;                       // scripted stand-in for the human
+        fm.player.bot.controlSource = ControlSource.AI;   // scripted stand-in for the human (P2: direct)
         if (policy == "afk") { d.aiThrottle = 0f; d.aiSteer = 0f; return; }
 
         Vector3 self = fm.player.bot.rb.worldCenterOfMass;

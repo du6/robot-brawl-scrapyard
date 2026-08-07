@@ -213,15 +213,6 @@ public static class CareerDB
     public float damageDealt;
     public List<string> leagueHistory = new List<string>();
 }
-
-/// <summary>V2.5 (owen 2026-08-06): one entry in the program LIBRARY —
-/// a program saved as a document, independent of any robot. The canvas's
-/// SAVE/SAVE AS write these; LOAD TO ROBOT is what arms one on a machine.</summary>
-[System.Serializable] public class SavedProgram
-{
-    public string name = "";
-    public string json = "";
-}
 [System.Serializable] public class CareerBlueprint { public string name; public string snapshot; public string program = ""; }
 /// <summary>MEDALS (2026-08-02, owen: "user should win medal awards for each
 /// league campaign, and be able to check their medals in history"). ONE
@@ -263,9 +254,6 @@ public static class CareerDB
     /// <summary>Medals (2026-08-02). Empty on every pre-existing save by
     /// construction - see CareerMedal.</summary>
     public List<CareerMedal> medals = new List<CareerMedal>();
-    /// <summary>V2.5: the program library. JsonUtility hands every older
-    /// save an empty list, which IS the migration (the medals precedent).</summary>
-    public List<SavedProgram> programs = new List<SavedProgram>();
     public int fights; public int fightWins; public int sessions;   // telemetry
     public int tutorialStep;
     /// <summary>C4: index into stable of the robot being edited; -1 = none.</summary>

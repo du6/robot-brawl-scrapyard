@@ -1,0 +1,401 @@
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+using UnityEngine.EventSystems;
+using UnityEngine.UI;
+
+namespace RobotBrawl.Phase0
+{
+/// <summary>P3b acceptance bench — drives the Program Bench canvas's
+/// DRAG-AND-DROP through the same uGUI drag events a finger raises
+/// (OnBeginDrag/OnDrag/OnEndDrag on the real ProgramDragHandle chips, real
+/// screen-space drop coordinates read off the live layout), and asserts the
+/// program data after every gesture through the TestProg seam — no
+/// reflection, the TouchSmoke pattern. Career state is IN-MEMORY ONLY
+/// (autosave off, owner data restored at exit).
+///
+/// Covers: preset install → hat reorder by drag (ghost + drop line seen
+/// mid-flight) → block reorder within a hat → cross-hat move → nest into a
+/// C-block by dropping between IF and END IF → IF-span move stays balanced
+/// → off-list delete (span-deletes the IF) → + BLOCK / + HAT dragged as
+/// palette sources to exact positions → ▲▼ fallback still live → block cap
+/// refuses inserts but not moves.
+///
+/// Run in play mode: CanvasDragBench.Run(); read [DragBench] console lines.</summary>
+public class CanvasDragBench : MonoBehaviour
+{
+    public static CanvasDragBench Run()
+    { return new GameObject("canvas_drag_bench").AddComponent<CanvasDragBench>(); }
+
+    public int passed, failed;
+    public bool finished;
+    readonly List<string> log = new List<string>();
+
+    void Check(bool ok, string what)
+    {
+        if (ok) passed++; else failed++;
+        log.Add((ok ? "PASS  " : "FAIL  ") + what);
+    }
+
+    // ---- finders ----------------------------------------------------------
+    static Button Btn(string prefix)
+    {
+        foreach (var b in Object.FindObjectsByType<Button>(FindObjectsSortMode.None))
+        {
+            var t = b.GetComponentInChildren<Text>();
+            if (t != null && t.text.StartsWith(prefix)) return b;
+        }
+        return null;
+    }
+    static bool Tap(string prefix)
+    { var b = Btn(prefix); if (b == null) return false; b.onClick.Invoke(); return true; }
+
+    static RectTransform FindRT(Component root, string name)
+    {
+        foreach (var rt in root.GetComponentsInChildren<RectTransform>(true))
+            if (rt.name == name) return rt;
+        return null;
+    }
+    static ProgramDragHandle Handle(ProgramCanvas pc, int kind, int hat, int block)
+    {
+        foreach (var h in pc.GetComponentsInChildren<ProgramDragHandle>(true))
+            if (h.kind == kind && (hat < 0 || h.hat == hat) && (block < 0 || h.block == block))
+                return h;
+        return null;
+    }
+    static Button BtnInCard(ProgramCanvas pc, string cardName, string label)
+    {
+        var card = FindRT(pc, cardName);
+        if (card == null) return null;
+        foreach (var b in card.GetComponentsInChildren<Button>(true))
+        {
+            var t = b.GetComponentInChildren<Text>();
+            if (t != null && t.text == label) return b;
+        }
+        return null;
+    }
+
+    // ---- geometry ---------------------------------------------------------
+    static Rect WorldRect(RectTransform rt)
+    { var c = new Vector3[4]; rt.GetWorldCorners(c); return Rect.MinMaxRect(c[0].x, c[0].y, c[2].x, c[2].y); }
+    static float CenterY(RectTransform rt) { var r = WorldRect(rt); return (r.yMin + r.yMax) * 0.5f; }
+    static Vector2 TopOf(RectTransform rt) { var r = WorldRect(rt); return new Vector2(r.center.x, r.yMax - 2f); }
+    static Vector2 BottomOf(RectTransform rt) { var r = WorldRect(rt); return new Vector2(r.center.x, r.yMin + 2f); }
+    static Vector2 Between(RectTransform a, RectTransform b)
+    { return new Vector2(WorldRect(a).center.x, (CenterY(a) + CenterY(b)) * 0.5f); }
+
+    // ---- one full synthetic drag ------------------------------------------
+    bool sawActive, sawLine, sawDelete;
+    string lastDragStatus = "";
+
+    /// <summary>Drag a handle onto a specific row THE WAY A FINGER WOULD:
+    /// the pointer stays clamped inside the scroll viewport (so a row that
+    /// is currently scrolled out of view triggers the canvas's own edge
+    /// auto-scroll instead of resolving as an off-list DELETE), and the
+    /// target point is re-read from the live layout every frame until the
+    /// row really is under the pointer. `bottom` aims at the row's lower
+    /// edge (insert AFTER), else its upper edge (insert BEFORE).</summary>
+    IEnumerator DragToRow(ProgramCanvas pc, ProgramDragHandle h, string cardName, string rowName, bool bottom)
+    {
+        lastDragStatus = "(no drag)";
+        if (h == null) yield break;
+        var e = new PointerEventData(EventSystem.current);
+        e.position = h.transform.position;
+        h.OnBeginDrag(e); yield return null;
+        var vpRT = FindRT(pc, "progviewport");
+        for (int k = 0; k < 40; k++)
+        {
+            var card = FindRT(pc, cardName);
+            var row = card != null ? FindRT(card, rowName) : null;
+            if (row == null) break;
+            Vector2 want = bottom ? BottomOf(row) : TopOf(row);
+            Vector2 aim = want;
+            if (vpRT != null)
+            {
+                var vr = WorldRect(vpRT);
+                aim.y = Mathf.Clamp(want.y, vr.yMin + 6f, vr.yMax - 6f);
+                aim.x = Mathf.Clamp(want.x, vr.xMin + 6f, vr.xMax - 6f);   // card wider than viewport at iPhone width
+            }
+            e.position = aim;
+            h.OnDrag(e);
+            yield return null;
+            if (Mathf.Abs(aim.y - want.y) < 1f && k >= 2) break;   // on target, settled
+        }
+        lastDragStatus = pc.TestStatus;
+        h.OnEndDrag(e); yield return null; yield return null;
+        Canvas.ForceUpdateCanvases();
+    }
+
+    /// <summary>Park the list at the top and let the layout settle before a
+    /// FIXED-POINT drag computes its target. Every drag leaves the ScrollRect
+    /// wherever its edge auto-scroll (or elastic clamp) ended, so a target
+    /// computed from world rects afterwards points at where a row USED to be
+    /// — the whole C/D flake class, once removed at the source.</summary>
+    IEnumerator SettleList(ProgramCanvas pc)
+    {
+        var sr2 = pc.GetComponentInChildren<UnityEngine.UI.ScrollRect>(true);
+        if (sr2 != null) { sr2.StopMovement(); sr2.verticalNormalizedPosition = 1f; }
+        Canvas.ForceUpdateCanvases();
+        yield return null; yield return null;
+        Canvas.ForceUpdateCanvases();
+    }
+    IEnumerator Drag(ProgramCanvas pc, ProgramDragHandle h, Vector2 to)
+    {
+        sawActive = sawLine = sawDelete = false;
+        var e = new PointerEventData(EventSystem.current);
+        Vector2 from = h.transform.position;
+        e.position = from;
+        h.OnBeginDrag(e);
+        yield return null;
+        e.position = (from + to) * 0.5f; h.OnDrag(e);
+        yield return null;
+        e.position = to; h.OnDrag(e);
+        yield return null;
+        sawActive = pc.TestDragActive;
+        sawLine = pc.TestDropLine != null && pc.TestDropLine.activeSelf;
+        sawDelete = pc.TestDropDelete;
+        h.OnEndDrag(e);
+        yield return null; yield return null;
+        Canvas.ForceUpdateCanvases();
+    }
+
+    IEnumerator Start()
+    {
+        var ms = GameObject.Find("ModeSelect");
+        if (ms != null) Destroy(ms);
+        var bm = Object.FindFirstObjectByType<BuilderManager>();
+        if (bm == null) bm = new GameObject("BuilderManager").AddComponent<BuilderManager>();
+
+        // in-memory career FIRST, then respawn the UI under it — the PROGRAM
+        // tab is built career-only at UI build time (the C6.5 gate).
+        var savedData = Career.Data; bool savedActive = Career.active; bool savedAuto = Career.autosave;
+        Career.autosave = false;
+        Career.Data = new CareerData();
+        Career.Data.stable.Add(new CareerRobot { name = "TESTBOT", snapshot = "", program = "" });
+        Career.Data.activeRobot = 0;
+        Career.active = true;
+        MobileBuilderUI.forceMobileUI = true;
+        if (MobileBuilderUI.inst != null) { Destroy(MobileBuilderUI.inst.gameObject); yield return null; }
+        float t0 = Time.realtimeSinceStartup;
+        while (!MobileBuilderUI.Active && Time.realtimeSinceStartup - t0 < 6f) yield return null;
+        Check(bm != null && MobileBuilderUI.Active, "mobile UI attaches under in-memory career");
+        yield return null; yield return null;
+
+        Tap("PROGRAM"); yield return null;
+        var pc = Object.FindFirstObjectByType<ProgramCanvas>();
+        if (pc == null) { Tap("PROGRAM"); yield return null; pc = Object.FindFirstObjectByType<ProgramCanvas>(); }
+        Check(pc != null, "PROGRAM tab opens the canvas");
+        if (pc == null) { Finish(savedData, savedActive, savedAuto); yield break; }
+        Canvas.ForceUpdateCanvases(); yield return null;
+
+        // A. preset + handle inventory --------------------------------------
+        // V2.4: the canvas now has ONE preset button. Cover it (install +
+        // caption render), then install Matador through the seam so every
+        // drag phase below keeps its original 3-hat fixture.
+        Tap("STARTER KIT"); yield return null; yield return null;
+        Canvas.ForceUpdateCanvases();
+        var sk = pc.TestProg;
+        Check(sk != null && sk.hats.Count == 4 && sk.hats[0].name == "WALL!",
+              "STARTER KIT button installs the merged preset (4 hats)");
+        var skCard = FindRT(pc, "hat_0");
+        Check(skCard != null && FindRT(skCard, "note") != null,
+              "tutorial caption renders above the hat header");
+        // V2.5: the document bar — SAVE/SAVE AS write the program library,
+        // LOAD TO ROBOT still gates on Validate. Chips found by NAME (label
+        // prefix would confuse SAVE with SAVE AS).
+        Check(FindRT(pc, "progbottom") != null && FindRT(pc, "prog_save") != null
+              && FindRT(pc, "prog_saveas") != null && FindRT(pc, "prog_load") != null,
+              "document bar at the bottom: SAVE / SAVE AS / LOAD TO ROBOT");
+        int libBefore = Career.Data.programs.Count;
+        FindRT(pc, "prog_save").GetComponent<Button>().onClick.Invoke(); yield return null;
+        Check(Career.Data.programs.Count == libBefore + 1
+              && Career.Data.programs[libBefore].name == "Starter Kit",
+              "SAVE writes the library under the canvas title");
+        FindRT(pc, "prog_saveas").GetComponent<Button>().onClick.Invoke(); yield return null;
+        var saDlg = FindRT(pc, "saveas_dlg");
+        Check(saDlg != null && saDlg.gameObject.activeSelf, "SAVE AS opens the name dialog");
+        FindRT(pc, "saveas_name").GetComponent<InputField>().text = "STARTER COPY";
+        FindRT(pc, "saveas_ok").GetComponent<Button>().onClick.Invoke(); yield return null;
+        Check(Career.Data.programs.Count == libBefore + 2 && !saDlg.gameObject.activeSelf,
+              "SAVE AS saves a copy under the typed name");
+        FindRT(pc, "prog_load").GetComponent<Button>().onClick.Invoke(); yield return null;
+        {
+            var armed = Career.Data.stable[0].program;
+            bool refused = string.IsNullOrEmpty(armed);
+            Check(refused ? pc.TestStatus.Length > 0 : armed == pc.TestProg.ToJson(),
+                  "LOAD TO ROBOT arms exactly the canvas program or refuses via Validate (" + (refused ? "refused" : "armed") + ")");
+        }
+
+        pc.TestInstall(RobotProgram.Matador()); yield return null; yield return null;
+        Canvas.ForceUpdateCanvases();
+        var p = pc.TestProg;
+        Check(p.hats.Count == 3 && p.hats[0].name == "TOO HOT", "Matador installs (3 hats)");
+        int nHat = 0, nBlk = 0, nNewH = 0, nNewB = 0;
+        foreach (var h in pc.GetComponentsInChildren<ProgramDragHandle>(true))
+        {
+            if (h.kind == ProgramDragHandle.HAT) nHat++;
+            else if (h.kind == ProgramDragHandle.BLOCK) nBlk++;
+            else if (h.kind == ProgramDragHandle.NEW_HAT) nNewH++;
+            else nNewB++;
+        }
+        // V2.2 Matador: TOO HOT [MOVE AWAY, TURN] · STRIKE [WEAPON, MOVE
+        // TOWARD] · STALK [MOVE TOWARD(SET), FOREVER, WAIT, END] = 8 blocks,
+        // 1 closer (END) without a handle.
+        Check(nHat == 3 && nBlk == 7 && nNewH == 1 && nNewB == 3,
+              "handles: 3 hat + 7 block (closers get none) + palette sources (got "
+              + nHat + "/" + nBlk + "/" + nNewH + "/" + nNewB + ")");
+
+        // B. hat reorder by drag: STALK (hat 2) to the top -------------------
+        yield return SettleList(pc);
+        {   // aim clamped inside the viewport on BOTH axes - at iPhone width
+            // the hat card is ~2.5x wider than the visible list, so TopOf's
+            // center-x sits right of the viewport and resolves as off-list
+            // DELETE (and its y can sit above it). A finger can only drop at
+            // points inside the visible list.
+            var hatTop = TopOf(FindRT(pc, "hat_0"));
+            var vpr = WorldRect(FindRT(pc, "progviewport"));
+            hatTop.x = Mathf.Clamp(hatTop.x, vpr.xMin + 6f, vpr.xMax - 6f);
+            hatTop.y = Mathf.Clamp(hatTop.y, vpr.yMin + 6f, vpr.yMax - 6f);
+            yield return Drag(pc, Handle(pc, ProgramDragHandle.HAT, 2, -1), hatTop);
+        }
+        p = pc.TestProg;
+        Check(p.hats.Count == 3 && p.hats[0].name == "STALK" && p.hats[1].name == "TOO HOT",
+              "drag hat to top reorders priority");
+        Check(sawActive && sawLine && !sawDelete, "ghost drag active + drop line shown mid-drag");
+
+        // C. block reorder within a hat: STRIKE's WEAPON to the end ----------
+        // (This was the long-deferred assert, and it took three runs to name
+        // the real mechanism: hat_2 is the BOTTOM card, so its rows can sit
+        // BELOW the scroll viewport — a drop point computed from the row's
+        // world rect then lands OUTSIDE the list and arms DELETE, or resolves
+        // a row short, depending on whatever scroll position the previous
+        // drag left behind. A finger would drag to the edge and let the list
+        // auto-scroll; DragToRow does exactly that — pointer clamped inside
+        // the viewport, re-aimed at the live row every frame until it is
+        // actually under the pointer.)
+        {
+            yield return DragToRow(pc, Handle(pc, ProgramDragHandle.BLOCK, 2, 0), "hat_2", "brow_1", true);
+            p = pc.TestProg;
+            Check(p.hats.Count == 3 && p.hats[2].body.Count == 2 && p.hats[2].body[1].op == POp.Weapon,
+                  "drag reorders a block within its hat (drop='" + lastDragStatus + "')");
+        }
+
+        // D. cross-hat move: STALK's MOVE TOWARD(SET) into TOO HOT at row 1 --
+        // (Same DragToRow discipline — C's drag leaves the list wherever its
+        // auto-scroll ended.)
+        {
+            yield return DragToRow(pc, Handle(pc, ProgramDragHandle.BLOCK, 0, 0), "hat_1", "brow_0", false);
+            p = pc.TestProg;
+            Check(p.hats.Count == 3 && p.hats[0].body.Count == 3 && p.hats[1].body.Count == 3
+                  && p.hats[1].body[0].op == POp.MoveRel,
+                  "drag moves a block into another hat (drop='" + lastDragStatus + "')");
+        }
+
+        // E. custom IF hat: nesting is a POSITION under the flat markers -----
+        p.hats.Clear();
+        var ih = new PHat { name = "IFHAT" };
+        ih.when.Add(PCondTerm.Always());
+        ih.body.Add(PBlock.MkMove(70f, 1f, 0));                 // 0  (macro MOVE)
+        ih.body.Add(PBlock.MkIf(PCondTerm.Always()));           // 1  IF
+        ih.body.Add(PBlock.MkWait(0.5f));                       // 2
+        ih.body.Add(PBlock.MkEndIf());                          // 3  END IF
+        ih.body.Add(PBlock.MkMove(-50f, 0f, 0));                // 4  (macro SET)
+        p.hats.Add(ih);
+        pc.TestDirtyRefresh();
+        yield return null; Canvas.ForceUpdateCanvases(); yield return null;
+        {
+            yield return SettleList(pc);
+            var card = FindRT(pc, "hat_0");
+            // drop MOVE between WAIT (row 2) and END IF (row 3) → nested
+            yield return DragToRow(pc, Handle(pc, ProgramDragHandle.BLOCK, 0, 0), "hat_0", "brow_3", false);
+            // (live-layout drop: fixed-point Between() resolved one slot low at iPhone geometry)
+            p = pc.TestProg;
+            var b = p.hats[0].body;
+            Check(b.Count == 5 && b[0].op == POp.If && b[2].op == POp.Move && b[3].op == POp.EndIf,
+                  "drop between IF and END IF nests the block");
+            // visual: the nested row renders indented one level deeper
+            card = FindRT(pc, "hat_0");
+            var r0 = FindRT(card, "brow_0"); var r2 = FindRT(card, "brow_2");
+            int pad0 = r0.GetComponent<HorizontalLayoutGroup>().padding.left;
+            int pad2 = r2.GetComponent<HorizontalLayoutGroup>().padding.left;
+            Check(pad2 > pad0, "nested row indents deeper than the IF row (" + pad0 + "→" + pad2 + ")");
+        }
+
+        // F. IF-span move: dragging the IF takes IF..END IF intact -----------
+        {
+            yield return SettleList(pc);
+            yield return DragToRow(pc, Handle(pc, ProgramDragHandle.BLOCK, 0, 0), "hat_0", "brow_4", true);
+            // (live-layout drop replaces BottomOf(brow_4) fixed point - null-safe when rows shift)
+            p = pc.TestProg;
+            var b = p.hats[0].body;
+            Check(b.Count == 5 && b[0].op == POp.Move && b[1].op == POp.If && b[4].op == POp.EndIf,
+                  "dragging an IF moves the whole IF..END IF span");
+        }
+
+        // G. off-list delete: the IF span goes as one C-block ----------------
+        {
+            yield return SettleList(pc);
+            var vr = WorldRect(FindRT(pc, "progviewport"));
+            var off = new Vector2(vr.xMin - 120f, (vr.yMin + vr.yMax) * 0.5f);
+            yield return Drag(pc, Handle(pc, ProgramDragHandle.BLOCK, 0, 1), off);
+            p = pc.TestProg;
+            Check(sawDelete, "off-list drag arms DELETE mid-drag");
+            Check(p.hats[0].body.Count == 1 && p.hats[0].body[0].op == POp.Move,
+                  "release off-list span-deletes the IF..END IF");
+        }
+
+        // H. palette sources dragged to exact positions ----------------------
+        {
+            yield return SettleList(pc);
+            var card = FindRT(pc, "hat_0");
+            yield return Drag(pc, Handle(pc, ProgramDragHandle.NEW_BLOCK, -1, -1), TopOf(FindRT(card, "brow_0")));
+            p = pc.TestProg;
+            Check(p.hats[0].body.Count == 2 && p.hats[0].body[0].op == POp.Move,
+                  "+ BLOCK dragged to row 1 inserts there (macro MOVE default)");
+            yield return SettleList(pc);
+            yield return Drag(pc, Handle(pc, ProgramDragHandle.NEW_HAT, -1, -1), TopOf(FindRT(pc, "hat_0")));
+            p = pc.TestProg;
+            Check(p.hats.Count == 2 && p.hats[0].name == "" && p.hats[0].body.Count == 1
+                  && p.hats[1].name == "IFHAT",
+                  "+ HAT dragged to the top inserts at priority 1");
+        }
+
+        // I. ▲▼ fallback stays live ------------------------------------------
+        {
+            var up = BtnInCard(pc, "hat_1", "▲");
+            Check(up != null, "▲ fallback present on hat 2");
+            if (up != null) { up.onClick.Invoke(); yield return null; Canvas.ForceUpdateCanvases(); }
+            p = pc.TestProg;
+            Check(p.hats[0].name == "IFHAT", "▲ tap still reorders (fallback alive)");
+        }
+
+        // J. caps: the 48-block ceiling refuses inserts, allows moves --------
+        while (p.BlockCount() < RobotProgram.MAX_BLOCKS)
+            p.hats[0].body.Add(PBlock.MkMove(70f, 0f, 0));
+        pc.TestDirtyRefresh();
+        yield return null; Canvas.ForceUpdateCanvases();
+        pc.InsertBlockAt(0, 0);
+        yield return null;
+        p = pc.TestProg;
+        Check(p.BlockCount() == RobotProgram.MAX_BLOCKS && pc.TestStatus.Contains("64"),
+              "insert at the 64-block cap refused with the amber");
+        int h1n = p.hats[1].body.Count;
+        pc.MoveBlockSpan(0, 0, 1, 0);
+        yield return null;
+        p = pc.TestProg;
+        Check(p.BlockCount() == RobotProgram.MAX_BLOCKS && p.hats[1].body.Count == h1n + 1,
+              "move at the cap still allowed (move is not an add)");
+
+        Finish(savedData, savedActive, savedAuto);
+    }
+
+    void Finish(CareerData savedData, bool savedActive, bool savedAuto)
+    {
+        Career.Data = savedData; Career.active = savedActive; Career.autosave = savedAuto;
+        foreach (var l in log) Debug.Log("[DragBench] " + l);
+        Debug.Log(string.Format("[DragBench] RESULT: {0} pass, {1} fail{2}",
+                  passed, failed, failed == 0 ? " - ALL GREEN" : " - FIX NEEDED"));
+        finished = true;
+    }
+}
+}

@@ -150,7 +150,7 @@ public class RB2Probe : MonoBehaviour
     {
         var d = fm.player.drive;
         if (d == null || fm.player.bot == null) return;
-        d.useAI = true;
+        fm.player.bot.controlSource = ControlSource.AI;   // P2: direct, the compat property is gone
         if (pol[i] == "afk") { d.aiThrottle = 0f; d.aiSteer = 0f; return; }
         Vector3 self = fm.player.bot.rb.worldCenterOfMass;
         Vector3 tgt = fm.enemy.bot != null ? fm.enemy.bot.rb.worldCenterOfMass : Vector3.zero;

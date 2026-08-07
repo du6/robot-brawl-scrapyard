@@ -1,0 +1,29 @@
+PASS  rangefinder priced 120
+PASS  compass priced 180
+PASS  tilt sensor priced 60
+PASS  edge sentinel priced 90
+PASS  damage bus priced 70
+PASS  rangefinder mass ~8 kg (8.0)
+PASS  compass mass ~10 kg (10.0)
+PASS  tiltsensor mass ~4 kg (4.0)
+PASS  edgesentinel mass ~6 kg (6.0)
+PASS  dmgbus mass ~3 kg (3.0)
+PASS  fixture loads 13 parts (13)
+PASS  scouting loadout line names the kit
+PASS  fixture spawns
+PASS  SensorBus registered
+PASS  5 live sensors (5)
+PASS  compass target wired to the dummy
+PASS  rangefinder part present on the body
+PASS  rangefinder valid
+PASS  rangefinder ±5 cm (read 3.000 vs 3.000)
+PASS  rangefinder tags the block 'wall' (wall)
+PASS  tilt reads upright
+PASS  tilt sees the flip (upY -1.00)
+PASS  detached rangefinder reads no-signal
+PASS  telemetry strip says 'no signal'
+PASS  live count drops to 4 (4)
+PASS  restored sensor reads again
+PASS  parked idle draw ~0.45 kJ/s (0.46)
+PASS  deterministic: two runs read identically
+[SensorProbe] RESULT: 28 pass, 0 fail - ALL GREEN

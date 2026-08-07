@@ -106,16 +106,11 @@ public class RaycastWheelDrive : MonoBehaviour
     // and the bell-bug class (three writers fighting over a boolean) is dead.
     // Owner-less drives (Phase 0 sandbox bots) keep the legacy field.
     // Scheduled for deletion once every caller writes controlSource directly.
-    public bool useAI
-    {
-        get { return owner != null ? owner.controlSource != ControlSource.Keyboard : useAILegacy; }
-        set
-        {
-            if (owner != null) owner.controlSource = value ? ControlSource.AI : ControlSource.Keyboard;
-            else useAILegacy = value;
-        }
-    }
-    bool useAILegacy = false;
+    // P2 (2026-08-05): the compatibility property is DELETED — every caller
+    // writes CompoundRobot.controlSource directly now. Owner-less Phase 0
+    // sandbox drives keep this one legacy field, read only by AiRouted.
+    public bool sandboxAI = false;
+    bool AiRouted { get { return owner != null ? owner.controlSource != ControlSource.Keyboard : sandboxAI; } }
 
     // ---- P0: per-wheel command channels. Channel index = placement order at
     // Init, stable for the life of the body (a wheel that falls off keeps its
@@ -158,7 +153,7 @@ public class RaycastWheelDrive : MonoBehaviour
     public PowerPlant power;
     public float aiSteer = 0f;
 
-    public float CurrentThrottle() { return useAI ? aiThrottle : Phase0Input.Throttle(); }
+    public float CurrentThrottle() { return AiRouted ? aiThrottle : Phase0Input.Throttle(); }
     /// <summary>Round-6 fix 1: what the wheels ACTUALLY get, after the power
     /// plant has had its say. CurrentThrottle() is the REQUEST; on a flat pack
     /// it still reads 1.0 while the machine sits motionless, which is how the
@@ -171,7 +166,7 @@ public class RaycastWheelDrive : MonoBehaviour
         float req = directWheelCmd ? MeanCmd() : CurrentThrottle();
         return req * (power != null ? power.supplyFrac : 1f);
     }
-    public float CurrentSteer() { return useAI ? aiSteer : Phase0Input.Steer(); }
+    public float CurrentSteer() { return AiRouted ? aiSteer : Phase0Input.Steer(); }
 
     Rigidbody rb;
     CompoundRobot owner;   // set for arena bots — enables mount tracking
@@ -538,6 +533,41 @@ public class RaycastWheelDrive : MonoBehaviour
 
     /// <summary>Diagnostics: each wheel's body-space roll direction (drive dir).</summary>
     public Vector3 RollOf(int i) { return wheels[i].rollLocal; }
+
+    /// <summary>V2 (programmable robots): signed roll speed (m/s) of one
+    /// wheel CHANNEL — the body's actual velocity at that wheel's anchor
+    /// projected on its rolling direction. Measured from the world, not the
+    /// command: a stalled, lifted or detached wheel reads ~0, which is what
+    /// keeps the program runtime's "RUN … n rounds" honest.</summary>
+    public float WheelRollSpeed(int channel)
+    {
+        if (rb == null) return 0f;
+        for (int i = 0; i < wheels.Count; i++)
+        {
+            var w = wheels[i];
+            if (w.idx != channel) continue;
+            if (!w.grounded) return 0f;
+            Vector3 v = rb.GetPointVelocity(transform.TransformPoint(w.localAnchor));
+            return Vector3.Dot(v, transform.TransformDirection(w.rollLocal));
+        }
+        return 0f;
+    }
+
+    /// <summary>V2: wheel circumference (m) — rounds = distance / this.</summary>
+    public float WheelCircumference() { return 2f * Mathf.PI * Mathf.Max(radius, 0.01f); }
+
+    /// <summary>V2: which SIDE a wheel channel sits on — its anchor's body-X
+    /// (body +X = the machine's right; the differential uses the same test).
+    /// The drive is the ONLY honest source: spawned CompoundRobots don't
+    /// carry wheels in `parts` (measured: spec ids core_0/beam_1/… and no
+    /// wheel entries), so any parts-list side resolution silently counts
+    /// ZERO wheels — the bug that shipped v1's left/right ops as no-ops.</summary>
+    public float WheelSideX(int channel)
+    {
+        for (int i = 0; i < wheels.Count; i++)
+            if (wheels[i].idx == channel) return wheels[i].localAnchor.x;
+        return 0f;
+    }
 }
 
 }

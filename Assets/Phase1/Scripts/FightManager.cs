@@ -35,7 +35,7 @@ public class FightManager : MonoBehaviour
     public static FightManager current;
 
     void Awake() { current = this; }
-    void OnDestroy() { if (current == this) current = null; }
+    void OnDestroy() { if (current == this) current = null; programBannerNow = false; }
 
     public enum State { Settling, Fighting, Ended }
     public enum Outcome { None, PlayerWin, PlayerLoss, Draw }
@@ -121,6 +121,13 @@ public class FightManager : MonoBehaviour
     /// Protect/Bell/Freeze below are THE ONLY writers of
     /// CompoundRobot.controlSource during a fight.</summary>
     public ControlSource playerSource = ControlSource.Keyboard;
+    /// <summary>P3c harness seam: true while the HUD is drawing the
+    /// PROGRAM ARMED banner (bannerNow precedent — state, not pixels).</summary>
+    public static bool programBannerNow;
+    /// <summary>P2: the enemy side's grant, same contract. AI for every
+    /// roster fight (the spawn default), Program for an Autonomy League bout
+    /// or a ProgramBench series — both sides through the single authority.</summary>
+    public ControlSource enemySource = ControlSource.AI;
 
     public BuilderManager bm;
     AudioSource music;   // fight theme, started in Setup, stopped in End
@@ -166,6 +173,18 @@ public class FightManager : MonoBehaviour
         enemy.label = string.IsNullOrEmpty(enemyName) ? "MAULER" : enemyName;
         enemy.bot = eBot; enemy.drive = eDrive; enemy.ai = eAi;
         timer = DEFAULT_MATCH_TIME;
+        // P1: the compass tracker's "match beacon" — each side's SensorBus
+        // (if the build carries sensors) tracks the OTHER machine.
+        if (pBot != null)
+        {
+            var pb = pBot.GetComponent<SensorBus>();
+            if (pb != null) pb.target = eBot;
+        }
+        if (eBot != null)
+        {
+            var eb = eBot.GetComponent<SensorBus>();
+            if (eb != null) eb.target = pBot;
+        }
         InitSide(player);
         InitSide(enemy);
         // Pre-bell settle: protect both bots and freeze all controls.
@@ -229,6 +248,8 @@ public class FightManager : MonoBehaviour
         {
             s.drive.aiThrottle = 0f;
             s.drive.aiSteer = 0f;
+            s.drive.ClearWheelCmd();               // P2: a Program bot freezes
+            s.drive.directWheelCmd = false;        // like any other machine
         }
     }
 
@@ -254,7 +275,10 @@ public class FightManager : MonoBehaviour
         // this FIGHT says it gets — Keyboard for humans, AI for a bench,
         // Program for an Autonomy League bout — through the single authority.
         if (player.bot != null) player.bot.controlSource = playerSource;
-        if (enemy.ai != null) enemy.ai.enabled = true;
+        // P2: the enemy side gets the same treatment — its AIController only
+        // wakes when this fight actually routes the enemy to AI.
+        if (enemy.bot != null) enemy.bot.controlSource = enemySource;
+        if (enemy.ai != null && enemySource == ControlSource.AI) enemy.ai.enabled = true;
         state = State.Fighting;
         bellFlash = 1.0f;
         CompoundRobot.Log(string.Format(
@@ -822,6 +846,8 @@ public class FightManager : MonoBehaviour
         {
             s.drive.aiThrottle = 0f;
             s.drive.aiSteer = 0f;
+            s.drive.ClearWheelCmd();               // P2: a Program bot freezes
+            s.drive.directWheelCmd = false;        // like any other machine
         }
     }
 
@@ -865,6 +891,23 @@ public class FightManager : MonoBehaviour
         GUI.Label(new Rect(x, 12 + dy, w, 26), string.Format("{0}:{1:00}", t / 60, t % 60), hudStyle);
         DrawBar(x + 16, 40 + dy, 482, player);
         DrawBar(x + w - 498, 40 + dy, 482, enemy);
+
+        // P3c: the armed banner (design §6) — a fight the autopilot drives
+        // says so, loudly, for the WHOLE fight (persistent mode banner, the
+        // ModeBanner pattern): the player's hands are off the sticks and the
+        // screen must never let them forget why. playerSource is the single
+        // authority the bell writes; programBannerNow is the harness seam.
+        programBannerNow = playerSource == ControlSource.Program;
+        if (programBannerNow)
+        {
+            var abst = new GUIStyle(GUI.skin.box);
+            abst.fontSize = 15; abst.fontStyle = FontStyle.Bold;
+            var apc = GUI.color;
+            GUI.color = new Color(1f, 0.8f, 0.25f, 0.95f);
+            GUI.Box(new Rect(x + (w - 520f) * 0.5f, 142f + dy, 520f, 28f),
+                    "PROGRAM ARMED — autopilot drives this fight", abst);
+            GUI.color = apc;
+        }
 
         if (state == State.Settling)
         {
@@ -976,6 +1019,7 @@ public class FightManager : MonoBehaviour
 
     void DrawResults()
     {
+        programBannerNow = false;   // P3c: the fight is over; so is the banner
         Color old = GUI.color;
         float H = Screen.height / UIS, W = Screen.width / UIS;
         Color accent = outcome == Outcome.PlayerWin  ? new Color(0.35f, 1f, 0.45f)

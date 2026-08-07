@@ -66,6 +66,17 @@ public class P1PartDef
     /// carbon-fibre engine block is not a thing.</summary>
     public string[] allowedMats = null;
 
+    /// <summary>P1 (Programmable Robots, 2026-08-05): this part is a SENSOR —
+    /// a destructible eye that feeds SensorBus. Consequences elsewhere: the
+    /// ghost stores its mount-face normal in wheelAxis (a nose rangefinder sees
+    /// ahead, a side one covers a flank), SpawnBot registers it with the bus,
+    /// and shearing it off silences its channels ("no signal"). Sensors are
+    /// pinned parts: the mass is electronics, not casing — like the battery.</summary>
+    public bool sensor = false;
+    /// <summary>Idle draw while the machine is live, kW. More eyes, faster
+    /// drain — the widowmaker lesson generalized (design doc §4.1).</summary>
+    public float sensorKW = 0f;
+
     // ---- §6.2 energy budget ------------------------------------------------
     /// <summary>Stored energy, kJ. Batteries are the tank. The engine carries a
     /// small reserve of its own so an engine-only build still moves - a build
@@ -277,6 +288,40 @@ public class P1PartDef
             new P1PartDef { id = "hook",    label = "Hook",              category = P1Category.Weapon,     size = new Vector3(0.16f, 0.30f, 0.20f),
                             matName = "Steel", edgeHardness = 1.3f,
                             desc = "Curls back on itself. Instead of knocking the enemy away it drags them toward you and off their line." },
+
+            // ---- P1 (Programmable Robots, 2026-08-05): the sensor palette ---
+            // Five destructible eyes for the program a robot will one day run
+            // (design doc v1.1 §4.1). All pinned to Aluminum — the mass is the
+            // electronics, not the casing (the battery precedent). massMul
+            // hits the design-doc masses exactly from clean ≥0.16 m boxes
+            // (faces must clear SOCKET_PITCH 0.15 or the part is hand-
+            // unplaceable — the blade lesson). Prices live in CareerDB's
+            // TechFloor: sensors are technology, not tonnage.
+            new P1PartDef { id = "rangefinder", label = "Rangefinder",   category = P1Category.Control,    size = new Vector3(0.18f, 0.16f, 0.18f),
+                            materialChoice = false, sensor = true, sensorKW = 0.10f, massMul = 0.572f,
+                            desc = "Distance eye, 12 m. Sees along the face you mount it on - a nose rangefinder looks ahead, a side one covers a flank. Shear it off and its channel goes dark." },
+            new P1PartDef { id = "compass",     label = "Compass tracker", category = P1Category.Control,  size = new Vector3(0.20f, 0.16f, 0.20f),
+                            materialChoice = false, sensor = true, sensorKW = 0.15f, massMul = 0.579f,
+                            desc = "Arena beacon receiver: bearing and range to the enemy's center of mass, always on. The cheap way to FIND them - aiming is still your geometry problem." },
+            new P1PartDef { id = "tiltsensor",  label = "Tilt sensor",   category = P1Category.Control,    size = new Vector3(0.16f, 0.16f, 0.16f),
+                            materialChoice = false, sensor = true, sensorKW = 0.05f, massMul = 0.362f,
+                            desc = "Knows which way is up: tilt, pitch and roll signs, flipped or not. The self-righting program starts here." },
+            // V2.2 (owen's call, 2026-08-06): the edge sentinel SPLIT into two
+            // parts — each unlocks its own macro-verb family on the program
+            // canvas (MOVE TOWARD/AWAY FROM x · TURN side TO x). Career
+            // migration turns every owned edge sentinel into one of EACH
+            // (the old part did both jobs; the split must not shrink what a
+            // player already paid for). Combined idle draw matches the old
+            // 0.10 kW when both are mounted.
+            new P1PartDef { id = "wallsensor", label = "Wall sensor",     category = P1Category.Control,   size = new Vector3(0.18f, 0.16f, 0.18f),
+                            materialChoice = false, sensor = true, sensorKW = 0.05f, massMul = 0.429f,
+                            desc = "Watches the arena walls: distance and direction to the nearest one. Wall-shy programs and TURN SIDE TO WALL read this." },
+            new P1PartDef { id = "trapsensor", label = "Trap sensor",     category = P1Category.Control,   size = new Vector3(0.16f, 0.16f, 0.16f),
+                            materialChoice = false, sensor = true, sensorKW = 0.05f, massMul = 0.362f,
+                            desc = "Hazard eye: distance and direction to the nearest arena trap, plus a too-close flag. MOVE AWAY FROM TRAP starts here." },
+            new P1PartDef { id = "dmgbus",      label = "Damage bus",    category = P1Category.Control,    size = new Vector3(0.16f, 0.16f, 0.16f),
+                            materialChoice = false, sensor = true, sensorKW = 0.05f, massMul = 0.271f,
+                            desc = "Self-diagnostics: own HP, parts lost, battery fraction, and a took-a-hit pulse. Retreat rules read this." },
         };
     }
 }

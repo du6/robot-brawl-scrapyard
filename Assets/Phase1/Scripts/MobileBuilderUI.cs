@@ -64,6 +64,8 @@ public class MobileBuilderUI : MonoBehaviour
     // the `names` array, LayoutTabs' count, and all three arms of ShowTab.
     // TROPHIES is index 4 now; there is no index 5.
     GameObject trophyPanel; Transform trophyContent; Text trophyHeader;
+    // ---- P3a: the Program Bench canvas (career-only tab, index 5) ----
+    GameObject programPanel; ProgramCanvas programCanvas;
     InputField nameInput;
     int retireArmM = -1;
     int bpDelArmM = -1;   // OWEN: blueprint armed for deletion
@@ -341,7 +343,7 @@ public class MobileBuilderUI : MonoBehaviour
 
         // tab buttons across the top of the dock. SHOP (C2) exists only in
         // career mode; LayoutTabs re-anchors whenever the career switch flips.
-        string[] names = { "BUILD", "FIGHT", "GARAGE", "SHOP", "TROPHIES" };
+        string[] names = { "BUILD", "FIGHT", "GARAGE", "SHOP", "TROPHIES", "PROGRAM" };   // P3a: index 5, career-only
         tabBtns.Clear();
         for (int i = 0; i < names.Length; i++)
         {
@@ -367,7 +369,8 @@ public class MobileBuilderUI : MonoBehaviour
         shopPanel = MkPanel("shop", dock.transform, new Color(0f, 0f, 0f, 0f));
         robotsPanel = MkPanel("robots", dock.transform, new Color(0f, 0f, 0f, 0f));
         trophyPanel = MkPanel("trophies", dock.transform, new Color(0f, 0f, 0f, 0f));
-        foreach (var p in new[] { buildPanel, fightPanel, garagePanel, shopPanel, robotsPanel, trophyPanel })
+        programPanel = MkPanel("program", dock.transform, new Color(0f, 0f, 0f, 0f));   // P3a
+        foreach (var p in new[] { buildPanel, fightPanel, garagePanel, shopPanel, robotsPanel, trophyPanel, programPanel })
         {
             var rt = p.GetComponent<RectTransform>();
             rt.anchorMin = new Vector2(0f, 0f); rt.anchorMax = new Vector2(1f, 1f);
@@ -384,6 +387,9 @@ public class MobileBuilderUI : MonoBehaviour
         BuildShopTab();
         BuildRobotsTab();
         BuildTrophiesTab();
+        // P3a: career-only, the C6.5 rule (never build career UI the sandbox
+        // can mis-hit; the garage is the same rule in reverse).
+        if (Career.active) BuildProgramTab();
         // LAST, so it is the final sibling and therefore draws over every
         // panel above. A modal that renders under the dock is not a modal.
         BuildSaveDialog();
@@ -721,7 +727,15 @@ public class MobileBuilderUI : MonoBehaviour
         grid.spacing = new Vector2(6f, 4f);
         grid.padding = new RectOffset(4,4,4,4);
         grid.constraint = GridLayoutGroup.Constraint.FixedRowCount;
-        grid.constraintCount = 3;
+        // P1 (2026-08-05): 3 -> 4. The five sensor parts take the catalogue to
+        // 24; at three rows that is 8 columns and the viewport-derived cell
+        // width lands ~131 units on the iPad — UNDER the 150 the 2026-08-05
+        // three-row change measured as the minimum that fits a pinned part's
+        // two-line label (29.6 into a 30 box at 150). Four rows is 6 columns
+        // → ~176-unit cells, wider than before, still no palette scroll.
+        // Costs one more dock row; DockH(0) accounts for it, 0.68 cap
+        // unchanged. Flagged for the iPad device pass.
+        grid.constraintCount = 4;
         grid.startAxis = GridLayoutGroup.Axis.Horizontal;   // top shelf 0-9, bottom shelf 10-18
         var csf = content.AddComponent<ContentSizeFitter>();
         csf.horizontalFit = ContentSizeFitter.FitMode.PreferredSize;
@@ -993,7 +1007,7 @@ public class MobileBuilderUI : MonoBehaviour
         {
             msgBarRt.sizeDelta = new Vector2(0f, h);
             if (tipBarRt != null && tipBar != null && tipBar.activeSelf)
-                tipBarRt.anchoredPosition = new Vector2(0f, -(BAR_H + h));
+                tipBarRt.anchoredPosition = new Vector2(0f, -(BarH + h));
             ApplyDockH();
         }
     }
@@ -1139,6 +1153,15 @@ public class MobileBuilderUI : MonoBehaviour
             if (bt != null)
                 bt.text = MatDB.Get(cur).name.ToUpper()
                         + (MatSheetOpen ? "  \u25be" : "  \u25b4");
+            // C19: the label just changed — keep its width honest, or a
+            // long material name re-clips until the next scale re-apply.
+            if (bt != null)
+            {
+                var mle = matBtn.GetComponent<LayoutElement>();
+                if (mle == null) mle = matBtn.gameObject.AddComponent<LayoutElement>();
+                mle.minWidth = bt.preferredWidth + 12f;
+                mle.flexibleWidth = 1f;
+            }
             var bi = matBtn.GetComponent<Image>();
             if (bi != null)
                 bi.color = MatSheetOpen ? new Color(0.20f,0.45f,0.65f,1f)
@@ -1270,12 +1293,18 @@ public class MobileBuilderUI : MonoBehaviour
                 int lidx = li, cidx = ci;
                 var c = lg.contests[ci];
                 bool done = Career.Data.doneContests.Contains(c.id);
+                // P4: \u2699 = ever won this contest AUTONOMOUSLY (owen's "shared
+                // contests, tracked separately" \u2014 the mark is the record).
+                bool autoDone = Career.Data.autoDoneContests.Contains(c.id);
                 var row = MkPanel("contest_" + c.id, careerBoardContent, new Color(0.10f,0.11f,0.14f,1f));
                 var rle = row.AddComponent<LayoutElement>(); rle.minHeight = TouchRow(); rle.preferredHeight = TouchRow();
                 var rh = row.AddComponent<HorizontalLayoutGroup>(); rh.spacing = 4f; rh.childForceExpandHeight = true; rh.childForceExpandWidth = false; rh.padding = new RectOffset(6,4,2,2);
                 var lbl = MkText("lbl", row.transform,
-                    string.Format("{0}{1} ({2}) \u00b7 {3} scrap{4}{5}",
-                        done ? "\u2713 " : "", EnemyRoster.Find(c.oppId).label, c.tier,
+                    // "[AUTO]", not \u2699: LegacyRuntime.ttf has no gear glyph \u2014
+                    // the bench's Contains() check passed while the SCREEN
+                    // showed nothing (data-vs-pixels, caught by the shot).
+                    string.Format("{0}{1}{2} ({3}) \u00b7 {4} scrap{5}{6}",
+                        done ? "\u2713 " : "", autoDone ? "[AUTO] " : "", EnemyRoster.Find(c.oppId).label, c.tier,
                         done ? Mathf.RoundToInt(c.purse * 0.4f) : c.purse,
                         done ? " (re-entry)" : "",
                         c.entryFee > 0 ? " \u00b7 fee " + c.entryFee + " scrap" : ""),
@@ -1289,10 +1318,17 @@ public class MobileBuilderUI : MonoBehaviour
                 var scb = MkButton("cscout_" + c.id, row.transform, "SCOUT", 14, () => { if (bm != null) bm.StartScout(lidx, cidx); });
                 scb.gameObject.AddComponent<LayoutElement>().minWidth = 72f;
                 scb.GetComponent<Image>().color = new Color(0.20f,0.45f,0.65f,1f);
-                var fb = MkButton("cfight_" + c.id, row.transform, "FIGHT", 14, () => { if (bm != null) bm.StartCareerFight(lidx, cidx); });
-                fb.gameObject.AddComponent<LayoutElement>().minWidth = 72f;
+                // P4 (owen 2026-08-06): FIGHT splits into MANUAL FIGHT and
+                // AUTONOMY FIGHT — same contest, same purse; autonomy hands
+                // the robot to its saved program and kills the keyboard.
+                var fb = MkButton("cfight_" + c.id, row.transform, "MANUAL FIGHT", 14, () => { if (bm != null) bm.StartCareerFight(lidx, cidx); });
+                fb.gameObject.AddComponent<LayoutElement>().minWidth = 118f;
                 fb.GetComponent<Image>().color = FIGHT_OK;
+                var ab = MkButton("cauto_" + c.id, row.transform, "AUTONOMY FIGHT", 14, () => { if (bm != null) bm.StartCareerFight(lidx, cidx, true); });
+                ab.gameObject.AddComponent<LayoutElement>().minWidth = 132f;
+                ab.GetComponent<Image>().color = AUTO_OK;
                 fightGates.Add(new FightGate { btn = fb, img = fb.GetComponent<Image>(),
+                                               abtn = ab, aimg = ab.GetComponent<Image>(),
                                                lbl = lbl, baseLabel = lbl.text, li = lidx, ci = cidx });
             }
         }
@@ -1610,11 +1646,37 @@ public class MobileBuilderUI : MonoBehaviour
         // palette tiles carry two lines in a fixed cell so they get the floor
         // rather than the ideal, and the status bar is the one line that must
         // survive being read mid-build.
-        foreach (var tb in tabBtns) if (tb != null) SetFont(tb.transform, 15f);
+        FitTabFonts();
         foreach (var mb in matButtons) if (mb != null) SetFont(mb.transform, 13f);
         foreach (var pb in partButtons) if (pb != null) SetFont(pb.transform, 11f);
         if (actRowRt != null) SetFont(actRowRt, 14f);
+        // V2.2 C19 repair: the action row split its width EQUALLY, so the one
+        // button whose face carries a VARIABLE label — MATERIAL, showing the
+        // current material's name — clipped on the sim. Width now follows each
+        // label (min-width = text + padding); the group spreads the slack.
+        if (actRowRt != null)
+            foreach (var ab in actRowRt.GetComponentsInChildren<UnityEngine.UI.Button>(true))
+            {
+                var lt2 = ab.GetComponentInChildren<UnityEngine.UI.Text>();
+                if (lt2 == null) continue;
+                var le2 = ab.GetComponent<UnityEngine.UI.LayoutElement>();
+                if (le2 == null) le2 = ab.gameObject.AddComponent<UnityEngine.UI.LayoutElement>();
+                le2.minWidth = lt2.preferredWidth + 12f;
+                le2.flexibleWidth = 1f;
+            }
         if (statsText != null) statsText.fontSize = FontUnits(13f);
+        // V2.2 C19 repair (first PROPER-SIM sweep — the 08-06 "environmental"
+        // theory was half wrong): the stats bar was a 46-unit constant while
+        // its label is FontUnits-scaled, so on the iPad sim the second wrapped
+        // line fell outside the bar. Budget two lines; the bars below read
+        // BarH so the stack follows.
+        if (statsRt != null)
+            statsRt.sizeDelta = new Vector2(0f, Mathf.Max(BAR_H, FontUnits(13f) * 2f + 14f));
+        if (msgBarRt != null) msgBarRt.anchoredPosition = new Vector2(0f, -BarH);
+        // …and the collapse handle was the one label never re-fonted: built at
+        // a literal 18 units, it read 9.6 pt on the sim. Same fix as every
+        // other control — physical points through SetFont.
+        if (dockHandle != null) SetFont(dockHandle.transform, 12f);
         // The notice and tip bars were the two the first sweep never saw,
         // because neither is on screen unless the game has something to say.
         if (msgBar != null) SetFont(msgBar.transform, 12f);
@@ -1690,11 +1752,13 @@ public class MobileBuilderUI : MonoBehaviour
             // the action row as a chooser and gave their row back. It is five
             // again (owen, 2026-08-05) because the palette went to THREE rows
             // so its tiles stop truncating their own stock counts - see the
-            // GridLayoutGroup note. Tab strip + action row + three palette
-            // rows. The 0.68 cap is unchanged and still has the last word, so
-            // a device that overstates its dpi cannot turn this into a dock
-            // that swallows the screen.
-            float want = 5f * R + 38f + safeB;
+            // GridLayoutGroup note. P1 (same day): SIX, because the sensor
+            // palette takes the catalogue to 24 parts and the grid to FOUR
+            // rows — tab strip + action row + four palette rows. The 0.68 cap
+            // is unchanged and still has the last word, so a device that
+            // overstates its dpi cannot turn this into a dock that swallows
+            // the screen.
+            float want = 6f * R + 38f + safeB;
             return ch1 > 100f ? Mathf.Min(want, ch1 * 0.68f) : want;
         }
         if (!Career.active) return 210f;
@@ -1707,7 +1771,7 @@ public class MobileBuilderUI : MonoBehaviour
         float ch = 0f;
         if (canvas != null) { var crt = canvas.GetComponent<RectTransform>(); if (crt != null) ch = crt.rect.height; }
         if (ch < 100f) return 470f;               // canvas not laid out yet
-        float top = BAR_H
+        float top = BarH
                   + ((msgBar != null && msgBar.activeSelf) ? MsgH : 0f)
                   + ((tipBar != null && tipBar.activeSelf) ? TipH : 0f);
         // - HANDLE_H: the list tabs used to take EVERY unit down to the top
@@ -1773,7 +1837,7 @@ public class MobileBuilderUI : MonoBehaviour
         float ch = 0f;
         if (canvas != null) { var crt = canvas.GetComponent<RectTransform>(); if (crt != null) ch = crt.rect.height; }
         if (ch < 100f) { coverBottom = coverTop = 0f; return; }
-        float top = BAR_H
+        float top = BarH
                   + ((msgBar != null && msgBar.activeSelf) ? MsgH : 0f)
                   + ((tipBar != null && tipBar.activeSelf) ? TipH : 0f);
         coverBottom = Mathf.Clamp01(dockH / ch);
@@ -1805,6 +1869,35 @@ public class MobileBuilderUI : MonoBehaviour
 
     /// <summary>C2: which tabs exist follows the career switch - 3 tabs in
     /// the sandbox, 4 with SHOP in career mode.</summary>
+    /// <summary>V2.2 C19 repair: six career tabs share the safe width and
+    /// TROPHIES/PROGRAM overflowed their sixth at 15 pt. Reset every tab to
+    /// the standard 15 pt, then shrink any label that overflows its box,
+    /// floored at the sweep's own 10.5 pt line. Idempotent, and called from
+    /// BOTH re-layout paths — ApplyTouchSizes (scale change) and LayoutTabs
+    /// (career flip changes the tab count, which changes every box width
+    /// WITHOUT a scale change; fitting only on scale change is how the first
+    /// verification run kept the stale 3-tab fit).</summary>
+    void FitTabFonts()
+    {
+        int tabsLive = 0;
+        foreach (var tb in tabBtns) if (tb != null && tb.gameObject.activeSelf) tabsLive++;
+        float cw2 = CanvasW;
+        if (tabsLive == 0 || cw2 <= 1f) return;
+        float tw = cw2 * Mathf.Max(0.1f, safeFracR - safeFracL) / tabsLive - 10f;
+        if (tw < 20f) return;
+        int floorU = FontUnits(10.5f);
+        foreach (var tb in tabBtns)
+        {
+            if (tb == null || !tb.gameObject.activeSelf) continue;
+            var lt = tb.GetComponentInChildren<UnityEngine.UI.Text>();
+            if (lt == null) continue;
+            lt.fontSize = FontUnits(15f);
+            int guard = 24;
+            while (lt.fontSize > floorU && lt.preferredWidth > tw && guard-- > 0)
+                lt.fontSize = lt.fontSize - 1;
+        }
+    }
+
     void LayoutTabs()
     {
         // TROPHIES is career-only, like SHOP - 5 tabs in career mode, still 3
@@ -1813,7 +1906,7 @@ public class MobileBuilderUI : MonoBehaviour
         // row ("own N"), so the tab restated two numbers the player had
         // anyway. What it uniquely showed - which robot was holding what - it
         // stopped being able to say when designs stopped holding parts.
-        int n = Career.active ? 5 : 3;
+        int n = Career.active ? 6 : 3;   // P3a: +PROGRAM in career
         for (int i = 0; i < tabBtns.Count; i++)
         {
             bool show = i < n;
@@ -1834,6 +1927,15 @@ public class MobileBuilderUI : MonoBehaviour
         var tl2 = tabBtns.Count > 2 ? tabBtns[2].GetComponentInChildren<Text>() : null;
         if (tl2 != null) tl2.text = Career.active ? "ROBOTS" : "GARAGE";
         RefreshTabHighlight();   // renaming a tab resets nothing about selection
+        FitTabFonts();           // C19: box widths just changed with the tab count
+    }
+
+    /// <summary>P3a: the Program Bench canvas. All machinery lives in
+    /// ProgramCanvas.cs; this just mounts it on the career-only panel.</summary>
+    void BuildProgramTab()
+    {
+        programCanvas = programPanel.AddComponent<ProgramCanvas>();
+        programCanvas.Init(bm);
     }
 
     void BuildShopTab()
@@ -2529,7 +2631,9 @@ public class MobileBuilderUI : MonoBehaviour
     public bool TestOverUI(Vector2 screenPoint) { return OverUI(screenPoint); }
     public float TestCanvasScale { get { return canvas != null ? canvas.scaleFactor : -1f; } }
 
-    void ShowTab(int i)
+    /// <summary>P3a: public as a harness seam (the TouchSmoke Test* precedent)
+    /// — tab switching was only reachable through private button closures.</summary>
+    public void ShowTab(int i)
     {
         if (i >= 3 && !Career.active) i = 0;   // SHOP/PARTS are career-only
         tab = i;
@@ -2550,9 +2654,11 @@ public class MobileBuilderUI : MonoBehaviour
         if (robotsPanel != null) robotsPanel.SetActive(open && robots);
         if (shopPanel != null) shopPanel.SetActive(open && i == 3);
         if (trophyPanel != null) trophyPanel.SetActive(open && i == 4 && Career.active);
+        if (programPanel != null) programPanel.SetActive(open && i == 5 && Career.active);   // P3a
         if (i == 3) { shopNote = ""; shopNoteBad = false; RefreshShop(); }
         if (robots) RefreshRobots();
         if (i == 4) RefreshTrophies();
+        if (i == 5 && programCanvas != null) programCanvas.Refresh();   // P3a
         // R1 fix 2 + 6: geometry and selection are both per-tab now.
         ApplyDockH();
         RefreshTabHighlight();
@@ -2585,7 +2691,7 @@ public class MobileBuilderUI : MonoBehaviour
         // R4: the top band is now up to three stacked bars, and SKIP TIPS is a
         // real button in the third one - a tap there must not also drag the
         // build camera.
-        float top = BAR_H
+        float top = BarH
                   + ((msgBar != null && msgBar.activeSelf) ? MsgH : 0f)
                   + ((tipBar != null && tipBar.activeSelf) ? TipH : 0f);
         // The handle floats ABOVE the dock, so the dock's height does not cover
@@ -2829,6 +2935,10 @@ public class MobileBuilderUI : MonoBehaviour
     /// Everything that stacks under the top bars reads this rather than the
     /// MSG_H constant, or the dock and the camera would keep budgeting for a
     /// bar that is no longer 38 tall.</summary>
+    /// <summary>The stats bar's LIVE height (V2.2 C19 repair): the bar now
+    /// budgets two FontUnits lines, so everything stacking under it must read
+    /// this rather than the 46-unit constant — the MsgH pattern exactly.</summary>
+    float BarH { get { return statsRt != null ? statsRt.sizeDelta.y : BAR_H; } }
     float MsgH { get { return msgBarRt != null ? msgBarRt.sizeDelta.y : MSG_H; } }
     float TipH { get { return tipBarRt != null ? tipBarRt.sizeDelta.y : TIP_H; } }
     RectTransform msgBarRt, tipBarRt;
@@ -2902,7 +3012,7 @@ public class MobileBuilderUI : MonoBehaviour
         if (!show) return;
         var prt = tipBar.GetComponent<RectTransform>();
         FitTipBar();
-        float y = -(BAR_H + ((msgBar != null && msgBar.activeSelf) ? MsgH : 0f));
+        float y = -(BarH + ((msgBar != null && msgBar.activeSelf) ? MsgH : 0f));
         if (Mathf.Abs(prt.anchoredPosition.y - y) > 0.5f) prt.anchoredPosition = new Vector2(0f, y);
     }
 
@@ -2935,11 +3045,14 @@ public class MobileBuilderUI : MonoBehaviour
     // only rebuilds when the PART COUNT or material changes, so a shop purchase
     // (which changes what you own but not what is placed) would have left a
     // stale "needs 1x Engine" sitting under a row that had become legal.
-    class FightGate { public Button btn; public Image img; public Text lbl; public string baseLabel; public int li, ci; }
+    class FightGate { public Button btn; public Image img; public Button abtn; public Image aimg; public Text lbl; public string baseLabel; public int li, ci; }
     readonly List<FightGate> fightGates = new List<FightGate>();
     float fightGateAt = -99f;
     static readonly Color FIGHT_OK   = new Color(0.40f, 0.22f, 0.09f, 1f);
     static readonly Color FIGHT_DEAD = new Color(0.19f, 0.19f, 0.21f, 1f);
+    /// <summary>P4: the AUTONOMY FIGHT button's live color — violet, so the
+    /// two ways to fight read as different commitments at a glance.</summary>
+    static readonly Color AUTO_OK    = new Color(0.30f, 0.20f, 0.44f, 1f);
 
     // OWEN 2026-08-02: recomputed on a timer, not per frame - ActiveRobotDirty
     // builds a full snapshot string to compare, which is fine four times a
@@ -2993,15 +3106,29 @@ public class MobileBuilderUI : MonoBehaviour
             if (g.btn == null || g.lbl == null) continue;
             string tag;
             bool blocked = bm.CareerFightBlocker(g.li, g.ci, out tag) != null;
-            string want = blocked ? g.baseLabel + "   \u2014   " + tag : g.baseLabel;
+            // P4: the autonomy button carries its OWN gate on top of the
+            // manual one. One AutonomyBlocker call covers all rows (it reads
+            // the active robot + bay, not the contest), so hoisting it out of
+            // the loop would be nicer \u2014 but the 0.25 s pump timer already
+            // bounds the cost and per-row keeps the code shaped like the
+            // manual gate beside it.
+            string aTag;
+            bool aBlocked = bm.AutonomyBlocker(out aTag) != null || blocked;
+            if (blocked) aTag = tag;
+            string want = blocked ? g.baseLabel + "   \u2014   " + tag
+                        : aBlocked ? g.baseLabel + "   \u2014   auto: " + aTag
+                        : g.baseLabel;
             if (g.lbl.text != want) g.lbl.text = want;
             g.lbl.color = blocked ? new Color(1f, 0.72f, 0.36f) : Color.white;
             if (g.img != null) g.img.color = blocked ? FIGHT_DEAD : FIGHT_OK;
+            if (g.aimg != null) g.aimg.color = aBlocked ? FIGHT_DEAD : AUTO_OK;
             var face = g.btn.GetComponentInChildren<Text>();
             // Deliberately still clickable. A dead button that swallows the tap
             // is the same complaint again; tapping a greyed one still pumps the
             // full sentence into the message bar for anyone who wants it.
             if (face != null) face.color = blocked ? new Color(0.52f, 0.52f, 0.56f) : Color.white;
+            var aface = g.abtn != null ? g.abtn.GetComponentInChildren<Text>() : null;
+            if (aface != null) aface.color = aBlocked ? new Color(0.52f, 0.52f, 0.56f) : Color.white;
         }
     }
 
