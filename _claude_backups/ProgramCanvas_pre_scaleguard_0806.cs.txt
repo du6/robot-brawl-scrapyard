@@ -152,25 +152,6 @@ public class ProgramCanvas : MonoBehaviour
 
     void Update()
     {
-        // Scale-settle guard (08-06): BuildUI can run on the respawn frame
-        // BEFORE the CanvasScaler settles for a new device/window, baking the
-        // chrome (header/status/action row) at the wrong TouchRow/FontUnits —
-        // measured 2× too big after an iPad switch while the LIST, rebuilt
-        // later by Refresh, was right. MobileBuilderUI re-applies fonts on
-        // scale change (the C19 pass); the canvas's answer is a full rebuild
-        // at the settled scale. Skipped mid-drag.
-        if (canvas != null && builtSf > 0f && !TestDragActive
-            && Mathf.Abs(canvas.scaleFactor - builtSf) > builtSf * 0.02f)
-        {
-            for (int i = transform.childCount - 1; i >= 0; i--)
-                Destroy(transform.GetChild(i).gameObject);
-            saveAsDlg = null; openDlg = null; openListContent = null;
-            saveAsInput = null; saveAsErr = null; progDropLabel = null;
-            hiHat = hiStep = -1;
-            BuildUI();
-            Refresh();
-            return;
-        }
         var r = LiveRunner();
         int h = r != null ? r.lastFiredHat : -1;
         int s = r != null ? r.activeStep : -1;
@@ -503,9 +484,7 @@ public class ProgramCanvas : MonoBehaviour
     // ---- UI skeleton ------------------------------------------------------
     void BuildUI()
     {
-        // Re-entrant for the scale-settle rebuild: LayoutGroup is
-        // [DisallowMultipleComponent], so a second AddComponent returns null.
-        var v = gameObject.GetComponent<VerticalLayoutGroup>() ?? gameObject.AddComponent<VerticalLayoutGroup>();
+        var v = gameObject.AddComponent<VerticalLayoutGroup>();
         v.spacing = 4f; v.childForceExpandWidth = true; v.childForceExpandHeight = false;
         v.padding = new RectOffset(4, 4, 4, 4);
 
@@ -566,7 +545,6 @@ public class ProgramCanvas : MonoBehaviour
         lle.minHeight = FontUnits(11f) * 1.5f; lle.preferredHeight = FontUnits(11f) * 1.5f;
 
         // V2.6: bottom document bar removed — everything lives on the top row.
-        builtSf = canvas != null ? canvas.scaleFactor : -1f;
     }
 
     // ---- V2.5 program library (SAVE / SAVE AS / LOAD TO ROBOT) ------------
@@ -652,7 +630,6 @@ public class ProgramCanvas : MonoBehaviour
     // ---- V2.5b saved-programs picker (OPEN) ------------------------------
     GameObject openDlg; Transform openListContent; int openDelArm = -1;
     Text progDropLabel;   // V2.6: dropdown shows the open program's name
-    float builtSf = -1f;   // scaleFactor the chrome was built at (Update guard)
 
     void OpenPicker()
     {
