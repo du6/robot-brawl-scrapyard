@@ -501,20 +501,11 @@ public class ProgramCanvas : MonoBehaviour
 
         // presets + actions row
         var actions = MkRow(transform);
-        // V2.6 (owen): ONE row — a program DROPDOWN (label = the open
-        // program; tap = the switch list: STARTER KIT preset + the library)
-        // plus SAVE / SAVE AS / LOAD TO ROBOT. The bottom document bar is
-        // GONE — the reclaimed height goes to the code. The row is a
-        // ChipFlow, so it wraps at narrow widths instead of clipping.
-        var dd = MkChip("prog_dropdown", actions.transform, "STARTER KIT  ▾", 11f,
-               new Color(0.15f, 0.22f, 0.30f, 0.95f), OpenPicker, 150f);
-        progDropLabel = dd.GetComponentInChildren<Text>();
-        MkChip("prog_save", actions.transform, "SAVE", 12f,
-               new Color(0.16f, 0.34f, 0.18f, 0.95f), OnSaveTapped, 84f);
-        MkChip("prog_saveas", actions.transform, "SAVE AS", 12f,
-               new Color(0.15f, 0.22f, 0.30f, 0.95f), OpenSaveAs, 100f);
-        MkChip("prog_load", actions.transform, "LOAD TO ROBOT", 12f,
-               new Color(0.36f, 0.27f, 0.10f, 0.95f), SaveProgram, 150f);
+        // V2.4: the three preset buttons merged into one STARTER KIT (the
+        // deduped union — RobotProgram.StarterKit()). The old preset methods
+        // survive for benches and the balance matrix.
+        MkChip("preset_starter", actions.transform, "STARTER KIT", 11f,
+               new Color(0.15f, 0.22f, 0.30f, 0.95f), () => InstallPreset(RobotProgram.StarterKit()), 132f);
         // V2.5: SAVE moved to the bottom document bar (owen) — top row is presets only.
 
         // scroll (the SHOP pattern; sizeDelta ZERO — the R1 lesson by name)
@@ -544,7 +535,20 @@ public class ProgramCanvas : MonoBehaviour
         var lle = lockedHint.gameObject.AddComponent<LayoutElement>();
         lle.minHeight = FontUnits(11f) * 1.5f; lle.preferredHeight = FontUnits(11f) * 1.5f;
 
-        // V2.6: bottom document bar removed — everything lives on the top row.
+        // V2.5 (owen): the DOCUMENT actions live at the BOTTOM of the
+        // expanded view — SAVE / SAVE AS write the program library
+        // (Career.Data.programs); LOAD TO ROBOT is what arms the canvas
+        // program on the open machine (the old top-SAVE behavior).
+        var docBar = MkRow(transform);
+        docBar.name = "progbottom";
+        MkChip("prog_open", docBar.transform, "OPEN", 12f,
+               new Color(0.18f, 0.24f, 0.32f, 0.95f), OpenPicker, 84f);
+        MkChip("prog_save", docBar.transform, "SAVE", 12f,
+               new Color(0.16f, 0.34f, 0.18f, 0.95f), OnSaveTapped, 84f);
+        MkChip("prog_saveas", docBar.transform, "SAVE AS", 12f,
+               new Color(0.15f, 0.22f, 0.30f, 0.95f), OpenSaveAs, 100f);
+        MkChip("prog_load", docBar.transform, "LOAD TO ROBOT", 12f,
+               new Color(0.36f, 0.27f, 0.10f, 0.95f), SaveProgram, 150f);
     }
 
     // ---- V2.5 program library (SAVE / SAVE AS / LOAD TO ROBOT) ------------
@@ -629,7 +633,6 @@ public class ProgramCanvas : MonoBehaviour
 
     // ---- V2.5b saved-programs picker (OPEN) ------------------------------
     GameObject openDlg; Transform openListContent; int openDelArm = -1;
-    Text progDropLabel;   // V2.6: dropdown shows the open program's name
 
     void OpenPicker()
     {
@@ -650,7 +653,7 @@ public class ProgramCanvas : MonoBehaviour
         var v = openDlg.AddComponent<VerticalLayoutGroup>();
         v.spacing = 6f; v.padding = new RectOffset(10, 10, 10, 10);
         v.childForceExpandWidth = true; v.childForceExpandHeight = false;
-        MkText("t", openDlg.transform, "SWITCH PROGRAM", 12f, TextAnchor.MiddleLeft);
+        MkText("t", openDlg.transform, "OPEN PROGRAM", 12f, TextAnchor.MiddleLeft);
         var scGO = MkPanel("open_scroll", openDlg.transform, new Color(0f, 0f, 0f, 0.25f));
         var sle2 = scGO.AddComponent<LayoutElement>(); sle2.flexibleHeight = 1f; sle2.minHeight = 60f;
         var sr2 = scGO.AddComponent<ScrollRect>(); sr2.horizontal = false; sr2.vertical = true;
@@ -676,12 +679,6 @@ public class ProgramCanvas : MonoBehaviour
     {
         for (int i = openListContent.childCount - 1; i >= 0; i--)
             Destroy(openListContent.GetChild(i).gameObject);
-        // V2.6: the preset leads the switch list; library rows follow.
-        var prow = MkRow(openListContent);
-        var pb = MkChip("open_preset", prow.transform, "STARTER KIT  (preset)", 11f,
-            new Color(0.18f, 0.30f, 0.22f, 0.95f), () =>
-            { openDlg.SetActive(false); InstallPreset(RobotProgram.StarterKit()); }, 200f);
-        pb.GetComponent<LayoutElement>().flexibleWidth = 1f;
         var lib = Career.Data != null ? Career.Data.programs : null;
         if (lib == null || lib.Count == 0)
         {
@@ -756,8 +753,6 @@ public class ProgramCanvas : MonoBehaviour
         header.text = r != null
             ? "PROGRAM — " + r.name + (dirty ? "  (unsaved)" : "")
             : "PROGRAM — no robot open (SAVE a robot first; its program rides with it)";
-        if (progDropLabel != null)
-            progDropLabel.text = (string.IsNullOrEmpty(prog.title) ? "PROGRAMS" : prog.title.ToUpper()) + "  ▾";
         RebuildList();
         RefreshLockedHint();
     }

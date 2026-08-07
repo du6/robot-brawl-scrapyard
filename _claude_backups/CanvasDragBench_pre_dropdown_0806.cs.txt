@@ -192,9 +192,7 @@ public class CanvasDragBench : MonoBehaviour
         // V2.4: the canvas now has ONE preset button. Cover it (install +
         // caption render), then install Matador through the seam so every
         // drag phase below keeps its original 3-hat fixture.
-        // V2.6: the preset installs through the program DROPDOWN's switch list.
-        FindRT(pc, "prog_dropdown").GetComponent<Button>().onClick.Invoke(); yield return null;
-        FindRT(pc, "open_preset").GetComponent<Button>().onClick.Invoke(); yield return null; yield return null;
+        Tap("STARTER KIT"); yield return null; yield return null;
         Canvas.ForceUpdateCanvases();
         var sk = pc.TestProg;
         Check(sk != null && sk.hats.Count == 4 && sk.hats[0].name == "WALL!",
@@ -205,10 +203,9 @@ public class CanvasDragBench : MonoBehaviour
         // V2.5: the document bar — SAVE/SAVE AS write the program library,
         // LOAD TO ROBOT still gates on Validate. Chips found by NAME (label
         // prefix would confuse SAVE with SAVE AS).
-        Check(FindRT(pc, "progbottom") == null && FindRT(pc, "prog_open") == null
-              && FindRT(pc, "prog_save") != null && FindRT(pc, "prog_saveas") != null
-              && FindRT(pc, "prog_load") != null && FindRT(pc, "prog_dropdown") != null,
-              "one top row: dropdown + SAVE + SAVE AS + LOAD TO ROBOT, no bottom bar");
+        Check(FindRT(pc, "progbottom") != null && FindRT(pc, "prog_save") != null
+              && FindRT(pc, "prog_saveas") != null && FindRT(pc, "prog_load") != null,
+              "document bar at the bottom: SAVE / SAVE AS / LOAD TO ROBOT");
         int libBefore = Career.Data.programs.Count;
         FindRT(pc, "prog_save").GetComponent<Button>().onClick.Invoke(); yield return null;
         Check(Career.Data.programs.Count == libBefore + 1
@@ -231,7 +228,7 @@ public class CanvasDragBench : MonoBehaviour
 
         // V2.5b: the OPEN picker — lists the library, opens onto the canvas,
         // two-tap delete. Library holds "Starter Kit" + "STARTER COPY" here.
-        FindRT(pc, "prog_dropdown").GetComponent<Button>().onClick.Invoke(); yield return null;
+        FindRT(pc, "prog_open").GetComponent<Button>().onClick.Invoke(); yield return null;
         var opDlg = FindRT(pc, "open_dlg");
         Check(opDlg != null && opDlg.gameObject.activeSelf
               && FindRT(pc, "open_0") != null && FindRT(pc, "open_1") != null,
@@ -241,7 +238,7 @@ public class CanvasDragBench : MonoBehaviour
         Check(pc.TestProg.hats.Count == 4 && pc.TestProg.title == "STARTER COPY"
               && !opDlg.gameObject.activeSelf,
               "tapping a saved program opens it on the canvas");
-        FindRT(pc, "prog_dropdown").GetComponent<Button>().onClick.Invoke(); yield return null;
+        FindRT(pc, "prog_open").GetComponent<Button>().onClick.Invoke(); yield return null;
         FindRT(pc, "odel_0").GetComponent<Button>().onClick.Invoke(); yield return null;
         Check(Career.Data.programs.Count == 2, "delete arms on first tap (nothing removed)");
         FindRT(pc, "odel_0").GetComponent<Button>().onClick.Invoke(); yield return null;
