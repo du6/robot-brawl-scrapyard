@@ -60,24 +60,6 @@ public class ProgramRunner : MonoBehaviour
     bool stepEntered; float stepT0, roundsAcc; int fireBase;
 
     // ---- stall watch (F8) and bus hold (R2 major 4) ---------------------
-    // ---- brake (F5), behaviour critic R3 --------------------------------
-    // Full retreat authority at or inside this clearance; tapering beyond it.
-    const float WALL_CLEAR = 3.0f;
-    const float WALL_TOP_SPEED = 4.0f;   // m/s of retreat at full urgency
-    const float WALL_SAFE  = 5.0f;   // clearance at which the retreat is DONE
-    const float WALL_FLOOR = 0.45f;  // minimum thrust while pivoting to escape
-    const float WALL_HYST  = 1.0f;   // metres of slack before a retreat re-arms
-    bool wallRetreatDone;
-
-    const float SPUN_COOLDOWN = 0.5f;  // s a spinning hat is passed over
-    int spunHat = -1; float spunUntil;
-
-    const float BRAKE_TIME  = 1.00f;   // s ceiling on the counter-thrust
-    const float BRAKE_POWER = 1.00f;   // full reverse thrust: a brake, not a nudge
-    const float BRAKE_STOP  = 0.35f;   // m/s below which coasting is fine
-    const float BRAKE_YAW   = 0.60f;   // rad/s (~34 deg/s) below which spin is fine
-    float brakeUntil, brakeFwd, brakeSteer;
-
     const float STALL_GRACE = 1.2f;    // no measurable progress for this long
     const float STALL_POS   = 0.15f;   // metres
     const float STALL_YAW   = 8f;      // degrees
@@ -142,10 +124,7 @@ public class ProgramRunner : MonoBehaviour
         evalAcc = 0f; clock = 0f;
         activeHat = -1; pc = 0; loops.Clear(); stepEntered = false;
         lastFiredHat = -1; activeStep = -1;
-        spunHat = -1; spunUntil = 0f; yawAcc = 0f; wallRetreatDone = false;
-        lastHp = 1f; lastPower = 1f; lastParts = 0f; everBus = false;
-        spunHat = -1; spunUntil = 0f; yawAcc = 0f;
-        brakeUntil = 0f; brakeFwd = 0f; brakeSteer = 0f; heldDrive = false;
+        turnGain = 0f; relTarget = -1; relPct = 0f;
     }
 
     bool heldDrive;   // true while WE own drive.directWheelCmd
@@ -190,8 +169,9 @@ public class ProgramRunner : MonoBehaviour
 
     void TriggerEval()
     {
-        int top;
-        top = TopHat();
+        int top = -1;
+        for (int i = 0; i < program.hats.Count; i++)
+            if (CondsTrue(program.hats[i].when)) { top = i; break; }
 
         if (activeHat < 0)
         {
@@ -203,34 +183,9 @@ public class ProgramRunner : MonoBehaviour
         // FOREVER release: inside a forever loop AND own WHEN false
         if (InForever() && !CondsTrue(program.hats[activeHat].when))
         {
-            ReleaseHat(top < 0);
+            ReleaseHat();
             if (top >= 0) StartHat(top);
         }
-    }
-
-    /// <summary>Pure loop/branch scaffolding: executing it produces no
-    /// command. A hat that can only ever reach these is spinning.</summary>
-    static bool IsStructural(POp o)
-    {
-        return o == POp.If || o == POp.Else || o == POp.EndIf
-            || o == POp.Repeat || o == POp.Forever || o == POp.End;
-    }
-
-    /// <summary>Topmost hat whose WHEN is true, skipping any hat we caught
-    /// SPINNING in the last SPUN_COOLDOWN seconds. Without the skip the 5 Hz
-    /// trigger handed control straight back to the spinner every 0.2 s, so the
-    /// safety hat underneath held the wheels 81% of the time yet never kept a
-    /// command long enough to move the robot -- it drifted 0.75 m the WRONG
-    /// way. The cooldown is short on purpose: a hat that spins only while some
-    /// condition is false must recover the moment that condition flips.</summary>
-    int TopHat()
-    {
-        for (int i = 0; i < program.hats.Count; i++)
-        {
-            if (i == spunHat && clock < spunUntil) continue;
-            if (CondsTrue(program.hats[i].when)) return i;
-        }
-        return -1;
     }
 
     bool InForever()
@@ -239,45 +194,16 @@ public class ProgramRunner : MonoBehaviour
         return false;
     }
 
-    /// <summary>Give up whatever the active hat was doing. R3 critic caught
-    /// the R2 weapon latch being too broad: a RUN WEAPON FOR 5 s that got
-    /// PREEMPTED never stopped -- measured still firing 2.8 s past its own
-    /// duration and on past the end of the fight -- because ExitStep only runs
-    /// when a step finishes on its own, and StartHat no longer cleaned up
-    /// after it. An in-flight blocking step OWNS its channels and must release
-    /// them however it ends. `disarm` additionally drops the WEAPON ON latch:
-    /// a handover keeps it (a program that never says WEAPON OFF should keep
-    /// spinning), but going idle with no hat true at all is the program saying
-    /// nothing, and a robot parked with its blade at full for the rest of the
-    /// fight -- 0.005 PowerFrac/s, 30-45% of the reserve -- is not what
-    /// anybody wrote.</summary>
-    void AbandonHat(bool disarm)
-    {
-        if (stepEntered && activeHat >= 0 && activeHat < program.hats.Count)
-        {
-            var body = program.hats[activeHat].body;
-            if (pc >= 0 && pc < body.Count) ExitStep(body[pc], false);
-        }
-        ZeroDrive();
-        if (disarm) DisarmWeapons();
-    }
-
-    void DisarmWeapons()
-    { for (int i = 0; i < actFire.Length; i++) { actFire[i] = false; actSign[i] = 1f; } }
-
     void StartHat(int i)
     {
-        AbandonHat(false);
+        ZeroDrive();
         activeHat = i; pc = 0; loops.Clear(); stepEntered = false;
         lastFiredHat = i; activeStep = -1;
     }
 
-    void ReleaseHat() { ReleaseHat(true); }
-
-    /// <summary>disarm:false only when another hat takes over the same step.</summary>
-    void ReleaseHat(bool disarm)
+    void ReleaseHat()
     {
-        AbandonHat(disarm);
+        ZeroDrive();
         activeHat = -1; pc = 0; loops.Clear(); stepEntered = false;
         lastFiredHat = -1; activeStep = -1;
     }
@@ -287,7 +213,6 @@ public class ProgramRunner : MonoBehaviour
     void Advance(float dt)
     {
         var body = program.hats[activeHat].body;
-        bool didWork = false;
         int budget = INSTANT_BUDGET;
         while (budget-- > 0)
         {
@@ -299,18 +224,17 @@ public class ProgramRunner : MonoBehaviour
                 // made -- a hat whose body holds no blocking step produced
                 // literally nothing -- and cost up to 0.20 s of dead time on
                 // every single loop of every other hat.
-                int topNow;
-                topNow = TopHat();
+                int topNow = -1;
+                for (int i = 0; i < program.hats.Count; i++)
+                    if (CondsTrue(program.hats[i].when)) { topNow = i; break; }
                 if (topNow == activeHat)
                 {
                     if (body.Count == 0) return;   // nothing to run: hold, don't spin
                     pc = 0; loops.Clear(); stepEntered = false; activeStep = -1;
                     continue;
                 }
-                // Keep the weapon latch when another hat takes over; drop it
-                // when the program has nothing true to say at all.
-                ReleaseHat(topNow < 0);
-                if (topNow < 0) return;
+                ReleaseHat();
+                if (topNow < 0) return;      // nothing is true: idle, zeroed
                 // Run the incoming hat's first step NOW. Returning here cost
                 // one physics step of zero channels on every handover (R2
                 // minor 1) -- the TriggerEval path never had that hole.
@@ -320,7 +244,6 @@ public class ProgramRunner : MonoBehaviour
             }
             var b = body[pc];
             activeStep = pc;
-            if (!IsStructural(b.op)) didWork = true;
             switch (b.op)
             {
                 case POp.SetMotor: WriteMotor(b); pc++; continue;
@@ -379,23 +302,8 @@ public class ProgramRunner : MonoBehaviour
                     return;   // blocked here until done (or preempted)
             }
         }
-        // INSTANT BUDGET EXHAUSTED. If the hat did any WORK on the way -- any
-        // step that is not pure loop scaffolding -- that is just a SET-only
-        // hat holding its command, which is correct and must not be disturbed.
-        if (didWork) return;
-        //
-        // step without ever reaching a blocking one: it is spinning. The R3
-        // critic built the case Validate cannot see --
-        //     FOREVER { IF (something false) { MOVE 70% FOR 1.0 s } }
-        // which walks FOREVER -> IF -> skip -> END -> FOREVER forever. Measured
-        // 8.0 s, 0.00 m, 0% wheel command, and -- the real damage -- the WALL!
-        // safety hat sitting UNDER it never ran once, because preemption is
-        // strictly higher hats only. A hat that cannot reach a blocking step
-        // this step yields to the hats below it.
-        spunHat = activeHat; spunUntil = clock + SPUN_COOLDOWN;
-        int lower = TopHat();
-        ReleaseHat(lower < 0);
-        if (lower >= 0) StartHat(lower);
+        // instant budget exhausted — yield to the next physics step. With the
+        // loop-needs-a-blocking-step validation this is a defensive backstop.
     }
 
     readonly List<PCondTerm> oneTermList = new List<PCondTerm>(1);
@@ -462,7 +370,8 @@ public class ProgramRunner : MonoBehaviour
             }
             case POp.MoveRel:
             {
-                float drive, steer; RelCommand(b.target, b.arg, out drive, out steer);
+                float bear; bool sig = TargetSignal(b.target, out bear);
+                float drive, steer; RelDrive(b.arg, bear, sig, out drive, out steer);
                 WriteSteered(drive, steer);
                 break;
             }
@@ -504,16 +413,6 @@ public class ProgramRunner : MonoBehaviour
         stallMark = clock;
     }
 
-    /// <summary>Has an AWAY FROM WALL step already opened the range it asks
-    /// for? ROUNDS flavour only: a TIMED step was handed an explicit duration
-    /// by the player and honours it, commanding nothing while it waits.</summary>
-    bool WallRetreatSatisfied(PBlock b)
-    {
-        if (b.op != POp.MoveRel || b.arg >= 0f || b.target != (int)PTarget.Wall) return false;
-        if (bus == null || !bus.wallValid) return false;
-        return bus.wallDist >= Mathf.Min(WALL_SAFE, BuilderManager.ARENA_HALF * 0.75f);
-    }
-
     bool StepDone(PBlock b, float dt)
     {
         switch (b.op)
@@ -526,12 +425,6 @@ public class ProgramRunner : MonoBehaviour
                 {
                     roundsAcc += RoundsDelta(b, dt);
                     if (roundsAcc >= b.rounds) return true;
-                    // A ROUNDS retreat started from somewhere already clear
-                    // turns no wheels, so it can never bank a round: it sat
-                    // there commanding nothing and exited 1.2 s later on the
-                    // STALL watchdog, every single loop. The goal is met, and
-                    // saying so is honest where a fake stall is not.
-                    if (WallRetreatSatisfied(b)) return true;
                     return clock - stepT0 >= RobotProgram.MAX_DUR || Stalled();
                 }
                 return clock - stepT0 + 1e-6f >= b.dur;
@@ -555,45 +448,13 @@ public class ProgramRunner : MonoBehaviour
         }
     }
 
-    /// <summary>F5 (behaviour critic R2, quantified R3): a timed step ended
-    /// its COMMAND, but nothing ever stopped the robot. MOVE 70% FOR 1.0 s
-    /// travelled 2.10 m under power and then coasted 3.19 m further -- every
-    /// timed step landed 1.3x to 2.5x beyond what it read, so no sequence of
-    /// them went where the program said. Zeroing the wheels is not braking.
-    /// We command a short counter-thrust against whatever the body is still
-    /// doing, linear AND angular, and stand it down the instant a later step
-    /// drives. Keyboard feel is untouched: this is the program path only.</summary>
-    void BeginBrake()
+    void ExitStep(PBlock b)
     {
-        ZeroWheels();
-        brakeUntil = 0f; brakeFwd = 0f; brakeSteer = 0f;
-        var rb = self != null ? self.GetComponent<Rigidbody>() : null;
-        if (rb == null) return;
-        float fwd = Vector3.Dot(rb.linearVelocity, self.transform.forward);
-        if (Mathf.Abs(fwd) >= BRAKE_STOP) brakeFwd   = -Mathf.Sign(fwd) * BRAKE_POWER;
-        if (brakeFwd != 0f) brakeUntil = clock + BRAKE_TIME;
-    }
-
-    void ExitStep(PBlock b) { ExitStep(b, true); }
-
-    /// <summary>brake:false when the step is being ABANDONED rather than
-    /// finishing on its own. A handover must NOT brake -- the incoming hat
-    /// wants to drive, and braking every preemption left a safety hat unable
-    /// to accelerate at all (0.14 m in 2 s, measured). Aiming verbs (TURN BY,
-    /// SIDE TO) do not brake either: an angular counter-thrust overshot the
-    /// other way worse than the coast it was meant to cancel (SIDE TO landed
-    /// 28-54 deg out with one, 1-18 deg without).</summary>
-    void ExitStep(PBlock b, bool brake)
-    {
-        if (b.op == POp.RunMotor) ZeroMotor(b);       // "ran for n" => stops after n
+        if (b.op == POp.RunMotor) ZeroMotor(b);       // "ran for n" ⇒ stops after n
         else if (b.op == POp.Fire) SetFire(b, false);
-        else if (b.op == POp.Move || b.op == POp.MoveRel)
-        {
-            if (brake) BeginBrake();                  // a timed MOVE STOPS
-            else ZeroWheels();
-        }
-        else if (b.op == POp.TurnLR || b.op == POp.TurnBy || b.op == POp.FaceSide)
-            ZeroWheels();
+        else if (b.op == POp.Move || b.op == POp.TurnLR || b.op == POp.TurnBy
+              || b.op == POp.MoveRel || b.op == POp.FaceSide)
+            ZeroWheels();                             // timed macros stop what they drove
     }
 
     // ---- channel state ----------------------------------------------------
@@ -642,173 +503,6 @@ public class ProgramRunner : MonoBehaviour
     /// drive. TOWARD keeps the same bearing error, but its forward base is
     /// now scaled by cos as well, so a steer that saturates pivots the nose
     /// in rather than flying a circle the robot can never close.</summary>
-    /// <summary>Drive + steer for one MOVE TOWARD/AWAY step.
-    ///
-    /// AWAY FROM WALL is the reason this wrapper exists. Every other target
-    /// is a THING with a position; the arena is not. "Get away from the
-    /// nearest plane" is unsatisfiable inside a bounded box -- there is
-    /// always another wall behind you -- and the nearest plane changes
-    /// IDENTITY at the mid-line, so the command reversed at full magnitude
-    /// with nothing to damp it. Behaviour critic R3, measured: wallDist
-    /// ping-ponging 1.02-6.91 m forever, five 180-degree flips in 11 s, peak
-    /// 7.5 m/s, ending up closer to a wall than the 1.2 m threshold the WALL!
-    /// hat exists to defend; and a stationary robot at the arena centre
-    /// chattering 40 full reversals in 18 s.
-    ///
-    /// Two changes, and it needed both:
-    ///   1. STEER ON THE FIELD, not the nearest plane. SensorBus sums an
-    ///      inverse-square repulsion over all four walls -- continuous
-    ///      everywhere, no antipode, zero at the centre.
-    ///   2. GOVERN THE THRUST by how pinned the robot actually is. Full
-    ///      authority at or inside WALL_CLEAR, tapering to nothing at the
-    ///      centre. That is the verb's missing SET POINT: "open the range"
-    ///      is now a goal it can reach and stop at, not an appetite it can
-    ///      never satisfy -- and it is the speed limit that stops a retreat
-    ///      crossing the whole arena and arriving at the far wall 0.9 s
-    ///      later.
-    ///
-    /// The verb still means exactly what it says: increase the clearance.
-    /// It just knows when it has.</summary>
-    /// <summary>Drive + steer for one MOVE TOWARD/AWAY step.
-    ///
-    /// AWAY FROM WALL is the reason this wrapper exists. Every other target is
-    /// a THING with a position; the arena is not. "Get away from the nearest
-    /// plane" is unsatisfiable inside a bounded box -- there is always another
-    /// wall behind you -- and the nearest plane changes IDENTITY at the
-    /// mid-line, so the command reversed at full magnitude with nothing to
-    /// damp it. Behaviour critic R3, measured: wallDist ping-ponging
-    /// 1.02-6.91 m forever, five 180-degree flips in 11 s, peak 7.5 m/s,
-    /// ending up closer to a wall than the 1.2 m the WALL! hat exists to
-    /// defend; and a stationary robot at the arena centre chattering 40 full
-    /// reversals in 18 s.
-    ///
-    /// It took five things, and every one was found by measurement after the
-    /// previous four already looked finished:
-    ///   1. STEER ON THE FIELD, not the nearest plane -- continuous, no
-    ///      antipode, zero at the centre.
-    ///   2. GOVERN the thrust by how pinned we are: the verb's missing set
-    ///      point, and its speed limit.
-    ///   3. DAMP on the retreat already being made, or a proportional
-    ///      controller on a low-friction mass sails past and comes back.
-    ///   4. FLOOR the thrust while pivoting, or an escape that is ABEAM
-    ///      commands exactly zero and a short burst never leaves the wall.
-    ///   5. BRAKE at the end, because ceasing to command is not stopping:
-    ///      it coasted 4.88 m after going quiet.
-    ///
-    /// And one invariant under all of it, at the bottom of this method: a
-    /// retreat NEVER commands thrust toward the nearest wall.</summary>
-    void RelCommand(int target, float pct, out float drive01, out float steer)
-    {
-        if (pct >= 0f || target != (int)PTarget.Wall)
-        {
-            float bear; bool sig = TargetSignal(target, out bear);
-            RelDrive(pct, bear, sig, out drive01, out steer);
-            return;
-        }
-
-        drive01 = 0f; steer = 0f;
-
-        // You cannot flee what you cannot sense. The old fall-through hit
-        // RelDrive's no-signal branch, which drives STRAIGHT AHEAD at full
-        // power -- inside a box, that is how you hit a wall. Same lesson as
-        // the damage bus: a dead sensor must not produce confident wrong
-        // action.
-        if (bus == null || !bus.wallValid || !bus.wallFieldValid) return;
-
-        // The stopping clearance the verb never had, LATCHED. A bare threshold
-        // bang-banged: the robot hit 5 m still moving, went quiet, coasted
-        // through the centre and out the far side until clearance fell back
-        // under 5 m, which re-armed the retreat at full power.
-        float half = BuilderManager.ARENA_HALF;
-        float stop = Mathf.Min(WALL_SAFE, half * 0.75f);
-        if (wallRetreatDone) { if (bus.wallDist < stop - WALL_HYST) wallRetreatDone = false; }
-        else if (bus.wallDist >= stop) wallRetreatDone = true;
-
-        float v = EscapeSpeed();
-
-        if (wallRetreatDone)
-        {
-            // Clear. But ceasing to COMMAND is not stopping -- the retreat has
-            // real speed in it and simply glided, 4.88 m in the three seconds
-            // after going quiet. So brake to an actual halt. This is only safe
-            // because of the invariant at the bottom of this method, which
-            // vetoes any thrust toward the nearest wall: a brake here can
-            // never turn into the bug owen reported.
-            if (Mathf.Abs(v) < BRAKE_STOP) return;
-            RelDrive(pct, bus.wallEscapeDeg + 180f, true, out drive01, out steer);
-            drive01 *= (v > 0f ? -1f : 1f) * Mathf.Clamp01(Mathf.Abs(v) / WALL_TOP_SPEED);
-            steer = 0f;
-        }
-        else
-        {
-            // Driving AWAY along the escape field is the same thing as driving
-            // TOWARD (escape + 180), which is exactly what RelDrive's AWAY
-            // branch already computes. One controller, two framings.
-            RelDrive(pct, bus.wallEscapeDeg + 180f, true, out drive01, out steer);
-
-            // THRUST FLOOR. Thrust scales by cos(escape), so with the escape
-            // ABEAM the base is exactly zero and a burst is spent pivoting and
-            // nothing else: 0.8 s at 80% gained 2.57 m with the wall dead
-            // ahead and 0.22 m abeam. Not enough for the shipped WallShy hat
-            // to clear its own 1.2 m threshold in one burst, so it re-fired
-            // every tick. Keep the SIGN and floor only the magnitude.
-            float unit = Mathf.Abs(pct) * 0.01f;
-            if (unit > 1e-4f)
-            {
-                float c = drive01 / unit;                      // cos(escape)
-                if (Mathf.Abs(c) < WALL_FLOOR)
-                    drive01 = unit * (c < 0f ? -WALL_FLOOR : WALL_FLOOR);
-            }
-
-            // DAMPING, clamped at zero and never negative: letting it reach
-            // -0.6 as an active brake tripped owen's own regression check,
-            // flipping the command to +0.17 FORWARD with the wall dead ahead.
-            float u = Mathf.Clamp01(WallUrgency() - v / WALL_TOP_SPEED);
-            if (u <= 0.02f) { drive01 = 0f; steer = 0f; return; }
-            drive01 *= u; steer *= u;
-        }
-
-        // THE INVARIANT. A retreat never commands thrust toward the nearest
-        // wall. Tested as a MAGNITUDE along the wall bearing rather than a
-        // hard ahead/behind boundary, because at exactly abeam the sign of
-        // "ahead" flips on sensor jitter and would veto the pivot creep half
-        // the time. owen's original bug, made structurally impossible.
-        if (drive01 * Mathf.Cos(bus.wallBearingDeg * Mathf.Deg2Rad) > 0.05f)
-        { drive01 = 0f; steer = 0f; }
-    }
-
-    /// <summary>How fast we are already retreating, m/s along the escape
-    /// direction. Negative means we are still closing on the arena edge.
-    /// Dots against the bus's WORLD vector: rebuilding the direction from
-    /// transform.forward was wrong on any build whose drive axis is not +Z,
-    /// and on an X-drive build it read ~0 while the robot was doing 6-7 m/s,
-    /// which killed the damping and brought the whole limit cycle back.</summary>
-    float EscapeSpeed()
-    {
-        var rb = self != null ? self.GetComponent<Rigidbody>() : null;
-        if (rb == null || bus == null || !bus.wallFieldValid) return 0f;
-        return Vector3.Dot(rb.linearVelocity, bus.wallEscapeDir);
-    }
-
-    /// <summary>1 while pinned at or inside WALL_CLEAR, falling linearly to 0
-    /// at the arena centre, where the escape field is zero as well.
-    ///
-    /// NOTE these two constants are not independent: outside WALL_CLEAR only
-    /// the RATIO WALL_TOP_SPEED / (ARENA_HALF - WALL_CLEAR) survives, and it
-    /// is 1.0 per second today -- "you may retreat at (7 - wallDist) m/s".
-    /// Moving either one moves the ramp. WALL_TOP_SPEED has never actually
-    /// been the binding limit: the fastest retreat measured anywhere, over
-    /// every heading and three arena sizes, was 3.79 m/s.</summary>
-    float WallUrgency()
-    {
-        float half = BuilderManager.ARENA_HALF;
-        // Progression ships 5.5 and 5.0 half-arenas; clamp so a small box
-        // cannot collapse the ramp into a step function.
-        float clear = Mathf.Min(WALL_CLEAR, half * 0.5f);
-        float span = Mathf.Max(half - clear, 0.5f);
-        return Mathf.Clamp01((half - bus.wallDist) / span);
-    }
-
     static void RelDrive(float argPct, float bearingDeg, bool signal,
                          out float drive01, out float steer)
     {
@@ -929,7 +623,6 @@ public class ProgramRunner : MonoBehaviour
     void ZeroChannels()
     {
         ZeroDrive();
-        brakeUntil = 0f; brakeFwd = 0f; brakeSteer = 0f;
         for (int i = 0; i < actFire.Length; i++) { actFire[i] = false; actSign[i] = 1f; }
     }
 
@@ -940,7 +633,8 @@ public class ProgramRunner : MonoBehaviour
         // wheel channels every step — the SET persists, the aim stays fresh.
         if (relTarget >= 0)
         {
-            float baseP, st; RelCommand(relTarget, relPct, out baseP, out st);
+            float bear; bool sig = TargetSignal(relTarget, out bear);
+            float baseP, st; RelDrive(relPct, bear, sig, out baseP, out st);
             foreach (var i in leftCh) if (i < wheelState.Length)
                 wheelState[i] = Mathf.Clamp(baseP + st, -1f, 1f);
             foreach (var i in rightCh) if (i < wheelState.Length)
@@ -949,36 +643,13 @@ public class ProgramRunner : MonoBehaviour
         float steer = 0f;
         if (turnGain > 0.001f && bus != null && bus.compassValid)
             steer = Mathf.Clamp(bus.enemyBearingDeg * TURN_GAIN * turnGain, -1f, 1f);
-        // A brake only stands while NOTHING ELSE is driving: the moment the
-        // next step writes a wheel command the brake stands down, so a REPEAT
-        // of back-to-back moves never fights itself.
-        if (clock >= brakeUntil) { brakeFwd = 0f; brakeSteer = 0f; }
-        else
-        {
-            bool idle = relTarget < 0 && Mathf.Abs(steer) < 0.001f;
-            if (idle)
-                for (int i = 0; i < wheelState.Length; i++)
-                    if (Mathf.Abs(wheelState[i]) > 0.01f) { idle = false; break; }
-            // Closed loop: a fixed pulse was hopeless on a fast build (0.20 s
-            // at 75% barely dented 8.4 m/s). Push against the motion until it
-            // is actually gone, capped by BRAKE_TIME so a jam cannot hold the
-            // wheels, and stand down the moment a later step drives.
-            var rbb = idle && self != null ? self.GetComponent<Rigidbody>() : null;
-            float v = rbb != null ? Vector3.Dot(rbb.linearVelocity, self.transform.forward) : 0f;
-            if (!idle || rbb == null || Mathf.Abs(v) < BRAKE_STOP)
-            { brakeUntil = 0f; brakeFwd = 0f; }
-            else brakeFwd = -Mathf.Sign(v) * BRAKE_POWER;
-        }
         int n = Mathf.Min(wheelState.Length, drive.ChannelCount);
         for (int i = 0; i < n; i++)
         {
             float s = 0f;
             if (steer != 0f)
                 s = leftCh.Contains(i) ? steer : (rightCh.Contains(i) ? -steer : 0f);
-            float bs = brakeSteer == 0f ? 0f
-                     : (leftCh.Contains(i) ? brakeSteer
-                                           : (rightCh.Contains(i) ? -brakeSteer : 0f));
-            drive.SetWheelCmd(i, Mathf.Clamp(wheelState[i] + s + brakeFwd + bs, -1f, 1f));
+            drive.SetWheelCmd(i, Mathf.Clamp(wheelState[i] + s, -1f, 1f));
         }
         for (int i = 0; i < actuators.Length; i++)
         {
@@ -1056,10 +727,10 @@ public class ProgramRunner : MonoBehaviour
             case PCond.EdgeDist: ok = bus.wallValid; return bus.wallDist;         // V2.2: wall sensor
             case PCond.HazardNear: ok = bus.trapValid; return bus.trapNear ? 1f : 0f;
             case PCond.TrapDist: ok = bus.trapValid; return bus.trapDist;
-            case PCond.HpFrac:    ok = everBus; return bus.busValid ? bus.hpFrac : 0f;
-            case PCond.PowerFrac: ok = everBus; return bus.busValid ? bus.powerFrac : 0f;
+            case PCond.HpFrac:    ok = everBus; return lastHp;
+            case PCond.PowerFrac: ok = everBus; return lastPower;
             case PCond.HitRecently: ok = bus.busValid; return bus.hitRecently ? 1f : 0f;
-            case PCond.PartsLost: ok = everBus; return bus.busValid ? bus.partsLost : lastParts;
+            case PCond.PartsLost: ok = everBus; return lastParts;
             default: return 0f;
         }
     }

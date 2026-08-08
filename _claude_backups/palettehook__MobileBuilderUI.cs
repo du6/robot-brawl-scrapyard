@@ -679,7 +679,7 @@ public class MobileBuilderUI : MonoBehaviour
         var scroll = scrollGO.AddComponent<ScrollRect>(); scroll.horizontal = true; scroll.vertical = false;
         var viewport = MkPanel("viewport", scrollGO.transform, new Color(0f,0f,0f,0.15f));
         var vp = viewport.GetComponent<RectTransform>(); Stretch(vp);
-        vp.offsetMin = new Vector2(0f, 10f);      // leave the scrollbar its lane
+        vp.offsetMin = new Vector2(0f, PART_LANE);   // leave the scrollbar its lane
         viewport.AddComponent<Mask>().showMaskGraphic = true;
         var content = MkPanel("content", viewport.transform, new Color(0f,0f,0f,0f));
         var crt = content.GetComponent<RectTransform>();
@@ -725,26 +725,7 @@ public class MobileBuilderUI : MonoBehaviour
         grid.cellSize = new Vector2(112f, 50f);
         partGrid = grid;
         grid.spacing = new Vector2(6f, 4f);
-        // VERTICAL PADDING ZERO, and that is the whole fix for owen's
-        // 2026-08-07 report that the bottom palette row looked cut off.
-        //
-        // Four rows of 34 plus three 4-unit gaps is 148, which is exactly the
-        // viewport. Add 4+4 of vertical padding and the content is 156 into a
-        // 148 hole, so the bottom row lost 8 units — the second line of every
-        // tile, which is where the free-stock count lives. The scroller is
-        // HORIZONTAL-only, so no swipe ever revealed it.
-        //
-        // The first fix grew the dock by the missing 8 instead. It worked, and
-        // it was WRONG: a taller dock covers more of the build area, so parts
-        // could no longer be placed where they used to be. CareerSmoke went
-        // 127/127 -> 112/127, fifteen failures across buying, selling,
-        // placement, enrollment, purses and draft mode. Measured A/B with the
-        // correction pinned off. Giving the palette room by taking it from the
-        // BUILD AREA is a bad trade; giving it room by dropping cosmetic
-        // padding inside its own viewport costs nothing at all.
-        //
-        // Horizontal padding stays: that axis scrolls, so it cannot clip.
-        grid.padding = new RectOffset(4,4,0,0);
+        grid.padding = new RectOffset(4,4,4,4);
         grid.constraint = GridLayoutGroup.Constraint.FixedRowCount;
         // P1 (2026-08-05): 3 -> 4. The five sensor parts take the catalogue to
         // 24; at three rows that is 8 columns and the viewport-derived cell
@@ -1515,6 +1496,13 @@ public class MobileBuilderUI : MonoBehaviour
 
     RectTransform matRowRt, actRowRt, partScrollRt;
     UnityEngine.UI.GridLayoutGroup partGrid;
+    /// <summary>Units the palette grid needs beyond what DockH budgeted for
+    /// it. Measured, never guessed — see the note where it is computed.</summary>
+    float paletteShort;
+    float lastGap = float.NaN;   // see RefreshPaletteShort
+    /// <summary>The lane the viewport hands the horizontal scrollbar. Shared
+    /// so the layout and the fit check cannot drift apart.</summary>
+    const float PART_LANE = 10f;
     float lastScaleFactor, lastLayoutSig;
 
     /// <summary>One finger-sized row, in canvas units.
@@ -1777,6 +1765,28 @@ public class MobileBuilderUI : MonoBehaviour
                                                     / (float)partGrid.constraintCount));
             float cellW = vw > 50f ? (vw - 8f - (cols - 1) * 6f) / cols : 112f;
             partGrid.cellSize = new Vector2(Mathf.Max(84f, cellW), R);
+            // ...and the same trap ONE AXIS OVER, which the note above did not
+            // catch: the cell WIDTH is derived from the viewport, but the cell
+            // HEIGHT is just R, and nobody checked that `rows` of them FIT.
+            // They did not. DockH budgets 6*R for six rows, but the palette is
+            // a GRID: four rows also carry three 4-unit gaps, 4+4 of padding,
+            // and the 10-unit lane the viewport gives the scrollbar. Measured
+            // on the iPad — 156 units of content into a 148-unit viewport, so
+            // the BOTTOM ROW was clipped by 8 of its 34 units. That is the
+            // second line of the tile: the free-stock count, invisible on
+            // exactly the parts you run out of. (owen, 2026-08-07: "the text
+            // of the bottom rows of buttons looks cutoff a bit".) It was
+            // flagged as a risk when the grid went to four rows and shipped
+            // anyway — see the constraintCount note.
+            //
+            // Not re-fitted by hand, because that is what put it here. We
+            // MEASURE the shortfall and hand it back to DockH. `have` subtracts
+            // our own correction first, so this is a fixed point rather than a
+            // feedback loop: grow the dock, the shortfall reads the same, it
+            // settles in one pass and re-derives itself on any other device.
+            // The shortfall this creates is measured in RefreshPaletteShort,
+            // which ApplyDockH calls — not here, because this pass only runs
+            // on resize and the answer would freeze at the first frame's.
         }
         if (handleRt != null) handleRt.sizeDelta = new Vector2(300f, R);
         ApplyDockH();
@@ -1828,7 +1838,7 @@ public class MobileBuilderUI : MonoBehaviour
             // is unchanged and still has the last word, so a device that
             // overstates its dpi cannot turn this into a dock that swallows
             // the screen.
-            float want = 6f * R + 38f + safeB;
+            float want = 6f * R + 38f + paletteShort + safeB;
             return ch1 > 100f ? Mathf.Min(want, ch1 * 0.68f) : want;
         }
         if (!Career.active) return 210f;
@@ -1856,9 +1866,51 @@ public class MobileBuilderUI : MonoBehaviour
     /// <summary>R5: the dock height depends on which of the top bars are live,
     /// and those toggle at runtime - re-apply whenever that changes so the dock
     /// never overlaps the tip row and never leaves a gap under it.</summary>
+    /// <summary>How many units the palette grid needs beyond what DockH gave
+    /// it. Lives here, called from ApplyDockH, because the relayout pass that
+    /// sizes the cells runs on resize ONLY — computing it there left it stuck
+    /// at whatever the very first frame said, which is zero.
+    ///
+    /// `have` subtracts our own correction first, so this is a fixed point
+    /// and not a feedback loop: the dock grows, the shortfall reads the same,
+    /// it settles in one pass and re-derives itself on any other device.</summary>
+    void RefreshPaletteShort()
+    {
+        if (partScrollRt == null) return;
+        var sc = partScrollRt.GetComponent<ScrollRect>();
+        if (sc == null || sc.viewport == null || sc.content == null) return;
+        // A SERVO on the actual clipping, not a model of it. The first attempt
+        // reconstructed the requirement from cell size, spacing, padding and
+        // the scrollbar lane, then subtracted its own correction to avoid a
+        // feedback loop — and RATCHETED anyway, 8 units per tab round trip,
+        // because on the frame after a tab switch the dock has been resized
+        // but the rect has not caught up, so the correction got counted twice.
+        //
+        // This measures the one thing that actually matters and steers it to
+        // zero: content taller than viewport means that many units are being
+        // clipped, so ask for that many more; viewport taller than content
+        // means we over-asked, so give it back. Converges in two frames, is
+        // self-correcting in both directions, and assumes nothing about how
+        // DockH decomposes its budget — which is what made the model wrong.
+        float gap = sc.content.rect.height - sc.viewport.rect.height;
+        // ACT ONLY ON A SETTLED READING. A gain-1 servo with a one-frame lag
+        // does what every gain-1 servo with a one-frame lag does: it overshoots
+        // and reverses, and this one sat in a two-state limit cycle between a
+        // 148 and a 164 viewport, clipping on every other visit to the tab.
+        // (The wall-retreat controller earlier today failed the same way for
+        // the same reason — a proportional term against a laggy measurement.)
+        // Requiring the same gap twice running means we never steer off a
+        // rect that is still catching up with the last correction.
+        if (float.IsNaN(lastGap) || Mathf.Abs(gap - lastGap) > 0.5f) { lastGap = gap; return; }
+        lastGap = gap;
+        if (Mathf.Abs(gap) < 0.5f) return;
+        paletteShort = Mathf.Max(0f, paletteShort + gap);
+    }
+
     void ApplyDockH()
     {
         if (dockRt == null) return;
+        if (tab == 0 && dockOpen) RefreshPaletteShort();
         float dh = DockH(tab);
         if (Mathf.Abs(dockRt.sizeDelta.y - dh) > 0.5f) dockRt.sizeDelta = new Vector2(0f, dh);
         if (scrim != null) scrim.SetActive(dh > 300f);
@@ -2777,6 +2829,19 @@ public class MobileBuilderUI : MonoBehaviour
     void Update()
     {
         if (bm == null) { bm = Object.FindFirstObjectByType<BuilderManager>(); if (bm == null) return; }
+        // The palette fit must be re-checked on a SETTLED frame, not only
+        // inside ApplyDockH. ApplyDockH runs BEFORE the layout it triggers, so
+        // the rect it reads is one pass stale — and on a tab switch it reads a
+        // rect belonging to whichever tab was showing, which zeroed the
+        // correction and put the clipping straight back the moment you came
+        // back to BUILD. Here it sees the settled value, and only while BUILD
+        // is actually the tab on screen.
+        if (tab == 0 && dockOpen && partGrid != null && partScrollRt != null)
+        {
+            float was = paletteShort;
+            RefreshPaletteShort();
+            if (Mathf.Abs(paletteShort - was) > 0.5f) ApplyDockH();
+        }
         // Watch the canvas SIZE as well as the scale factor. Switching the
         // simulated device changes both, but a rotation changes only the size,
         // and the palette's column width is derived from the viewport width -

@@ -1,0 +1,11 @@
+=== BATCH D - F6 lockout, re-arm cost, F5 coast
+D0/F5  MOVE 70% FOR 1.0s from a standstill:
+   commanded 1.00s -> 2.10 m, speed at release 4.11 m/s (peak 4.11)
+   then COASTED a further 3.19 m over 1.56 s before dropping under 0.15 m/s; TOTAL 5.29 m for a 1.0 s order
+   local travel dir (z=nose?) = (0.01, 0.08, 1.00)
+D1 F6 Validate=OK (accepted!)
+D1 F6 8s: wheel-live 0% | hat0(PATROL) 392 steps, hat1(SAFETY) 0, none 9 | moved 0.00 m | avg frame 20.0 ms
+D1c CONTROL (same program, IF TRUE) 5s: wheel-live 96% | hat0 242 hat1 0 | moved 8.59 m | avg frame 20.0 ms
+D2 all-instant body (re-arms in place): avg frame 20.0 ms
+D2c CONTROL blocking body: avg frame 20.0 ms
+=== DONE

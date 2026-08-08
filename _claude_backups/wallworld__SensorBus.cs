@@ -71,16 +71,6 @@ public class SensorBus : MonoBehaviour
     /// robot-relative. Continuous everywhere; magnitude zero at the centre.
     /// Use this, not wallBearingDeg, for anything that RETREATS.</summary>
     public bool wallFieldValid; public float wallEscapeDeg;
-    /// <summary>The same direction in WORLD space. Published because a caller
-    /// that rebuilds it from the transform gets it WRONG: wallEscapeDeg is
-    /// measured off `forwardLocal`, the BUILD's drive axis, which
-    /// BuilderManager snaps to (0,0,1) or (1,0,0) depending on the wheel roll
-    /// axis. ProgramRunner reconstructed it from transform.forward and on an
-    /// X-drive build the two were 90 degrees apart -- the damping term read
-    /// ~0 while the robot was doing 6-7 m/s, and the whole wall-to-wall limit
-    /// cycle came back (band 1.02-6.98 m, 8 reversals, peak 8.54 m/s). Dot
-    /// against this and the frame cannot be got wrong.</summary>
-    public Vector3 wallEscapeDir;
     public bool trapValid;    public float trapDist;   public float trapBearingDeg; public bool trapNear;
     public bool busValid;     public float hpFrac = 1f; public int partsLost; public float powerFrac = 1f; public bool hitRecently;
 
@@ -131,7 +121,7 @@ public class SensorBus : MonoBehaviour
     }
 
     void Invalidate()
-    { rangeValid = compassValid = tiltValid = wallValid = trapValid = busValid = wallFieldValid = false; wallEscapeDir = Vector3.zero; }
+    { rangeValid = compassValid = tiltValid = wallValid = trapValid = busValid = wallFieldValid = false; }
 
     void FixedUpdate()
     {
@@ -260,7 +250,6 @@ public class SensorBus : MonoBehaviour
         wallFieldValid = push.sqrMagnitude > 1e-6f;
         wallEscapeDeg = (!wallFieldValid || fwd.sqrMagnitude < 1e-6f) ? 0f
             : Vector3.SignedAngle(fwd.normalized, push.normalized, Vector3.up);
-        wallEscapeDir = wallFieldValid ? push.normalized : Vector3.zero;
     }
 
     /// <summary>Nearest LIVE hazard: distance, signed bearing, and the

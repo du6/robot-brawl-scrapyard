@@ -1,0 +1,56 @@
+=== BATCH G - ProgramCanvas end to end (the real player path)
+active robot=spinner1 existing program len=0
+host canvas=mobile_builder_canvas
+canvas built. hats=0 status="no program yet — tap PROGRAMS ▾ and pick a preset to start"
+after +HAT:
+title="" hats=1
+  H0 "" WHEN Always>0
+    0 Move part=AllWheels idx=0 arg=70 dur=1 rnd=0 tgt=0 cond=null
+after +BLOCK and 3 op taps on block 1:
+title="" hats=1
+  H0 "" WHEN Always>0
+    0 Move part=AllWheels idx=0 arg=70 dur=1 rnd=0 tgt=0 cond=null
+    1 Weapon part=AllWheels idx=0 arg=100 dur=0 rnd=0 tgt=0 cond=null
+after value taps:
+title="" hats=1
+  H0 "" WHEN EnemyRange>1
+    0 Move part=AllWheels idx=0 arg=100 dur=1.5 rnd=0 tgt=0 cond=null
+    1 Weapon part=AllWheels idx=0 arg=100 dur=0 rnd=0 tgt=0 cond=null
+after +REPEAT:
+title="" hats=1
+  H0 "" WHEN EnemyRange>1
+    0 Move part=AllWheels idx=0 arg=100 dur=1.5 rnd=0 tgt=0 cond=null
+    1 Weapon part=AllWheels idx=0 arg=100 dur=0 rnd=0 tgt=0 cond=null
+    2 Repeat part=AllWheels idx=0 arg=3 dur=0 rnd=0 tgt=0 cond=null
+    3 Move part=AllWheels idx=0 arg=70 dur=1 rnd=0 tgt=0 cond=null
+    4 End part=AllWheels idx=0 arg=0 dur=0 rnd=0 tgt=0 cond=null
+LOAD TO ROBOT status="loaded to spinner1 (1 hats, 5 blocks) — TEST DRIVE → AUTO to watch it"
+robot json len=643
+PROGRAM AS STORED ON THE ROBOT:
+title="" hats=1
+  H0 "" WHEN EnemyRange>1
+    0 Move part=AllWheels idx=0 arg=100 dur=1.5 rnd=0 tgt=0 cond=Always<0
+    1 Weapon part=AllWheels idx=0 arg=100 dur=0 rnd=0 tgt=0 cond=Always<0
+    2 Repeat part=AllWheels idx=0 arg=3 dur=0 rnd=0 tgt=0 cond=Always<0
+    3 Move part=AllWheels idx=0 arg=70 dur=1 rnd=0 tgt=0 cond=Always<0
+    4 End part=AllWheels idx=0 arg=0 dur=0 rnd=0 tgt=0 cond=Always<0
+>>> MISMATCH between drawn and stored (see the two dumps)
+canvas after save shows:
+title="" hats=1
+  H0 "" WHEN EnemyRange>1
+    0 Move part=AllWheels idx=0 arg=100 dur=1.5 rnd=0 tgt=0 cond=Always<0
+    1 Weapon part=AllWheels idx=0 arg=100 dur=0 rnd=0 tgt=0 cond=Always<0
+    2 Repeat part=AllWheels idx=0 arg=3 dur=0 rnd=0 tgt=0 cond=Always<0
+    3 Move part=AllWheels idx=0 arg=70 dur=1 rnd=0 tgt=0 cond=Always<0
+    4 End part=AllWheels idx=0 arg=0 dur=0 rnd=0 tgt=0 cond=Always<0
+StartTest: testRobot=True testRunner=True
+PROGRAM ARMED ON THE ROBOT:
+title="" hats=1
+  H0 "" WHEN EnemyRange>1
+    0 Move part=AllWheels idx=0 arg=100 dur=1.5 rnd=0 tgt=0 cond=Always<0
+    1 Weapon part=AllWheels idx=0 arg=100 dur=0 rnd=0 tgt=0 cond=Always<0
+    2 Repeat part=AllWheels idx=0 arg=3 dur=0 rnd=0 tgt=0 cond=Always<0
+    3 Move part=AllWheels idx=0 arg=70 dur=1 rnd=0 tgt=0 cond=Always<0
+    4 End part=AllWheels idx=0 arg=0 dur=0 rnd=0 tgt=0 cond=Always<0
+>>> MATCH: armed program == stored program
+=== DONE (career data restored, autosave restored)

@@ -1,0 +1,278 @@
+BEHAVIOUR CRITIC - ROUND 2 - Robot Brawl: Bolt & Blade
+2026-08-07. Author-your-own-program pass. Everything below was MEASURED in play mode
+on a live rig; raw logs are in critic_r2_a..g.txt beside this file.
+Editor state restored: mode=Build, Career.devFreeBuild=false, Career.autosave=true,
+Career.Data/active/activeContest restored, fightAutonomous=false. Play mode never left.
+
+RIG used for A-F (14 parts): core, 2 beams, battery, spindle+spinner, compass, dmgbus,
+wallsensor, tiltsensor, 4 wheels. G used the same minus the weapon and the bus/tilt.
+
+=====================================================================
+FINDINGS
+=====================================================================
+
+--- BLOCKER -------------------------------------------------------
+None confirmed. The four MAJORs below are all reproducible and two of them cost the
+player most of a fight, but none of them is a hard lock of the sequencer itself.
+
+--- MAJOR 1: WEAPON ON does not survive a hat change. A spinner was commanded OFF
+    for 91% of a real fight by a program that never contains WEAPON OFF.
+
+PROGRAM (battery E, run as a real L1C1 career AUTONOMY fight vs SCOUT, playerSource=Program):
+  h0 FLIPPED  WHEN Flipped > 0.5      [ TURN 100% 1.0s ]
+  h1 WALL     WHEN EdgeDist < 1.5     [ MOVE AWAY WALL 85% 1.0s ; TURN BY 90 ]
+  h2 HURT     WHEN HpFrac < 0.5       [ MOVE AWAY ENEMY 70% 1.5s ]
+  h3 STRIKE   WHEN EnemyRange < 2.0   [ WEAPON ON ; MOVE TO ENEMY 100% 1.0s ]
+  h4 SEEK     WHEN always             [ WEAPON ON ; MOVE TO ENEMY 70% 1.5s ]
+  Validate() = OK. AutonomyBlocker = allowed.
+
+WHAT THE PROGRAM SAYS: the weapon is switched ON and never switched off. Two hats turn
+it on; nothing anywhere turns it off.
+
+MEASURED (26.0 s sampled at the physics rate, actuator.aiFire integrated):
+  aiFire true for  9%  of the fight  ( = 2.42 s )
+  hat dwell:  FLIP 20.82 s   WALL 2.76 s   HURT 0.00 s   STRIKE 1.86 s   SEEK 0.56 s
+  STRIKE dwell + SEEK dwell = 2.42 s -- EXACTLY the aiFire time, to the sample.
+  weapon commanded OFF for the whole 2.76 s the WALL hat was in charge.
+
+CONTROL LEG (battery F): same rig, same opponent, same four hats, one change - every hat
+now begins with WEAPON ON.
+  aiFire = 99.8% of 24.0 s. aiFire==false on 2 physics steps out of 1200.
+  => the 9% in E was caused by the missing repeat of WEAPON ON, nothing else.
+
+DIAGNOSIS: ProgramRunner.StartHat() and ReleaseHat() both call ZeroChannels(), which does
+  for (i) { actFire[i] = false; actSign[i] = 1f; }
+Every handover therefore kills the weapon, and only a hat whose own body contains a
+POp.Weapon block turns it back on. The V2 channel rule ("ANY handover zeroes everything")
+is deliberate for WHEELS -- motors should coast on a handover. Applying it to the weapon
+latch means there is NO WAY to express "keep the blade spinning" in the language: the
+player must paste WEAPON ON into the top of every hat including safety hats, and the
+canvas gives no hint of it. A wall touch or a flip silently disarms the machine.
+
+--- MAJOR 2: MOVE AWAY FROM WALL, held as a standing order, never converges. It flaps
+    across the arena at full power and spends ~half of every cycle REDUCING the wall
+    distance it is supposed to increase.
+
+PROGRAM (battery D3), wall aimed dead ahead at the start:
+  h0 WHEN always [ MOVE AWAY WALL 80% (SET, no seconds/rounds) ; WAIT 3.0 ]
+
+WHAT THE PROGRAM SAYS: increase the distance to the wall and hold that.
+
+MEASURED (wallDist / wallBearing / mean wheel command, 0.25 s samples):
+  t=0.00 d2.76 b   0 c-0.80      t=2.50 d4.60 b 180 c+0.80
+  t=0.75 d4.19 b   0 c-0.80      t=3.00 d6.69 b 180 c+0.80
+  t=1.25 d6.48 b   0 c-0.80      t=3.25 d5.52 b  -1 c-0.80
+  t=1.50 d5.83 b-180 c+0.80      t=4.00 d3.76 b  -2 c-0.80
+  t=2.25 d4.24 b 180 c+0.80      t=4.75 d5.46 b  -1 c-0.80
+  Limit cycle: period ~1.75 s, wallDist oscillating 3.76 .. 6.69 m, wheel command
+  reversing sign every ~1.5 s, and wallDist FALLING for 0.75-1.00 s of each half cycle
+  (5.83 -> 4.24 m and 5.52 -> 3.76 m) while the verb is commanding AWAY at 80%.
+
+DIAGNOSIS: two things compound. (a) SensorBus.ReadWall() reports only the NEAREST of the
+four wall planes, so the target identity jumps discontinuously when the robot crosses the
+arena mid-line -- the bearing snaps 0 -> 180 and ProgramRunner.RelDrive flips the drive
+term from -cos to +cos in one tick, with no hysteresis. (b) F5 (no brake on a timed step)
+means the body is still travelling the old way when the sign flips, so the first ~0.9 s of
+the new command is spent fighting momentum. RelDrive has no velocity term and no damping.
+The R1 AWAY fix holds - it never grinds into a wall - but the verb still does not settle.
+
+--- MAJOR 3: a stalled blocking step burns the FULL 10 s MAX_DUR with zero progress,
+    then the hat restarts from the top and stalls again - forever. (This is the deferred
+    F8, now quantified.)
+
+PROGRAM (battery G, test drive, wall sensor + compass + 4 wheels, no weapon):
+  h0 WALL  WHEN EdgeDist < 1.5  [ MOVE AWAY WALL 85% 1.0s ; TURN BY 90 ]
+  h1 IDLE  WHEN always          [ WAIT 0.5 ]
+
+MEASURED - activeStep run-length trace over 18.0 s (h<hat>s<step>:seconds):
+  h-1s-1:0.18  h1s0:3.50  h0s-1:0.02  h0s0:1.00  h0s1:10.00  h0s0:1.00  h0s1:2.28
+  yaw delta across the whole 10.00 s TURN BY 90 step: 0.0 degrees (held at y=29 exactly).
+  wallDist held at 1.0 m, wall bearing held at 147 deg, for 14 s straight.
+
+WHAT THE PROGRAM SAYS: turn 90 degrees. WHAT HAPPENED: 10.00 s of commanded pivot, 0.0
+degrees of yaw, then RobotProgram.MAX_DUR expired, the body finished, the hat re-armed
+(wall still < 1.5) and ran the identical pair again. Every lower hat is locked out for the
+whole time. There is no escalation, no fallback and no give-up.
+
+HONESTY NOTE: the JAM itself was harness-induced - I teleported the robot near a wall and
+it tumbled onto its side before settling, so "a 4-wheel box that cannot pivot" is my rig,
+not the game. What G measures validly is the RUNNER'S RESPONSE to a stall, and that is
+real: StepDone(TurnBy) returns true only on `clock - stepT0 >= MAX_DUR`, and Advance's
+body-end path re-arms the same hat in place. The same shape showed up unassisted in the
+real fight (battery F): the WALL hat held for 12.22 s continuously - 51% of a 24 s fight -
+while wallDist sat at 0.7-1.6 m and the enemy was inside 1.4 m for most of it.
+
+--- MAJOR 4: losing the damage-bus part silently INVERTS every hat that depends on it.
+    A robot at 30% hp stops retreating and charges the moment the bus is shot off.
+
+PROGRAM (battery B2):
+  h0 ALARM   WHEN HpFrac < 0.5  [ MOVE BACK 70% (SET) ]
+  h1 CRUISE  WHEN always        [ MOVE FWD 40% (SET) ]
+
+MEASURED:
+  hp forced to 0.300, dmgbus alive:   busValid=True  hat=0  mean wheel cmd = -0.70  (retreat)
+  DestroyPart(dmgbus_7), 0.8 s later: busValid=False hat=1  mean wheel cmd = +0.40  (charge)
+  hp is still 0.300. Nothing about the robot's condition changed - only its ability to read it.
+
+DIAGNOSIS: ProgramRunner.Read() returns ok=bus.busValid for HpFrac/PowerFrac/PartsLost/
+HitRecently, and CondsTrue() treats !ok as FALSE. "I cannot tell" and "I am healthy" are
+the same answer. This is the documented sensor-loss semantics (SensorBus: a dead sensor is
+"no signal"), and for EnemyRange it is fine. For a SAFETY hat it is exactly backwards: the
+one moment the bus dies is the moment you are being taken apart, and the program's response
+is to abandon the retreat. The player cannot express "< 50% hp OR I have lost the bus" -
+there is no OR and no invalid-sensor condition. Same trap applies to Flipped/TiltUpY if the
+tilt sensor is knocked off while the machine is upside down.
+
+--- MINOR 1: one physics step (0.020 s) of ZERO channels on every hat handover that goes
+    through Advance's body-end re-arm path.
+
+MEASURED, three independent triggers, all identical:
+  D0 (hp trigger, no teleport), per-physics-step mean wheel command:
+    [h1 0.40] x8  <SetHp 0.30>  [h0 0.00] [h0 -0.70] [h0 -0.70] ... x17
+  B1 (PartsLost trigger): hat flips at 0.020 s, cmd 0.00 on that step, -0.70 after.
+  B3 (Flipped trigger):   hat flips at 0.020 s, cmd 0.00 on that step, -0.70 after.
+  G gives the smoking gun: the trace contains a segment `h0s-1:0.02` - activeStep is -1
+    (no step executed) for exactly one physics step at the handover.
+  Real fight (F): 3 of 7 handovers had a zero wheel command on the handover step.
+
+DIAGNOSIS: ProgramRunner.Advance(), body-end branch:
+    ReleaseHat();
+    if (topNow >= 0) StartHat(topNow);
+    return;                 // <-- returns WITHOUT running the new hat's first step
+StartHat sets activeStep=-1 and ZeroChannels(), and the `return` skips straight to
+ApplyChannels(), which pushes the zeros to the drive. The TriggerEval path does NOT have
+this hole (Advance still runs after it in the same FixedUpdate), which is why only some
+handovers show it. Cost is 20 ms of coast plus a 20 ms weapon blip - small, but it is the
+first step of a preempting SAFETY hat that is thrown away.
+
+--- MINOR 2: WEAPON OFF barely slows a spinner. After 2.0 s of commanded OFF the blade is
+    still at 96% speed.
+
+PROGRAM (battery D1): h0 WHEN always [ FOREVER { WEAPON ON ; WAIT 2.0 ; WEAPON OFF ; WAIT 2.0 } ]
+MEASURED (actuator.rate, rad/s, 0.2 s samples; F = aiFire true):
+  ON  phase: F7.4 F24.6 F34.0 F41.8 F48.4 F53.6 F58.3 F63.1 F67.5 F71.5   (spin-up ~2 s, good)
+  OFF phase: -73.1 -72.8 -72.5 -72.2 -71.9 -71.6 -71.3 -71.0 -70.7 -70.4
+  Decay = 2.7 rad/s over 2.00 s = 1.35 rad/s per second => ~52 s to reach zero.
+  Over the whole 8.8 s trace rate never fell below 70.4.
+aiFire toggles at exactly the right instants (step index flips s2 <-> s4 on the 2.0 s
+boundaries, to the sample), so the COMMAND is honest; the physical result is not. A player
+writing WEAPON OFF to make the machine safe, to stop drawing power, or to set up a wedge
+push gets essentially nothing. SPIN_DRAG is the only brake and there is no brake verb.
+
+--- MINOR 3 (latent): FIRE can never complete on a spinner. Actuator.cyclesDone is only
+    incremented inside the NON-Spindle branch of Phase.Returning (Actuator.cs:865).
+    MEASURED: cyclesDone = 0 after 8.8 s of a spindle running at up to 73.5 rad/s.
+    StepDone(Fire) therefore falls through to the `arg * FIRE_CYCLE_TIMEOUT` fallback and a
+    FIRE 3 step would block for 12 s doing nothing the program asked for. RobotProgram.
+    Validate accepts FIRE on a spinner-only build. LATENT ONLY: POp.Fire is not in
+    ProgramCanvas.PLAYER_OPS, so no player can author it today - but old saved programs and
+    any harness can.
+
+--- MINOR 4: PowerFrac conditions cannot be exercised in the test bay.
+    MEASURED (B4): weapon spun to 73.5 rad/s + 40% drive for 6.0 s in test drive ->
+    powerFrac 1.000 -> 0.959 only; combatEnabled=False so PowerPlant ignores the draw.
+    A `WHEN power < 50%` hat can never be seen to fire in the bay. In the real fight it
+    reached 0.853 in 24 s - still nowhere near the 0.5/0.65 chips the canvas offers.
+    Not a defect in the runner; a hole in what the player can test and in what the
+    V_FRAC chip list ({0.1 .. 0.9}) implies is reachable.
+
+--- MINOR 5 (test-code only): VerbBench's SIDE TO labels are swapped. VerbBench.cs section E
+    calls SideTo(1,...) "LEFT TO" and SideTo(3,...) "RIGHT TO". ProgramCanvas.cs:1156 has
+    sides = {FRONT, RIGHT, BACK, LEFT} and ProgramRunner maps idx1 -> +90 deg (target off the
+    RIGHT). The GAME is correct and consistent; the bench log lies about which side it tested.
+
+=====================================================================
+VERIFIED CORRECT (measured, not assumed)
+=====================================================================
+
+DAMAGE BUS (assignment 1) - all four conditions fire when they should and only then:
+  HpFrac      : two-hat sweep 1.00/0.90/0.70/0.55/0.51 -> ALARM never fires;
+                0.49/0.45/0.30 -> ALARM fires. Threshold exact at 0.50. Latency 0.020 s.
+  HitRecently : robot.damageTaken +=5 -> hat fired at t=0.008 s, released at t=1.008 s.
+                SensorBus's 1.00 s window honoured to 8 ms.
+  PartsLost   : DestroyPart(spinner) -> partsLost 0->1, hat fired at 0.020 s,
+                hpFrac dropped 1.000 -> 0.873 in the same step.
+  PowerFrac   : reads PowerPlant.Frac correctly; threshold unreachable in the bay (MINOR 4).
+
+TILT (assignment 2):
+  Flipped     : robot inverted -> upY -1.000, flipped=true, hat fired at 0.020 s.
+  TiltUpY<0.75: held kinematic at known roll angles -
+                30 deg upY 0.866 -> no fire ; 41 deg upY 0.755 -> no fire ;
+                46 deg upY 0.695 -> FIRES  ; 60 deg upY 0.500 -> FIRES.
+                upY == cos(roll) to 3 decimals. Threshold exact.
+
+LOOP ARITHMETIC AND NESTING (assignment 3) - EXACT, no drift, no lost or extra iterations:
+  REPEAT 2 { REPEAT 3 { TURN 40% 0.2s ; WAIT 0.2 } ; MOVE 50% 0.4s }
+    trace: s2:0.20 s3:0.20  s2:0.20 s3:0.20  s2:0.20 s3:0.20  s5:0.40
+           s2:0.20 s3:0.20  s2:0.20 s3:0.20  s2:0.20 s3:0.20  s5:0.40  (then re-arms)
+    3 inner passes per outer pass, 2 outer passes per body, every duration exact to 0.20/0.40.
+  FOREVER { REPEAT 2 { IF wall<100 -> TURN 0.2 ELSE WAIT 0.5 ; WAIT 0.2 } ; MOVE 0.3 }
+    IF true : s3:0.20 s7:0.20  s3:0.20 s7:0.20  s9:0.30  repeating forever. Exact.
+    IF false: s5:0.50 s7:0.20  s5:0.50 s7:0.20  s9:0.30  repeating forever. Exact.
+    Depth 3 (FOREVER>REPEAT>IF) runs correctly and the IF is re-evaluated every iteration.
+  No dead gap between loop passes anywhere in any trace (F3 fix holds).
+
+MULTI-HAT PRIORITY UNDER REAL FIGHT CONDITIONS (assignment 4):
+  Worst preemption latency measured over a 26 s L1C1 autonomy fight, per hat, from the
+  physics step the WHEN became true to the step the hat took charge:
+    FLIPPED 0.160 s (n=2)   WALL 0.140 s (n=1)   STRIKE 0.080 s (n=2)   HURT n=0
+  All inside the 0.200 s TICK. Higher hats DO preempt lower ones mid-blocking-step, on time.
+  Lower hats correctly cannot preempt higher ones (STRIKE never interrupted WALL).
+  playerSource=Program held every frame; the enemy stayed roster AI.
+
+POST-MORTEM (F2 regression, re-checked in a REAL fight, not the bay):
+  robot killed mid-command -> worst wheel command over the next 60 physics steps = 0.000,
+  directWheelCmd = False, aiFire = False. F2 fix holds.
+
+F1 (hat with no blocking step) re-checked incidentally: every SET-only hat in batteries
+  A/B/D held its command continuously (0.40 / -0.70) for the full sample. Holds.
+
+SIDE TO (assignment 5) under program control, inside a FOREVER loop:
+  FOREVER { SIDE TO WALL / BACK ; WAIT 0.5 }, started from wall bearing 0:
+  bearing 0 -> -32 -> -70 -> -111 -> -156 -> -170, step completes at t=3.2 s with the
+  bearing at 179 (error 1 deg from the 180 target), then holds 176 +/- 0 deg for the next
+  4.6 s. No overshoot, no hunting, no oscillation. Converges and stays converged.
+  (Slow - 3.2 s for 180 deg - consistent with the deferred F7.)
+
+MOVE TO / AWAY as a SET survives a following WAIT: in D3 the MoveRel steering mode kept
+  recomputing every physics step through a 3.0 s WAIT (relTarget persisted, wheel command
+  never dropped below |0.80|). Behaviour is per spec.
+
+Validate() accepted every legal program I wrote and rejected none of them wrongly.
+
+=====================================================================
+SUSPECTED BUT UNMEASURED
+=====================================================================
+
+1. F6 (a FOREVER whose only blocking step sits behind a false IF) - I did NOT construct it.
+   C3b proves the ELSE branch supplies the blocking step, so the C3 family does not hit it.
+   Still open, still accepted by Validate.
+2. F4 (MOVE TOWARD from a wide bearing) was not re-run this round; I have no independent
+   confirmation that the cos-scaling fix still holds. VerbBench section J covers it.
+3. A detached weapon: ProgramRunner caches `actuators` at Init from
+   GetComponentsInChildren<Actuator>(true). If a weapon part detaches without its
+   GameObject being destroyed, the cached reference stays non-null and ApplyChannels would
+   keep writing aiFire to a limb that is no longer on the robot. I never got a weapon to
+   shed in 50 s of fighting, so this is inference from the code only.
+4. Enemy-relative MOVE TO against a moving target closed only 0.21 m per STRIKE entry
+   (4 entries, 1.86 s total) in the real fight. That is a weak number but the sample is
+   too small and too confounded by preemption to call it a finding.
+5. The robot spent 8.78 s (F) and ~19.8 s (E) genuinely flipped (upY measured at -0.23 to
+   0.00) with the FLIPPED hat spinning the wheels and never recovering. Whether the game
+   intends self-righting to be possible at all is a design question I could not settle;
+   what is measurable is that a flipped machine locks its top hat for the rest of the fight.
+
+=====================================================================
+DEFERRED ITEMS, IMPACT QUANTIFIED (as asked)
+=====================================================================
+F5 (no brake): in D3 the wheel command reversed at t=1.25 s and the robot kept travelling
+  the old way for a further 0.75-1.00 s and 1.6-2.2 m. In the fight, the WALL hat's
+  MOVE AWAY 85% for 1.0 s overshot from wallDist 1.2 m to 6.5 m - the arena centre - and
+  then fell back to 1.0 m. Every timed step lands roughly twice as far as it reads.
+F7 (TURN BY slow): 180 deg of SIDE TO took 3.2 s under program control. In a wall escape a
+  TURN BY 90 costs ~2.7 s, which is most of the time the robot has before it is back on
+  the wall - see MAJOR 3.
+F8 (stall bounds one step): quantified in MAJOR 3 - 10.00 s burned for 0.0 deg, then an
+  unbounded repeat. This is the single most damaging deferred item.
+
+END OF REPORT

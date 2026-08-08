@@ -29,8 +29,8 @@ PASS  run-to-completion: WHEN went false, the RUN keeps charge
 PASS  sequence completes and control falls back to the FOREVER hat
 PASS  RUN rounds: rotor spins under the trigger (rate measured)
 PASS  RUN rounds: 2 measured rounds complete and the trigger DROPS
-PASS  TURN BY 90° turns ~90° right on real wheels (89°)
-PASS  MOVE TOWARD ENEMY steers the nose onto the target (|bearing| 148° → min 26°)
+PASS  TURN BY 90° turns ~90° right on real wheels (90°)
+PASS  MOVE TOWARD ENEMY steers the nose onto the target (|bearing| 159° → min 0°)
 PASS  mirror: all 3 fights started
 PASS  mirror: both sides land damage in every fight (49/49 49/49 49/49)
 PASS  MIRROR symmetry: dealt==taken within 20% every fight (the program-era ~50% contract)
@@ -44,15 +44,15 @@ PASS  determinism: two spawns, identical 5 s channel trace (1066 vs 1066 chars)
 out=Draw Pdealt=49 Ptaken=49 t=90 viol=0 cause=Judges' decision — damage 49 vs 49 (0.0% margin level) · pieces 10/11 vs 10/11 · aggression 0% vs 0% · on its back 0% vs 0% — too close to call, scored a draw
 out=Draw Pdealt=49 Ptaken=49 t=90 viol=0 cause=Judges' decision — damage 49 vs 49 (0.0% margin level) · pieces 10/11 vs 10/11 · aggression 1% vs 1% · on its back 0% vs 0% — too close to call, scored a draw
 out=Draw Pdealt=49 Ptaken=49 t=90 viol=0 cause=Judges' decision — damage 49 vs 49 (0.0% margin level) · pieces 10/11 vs 10/11 · aggression 1% vs 1% · on its back 0% vs 0% — too close to call, scored a draw
-out=PlayerWin Pdealt=437 Ptaken=49 t=8 viol=0 cause=KO — enemy core destroyed
-out=PlayerWin Pdealt=359 Ptaken=49 t=8 viol=0 cause=KO — enemy core destroyed
-out=PlayerWin Pdealt=371 Ptaken=49 t=7 viol=0 cause=KO — enemy core destroyed
-out=PlayerWin Pdealt=430 Ptaken=49 t=9 viol=0 cause=KO — enemy core destroyed
-out=PlayerWin Pdealt=431 Ptaken=49 t=8 viol=0 cause=KO — enemy core destroyed
-out=PlayerWin Pdealt=377 Ptaken=49 t=7 viol=0 cause=KO — enemy core destroyed
-out=PlayerWin Pdealt=406 Ptaken=49 t=8 viol=0 cause=KO — enemy core destroyed
-out=PlayerWin Pdealt=427 Ptaken=49 t=8 viol=0 cause=KO — enemy core destroyed
-out=PlayerWin Pdealt=579 Ptaken=49 t=13 viol=0 cause=KO — enemy core destroyed
-out=PlayerWin Pdealt=396 Ptaken=49 t=7 viol=0 cause=KO — enemy core destroyed
+out=PlayerWin Pdealt=426 Ptaken=49 t=7 viol=0 cause=KO — enemy core destroyed
+out=PlayerWin Pdealt=373 Ptaken=49 t=6 viol=0 cause=KO — enemy core destroyed
+out=PlayerWin Pdealt=458 Ptaken=49 t=8 viol=0 cause=KO — enemy core destroyed
+out=PlayerWin Pdealt=427 Ptaken=49 t=7 viol=0 cause=KO — enemy core destroyed
+out=PlayerWin Pdealt=381 Ptaken=49 t=7 viol=0 cause=KO — enemy core destroyed
+out=PlayerWin Pdealt=446 Ptaken=49 t=8 viol=0 cause=KO — enemy core destroyed
+out=PlayerWin Pdealt=434 Ptaken=49 t=7 viol=0 cause=KO — enemy core destroyed
+out=PlayerWin Pdealt=404 Ptaken=49 t=8 viol=0 cause=KO — enemy core destroyed
+out=PlayerWin Pdealt=432 Ptaken=49 t=7 viol=0 cause=KO — enemy core destroyed
+out=PlayerWin Pdealt=401 Ptaken=49 t=7 viol=0 cause=KO — enemy core destroyed
 out=Draw Pdealt=0 Ptaken=0 t=5 viol=0 cause=trace window done
 out=Draw Pdealt=0 Ptaken=0 t=5 viol=0 cause=trace window done

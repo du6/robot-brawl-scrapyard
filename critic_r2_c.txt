@@ -1,0 +1,13 @@
+== C1 hat handover, per-physics-step wheel command ==
+  VALIDATE = OK
+  steps: [h0 0.00][h0 -0.70][h0 -0.70][h0 -0.70][h0 -0.70][h0 -0.70][h0 -0.70][h0 -0.70][h0 -0.70][h0 -0.70][h0 -0.70][h0 -0.70][h0 -0.70][h0 -0.70][h0 -0.70][h0 -0.70][h0 -0.70][h0 -0.70][h0 -0.70][h0 -0.70][h0 -0.70][h0 -0.70][h0 -0.70][h0 -0.70][h0 -0.70]
+== C2 REPEAT 3 inside REPEAT 2 (expect s2,s3 x3 then s5, twice per pass) ==
+  VALIDATE = OK
+  C2 | h0s3:0.16 h0s2:0.20 h0s3:0.20 h0s2:0.20 h0s3:0.20 h0s5:0.40 h0s2:0.20 h0s3:0.20 h0s2:0.20 h0s3:0.20 h0s2:0.20 h0s3:0.20 h0s5:0.40 h0s2:0.20 h0s3:0.20 h0s2:0.20 h0s3:0.20 h0s2:0.20 h0s3:0.20 h0s5:0.40 h0s2:0.20 h0s3:0.20 h0s2:0.20 h0s3:0.20 h0s2:0.20 h0s3:0.20 h0s5:0.22
+== C3 FOREVER { REPEAT 2 { IF wallDist<100 -> TURN 0.2 ELSE WAIT 0.5 ; WAIT 0.2 } ; MOVE 0.3 } ==
+  VALIDATE = OK
+  C3-true | h0s7:0.18 h0s3:0.20 h0s7:0.20 h0s9:0.30 h0s3:0.20 h0s7:0.20 h0s3:0.20 h0s7:0.20 h0s9:0.30 h0s3:0.20 h0s7:0.20 h0s3:0.20 h0s7:0.20 h0s9:0.30 h0s3:0.20 h0s7:0.20 h0s3:0.20 h0s7:0.20 h0s9:0.10
+== C3b same program, IF condition FALSE (expect ELSE branch s5) ==
+  VALIDATE = OK
+  C3b-false | h0s5:0.28 h0s7:0.20 h0s5:0.50 h0s7:0.20 h0s9:0.30 h0s5:0.50 h0s7:0.20 h0s5:0.50 h0s7:0.20 h0s9:0.30 h0s5:0.50 h0s7:0.20 h0s5:0.10
+DONE-C

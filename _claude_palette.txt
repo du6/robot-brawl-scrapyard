@@ -1,0 +1,7 @@
+BUILD #1: viewport 156.0 content 156.0 clipped=0
+after SHOP trip 1: viewport 156.0 content 156.0 clipped=0
+after SHOP trip 2: viewport 156.0 content 156.0 clipped=0
+after SHOP trip 3: viewport 156.0 content 156.0 clipped=0
+after SHOP trip 4: viewport 156.0 content 156.0 clipped=0
+after LEAGUE: viewport 156.0 content 156.0 clipped=0
+after PROGRAM: viewport 156.0 content 156.0 clipped=0

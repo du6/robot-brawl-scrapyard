@@ -1,0 +1,12 @@
+CONTROL LEG: same 4 hats, EVERY hat starts with WEAPON ON.
+== CONTROL RESULT (24.0 s) ==
+  weapon aiFire = 99.8% of fight (battery E, same shape without the repeated WEAPON ON, was 9%)
+  aiFire==false physics steps = 2 / 1200; hat handovers = 7; handovers whose step had ZERO wheel command = 3
+  rate min=41.1 max=73.5
+  minUpY=-0.232 time flipped=8.78 s
+  dealt=200.3 taken=38.2 hp=0.933 partsLost=0 pwr=0.853
+  hat RLE: h3:0.40 h2:1.00 h3:0.20 h2:0.20 h1:12.22 h3:0.40 h2:0.80 h0:8.76
+  series:  0:h3 up1.00 r4.2 w5.0 hp1.00 rt47 | 1:h2 up1.00 r1.9 w5.8 hp0.93 rt50 | 2:h1 up1.00 r1.4 w1.2 hp0.93 rt62 | 3:h1 up1.00 r2.8 w3.6 hp0.93 rt74 | 4:h1 up1.00 r2.6 w6.5 hp0.93 rt74 | 5:h1 up0.99 r0.8 w3.6 hp0.93 rt74 | 6:h1 up1.00 r1.3 w1.0 hp0.93 rt74 | 7:h1 up0.66 r0.6 w0.7 hp0.93 rt74 | 8:h1 up0.68 r0.9 w0.9 hp0.93 rt74 | 9:h1 up0.99 r5.0 w1.3 hp0.93 rt74 | 10:h1 up0.99 r5.2 w1.4 hp0.93 rt74 | 11:h1 up1.00 r3.0 w1.4 hp0.93 rt74 | 12:h1 up0.99 r5.1 w1.5 hp0.93 rt74 | 13:h1 up0.99 r5.1 w1.6 hp0.93 rt74 | 14:h1 up1.00 r3.3 w1.6 hp0.93 rt74 | 15:h2 up0.82 r1.0 w1.6 hp0.93 rt74 | 16:h0 up-0.09 r0.9 w1.0 hp0.93 rt74 | 17:h0 up-0.01 r1.0 w1.0 hp0.93 rt74 | 18:h0 up-0.07 r0.9 w1.0 hp0.93 rt74 | 19:h0 up0.00 r2.1 w1.0 hp0.93 rt74 | 20:h0 up0.00 r5.1 w1.0 hp0.93 rt74 | 21:h0 up0.00 r2.2 w1.0 hp0.93 rt74 | 22:h0 up-0.07 r1.2 w0.7 hp0.93 rt74 | 23:h0 up0.01 r1.1 w0.6 hp0.93 rt74 | 24:h0 up0.01 r1.5 w0.6 hp0.93 rt74 | 
+== post-mortem: kill the robot mid-command ==
+  worst wheel command after death = 0.000 directWheelCmd=False aiFire=False
+DONE-F

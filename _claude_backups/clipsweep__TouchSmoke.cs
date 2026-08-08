@@ -198,13 +198,6 @@ public class TouchSmoke : MonoBehaviour
         int bi = -1;
         for (int i = 1; i < bm.PaletteCount; i++)
             if (bi < 0 && bm.PartLabel(i).StartsWith("Beam")) bi = i;
-        // FIXTURE (2026-08-08): career stock is OWNED MINUS USED-IN-BUILD.
-        // The sandbox phase above leaves Aluminum beams in the build, so a
-        // flat grant of 1 can read as 0 free before this block ever taps -
-        // which is what made both career checks fail. Top up until exactly
-        // one is free, whatever the build happens to be holding.
-        for (int guard = 0; guard < 64 && bm.CareerRemaining(bi) < 1; guard++)
-            Career.AddItem("beam", "Aluminum", 1);
         yield return null;
         int nc = bm.PlacedCount;
         Tap("Beam"); yield return null;
@@ -277,53 +270,6 @@ public class TouchSmoke : MonoBehaviour
         Career.active = false;
         Career.Data = savedCareer;
         yield return null;
-        // ---- CLIP SWEEP -------------------------------------------------
-        // owen, 2026-08-07: "in the build tab the text of the bottom rows of
-        // buttons looks cutoff a bit." It was: the 4-row part palette needed
-        // 156 units of grid and the viewport gave 148, so the bottom row was
-        // clipped by 8 of its 34 and lost the second line of every tile — the
-        // free-stock count, on exactly the parts you run out of.
-        //
-        // Every bench was green through it, because they all check DATA and
-        // this is GEOMETRY. So the check is the general invariant rather than
-        // a note about the palette: CONTENT MAY OVERFLOW A VIEWPORT ONLY
-        // ALONG AN AXIS THAT ACTUALLY SCROLLS. Overflow across a scrolling
-        // axis is a swipe away; overflow across a FIXED axis is invisible
-        // forever. Swept over every ScrollRect in the scene, not a named
-        // list, so the next one is caught for free.
-        yield return null;
-        {
-            var bad = new List<string>();
-            foreach (var sc in Object.FindObjectsByType<ScrollRect>(FindObjectsSortMode.None))
-            {
-                if (!sc.gameObject.activeInHierarchy) continue;
-                if (sc.viewport == null || sc.content == null) continue;
-                var v = new Vector3[4]; sc.viewport.GetWorldCorners(v);
-                var c = new Vector3[4]; sc.content.GetWorldCorners(c);
-                if (!sc.vertical)
-                {
-                    float below = v[0].y - c[0].y;
-                    float above = c[1].y - v[1].y;
-                    float cut = Mathf.Max(below, above);
-                    if (cut > 1f)
-                        bad.Add(sc.name + " clips " + cut.ToString("0.0")
-                              + " units vertically (it does not scroll vertically)");
-                }
-                if (!sc.horizontal)
-                {
-                    float left = v[0].x - c[0].x;
-                    float right = c[3].x - v[3].x;
-                    float cut = Mathf.Max(left, right);
-                    if (cut > 1f)
-                        bad.Add(sc.name + " clips " + cut.ToString("0.0")
-                              + " units horizontally (it does not scroll horizontally)");
-                }
-            }
-            Check(bad.Count == 0, bad.Count == 0
-                  ? "no scroller clips its content across a FIXED axis"
-                  : "a scroller clips content across a fixed axis: " + string.Join(" | ", bad));
-        }
-
 
         foreach (var l in log) Debug.Log("[TouchSmoke] " + l);
         Debug.Log(string.Format("[TouchSmoke] RESULT: {0} pass, {1} fail{2}",

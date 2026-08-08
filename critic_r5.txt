@@ -1,0 +1,85 @@
+
+=== Q [WAIT.3, TURN BY 180, WAIT1.0] -- MAX_DUR stall cap is 10 s
+  * t=0.02 h=-1 s=-1 w=0.00,0.00,0.00,0.00 z=-4.01 cumYaw=0.0 wallD=3.27 wallB=180 enemyR=5.80
+  * t=0.20 h=0 s=0 w=0.00,0.00,0.00,0.00 z=-4.01 cumYaw=0.0 wallD=3.27 wallB=180 enemyR=5.80
+  * t=0.50 h=0 s=1 w=-0.70,0.70,-0.70,0.70 z=-4.01 cumYaw=0.0 wallD=3.27 wallB=180 enemyR=5.80
+  * t=2.02 h=0 s=1 w=-0.70,0.70,-0.70,0.70 z=-3.87 cumYaw=44.1 wallD=3.32 wallB=138 enemyR=5.90
+  * t=4.02 h=0 s=1 w=-0.70,0.70,-0.70,0.70 z=-2.92 cumYaw=126.4 wallD=3.90 wallB=56 enemyR=5.53
+  * t=4.62 h=0 s=1 w=-0.59,0.59,-0.59,0.59 z=-2.67 cumYaw=151.3 wallD=4.07 wallB=31 enemyR=5.32
+  * t=4.76 h=0 s=1 w=-0.48,0.48,-0.48,0.48 z=-2.63 cumYaw=156.8 wallD=4.10 wallB=25 enemyR=5.26
+  * t=4.92 h=0 s=1 w=-0.37,0.37,-0.37,0.37 z=-2.60 cumYaw=162.3 wallD=4.13 wallB=20 enemyR=5.23
+  * t=5.10 h=0 s=1 w=-0.26,0.26,-0.26,0.26 z=-2.57 cumYaw=167.5 wallD=4.15 wallB=14 enemyR=5.18
+  * t=5.96 h=0 s=2 w=0.00,0.00,0.00,0.00 z=-2.54 cumYaw=179.8 wallD=4.19 wallB=1 enemyR=5.09
+  * t=6.02 h=0 s=2 w=0.00,0.00,0.00,0.00 z=-2.53 cumYaw=180.1 wallD=4.19 wallB=0 enemyR=5.09
+  * t=6.96 h=-1 s=-1 w=0.00,0.00,0.00,0.00 z=-2.53 cumYaw=180.5 wallD=4.19 wallB=-1 enemyR=5.08
+  * t=7.02 h=0 s=0 w=0.00,0.00,0.00,0.00 z=-2.53 cumYaw=180.5 wallD=4.19 wallB=-1 enemyR=5.08
+  * t=7.32 h=0 s=1 w=-0.70,0.70,-0.70,0.70 z=-2.53 cumYaw=180.5 wallD=4.19 wallB=-1 enemyR=5.08
+  * t=8.02 h=0 s=1 w=-0.70,0.70,-0.70,0.70 z=-2.53 cumYaw=194.5 wallD=4.20 wallB=-13 enemyR=5.03
+  * t=10.02 h=0 s=1 w=-0.70,0.70,-0.70,0.70 z=-3.21 cumYaw=273.1 wallD=3.83 wallB=-91 enemyR=5.13
+  * t=11.44 h=0 s=1 w=-0.59,0.59,-0.59,0.59 z=-3.87 cumYaw=332.1 wallD=3.38 wallB=-151 enemyR=5.61
+  * t=11.58 h=0 s=1 w=-0.48,0.48,-0.48,0.48 z=-3.91 cumYaw=337.5 wallD=3.35 wallB=-157 enemyR=5.64
+  * t=11.74 h=0 s=1 w=-0.36,0.36,-0.36,0.36 z=-3.94 cumYaw=343.0 wallD=3.32 wallB=-162 enemyR=5.69
+  * t=11.92 h=0 s=1 w=-0.26,0.26,-0.26,0.26 z=-3.97 cumYaw=348.1 wallD=3.31 wallB=-167 enemyR=5.71
+  * t=12.02 h=0 s=1 w=-0.25,0.25,-0.25,0.25 z=-3.98 cumYaw=350.4 wallD=3.30 wallB=-169 enemyR=5.73
+  | t=12.02 h=0 s=1 w=-0.25,0.25,-0.25,0.25 z=-3.98 cumYaw=350.4 wallD=3.30 wallB=-169 enemyR=5.73
+
+=== R hat = FOREVER[ IF cond {MOVE50/0.5} ] with cond FALSE (Validate says OK). flip TRUE at 2.0s
+  * t=0.01 h=-1 s=-1 w=0.00,0.00,0.00,0.00 z=-4.01 cumYaw=0.0 wallD=3.27 wallB=180 enemyR=5.80
+  * t=0.19 h=0 s=1 w=0.00,0.00,0.00,0.00 z=-4.01 cumYaw=0.0 wallD=3.27 wallB=180 enemyR=5.80
+  * t=0.51 h=0 s=1 w=0.00,0.00,0.00,0.00 z=-4.01 cumYaw=0.0 wallD=3.27 wallB=180 enemyR=5.80
+  * t=1.01 h=0 s=1 w=0.00,0.00,0.00,0.00 z=-4.01 cumYaw=0.0 wallD=3.27 wallB=180 enemyR=5.80
+  * t=1.51 h=0 s=1 w=0.00,0.00,0.00,0.00 z=-4.01 cumYaw=0.0 wallD=3.27 wallB=180 enemyR=5.80
+  * t=2.01 h=0 s=1 w=0.00,0.00,0.00,0.00 z=-4.01 cumYaw=0.0 wallD=3.27 wallB=180 enemyR=5.80
+  | t=2.01 h=0 s=1 w=0.00,0.00,0.00,0.00 z=-4.01 cumYaw=0.0 wallD=3.27 wallB=180 enemyR=5.80
+  # cond->True t=2.01
+  * t=2.03 h=0 s=2 w=0.50,0.50,0.50,0.50 z=-4.01 cumYaw=0.0 wallD=3.27 wallB=180 enemyR=5.80
+  * t=2.53 h=0 s=2 w=0.50,0.50,0.50,0.50 z=-3.43 cumYaw=0.0 wallD=3.80 wallB=180 enemyR=5.32
+  * t=3.03 h=0 s=2 w=0.50,0.50,0.50,0.50 z=-1.74 cumYaw=0.0 wallD=5.45 wallB=180 enemyR=3.95
+  * t=3.53 h=0 s=2 w=0.50,0.50,0.50,0.50 z=1.06 cumYaw=0.0 wallD=5.80 wallB=0 enemyR=2.52
+  | t=4.01 h=0 s=2 w=0.50,0.50,0.50,0.50 z=4.79 cumYaw=0.0 wallD=2.46 wallB=0 enemyR=3.68
+
+=== S1 [ MOVE AWAY FROM WALL -70% (SET), WAIT 3.0 ] -- wallD must INCREASE
+  * t=0.01 h=-1 s=-1 w=0.00,0.00,0.00,0.00 z=-4.01 cumYaw=0.0 wallD=3.27 wallB=180 enemyR=5.80
+  * t=0.19 h=0 s=1 w=0.70,0.70,0.70,0.70 z=-4.01 cumYaw=0.0 wallD=3.27 wallB=180 enemyR=5.80
+  * t=0.51 h=0 s=1 w=0.70,0.70,0.70,0.70 z=-3.67 cumYaw=0.0 wallD=3.53 wallB=180 enemyR=5.62
+  * t=1.01 h=0 s=1 w=0.70,0.70,0.70,0.70 z=-1.85 cumYaw=0.0 wallD=5.23 wallB=180 enemyR=4.28
+  * t=1.34 h=0 s=1 w=-0.70,-0.70,-0.70,-0.70 z=0.29 cumYaw=0.0 wallD=6.58 wallB=0 enemyR=2.72
+  * t=1.51 h=0 s=1 w=-0.70,-0.70,-0.70,-0.70 z=1.35 cumYaw=0.0 wallD=5.62 wallB=0 enemyR=2.53
+  * t=2.01 h=0 s=1 w=-0.70,-0.70,-0.70,-0.70 z=3.56 cumYaw=0.0 wallD=3.28 wallB=0 enemyR=3.26
+  * t=2.51 h=0 s=1 w=-0.70,-0.70,-0.70,-0.70 z=4.07 cumYaw=0.0 wallD=2.64 wallB=0 enemyR=3.80
+  * t=3.01 h=0 s=1 w=-0.70,-0.70,-0.70,-0.70 z=3.40 cumYaw=0.0 wallD=3.23 wallB=0 enemyR=3.43
+  * t=3.21 h=-1 s=-1 w=0.00,0.00,0.00,0.00 z=2.87 cumYaw=0.0 wallD=3.73 wallB=0 enemyR=3.13
+  * t=3.41 h=0 s=1 w=-0.70,-0.70,-0.70,-0.70 z=2.30 cumYaw=0.0 wallD=4.32 wallB=0 enemyR=2.82
+  | t=3.41 h=0 s=1 w=-0.70,-0.70,-0.70,-0.70 z=2.30 cumYaw=0.0 wallD=4.32 wallB=0 enemyR=2.82
+
+=== S2 [ MOVE TOWARD ENEMY +60% (SET), WAIT 3.0 ] -- enemyR must DECREASE
+  * t=0.01 h=-1 s=-1 w=0.00,0.00,0.00,0.00 z=-4.01 cumYaw=0.0 wallD=3.27 wallB=180 enemyR=5.80
+  * t=0.19 h=0 s=1 w=0.04,1.00,0.04,1.00 z=-4.01 cumYaw=0.0 wallD=3.27 wallB=180 enemyR=5.80
+  * t=0.51 h=0 s=1 w=0.10,1.00,0.10,1.00 z=-3.77 cumYaw=5.8 wallD=3.45 wallB=175 enemyR=5.68
+  * t=0.65 h=0 s=1 w=0.22,0.98,0.22,0.98 z=-3.51 cumYaw=11.1 wallD=3.72 wallB=170 enemyR=5.38
+  * t=0.85 h=0 s=1 w=0.37,0.83,0.37,0.83 z=-2.96 cumYaw=19.6 wallD=4.24 wallB=161 enemyR=4.89
+  * t=1.01 h=0 s=1 w=0.43,0.77,0.43,0.77 z=-2.38 cumYaw=25.5 wallD=4.72 wallB=156 enemyR=4.56
+  * t=1.51 h=0 s=1 w=0.34,0.86,0.34,0.86 z=0.09 cumYaw=30.1 wallD=5.86 wallB=60 enemyR=2.19
+  * t=1.55 h=0 s=1 w=0.19,1.00,0.19,1.00 z=0.33 cumYaw=30.1 wallD=5.69 wallB=60 enemyR=1.59
+  * t=1.65 h=0 s=1 w=-0.15,1.00,-0.15,1.00 z=0.97 cumYaw=30.5 wallD=5.38 wallB=60 enemyR=0.98
+  * t=1.75 h=0 s=1 w=-0.40,1.00,-0.40,1.00 z=1.63 cumYaw=31.4 wallD=5.05 wallB=59 enemyR=0.59
+  * t=2.01 h=0 s=1 w=-0.40,1.00,-0.40,1.00 z=3.44 cumYaw=36.8 wallD=3.62 wallB=-36 enemyR=1.62
+  * t=2.51 h=0 s=1 w=-0.40,1.00,-0.40,1.00 z=5.81 cumYaw=49.0 wallD=1.00 wallB=-48 enemyR=4.93
+  * t=3.01 h=0 s=1 w=-0.40,1.00,-0.40,1.00 z=5.98 cumYaw=70.2 wallD=0.94 wallB=-68 enemyR=5.04
+  * t=3.21 h=-1 s=-1 w=0.00,0.00,0.00,0.00 z=6.10 cumYaw=83.3 wallD=0.88 wallB=-81 enemyR=5.17
+  * t=3.41 h=0 s=1 w=-0.40,1.00,-0.40,1.00 z=6.19 cumYaw=93.4 wallD=0.83 wallB=-92 enemyR=5.33
+  | t=3.41 h=0 s=1 w=-0.40,1.00,-0.40,1.00 z=6.19 cumYaw=93.4 wallD=0.83 wallB=-92 enemyR=5.33
+
+=== T [ MOVE 60% for 20 ROUNDS (=22.6 m, arena is 14 m), WAIT 0.5 ] -- expect the 10 s stall cap
+  * t=0.00 h=-1 s=-1 w=0.00,0.00,0.00,0.00 z=-4.01 cumYaw=0.0 wallD=3.27 wallB=180 enemyR=5.80
+  * t=0.18 h=0 s=0 w=0.60,0.60,0.60,0.60 z=-4.01 cumYaw=0.0 wallD=3.27 wallB=180 enemyR=5.80
+  * t=2.00 h=0 s=0 w=0.60,0.60,0.60,0.60 z=5.00 cumYaw=0.0 wallD=1.92 wallB=0 enemyR=4.05
+  * t=4.00 h=0 s=0 w=0.60,0.60,0.60,0.60 z=5.58 cumYaw=0.0 wallD=1.14 wallB=0 enemyR=5.02
+  * t=6.00 h=0 s=0 w=0.60,0.60,0.60,0.60 z=5.58 cumYaw=0.0 wallD=1.14 wallB=0 enemyR=5.02
+  * t=8.00 h=0 s=0 w=0.60,0.60,0.60,0.60 z=5.58 cumYaw=0.0 wallD=1.14 wallB=0 enemyR=5.02
+  * t=10.00 h=0 s=0 w=0.60,0.60,0.60,0.60 z=5.58 cumYaw=0.0 wallD=1.14 wallB=0 enemyR=5.02
+  * t=10.18 h=0 s=1 w=0.00,0.00,0.00,0.00 z=5.58 cumYaw=0.0 wallD=1.14 wallB=0 enemyR=5.02
+  * t=10.68 h=-1 s=-1 w=0.00,0.00,0.00,0.00 z=5.58 cumYaw=0.0 wallD=1.15 wallB=0 enemyR=5.02
+  * t=10.80 h=0 s=0 w=0.60,0.60,0.60,0.60 z=5.58 cumYaw=0.0 wallD=1.15 wallB=0 enemyR=5.02
+  * t=12.00 h=0 s=0 w=0.60,0.60,0.60,0.60 z=5.58 cumYaw=0.0 wallD=1.14 wallB=0 enemyR=5.02
+  | t=12.50 h=0 s=0 w=0.60,0.60,0.60,0.60 z=5.58 cumYaw=0.0 wallD=1.14 wallB=0 enemyR=5.02

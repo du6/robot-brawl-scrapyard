@@ -1,0 +1,46 @@
+=== BATCH E - wall limit cycle, bus hold, turn-power threshold
+E1  MOVE AWAY FROM WALL 80% (HOLD) over 18s: wallDist min=6.84 max=7.00 mean=6.95 | bearing >90deg jumps=40 | final dist=6.97 pos=(0.0, 0.2, 0.0)
+E1c CONTROL MOVE TOWARD WALL 70% (HOLD) over 8s: wallDist min=1.41 max=6.94 mean=2.38 | bearing >90deg jumps=0 | final dist=1.43 pos=(-1.7, 0.2, 5.6)
+E3 TIMED TURN 55% FOR 2.0s -> 2.2 deg (1.1 deg/s)
+E3 TIMED TURN 85% FOR 2.0s -> 220.0 deg (110.0 deg/s)
+E3 TIMED TURN 100% FOR 2.0s -> 319.2 deg (159.6 deg/s)
+E2 dmgbus partIdx=-1 powerPlant=True
+E2 t=5.5 realPower=0.79 busValid=True hat=1
+E2 t=6.0 realPower=0.79 busValid=True hat=1
+E2 t=6.5 realPower=0.78 busValid=True hat=1
+E2 t=7.0 realPower=0.78 busValid=True hat=1
+E2 t=7.5 realPower=0.78 busValid=True hat=1
+E2 t=8.0 realPower=0.77 busValid=True hat=1
+E2 t=8.5 realPower=0.77 busValid=True hat=1
+E2 t=9.0 realPower=0.77 busValid=True hat=1
+E2 t=9.5 realPower=0.77 busValid=True hat=1
+E2 t=10.0 realPower=0.76 busValid=True hat=1
+E2 t=10.5 realPower=0.76 busValid=True hat=1
+E2 t=11.0 realPower=0.76 busValid=True hat=1
+E2 t=11.5 realPower=0.75 busValid=True hat=1
+E2 t=12.0 realPower=0.75 busValid=True hat=1
+E2 t=12.5 realPower=0.75 busValid=True hat=1
+E2 t=13.0 realPower=0.75 busValid=True hat=1
+E2 t=13.5 realPower=0.74 busValid=True hat=1
+E2 t=14.0 realPower=0.74 busValid=True hat=1
+E2 t=14.5 realPower=0.74 busValid=True hat=1
+E2 t=15.0 realPower=0.74 busValid=True hat=1
+E2 t=15.5 realPower=0.73 busValid=True hat=1
+E2 t=16.0 realPower=0.73 busValid=True hat=1
+E2 t=16.5 realPower=0.73 busValid=True hat=1
+E2 t=17.0 realPower=0.72 busValid=True hat=1
+E2 t=17.5 realPower=0.72 busValid=True hat=1
+E2 t=18.0 realPower=0.72 busValid=True hat=1
+E2 t=18.5 realPower=0.72 busValid=True hat=1
+E2 t=19.0 realPower=0.71 busValid=True hat=1
+E2 t=19.5 realPower=0.71 busValid=True hat=1
+E2 t=20.0 realPower=0.71 busValid=True hat=1
+E2 t=20.5 realPower=0.70 busValid=True hat=1
+E2 t=21.0 realPower=0.70 busValid=True hat=1
+E2 t=21.5 realPower=0.70 busValid=True hat=1
+E2 t=22.0 realPower=0.70 busValid=True hat=1
+E2 t=22.5 realPower=0.69 busValid=True hat=1
+E2 t=23.0 realPower=0.69 busValid=True hat=1
+E2 t=23.5 realPower=0.69 busValid=True hat=1
+E2 t=24.0 realPower=0.69 busValid=True hat=1
+=== DONE

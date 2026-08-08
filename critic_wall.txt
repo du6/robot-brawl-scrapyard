@@ -1,0 +1,308 @@
+BEHAVIOUR CRITIC - MOVE AWAY FROM WALL (escape field + governor)
+2026-08-07. Play mode, no .cs touched. Raw data: critic_wall_A/B/X/S/F/G/H.txt
+
+CONTROL LEG FIRST. My harness reproduces VerbBench check N exactly on the
+same rig and start point: band 5.24-6.99 m, 2 reversals, peak 2.58 m/s
+(critic_wall_X.txt, run Z_ctrl_axis). So where I report a difference below,
+it is a difference, not a different harness.
+
+================================================================
+BROKEN
+================================================================
+
+--- B1. EscapeSpeed() READS THE WRONG BODY AXIS. On any build whose drive
+--- direction is local +X, the damping term is dead and the ENTIRE PRE-FIX
+--- PATHOLOGY COMES BACK.
+
+SensorBus.cs:221 measures wallEscapeDeg from robot.transform.TransformDirection
+(forwardLocal), where forwardLocal is the build's DRIVE direction (dDir,
+BuilderManager.cs:4023). ProgramRunner.cs:694 reconstructs that direction from
+self.transform.forward. Those are the same vector only when driveDir == (0,0,1).
+BuilderManager.cs:3471-3473 snaps driveDir to (0,0,1) OR (1,0,0) depending on
+wheel roll axis, so a chassis whose wheels roll along X gets a 90 deg frame
+error in EscapeSpeed and nowhere else.
+
+Rig: the VerbBench BODY rotated 90 deg (wheel axes 0,0,+-1). Builder accepts
+it, 10 parts, DriveDirNow = (1.00, 0.00, 0.00). Standing AWAY 80%, start
+(4.5, 0), 20 s. I logged the true escape-axis speed and the one the runner
+computes, side by side:
+
+  t=1.02  vTrue=+6.19 m/s   vRunner=-0.29
+  t=3.06  vTrue=+5.29       vRunner= 0.00
+  t=6.12  vTrue=-7.05       vRunner=-0.21
+  t=9.18  vTrue=-6.08       vRunner=+0.02
+
+vRunner is ~0 whenever vTrue is 5-7 m/s, so u = Clamp01(gov - 0) = gov: the
+damping term you added at ProgramRunner.cs:679 never subtracts anything.
+Result, measured over 20 s:
+
+                  band (m)      reversals   peak (m/s)   ends at
+  Z drive (ctrl)  5.24 - 6.99       2          2.58       6.97 m
+  X drive         1.02 - 6.98       8          8.54       1.58 m
+  what R3 measured 1.02 - 6.91    5 in 11 s     7.5      inside 1.2 m
+
+That is the old bug, digit for digit, including finishing closer to a wall
+than the 1.2 m the WALL! hat defends.
+
+HONEST CAVEAT, and it matters: X-drive builds are ALREADY broken by something
+older. RaycastWheelDrive.cs:565 WheelSideX returns localAnchor.x and
+ProgramRunner.cs:132 buckets left/right off it, so on an X-drive build 'left'
+is the rear pair. I ran the pre-existing paths on the same rig as a control:
+  S5b  TURN BY 90         -> dYaw = 0.22 deg in 3.5 s   (does nothing)
+  S5c  MOVE TOWARD WALL   -> d 3.00 -> 3.01 in 2.5 s    (does nothing)
+  S5a  plain MOVE 70%     -> moved 5.82 m               (works: base-only)
+So differential steering is dead there regardless of your change. Two of my
+X-drive runs show that half:
+  X_axisZ  escape exactly abeam -> 20 s, wallDist pinned at 2.50, peak speed
+           0.05 m/s, command 0.00. The robot never moves at all.
+  X_corner escape abeam -> 20 s skating along the +Z wall, z stuck 5.50-5.54,
+           wallDist band 1.05-1.50, never escapes.
+Those two are the pre-existing steering bug, not yours. X_axisX (the 8.54 m/s
+ping-pong) is yours, because there the escape is dead ahead/astern so base
+thrust works and only the damping is missing.
+
+Blame: ProgramRunner.cs:694. It should rotate the same vector SensorBus used:
+self.transform.TransformDirection(driveDirLocal), not self.transform.forward.
+Cheapest correct fix is to have SensorBus publish the escape direction in WORLD
+space alongside the relative bearing and have EscapeSpeed dot against that -
+then no caller can ever get the frame wrong again.
+
+--- B2. A SHORT AWAY BURST IS 12x WEAKER WHEN THE ESCAPE IS ABEAM. The shipped
+--- WallShy hat cannot clear its own trigger threshold in one burst.
+
+RelDrive scales thrust by cos(escape bearing) (ProgramRunner.cs:722), so with
+the escape 90 deg off the nose drive01 is exactly zero and the whole burst is
+spent pivoting. Static field map confirms it: at (6,0), 1 m off the wall, the
+most pinned a robot can be, the four wheel commands are +1.00/+1.00/-1.00/-1.00
+and NET THRUST IS 0.000 (critic_wall_A.txt).
+
+Measured: AWAY 80% held for 0.8 s from wallDist 1.50, by heading:
+  escape 180 (wall dead ahead)   +2.57 m
+  escape   0 (wall astern)       +1.52 m
+  escape -135                    +1.23 m
+  escape +135                    +0.88 m
+  escape  -45                    +0.93 m
+  escape  -90 (abeam)            +0.22 m   <-- 12x worse than the best case
+At 25% the abeam case gains +0.12 m in 0.8 s.
+
+RobotProgram.WallShy() (RobotProgram.cs:750) is:
+   WHEN EdgeDist < 1.2 : MOVE AWAY FROM WALL 80% FOR 0.8 s
+From 1.2 m with the wall abeam that burst ends at ~1.4 m, so the hat re-fires
+immediately. In four real L1C1 autonomy fights the WALL! hat was the firing hat
+15% / 73% / 3% / 65% of sampled frames and minimum wall clearance still reached
+0.59-1.07 m. Same shape in my sequencer run S1 (85% FOR 1.0 s from 1.10 m,
+wall abeam): the step spent its whole second turning and gained 0.56 m.
+
+Given time it always works - 3.0 s of the same command gains 4.20-4.52 m at
+80% from EVERY heading - so this is 'the burst length is wrong for the worst
+heading', not 'the verb cannot escape'. Two ways out: give AWAY+Wall a thrust
+floor while it is pivoting (Mathf.Max(0.25f, -cos) instead of -cos), or make
+the preset's burst duration long enough for the worst case (>= 1.5 s).
+
+--- B3. 'COMMANDS NOTHING ONCE IT IS CLEAR' IS TRUE ONLY WITHIN ~8 cm OF THE
+--- EXACT ARENA CENTRE. Everywhere else a stationary, perfectly safe robot
+--- keeps commanding full opposite lock.
+
+The zero at ProgramRunner.cs:680 needs u <= 0.02, i.e. with the robot stopped,
+gov <= 0.02, i.e. wallDist >= 6.92 m. wallDist only reaches 6.92 within 8 cm
+of the centre. VerbBench check O samples exactly (0,0), where wallFieldValid
+is false and the OTHER early return (line 657) fires, so the bench cannot see
+this. Static map, robot held stationary, AWAY 80% armed:
+
+   pos      wallDist   wheel commands    net
+  (1,0)      6.00      +0.248 / -0.252   0.00   <- 6 m of clearance
+  (2,0)      5.00      +0.498 / -0.502   0.00
+  (3,0)      4.00      +0.748 / -0.752   0.00
+  (0.5,0)    6.50      +0.123 / -0.127   0.00
+  (0,0)      6.99       0.000            0.00   <- the only place it is quiet
+
+Cost in the standing-order run: from (4.5,0) at 80% the robot reached 5 m of
+clearance at t=1.70 s, but kept manoeuvring - a decaying spiral through
+(-0.71,1.74), (-1.17,-0.93), (0.66,-0.66), (0.41,0.16) - and did not stop until
+t~13 s. Eleven seconds of orbiting after the verb had already succeeded. At 15%
+power it was still crossing the centre every ~5 s at t=19 s (x: 0.07 -> 1.03 ->
+-0.42 -> -0.23).
+
+Fix is a clearance deadband rather than an urgency one: return zero when
+wallDist >= some WALL_SAFE (my runs say 5.0-5.5 m is where nothing is being
+gained any more). That also makes the verb's contract legible to a player:
+'open the range to 5 m, then stop'.
+
+--- B4. N ROUNDS OF AWAY FROM WALL COMPLETES ZERO ROUNDS WHEN ALREADY CLEAR,
+--- AND EXITS ONLY BECAUSE THE STALL WATCHDOG CATCHES IT.
+
+  MOVE AWAY FROM WALL 80% 3 ROUNDS ; WAIT 5
+  from the arena centre: 9 s of run, max wheel command 0.00 for the whole
+  step, robot moved 0.08 m, the step ended at t=1.42 s - 1.22 s after entry,
+  which is STALL_GRACE (1.2 s), not the rounds and not MAX_DUR.
+  from wallDist 1.50: 3 rounds complete in 2.02 s, d 1.50 -> 4.66. Correct.
+This is not a hang - the F8 watchdog saves it - but a program with a rounds
+flavour of this verb silently burns 1.2 s doing nothing every time round the
+loop. Worth either documenting or making the zero-command case finish
+immediately instead of waiting out the watchdog.
+
+================================================================
+CONSTANTS: WHAT THE MEASUREMENTS SAY ABOUT WALL_CLEAR AND WALL_TOP_SPEED
+================================================================
+
+C1. YOU HAVE ONE KNOB, NOT TWO, AND ITS CURRENT VALUE IS 1.0 s^-1.
+
+Solving u = 0 gives the exact speed at which thrust cuts out:
+
+  v_cut = WALL_TOP_SPEED * Clamp01((ARENA_HALF - d) / (ARENA_HALF - WALL_CLEAR))
+
+Outside WALL_CLEAR the clamp is inactive and only the RATIO
+WALL_TOP_SPEED / (ARENA_HALF - WALL_CLEAR) survives. With 4.0 and 7-3=4 that
+ratio is exactly 1.0 per second, so outside 3 m the rule reduces to the very
+legible 'you may retreat at (7 - wallDist) metres per second' - i.e. you are
+allowed to close the remaining gap to the centre in one second.
+
+Verified against the trace, not assumed:
+  d=5.78, escape-axis speed 1.26, predicted cut at 1.22 -> command was 0.000
+  d=5.27, escape-axis speed 0.46, predicted u=0.3175 -> predicted base 0.246,
+          measured net command 0.24
+Changing either constant alone changes that ratio. If you want the cap and the
+ramp to be tunable separately, they need to be two independent constants; right
+now WALL_TOP_SPEED is the ramp slope wearing a speed-limit costume.
+
+C2. WALL_TOP_SPEED = 4.0 IS NEVER THE BINDING LIMIT ON THIS RIG. It only acts
+as a flat cap inside WALL_CLEAR, where gov saturates at 1. Peak speed across
+every 80% run I did - axis, both diagonals, both corner headings - was
+  2.58 / 3.79 / 3.52 / 3.52 / 3.31 / 3.27 / 3.24 m/s
+Never once 4.0. So as a speed cap it is inert; nothing in my data justifies
+moving it, and moving it would silently move the ramp instead.
+
+C3. WALL_CLEAR = 3.0 IS NOT THE SET POINT. THE SET POINT IS THE ARENA CENTRE.
+Every standing-order run finished at the exact centre, whatever the start:
+  from (4.5,0) 80%      -> (0.02,-0.05)  wallDist 6.96
+  from (5.5,5.5) yaw 0  -> (0.02, 0.06)  wallDist 6.95
+  from (5.5,5.5) yaw225 -> (-0.03,-0.01) wallDist 6.96
+  from (5.5,5.5) yaw 45 -> (-0.02,-0.04) wallDist 6.97
+  from (5.5,0) 25%      -> (0.06, 0.00)  wallDist 6.93
+  from (5.0,5.0) 25%    -> (-0.17,-0.16) wallDist 6.84
+  from (5.5,0) 15%      -> (-0.23, 0.00) wallDist 6.76
+The docstring's 'full authority at or inside WALL_CLEAR, tapering to nothing at
+the centre' is exactly right, but a reader will take WALL_CLEAR for the target
+clearance and it is not - it is only the knee of the ramp. Nothing I measured
+says 3.0 is the wrong knee. What IS wrong is that there is no stopping
+clearance at all (see B3): WALL_CLEAR sets where the ramp starts, and nothing
+sets where the verb is satisfied.
+
+C4. TIGHT-BOX LADDER RUNGS: I EXPECTED A PROBLEM AND DID NOT FIND ONE.
+Progression.cs:66-69 ships rungs at arenaHalf 5.5 and 5.0. Since WALL_CLEAR is
+absolute, span shrinks to 2.5 and 2.0 and the ratio rises to 1.6 and 2.0 - I
+predicted the retreat would be up to twice as aggressive in the smaller box.
+Measured, same 1.50 m clearance in each box, standing AWAY 80%, 15 s:
+  half 7.0 (ratio 1.00)  peak 3.31 m/s  band 5.81-7.00  2 reversals  ends centre
+  half 5.5 (ratio 1.60)  peak 3.27 m/s  band 4.46-5.49  2 reversals  ends centre
+  half 5.0 (ratio 2.00)  peak 3.24 m/s  band 4.00-4.99  2 reversals  ends centre
+No measurable difference, because at 1.50 m clearance gov is saturated at 1 in
+all three boxes and the ratio never applies. The prediction was wrong; the
+tight boxes are fine. One residual note, untested because no rung reaches it:
+if a future arena ever used arenaHalf <= 3.0, span clamps to 0.01 and
+WallUrgency becomes a step function - the governor would effectively switch off
+and B1's pathology would return for every build. A Mathf.Min(WALL_CLEAR,
+half*0.5f) guard would cost nothing.
+
+================================================================
+VERIFIED CORRECT
+================================================================
+
+V1. CORNERS AND DIAGONALS ARE FINE, AND THE FIELD IS A TRUE GRADIENT.
+The sum is separable - push = (-g(x), 0, -g(z)) with g odd and monotone - so it
+is exactly the negative gradient of V = sum of 1/(half +- x) + 1/(half +- z).
+One minimum, at the centre. No local minima, no saddle, no orbit source, no
+plane identity to swap. Static map at yaw 0 (escape bearing vs analytic value):
+  (6,6)   -131.4  (analytic -135 at the COM's own offset)
+  (6,5)   -103.9  (analytic -103.8)
+  (5,6)   -164.4  (analytic -166.2)
+  (6,3)    -93.0     (6,1)  -90.7     (6,0)  -90.0
+Crossing the x=z diagonal is smooth: (4,3.9) -133.2 -> (4,4.0) -135.3 ->
+(4,4.1) -137.4. Crossing the x=0 mid-line at z=5 is smooth: -178.6 -> 180.0 ->
++178.6, and the net command is a flat -0.800 across all three - no jump.
+Corner escapes measured from (5.5,5.5): reached 3 m of clearance in 0.84-1.20 s
+and 5 m in 1.64-2.50 s from all three tested headings, 1-2 command reversals,
+peak 3.52-3.79 m/s, settled at the centre. Both diagonal headings drove a clean
+straight line out of the corner.
+
+V2. IT NEVER FAILED TO ESCAPE ON A NORMAL (Z-drive) BUILD. Weak retreats work:
+  -25% from (5.5,0):  3 m at 1.84 s, 5 m at 2.80 s, peak 2.23 m/s
+  -25% from (5.0,5.0) corner: 3 m at 1.14 s, 5 m at 2.30 s, peak 2.53 m/s
+  -15% from (5.5,0) nose-away: 3 m at 1.50 s, 5 m at 2.50 s, peak 2.08 m/s
+The governor plus friction never pinned it at any power I tried down to 15%.
+Interesting inversion worth knowing: after 3.0 s from 1.50 m, 25% gains MORE
+clearance than 80% on the two best headings (+5.30 and +5.44 vs +4.52 and
++4.32) because 80% overshoots the centre and is dragged back. High power buys a
+faster first second, not more clearance.
+
+V3. THE EQUILIBRIUM IS THE CENTRE AND IT HOLDS. 25 s run from (4.5,0) at 80%:
+after t~13 s the robot sits at (0.01,-0.05), speed 0.01 m/s, command 0.00, and
+stays there for the remaining 12 s. No creep, no steady orbit - the spiral
+described in B3 decays rather than persisting. Same at 25% (settled by ~17 s)
+and 15% (still decaying at 19 s, amplitude down from 1.03 m to 0.42 m).
+
+V4. THE SEQUENCER INTERACTIONS ALL HOLD.
+  Safety hat WHEN EdgeDist<1.5 : AWAY 85% FOR 1.0 s ; TURN BY 90, from 1.10 m:
+    hat fires at 0.20 s, the AWAY step runs exactly 1.00 s (0.20->1.20), TURN BY
+    90 completes in 0.68 s, the hat RELEASES cleanly and hat 1 takes over at
+    1.88 s. Cycle repeats correctly three times in 9 s. Handover is correct.
+  Timed flavour with the governor already zeroed (robot at the centre, command
+    0.00 throughout): the 1.0 s duration is honoured to the tick (0.20->1.20),
+    the next step gets its 0.5 s, the WAIT gets 3.02 s. Zero thrust does NOT
+    shorten or lengthen a timed step.
+  3 ROUNDS near a wall completes properly (2.02 s, d 1.50 -> 4.66). The failing
+    case is B4 above.
+
+V5. THE UNCHANGED PATHS ARE UNCHANGED. All on the same rig, one step each:
+  MOVE TOWARD WALL 70%   d 2.49 -> 1.17, moved 1.32 m, max cmd 0.72   closes
+  MOVE 70%               d 6.99 -> 3.27, moved 4.00 m                 forward
+  MOVE -70%              d 6.99 -> 3.29, moved 4.01 m, bearing -> 180 backward
+  SIDE TO WALL / BACK TO bearing 0.00 -> -173.00, dYaw 174.8 deg      converges
+  MOVE AWAY FROM ENEMY   at wallDist 6.50 (nearly clear) max cmd 1.00, moved
+                         2.85 m - NOT governed by the wall
+  MOVE TOWARD ENEMY      max cmd 1.00, moved 1.88 m - not governed
+  MOVE AWAY FROM TRAP    at wallDist 1.50, no trap present -> drives straight at
+                         +0.70 as before - not governed
+The RelCommand guard (pct < 0 && target == Wall) is tight; nothing leaked.
+
+V6. NO CENTRE-CAMPING IN A REAL FIGHT. Four L1C1 autonomy fights with WallShy
+against four with Brawler, same 14-part fixture, same contest:
+                  outcome  %time within 1.5 m of centre  mean r  mean enemy dist
+  WALLSHY #0..#3  4 wins   1 / 3 / 2 / 3 %               5.2-6.4  1.52-1.72 m
+  BRAWLER #0..#3  4 wins   0 / 1 / 1 / 0 %               3.0-5.7  1.66-2.59 m
+The feared failure mode - the retreat hat winning the fight and parking the bot
+in the middle - did not happen. WallShy stayed CLOSER to the enemy than the
+control on average and won every fight. If anything it lives at the rim more
+than Brawler (%time within 2.5 m of a wall: 50-85 vs 1-73), but Brawler's own
+spread covers most of that, so with n=4 per arm I would not claim a difference
+beyond 'it engages normally'.
+
+================================================================
+COULD NOT REACH / DID NOT TEST
+================================================================
+
+- I could not isolate the EscapeSpeed frame bug (B1) from the pre-existing
+  X-drive steering bug, because the only builds that trigger one trigger the
+  other. B1 is proved by the vTrue/vRunner instrumentation, not by an isolated
+  behavioural A/B.
+- The fight arm is 4 fights per program, all wins, short (15-108 samples each at
+  10x time scale). That is enough to rule out centre-camping and not enough to
+  measure a balance shift. A proper answer wants MatrixBench's cell sizes.
+- I did not re-run VerbBench itself (time); I calibrated against its check N
+  numbers instead and reproduced them exactly.
+- Real fights add an enemy shoving the player into walls, so the fight-arm
+  minimum clearances (0.53-1.32 m, both programs) cannot be attributed to the
+  verb.
+- I did not test a build with the wall sensor DEAD mid-fight. Code reading says
+  the branch falls through to TargetSignal, which returns false, and RelDrive
+  with no signal drives straight ahead at full power - i.e. AWAY FROM WALL with
+  a shot-off wall sensor drives FORWARD, possibly into the wall. Pre-existing,
+  unverified, worth a look.
+- Only one chassis (VerbBench BODY and the MatrixBench FIXTURE). Heavier, faster
+  or higher-inertia builds will sit at a different point on the damping curve.
+
+Scratch data left in the project root: critic_wall_A.txt (static field map),
+_B (long dynamics), _X (drive-direction A/B), _S (sequencer + unchanged paths),
+_F (career fights), _G (burst-by-heading), _H (arena size).
+Editor left as found: mode Build, ARENA_HALF 7, timeScale 1, devFreeBuild
+restored to its original value (false), Career data restored.

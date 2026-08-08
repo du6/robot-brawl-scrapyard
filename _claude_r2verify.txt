@@ -1,0 +1,6 @@
+rig parts=15 acts=1 bus=True
+K before: hat=1 fire=True mean=0.40
+K after: fire 100/100 | L zeroFrames 0/100 | hat0 97/100
+M before: bus=True hp=0.315 hat=0 mean=-0.70
+M after:  bus=False hat=0 mean=-0.70
+N: frozen TURN BY 90 held step0 1.22 s (escaped=True, watched 1.42 s)

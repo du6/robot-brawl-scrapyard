@@ -1,0 +1,5 @@
+A owen only: robot=True parts=13 acts=1 bus=False compass=False
+B owen+compass: robot=True parts=14 acts=1 bus=False compass=True
+C +dmgbus sideX: robot=True parts=15 acts=1 bus=True compass=True
+D +dmgbus batTop: robot=True parts=15 acts=1 bus=True compass=True
+E +dmgbus absTop: robot=True parts=15 acts=1 bus=True compass=True

@@ -1,0 +1,42 @@
+### S1_safetyhat pos=5.90,0.00 yaw=0.00 d0=1.10 bear0=90.00
+TL 0.02:h-1s-1(d1.10,c0.00) 0.20:h0s0(d1.10,c0.00) 1.20:h0s1(d1.66,c0.00) 1.88:h1s0(d2.89,c0.60) 3.82:h0s0(d1.14,c-0.82) 4.82:h0s1(d3.30,c0.00) 5.68:h1s0(d5.95,c0.60) 7.42:h0s0(d1.16,c-0.81) 8.42:h0s1(d2.51,c0.00) 
+SUM S1_safetyhat d 1.10->3.10 bear 90.00->-70.75 dYaw=74.90 moved=5.97 maxCmd=1.00
+### S2_timed_at_centre pos=0.02,0.02 yaw=0.00 d0=6.97 bear0=0.00
+TL 0.02:h-1s-1(d6.97,c0.00) 0.20:h0s0(d6.97,c0.00) 1.20:h0s1(d6.98,c0.60) 1.70:h0s2(d6.39,c-1.00) 4.72:h0s0(d5.45,c-0.36) 5.72:h0s1(d6.13,c0.60) 
+SUM S2_timed_at_centre d 6.97->6.26 bear 0.00->-0.50 dYaw=0.51 moved=0.74 maxCmd=1.00
+### S3a_rounds_nearwall pos=5.50,0.00 yaw=0.00 d0=1.50 bear0=90.00
+TL 0.02:h-1s-1(d1.50,c0.00) 0.20:h0s0(d1.50,c0.00) 2.22:h0s1(d4.66,c1.00) 7.24:h0s0(d5.58,c-0.18) 
+SUM S3a_rounds_nearwall d 1.50->5.91 bear 90.00->-49.47 dYaw=47.82 moved=5.56 maxCmd=1.00
+### S3b_rounds_centre pos=0.02,0.02 yaw=0.00 d0=6.97 bear0=0.00
+TL 0.02:h-1s-1(d6.97,c0.00) 0.20:h0s0(d6.97,c0.00) 1.42:h0s1(d6.98,c0.00) 6.44:h0s0(d6.98,c0.00) 7.66:h0s1(d6.97,c0.00) 
+SUM S3b_rounds_centre d 6.97->6.96 bear 0.00->180.00 dYaw=0.00 moved=0.08 maxCmd=0.00
+### S4a_toward_wall pos=4.50,0.00 yaw=90.00 d0=2.49 bear0=0.00
+TL 0.02:h-1s-1(d2.49,c0.00) 0.20:h0s0(d2.49,c0.70) 
+SUM S4a_toward_wall d 2.49->1.17 bear 0.00->0.17 dYaw=-0.03 moved=1.32 maxCmd=0.72
+### S4b_move_fwd pos=0.00,0.00 yaw=0.00 d0=6.99 bear0=0.00
+TL 0.02:h-1s-1(d6.99,c0.00) 0.20:h0s0(d6.99,c0.70) 
+SUM S4b_move_fwd d 6.99->3.27 bear 0.00->0.09 dYaw=-0.10 moved=4.00 maxCmd=0.70
+### S4c_move_back pos=0.00,0.00 yaw=0.00 d0=6.99 bear0=0.00
+TL 0.02:h-1s-1(d6.99,c0.00) 0.20:h0s0(d6.99,c-0.70) 
+SUM S4c_move_back d 6.99->3.29 bear 0.00->179.90 dYaw=0.10 moved=4.01 maxCmd=0.70
+### S4d_sideto_back pos=4.50,0.00 yaw=90.00 d0=2.49 bear0=0.00
+TL 0.02:h-1s-1(d2.49,c0.00) 0.20:h0s0(d2.49,c0.00) 1.66:h0s-1(d2.52,c0.00) 1.76:h0s0(d2.52,c0.00) 2.60:h0s-1(d2.54,c0.00) 2.80:h0s0(d2.54,c0.00) 3.50:h0s-1(d2.56,c0.00) 
+SUM S4d_sideto_back d 2.49->2.56 bear 0.00->-173.00 dYaw=174.77 moved=0.06 maxCmd=0.65
+### S4e_away_enemy pos=0.50,0.00 yaw=0.00 d0=6.50 bear0=90.00
+TL 0.02:h-1s-1(d6.50,c0.00) 0.20:h0s0(d6.50,c-0.21) 
+SUM S4e_away_enemy d 6.50->5.30 bear 90.00->126.02 dYaw=50.55 moved=2.85 maxCmd=1.00
+### S4f_toward_enemy pos=0.50,0.00 yaw=0.00 d0=6.50 bear0=90.00
+TL 0.02:h-1s-1(d6.50,c0.00) 0.20:h0s0(d6.50,c0.21) 
+SUM S4f_toward_enemy d 6.50->5.31 bear 90.00->-24.16 dYaw=114.84 moved=1.88 maxCmd=1.00
+### S4g_away_trap pos=5.50,0.00 yaw=0.00 d0=1.50 bear0=90.00
+TL 0.02:h-1s-1(d1.50,c0.00) 0.20:h0s0(d1.50,c0.70) 
+SUM S4g_away_trap d 1.50->1.16 bear 90.00->-0.38 dYaw=0.85 moved=5.82 maxCmd=0.70
+### S5a_X_move_fwd pos=0.00,0.00 yaw=0.00 d0=6.99 bear0=0.00
+TL 0.02:h-1s-1(d6.99,c0.00) 0.20:h0s0(d6.98,c0.70) 
+SUM S5a_X_move_fwd d 6.99->1.18 bear 0.00->-0.92 dYaw=0.79 moved=5.82 maxCmd=0.70
+### S5b_X_turnby90 pos=0.00,0.00 yaw=0.00 d0=6.99 bear0=0.00
+TL 0.02:h-1s-1(d6.99,c0.00) 0.20:h0s0(d6.98,c0.00) 
+SUM S5b_X_turnby90 d 6.99->6.90 bear 0.00->-0.23 dYaw=0.22 moved=0.10 maxCmd=0.70
+### S5c_X_toward_wall pos=0.00,4.00 yaw=0.00 d0=3.00 bear0=-90.00
+TL 0.02:h-1s-1(d3.00,c0.00) 0.20:h0s0(d3.00,c0.05) 
+SUM S5c_X_toward_wall d 3.00->3.01 bear -90.00->-90.23 dYaw=0.22 moved=1.35 maxCmd=1.00

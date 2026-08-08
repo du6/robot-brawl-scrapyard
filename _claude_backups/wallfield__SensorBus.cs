@@ -35,7 +35,6 @@ public class SensorBus : MonoBehaviour
     /// <summary>Hazard-proximity radius the edge sentinel reports at. Matches
     /// the AI repulsion query's working range.</summary>
     public const float HAZARD_NEAR = 3f;
-    const float WALL_EPS = 0.05f;   // never divide by a zero clearance
 
     public CompoundRobot robot;
     /// <summary>The machine the compass tracks — the "match beacon" fiction.
@@ -67,20 +66,6 @@ public class SensorBus : MonoBehaviour
     // direction, which the old along-motion distance never carried. TRAP:
     // the same pair for the nearest live hazard, plus the too-close flag.
     public bool wallValid;    public float wallDist;   public float wallBearingDeg;
-    /// <summary>Direction that increases clearance from the arena AS A WHOLE,
-    /// robot-relative. Continuous everywhere; magnitude zero at the centre.
-    /// Use this, not wallBearingDeg, for anything that RETREATS.</summary>
-    public bool wallFieldValid; public float wallEscapeDeg;
-    /// <summary>The same direction in WORLD space. Published because a caller
-    /// that rebuilds it from the transform gets it WRONG: wallEscapeDeg is
-    /// measured off `forwardLocal`, the BUILD's drive axis, which
-    /// BuilderManager snaps to (0,0,1) or (1,0,0) depending on the wheel roll
-    /// axis. ProgramRunner reconstructed it from transform.forward and on an
-    /// X-drive build the two were 90 degrees apart -- the damping term read
-    /// ~0 while the robot was doing 6-7 m/s, and the whole wall-to-wall limit
-    /// cycle came back (band 1.02-6.98 m, 8 reversals, peak 8.54 m/s). Dot
-    /// against this and the frame cannot be got wrong.</summary>
-    public Vector3 wallEscapeDir;
     public bool trapValid;    public float trapDist;   public float trapBearingDeg; public bool trapNear;
     public bool busValid;     public float hpFrac = 1f; public int partsLost; public float powerFrac = 1f; public bool hitRecently;
 
@@ -131,7 +116,7 @@ public class SensorBus : MonoBehaviour
     }
 
     void Invalidate()
-    { rangeValid = compassValid = tiltValid = wallValid = trapValid = busValid = wallFieldValid = false; wallEscapeDir = Vector3.zero; }
+    { rangeValid = compassValid = tiltValid = wallValid = trapValid = busValid = false; }
 
     void FixedUpdate()
     {
@@ -231,36 +216,6 @@ public class SensorBus : MonoBehaviour
         Vector3 fwd = robot.transform.TransformDirection(forwardLocal); fwd.y = 0f;
         wallBearingDeg = fwd.sqrMagnitude < 1e-6f ? 0f
             : Vector3.SignedAngle(fwd.normalized, dir, Vector3.up);
-
-        // ---- the CONTINUOUS escape field ------------------------------
-        // Everything above describes the NEAREST PLANE, and that is a
-        // DISCONTINUOUS function of position: cross the arena mid-line and
-        // the reported plane swaps identity, the bearing jumps 180 degrees,
-        // and any controller built on it reverses at full magnitude with no
-        // hysteresis to damp it. Behaviour critic R3 measured a robot under a
-        // standing MOVE AWAY FROM WALL ping-ponging 1.02-6.91 m forever, five
-        // 180-degree flips in 11 s, peak 7.5 m/s, ending up closer to a wall
-        // than the 1.2 m threshold the WALL! hat exists to defend -- and a
-        // STATIONARY robot at the arena centre chattering full opposite lock,
-        // 40 reversals in 18 s, because the nearest plane there is a coin
-        // toss between four equals.
-        //
-        // So we publish a FIELD as well: an inverse-square repulsion summed
-        // over ALL FOUR planes. It is continuous everywhere, it has no
-        // antipode and no plane identity to swap, and it falls to exactly
-        // zero at the centre -- which is the one place a robot fleeing walls
-        // should want to be. wallDist/wallBearingDeg are untouched: EDGE DIST
-        // conditions and SIDE TO WALL still want the nearest plane.
-        float dpx = Mathf.Max(half - pos.x, WALL_EPS);
-        float dnx = Mathf.Max(half + pos.x, WALL_EPS);
-        float dpz = Mathf.Max(half - pos.z, WALL_EPS);
-        float dnz = Mathf.Max(half + pos.z, WALL_EPS);
-        Vector3 push = new Vector3(1f / (dnx * dnx) - 1f / (dpx * dpx), 0f,
-                                   1f / (dnz * dnz) - 1f / (dpz * dpz));
-        wallFieldValid = push.sqrMagnitude > 1e-6f;
-        wallEscapeDeg = (!wallFieldValid || fwd.sqrMagnitude < 1e-6f) ? 0f
-            : Vector3.SignedAngle(fwd.normalized, push.normalized, Vector3.up);
-        wallEscapeDir = wallFieldValid ? push.normalized : Vector3.zero;
     }
 
     /// <summary>Nearest LIVE hazard: distance, signed bearing, and the

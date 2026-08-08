@@ -1,0 +1,21 @@
+=== BATCH H - sensor frame vs drive frame; bus-hold with a real control
+H1 spinner rig (20 parts) FRAME CHECK: nearest wall is the +Z wall (geometrically DEAD AHEAD of local +Z).
+   sensor says wallBearing=17 deg, wallDist=4.42  -> then MOVE FORWARD 70% for 1 s
+   world dz=-1.29 m, wallDist 4.42 -> 5.69
+   VERDICT: sensor nose AGREES with drive nose
+H2 VerbBench-shaped rig (10 parts) FRAME CHECK: nearest wall is the +Z wall (geometrically DEAD AHEAD of local +Z).
+   sensor says wallBearing=-1 deg, wallDist=4.14  -> then MOVE FORWARD 70% for 1 s
+   world dz=2.97 m, wallDist 4.14 -> 1.17
+   VERDICT: sensor nose AGREES with drive nose
+H3 MOVE TOWARD WALL (HOLD) from wallDist 4.46 -> 5.79 pos=(0.0, 0.4, 1.2)
+H3 MOVE AWAY FROM WALL (HOLD) from wallDist 3.96 -> 6.61 pos=(0.0, 0.2, 0.5)
+H4  dmgbus SHOT OFF FIRST
+   t=1.0 hp=1.00 busValid=True hat=1 (0=RETREAT 1=CHARGE)
+   dmgbus destroyed at hp=0.99 busValid=False
+   after damage: REAL hp=0.24 dead=False busValid=False busHpFrac=1.00 hat=1
+   +2s: hat=1
+H4c CONTROL dmgbus survives
+   t=1.0 hp=1.00 busValid=True hat=1 (0=RETREAT 1=CHARGE)
+   after damage: REAL hp=0.25 dead=False busValid=True busHpFrac=0.25 hat=0
+   +2s: hat=0
+=== DONE

@@ -468,25 +468,6 @@ public class ProgramCanvas : MonoBehaviour
             default: b.dur = 0f; break;
         }
     }
-    /// <summary>Which way does this condition READ? Cycling a WHEN chip off
-    /// ALWAYS used to set the value but leave the comparator at ALWAYS's
-    /// default, GREATER (R3 critic C1) -- so one tap toward HP FRAC produced
-    /// WHEN HP > 0.1, a hat that fires all the time, and the player had to
-    /// notice and flip a separate chip. Everything measured as a distance, a
-    /// fraction or an angle is interesting when it goes LOW; counts and flags
-    /// are interesting when they go HIGH.</summary>
-    static PCmp DefaultCmp(PCond k)
-    {
-        switch (k)
-        {
-            case PCond.PartsLost:
-            case PCond.Flipped:
-            case PCond.HazardNear:
-            case PCond.HitRecently: return PCmp.Greater;
-            default:                return PCmp.Less;
-        }
-    }
-
     static float[] ValuesOf(PCond k)
     {
         switch (k)
@@ -1012,7 +993,7 @@ public class ProgramCanvas : MonoBehaviour
             int tiC = ti;
             MkChip("ck", head.transform, CondName(term.kind), 10f,
                    new Color(0.18f, 0.24f, 0.32f, 0.95f), () =>
-            { term.kind = NextCond(term.kind, BuildIds()); term.value = ValuesOf(term.kind)[0]; term.cmp = DefaultCmp(term.kind); MarkDirty(); }, 96f);
+            { term.kind = NextCond(term.kind, BuildIds()); term.value = ValuesOf(term.kind)[0]; MarkDirty(); }, 96f);
             if (term.kind != PCond.Always)
             {
                 MkChip("cc", head.transform, term.cmp == PCmp.Less ? "<" : ">", 13f,
@@ -1080,7 +1061,7 @@ public class ProgramCanvas : MonoBehaviour
                 var c = b.cond;
                 MkChip("ick", row.transform, CondName(c.kind), 10f,
                        new Color(0.18f, 0.24f, 0.32f, 0.95f), () =>
-                { c.kind = NextCond(c.kind, BuildIds()); c.value = ValuesOf(c.kind)[0]; c.cmp = DefaultCmp(c.kind); MarkDirty(); }, 96f);
+                { c.kind = NextCond(c.kind, BuildIds()); c.value = ValuesOf(c.kind)[0]; MarkDirty(); }, 96f);
                 if (c.kind != PCond.Always)
                 {
                     MkChip("icc", row.transform, c.cmp == PCmp.Less ? "<" : ">", 13f,

@@ -1,0 +1,32 @@
+PARTS: core_0 beam_1 beam_2 battery_3 spindleZP_4 spinnerZP_5 compass_6 dmgbus_7 wallsensor_8 tiltsensor_9  (n=10)
+== B1 PartsLost ==
+  before: hat=1 lost=0 hp=1.000 cmd=0.40
+  DestroyPart(5) = spinnerZP_5
+  after: hat=0 lost=1 hp=0.873 cmd=0.00 latency=0.020s
+== B2 dmgbus destroyed while the RETREAT hat is holding ==
+  hurt, bus alive: busValid=True hp=0.300 hat=0 cmd=-0.70
+  DestroyPart(7) = dmgbus_7
+  after: busValid=False hp(real)=0.300 hat=1 cmd=0.40
+== B3 Flipped / TiltUpY ==
+  upright: upY=0.996 flip=False hat=1 cmd=0.40
+  flipped: upY=-1.000 flip=True hat=0 cmd=0.00 latency=0.020s
+  1s later: upY=-0.992 flip=True hat=0 cmd=-0.70
+  TiltUpY<0.75 upright: upY=0.996 hat=1
+  roll=30deg cos=0.866 upY=0.866 flip=False hat=1
+  roll=41deg cos=0.755 upY=0.755 flip=False hat=1
+  roll=46deg cos=0.695 upY=0.695 flip=False hat=0
+  roll=60deg cos=0.500 upY=0.500 flip=False hat=0
+== B4 PowerFrac ==
+  t=0.0 pwr=0.995 hat=1 cmd=0.40
+  t=0.5 pwr=0.988 hat=1 cmd=0.40
+  t=1.0 pwr=0.981 hat=1 cmd=0.40
+  t=1.5 pwr=0.974 hat=1 cmd=0.40
+  t=2.0 pwr=0.970 hat=1 cmd=0.40
+  t=2.5 pwr=0.969 hat=1 cmd=0.40
+  t=3.0 pwr=0.967 hat=1 cmd=0.40
+  t=3.5 pwr=0.965 hat=1 cmd=0.40
+  t=4.0 pwr=0.964 hat=1 cmd=0.40
+  t=4.5 pwr=0.962 hat=1 cmd=0.40
+  t=5.0 pwr=0.961 hat=1 cmd=0.40
+  t=5.5 pwr=0.959 hat=1 cmd=0.40
+DONE-B

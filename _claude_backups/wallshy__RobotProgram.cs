@@ -693,13 +693,7 @@ public class RobotProgram
         var shy = new PHat { name = "WALL!",
             note = "1. SAFETY - the top hat always wins. Near a wall? Back away from it before doing anything else." };
         shy.when.Add(PCondTerm.Mk(PCond.EdgeDist, PCmp.Less, 1.2f));
-        // 0.8 s was too short for the worst heading. Thrust scales by
-        // cos(escape), so with the wall ABEAM most of a short burst is spent
-        // pivoting: 0.8 s at 80% gained 2.57 m dead ahead and 0.22 m abeam --
-        // not enough to clear this hat's own 1.2 m trigger, so it re-fired
-        // every tick. Behaviour critic measured WallShy holding the robot for
-        // 73% of one real fight. 1.5 s clears from every heading.
-        shy.body.Add(PBlock.MkMoveRel(PTarget.Wall, -80f, 1.5f, 0));
+        shy.body.Add(PBlock.MkMoveRel(PTarget.Wall, -80f, 0.8f, 0));
         p.hats.Add(shy);
         var dodge = new PHat { name = "TOO HOT",
             note = "2. DODGE - just got hit up close while still healthy? Back off and swerve instead of trading." };

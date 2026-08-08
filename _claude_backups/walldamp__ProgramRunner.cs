@@ -63,11 +63,6 @@ public class ProgramRunner : MonoBehaviour
     // ---- brake (F5), behaviour critic R3 --------------------------------
     // Full retreat authority at or inside this clearance; tapering beyond it.
     const float WALL_CLEAR = 3.0f;
-    const float WALL_TOP_SPEED = 4.0f;   // m/s of retreat at full urgency
-    const float WALL_SAFE  = 5.0f;   // clearance at which the retreat is DONE
-    const float WALL_FLOOR = 0.45f;  // minimum thrust while pivoting to escape
-    const float WALL_HYST  = 1.0f;   // metres of slack before a retreat re-arms
-    bool wallRetreatDone;
 
     const float SPUN_COOLDOWN = 0.5f;  // s a spinning hat is passed over
     int spunHat = -1; float spunUntil;
@@ -142,7 +137,7 @@ public class ProgramRunner : MonoBehaviour
         evalAcc = 0f; clock = 0f;
         activeHat = -1; pc = 0; loops.Clear(); stepEntered = false;
         lastFiredHat = -1; activeStep = -1;
-        spunHat = -1; spunUntil = 0f; yawAcc = 0f; wallRetreatDone = false;
+        turnGain = 0f; relTarget = -1; relPct = 0f;
         lastHp = 1f; lastPower = 1f; lastParts = 0f; everBus = false;
         spunHat = -1; spunUntil = 0f; yawAcc = 0f;
         brakeUntil = 0f; brakeFwd = 0f; brakeSteer = 0f; heldDrive = false;
@@ -504,16 +499,6 @@ public class ProgramRunner : MonoBehaviour
         stallMark = clock;
     }
 
-    /// <summary>Has an AWAY FROM WALL step already opened the range it asks
-    /// for? ROUNDS flavour only: a TIMED step was handed an explicit duration
-    /// by the player and honours it, commanding nothing while it waits.</summary>
-    bool WallRetreatSatisfied(PBlock b)
-    {
-        if (b.op != POp.MoveRel || b.arg >= 0f || b.target != (int)PTarget.Wall) return false;
-        if (bus == null || !bus.wallValid) return false;
-        return bus.wallDist >= Mathf.Min(WALL_SAFE, BuilderManager.ARENA_HALF * 0.75f);
-    }
-
     bool StepDone(PBlock b, float dt)
     {
         switch (b.op)
@@ -526,12 +511,6 @@ public class ProgramRunner : MonoBehaviour
                 {
                     roundsAcc += RoundsDelta(b, dt);
                     if (roundsAcc >= b.rounds) return true;
-                    // A ROUNDS retreat started from somewhere already clear
-                    // turns no wheels, so it can never bank a round: it sat
-                    // there commanding nothing and exited 1.2 s later on the
-                    // STALL watchdog, every single loop. The goal is met, and
-                    // saying so is honest where a fake stall is not.
-                    if (WallRetreatSatisfied(b)) return true;
                     return clock - stepT0 >= RobotProgram.MAX_DUR || Stalled();
                 }
                 return clock - stepT0 + 1e-6f >= b.dur;
@@ -669,143 +648,31 @@ public class ProgramRunner : MonoBehaviour
     ///
     /// The verb still means exactly what it says: increase the clearance.
     /// It just knows when it has.</summary>
-    /// <summary>Drive + steer for one MOVE TOWARD/AWAY step.
-    ///
-    /// AWAY FROM WALL is the reason this wrapper exists. Every other target is
-    /// a THING with a position; the arena is not. "Get away from the nearest
-    /// plane" is unsatisfiable inside a bounded box -- there is always another
-    /// wall behind you -- and the nearest plane changes IDENTITY at the
-    /// mid-line, so the command reversed at full magnitude with nothing to
-    /// damp it. Behaviour critic R3, measured: wallDist ping-ponging
-    /// 1.02-6.91 m forever, five 180-degree flips in 11 s, peak 7.5 m/s,
-    /// ending up closer to a wall than the 1.2 m the WALL! hat exists to
-    /// defend; and a stationary robot at the arena centre chattering 40 full
-    /// reversals in 18 s.
-    ///
-    /// It took five things, and every one was found by measurement after the
-    /// previous four already looked finished:
-    ///   1. STEER ON THE FIELD, not the nearest plane -- continuous, no
-    ///      antipode, zero at the centre.
-    ///   2. GOVERN the thrust by how pinned we are: the verb's missing set
-    ///      point, and its speed limit.
-    ///   3. DAMP on the retreat already being made, or a proportional
-    ///      controller on a low-friction mass sails past and comes back.
-    ///   4. FLOOR the thrust while pivoting, or an escape that is ABEAM
-    ///      commands exactly zero and a short burst never leaves the wall.
-    ///   5. BRAKE at the end, because ceasing to command is not stopping:
-    ///      it coasted 4.88 m after going quiet.
-    ///
-    /// And one invariant under all of it, at the bottom of this method: a
-    /// retreat NEVER commands thrust toward the nearest wall.</summary>
     void RelCommand(int target, float pct, out float drive01, out float steer)
     {
-        if (pct >= 0f || target != (int)PTarget.Wall)
+        if (pct < 0f && target == (int)PTarget.Wall && bus != null && bus.wallValid)
         {
-            float bear; bool sig = TargetSignal(target, out bear);
-            RelDrive(pct, bear, sig, out drive01, out steer);
+            float gov = WallUrgency();
+            if (gov <= 0.001f || !bus.wallFieldValid)
+            { drive01 = 0f; steer = 0f; return; }      // clear of every wall
+            // Driving AWAY along the escape field is the same thing as
+            // driving TOWARD (escape + 180), which is exactly what RelDrive's
+            // AWAY branch already computes. One controller, two framings.
+            RelDrive(pct, bus.wallEscapeDeg + 180f, true, out drive01, out steer);
+            drive01 *= gov; steer *= gov;
             return;
         }
-
-        drive01 = 0f; steer = 0f;
-
-        // You cannot flee what you cannot sense. The old fall-through hit
-        // RelDrive's no-signal branch, which drives STRAIGHT AHEAD at full
-        // power -- inside a box, that is how you hit a wall. Same lesson as
-        // the damage bus: a dead sensor must not produce confident wrong
-        // action.
-        if (bus == null || !bus.wallValid || !bus.wallFieldValid) return;
-
-        // The stopping clearance the verb never had, LATCHED. A bare threshold
-        // bang-banged: the robot hit 5 m still moving, went quiet, coasted
-        // through the centre and out the far side until clearance fell back
-        // under 5 m, which re-armed the retreat at full power.
-        float half = BuilderManager.ARENA_HALF;
-        float stop = Mathf.Min(WALL_SAFE, half * 0.75f);
-        if (wallRetreatDone) { if (bus.wallDist < stop - WALL_HYST) wallRetreatDone = false; }
-        else if (bus.wallDist >= stop) wallRetreatDone = true;
-
-        float v = EscapeSpeed();
-
-        if (wallRetreatDone)
-        {
-            // Clear. But ceasing to COMMAND is not stopping -- the retreat has
-            // real speed in it and simply glided, 4.88 m in the three seconds
-            // after going quiet. So brake to an actual halt. This is only safe
-            // because of the invariant at the bottom of this method, which
-            // vetoes any thrust toward the nearest wall: a brake here can
-            // never turn into the bug owen reported.
-            if (Mathf.Abs(v) < BRAKE_STOP) return;
-            RelDrive(pct, bus.wallEscapeDeg + 180f, true, out drive01, out steer);
-            drive01 *= (v > 0f ? -1f : 1f) * Mathf.Clamp01(Mathf.Abs(v) / WALL_TOP_SPEED);
-            steer = 0f;
-        }
-        else
-        {
-            // Driving AWAY along the escape field is the same thing as driving
-            // TOWARD (escape + 180), which is exactly what RelDrive's AWAY
-            // branch already computes. One controller, two framings.
-            RelDrive(pct, bus.wallEscapeDeg + 180f, true, out drive01, out steer);
-
-            // THRUST FLOOR. Thrust scales by cos(escape), so with the escape
-            // ABEAM the base is exactly zero and a burst is spent pivoting and
-            // nothing else: 0.8 s at 80% gained 2.57 m with the wall dead
-            // ahead and 0.22 m abeam. Not enough for the shipped WallShy hat
-            // to clear its own 1.2 m threshold in one burst, so it re-fired
-            // every tick. Keep the SIGN and floor only the magnitude.
-            float unit = Mathf.Abs(pct) * 0.01f;
-            if (unit > 1e-4f)
-            {
-                float c = drive01 / unit;                      // cos(escape)
-                if (Mathf.Abs(c) < WALL_FLOOR)
-                    drive01 = unit * (c < 0f ? -WALL_FLOOR : WALL_FLOOR);
-            }
-
-            // DAMPING, clamped at zero and never negative: letting it reach
-            // -0.6 as an active brake tripped owen's own regression check,
-            // flipping the command to +0.17 FORWARD with the wall dead ahead.
-            float u = Mathf.Clamp01(WallUrgency() - v / WALL_TOP_SPEED);
-            if (u <= 0.02f) { drive01 = 0f; steer = 0f; return; }
-            drive01 *= u; steer *= u;
-        }
-
-        // THE INVARIANT. A retreat never commands thrust toward the nearest
-        // wall. Tested as a MAGNITUDE along the wall bearing rather than a
-        // hard ahead/behind boundary, because at exactly abeam the sign of
-        // "ahead" flips on sensor jitter and would veto the pivot creep half
-        // the time. owen's original bug, made structurally impossible.
-        if (drive01 * Mathf.Cos(bus.wallBearingDeg * Mathf.Deg2Rad) > 0.05f)
-        { drive01 = 0f; steer = 0f; }
-    }
-
-    /// <summary>How fast we are already retreating, m/s along the escape
-    /// direction. Negative means we are still closing on the arena edge.
-    /// Dots against the bus's WORLD vector: rebuilding the direction from
-    /// transform.forward was wrong on any build whose drive axis is not +Z,
-    /// and on an X-drive build it read ~0 while the robot was doing 6-7 m/s,
-    /// which killed the damping and brought the whole limit cycle back.</summary>
-    float EscapeSpeed()
-    {
-        var rb = self != null ? self.GetComponent<Rigidbody>() : null;
-        if (rb == null || bus == null || !bus.wallFieldValid) return 0f;
-        return Vector3.Dot(rb.linearVelocity, bus.wallEscapeDir);
+        float bear; bool sig = TargetSignal(target, out bear);
+        RelDrive(pct, bear, sig, out drive01, out steer);
     }
 
     /// <summary>1 while pinned at or inside WALL_CLEAR, falling linearly to 0
-    /// at the arena centre, where the escape field is zero as well.
-    ///
-    /// NOTE these two constants are not independent: outside WALL_CLEAR only
-    /// the RATIO WALL_TOP_SPEED / (ARENA_HALF - WALL_CLEAR) survives, and it
-    /// is 1.0 per second today -- "you may retreat at (7 - wallDist) m/s".
-    /// Moving either one moves the ramp. WALL_TOP_SPEED has never actually
-    /// been the binding limit: the fastest retreat measured anywhere, over
-    /// every heading and three arena sizes, was 3.79 m/s.</summary>
+    /// at the arena centre, where the escape field is zero as well -- so the
+    /// robot arrives, stops, and stays stopped instead of hunting.</summary>
     float WallUrgency()
     {
         float half = BuilderManager.ARENA_HALF;
-        // Progression ships 5.5 and 5.0 half-arenas; clamp so a small box
-        // cannot collapse the ramp into a step function.
-        float clear = Mathf.Min(WALL_CLEAR, half * 0.5f);
-        float span = Mathf.Max(half - clear, 0.5f);
+        float span = Mathf.Max(half - WALL_CLEAR, 0.01f);
         return Mathf.Clamp01((half - bus.wallDist) / span);
     }
 

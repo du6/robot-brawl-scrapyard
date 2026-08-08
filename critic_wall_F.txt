@@ -1,0 +1,10 @@
+== L1C1 autonomy, hat0 of WallShy = WALL! (EdgeDist<1.2 : AWAY 80% FOR 0.8s)
+WALLSHY#0 out=PlayerWin dealt=77.68 taken=38.30 samples=90 %d<2.5=85 %d<1.5=78 %r<1.5=1 meanR=6.38 meanEnemyDist=1.61 minWall=0.59 %hat0=15
+WALLSHY#1 out=PlayerWin dealt=226.50 taken=38.28 samples=26 %d<2.5=84 %d<1.5=73 %r<1.5=3 meanR=5.57 meanEnemyDist=1.59 minWall=0.83 %hat0=73
+WALLSHY#2 out=PlayerWin dealt=77.69 taken=38.30 samples=107 %d<2.5=50 %d<1.5=12 %r<1.5=2 meanR=5.21 meanEnemyDist=1.72 minWall=1.07 %hat0=3
+WALLSHY#3 out=PlayerWin dealt=474.91 taken=38.28 samples=26 %d<2.5=80 %d<1.5=65 %r<1.5=3 meanR=5.52 meanEnemyDist=1.52 minWall=0.75 %hat0=65
+-- control: Brawler (no WALL! hat); %hat0 is its top hat, not a wall hat
+BRAWLER#0 out=PlayerWin dealt=77.69 taken=38.30 samples=107 %d<2.5=1 %d<1.5=0 %r<1.5=0 meanR=3.10 meanEnemyDist=2.24 minWall=1.32 %hat0=71
+BRAWLER#1 out=PlayerWin dealt=77.65 taken=38.30 samples=101 %d<2.5=4 %d<1.5=3 %r<1.5=1 meanR=3.00 meanEnemyDist=2.11 minWall=0.91 %hat0=68
+BRAWLER#2 out=PlayerWin dealt=77.69 taken=38.30 samples=108 %d<2.5=47 %d<1.5=12 %r<1.5=1 meanR=5.22 meanEnemyDist=1.66 minWall=0.53 %hat0=79
+BRAWLER#3 out=PlayerWin dealt=427.45 taken=38.28 samples=15 %d<2.5=73 %d<1.5=66 %r<1.5=0 meanR=5.68 meanEnemyDist=2.59 minWall=1.00 %hat0=60

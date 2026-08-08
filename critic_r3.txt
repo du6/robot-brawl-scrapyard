@@ -1,0 +1,457 @@
+BEHAVIOUR CRITIC - ROUND 3 (final)
+Robot Brawl: Bolt & Blade / ProgramRunner V2.2
+2026-08-07.  All numbers below are measured in play mode on the live editor.
+Raw logs: critic_r3_a.txt .. critic_r3_j.txt in the project root.
+
+METHOD
+  Every program below was authored by me, armed on a spawned rig via
+  ProgramRunner.Init/program (the VerbBench pattern), and sampled at the
+  physics rate (0.02 s).  Two rigs were used:
+    RIG-S  the 20-part spinner rig from the session handover (core, spinner,
+           4 wheels, compass, dmgbus, wallsensor).  NOTE: its wheel pairs are
+           mounted at DIFFERENT rotations (front pair rot 90, rear pair rot 0)
+           so their roll axes disagree.  It is a legal, shippable build.
+    RIG-C  a mechanically consistent 10-part rig, 4 aligned wheels
+           (the VerbBench BODY shape).
+  Every negative result has a control leg, marked CONTROL.
+
+================================================================================
+SECTION 1 - REGRESSIONS FROM THE ROUND 1 / ROUND 2 FIXES
+================================================================================
+
+R1  BLOCKER - THE WEAPON LATCH NEVER RELEASES A PREEMPTED ACTUATOR STEP.
+    Program (critic_r3_a.txt, A1):
+        hat 0  WHEN hp < G          : MOVE 50% FOR 1.0 s        (G flipped by me)
+        hat 1  WHEN always          : RUN WEAPON 90% FOR 5.0 s
+        Validate: OK.
+    Sequence: G false, so hat 1 runs.  At t=1.5 s I set G true so hat 0 preempts.
+    MEASURED (rig RIG-S, one actuator):
+        t=1.2  hat=1  actFire=True   spinner rate 49.5
+        t=1.8  hat=0  actFire=True   rate 63.5     <- preempted
+        t=7.8  hat=0  actFire=True   rate 73.5     <- 2.8 s PAST its own 5 s
+        t=8.8  hat=1  actFire=True
+    CONTROL (A1c, identical step, never preempted):
+        t=1.0 actFire=True ; t=5.6 actFire=False.  Correct.
+    WHAT THE PROGRAM SAYS: run the weapon for five seconds, then stop.
+    WHAT HAPPENS: the weapon runs forever.
+    CODE PATH: ProgramRunner.ExitStep is the ONLY caller of ZeroMotor()/
+    SetFire(b,false), and it only runs when StepDone() returns true.  A
+    preemption goes TriggerEval -> StartHat -> ZeroDrive(), and ZeroDrive was
+    changed in R2 to leave actFire alone.  Before R2, StartHat's ZeroChannels
+    cleaned this up.  The same hole exists for FIRE n CYCLES and for
+    SET/RUN on PPart.Actuator.  A preempted actuator step leaks its channel
+    permanently.
+    FIX SHAPE: on StartHat/ReleaseHat, run ExitStep for the step that was in
+    flight (or record which actuator channels the in-flight step owns and
+    release only those), instead of leaking the whole latch.
+
+R2  MAJOR - THE WEAPON KEEPS SPINNING WHEN NO HAT IS TRUE AT ALL.
+    Program (A2):
+        hat 0  WHEN hp < G : WEAPON ON ; MOVE 40% FOR 1.0 s     (only hat)
+    I flip G false at t=1.2 s, so nothing in the program is true any more.
+    MEASURED:
+        t=1.2  hat=0   actFire=True
+        t=3.2  hat=-1  actFire=True  rate 73.5  maxWheelCmd 0.00
+        t=7.2  hat=-1  actFire=True  rate 73.5
+    The robot sits perfectly still with the weapon at full speed for the rest
+    of the fight.  The player wrote a program that arms the weapon only inside
+    one conditional hat; there is no way to express -stop when that hat stops-
+    except by adding a catch-all WEAPON OFF hat, which nothing tells them to do.
+    COST: a continuously latched weapon drains the reserve at about 0.005 of
+    PowerFrac per second (measured E2: 0.79 -> 0.69 over 19 s of spin).  Over a
+    60-90 s fight that is 30-45% of the reserve spent on a weapon the program
+    never asked to keep running - a real, if not fatal, difficulty shift.
+    CONTROL (A3): a hat that says WEAPON ON, WAIT 1.5, STOP ALL, WAIT 3
+    correctly reads actFire=True at t=1.0 and actFire=False at t=2.2.  STOP ALL
+    and death still clear the latch as designed.
+
+R3  MAJOR - THE BUS HOLD HAS A SYMMETRIC COST: A BUS LOST EARLY FREEZES hp AT
+    1.00 AND THE RETREAT HAT CAN NEVER FIRE.
+    Program (critic_r3_h.txt, H4):
+        hat 0  WHEN hp < 35%  : MOVE BACKWARD 70% FOR 1.0 s     (RETREAT)
+        hat 1  WHEN always    : MOVE FORWARD 25% FOR 1.0 s      (CHARGE)
+    Leg A - dmgbus shot off first, damage afterwards:
+        t=1.0            real hp 1.00  busValid True   hat=1
+        dmgbus destroyed real hp 0.99  busValid False
+        after damage     real hp 0.24  busValid False  bus.hpFrac 1.00  hat=1
+        +2 s                                                     hat=1
+    CONTROL leg B - dmgbus survives, same damage:
+        after damage     real hp 0.25  busValid True   bus.hpFrac 0.25  hat=0
+        +2 s                                                     hat=0   correct
+    R2 fixed -sensor goes dark, so the retreat hat drops out mid-retreat-.  The
+    fix holds the LAST LIVE VALUE, so if the bus dies BEFORE the damage (which
+    is the commoner ordering - the bus is a small exposed part) the held value
+    is 1.00 and the safety hat is dead for the rest of the fight.  Measured
+    above at a real hp of 0.24.
+    FIX SHAPE: -cannot read- must be a third state, not a frozen number.  Either
+    age the held value (a reading older than N seconds stops satisfying a
+    threshold term), or let the canvas express -or if I have lost the bus- so
+    the player can write a fallback.  PartsLost and PowerFrac have the same
+    shape; HitRecently deliberately does not (it still gates on busValid),
+    so the six damage-bus conditions are not even consistent with each other.
+
+R4  MINOR / latent - ProgramRunner.Init() does not reset lastHp, lastPower,
+    lastParts, everBus, yawAcc or heldDrive.  Not reachable today: BuilderManager
+    AddComponents a fresh ProgramRunner on every spawn (BuilderManager.cs:3656
+    for TEST DRIVE, :4296 for an autonomy fight), so the fields are always
+    construction-fresh.  Code read only, not measured.  It becomes a live bug
+    the moment anyone pools or re-Inits a runner.
+
+R5  THE STALL ESCAPE - I could not make it fire on legitimate slow progress,
+    but it IS converting hangs into SILENT WRONG ANSWERS.
+    Controls first (critic_r3_b.txt):
+      MOVE 25% FOR 3 ROUNDS   ran 5.36 s, 3.45 m, 3.04/3 rounds  - completed on
+        rounds, NOT stalled, even though its first 2 s averaged only 0.243 m/s
+        (the stall floor is 0.15 m per 1.2 s = 0.125 m/s, so it is close).
+      MOVE 40% FOR 3 ROUNDS   ran 2.26 s, 3.32 m, 3.07/3 rounds  - correct.
+      MOVE 70% FOR 3 ROUNDS driven into a wall: ended at 1.94 s with 0.00/3
+        rounds - a correct escape, 1.2 s after the machine actually stopped.
+      Timed steps are never stall-checked at all (StepDone returns on b.dur),
+        so a slow MOVE 15% FOR 5 s cannot be truncated.  Good.
+    But on RIG-S:
+      TURN BY 15 deg  -> ended after 1.22 s having turned 0.0 deg
+      TURN BY 30 deg  -> ended after 1.66 s having turned 14.0 deg
+      SIDE TO WALL / FRONT from 24.1 deg -> ended after 1.22 s at 16.8 deg
+    All three ended on Stalled(), and all three then reported SUCCESS: pc++ and
+    the sequence moved on as if the turn had happened.  The root cause is the
+    rig (see MAJOR 4), but the stall watch is what turns a visible 10 s hang
+    into an invisible wrong answer.  A step that ends because nothing moved is
+    not the same event as a step that ends because it finished, and the runner
+    does not distinguish them - which also means a FaceSide that gave up
+    silently satisfies its own 8 deg contract as far as the sequence is
+    concerned.
+
+R6  THE IN-PLACE RE-ARM does not starve anything.  MEASURED (critic_r3_d.txt):
+    an all-instant body (MOVE 50% HOLD, re-arms every physics step) averaged
+    20.0 ms/frame; the blocking-body control (MOVE 50% HOLD; FOREVER WAIT 0.2)
+    averaged 20.0 ms/frame.  No measurable cost.  Verified good.
+
+================================================================================
+SECTION 2 - FINDINGS
+================================================================================
+
+BLOCKER 1 - F6 CONSTRUCTED AND MEASURED: A FOREVER WHOSE ONLY BLOCKING STEP IS
+            BEHIND A FALSE IF LOCKS OUT EVERY LOWER HAT, PERMANENTLY.
+    Program (critic_r3_d.txt, D1):
+        hat 0  PATROL  WHEN always
+                 FOREVER
+                   IF hp < -1          (a condition that is simply false)
+                     MOVE 70% FOR 1.0 s
+                   END IF
+                 END
+        hat 1  SAFETY  WHEN always
+                 MOVE 85% FOR 1.0 s
+    Validate(partIds) returns null.  The canvas accepts it, SAVE accepts it,
+    LOAD TO ROBOT accepts it.
+    MEASURED over 8.0 s (401 physics steps):
+        wheel command live         0 %          (never non-zero, once)
+        hat 0 in charge          392 steps
+        hat 1 in charge            0 steps      <- the safety hat never runs
+        distance moved          0.00 m
+        average frame           20.0 ms         (no perf hazard - it is silent)
+    CONTROL - the same program with the IF made true, 5.0 s:
+        wheel command live        96 %
+        hat 0 in charge          242 steps
+        distance moved          8.59 m
+    WHY: Validate marks a loop as having a blocking step if ANY b.Blocking step
+    appears while the loop is open, without caring that the step is inside a
+    false IF branch.  At run time Advance walks FOREVER -> IF(false) ->
+    SkipFromIf -> END -> back to FOREVER, three instants per lap, burns the
+    64-instant budget and yields, forever.  TriggerEval sees InForever() true
+    but the hat WHEN is still true, so it never releases; and preemption is
+    -strictly higher hats only-, so every hat BELOW is starved.  A player who
+    puts a WALL! or FLIPPED! safety hat under a patrol hat gets a robot that
+    stands motionless for the whole fight.
+    FIX SHAPE: the run-time side is the real fix - if a FOREVER lap completes
+    with no blocking step executed, treat the hat as finished (release it) so
+    lower hats get a turn.  A static check can only ever be a heuristic here
+    because the IF is data-dependent.
+
+BLOCKER 2 - THE WALL LIMIT CYCLE IS REAL AND IT IS THE WHOLE ARENA.
+    (R2 major 2, confirmed and re-characterised.  critic_r3_j.txt.)
+    Program: one hat, WHEN always, MOVE AWAY FROM WALL 80% (HOLD / SET flavour).
+    Rig RIG-C, started 2.5 m from the +Z wall with that wall dead ahead.
+    MEASURED, 11 s, wheel commands in brackets:
+        t= 0.0  d=2.52  bear= -21  w=[ 0.00, 0.00, 0.00, 0.00]  v=0.00  z= 4.5
+        t= 1.5  d=6.80  bear=-178  w=[ 0.73, 0.87, 0.73, 0.87]  v=7.49  z=-0.4
+        t= 3.0  d=3.42  bear=-179  w=[ 0.77, 0.83, 0.77, 0.83]  v=3.10  z=-3.5
+        t= 4.5  d=2.52  bear=  -7  w=[-0.55,-1.00,-0.55,-1.00]  v=2.84  z= 4.5
+        t= 6.0  d=5.73  bear=  -4  w=[-0.65,-0.95,-0.65,-0.95]  v=7.18  z= 1.1
+        t= 7.5  d=1.12  bear=-173  w=[ 0.56, 1.00, 0.56, 1.00]  v=1.37  z=-5.9
+        t= 9.0  d=4.42  bear=   1  w=[-0.84,-0.76,-0.84,-0.76]  v=6.96  z= 2.8
+        t=10.5  d=3.43  bear=   0  w=[-0.81,-0.79,-0.81,-0.79]  v=5.84  z= 3.3
+        SUMMARY: wallDist 1.02 .. 6.91 m, five 180-degree bearing flips, peak
+        speed 7.5 m/s in a 14 m arena.
+    Second leg, same order but started with the wall ASTERN: wallDist
+    1.02 .. 6.89 m, six flips, peak 9.16 m/s.
+    Third leg, started at the arena CENTRE: the robot barely translates
+    (wallDist 4.67 .. 6.98) but the wheels chatter at full opposite lock -
+    w=[0.95,-1.00,...] on one sample and w=[-0.94,1.00,...] the next - ten
+    >90-degree bearing flips in 11 s.  On rig RIG-S the same centre test gave
+    40 flips in 18 s while the robot did not move at all.
+    WHAT THE PROGRAM SAYS: keep away from the walls.
+    WHAT HAPPENS: the robot ping-pongs between the two opposite walls forever,
+    coming within 1.02 m of a wall - closer than the StarterKit WALL! hat
+    threshold of 1.2 m that exists to prevent exactly this.
+    WHY, precisely:
+      (a) SensorBus.ReadWall reports only the SINGLE nearest of four planes,
+          with no memory and no hysteresis.  Crossing the mid-line swaps the
+          plane and the bearing jumps 180 degrees (or 90, for a side wall).
+      (b) RelDrive computes drive = -cos(bearing), which is smooth IN THE
+          BEARING - but the bearing is a discontinuous function of POSITION,
+          so the drive command flips sign at full magnitude.
+      (c) AWAY has no set point.  -Increase the distance- is unsatisfiable in a
+          bounded arena, so the controller never converges and never slows.
+      (d) There is no brake (see MAJOR 5), so each half-cycle overshoots.
+    WHAT A GOOD FIX NEEDS - all four, not one:
+      1. A TARGET CLEARANCE, not an unbounded objective.  AWAY FROM WALL should
+         mean -open the range to at least C metres, then stop- (C tied to the
+         hat threshold, e.g. 2.0 m against a 1.2 m trigger).  Then the verb can
+         terminate and the hat can release.
+      2. A CONTINUOUS FIELD instead of nearest-plane-only.  Sum a repulsion
+         vector over all four planes (1/d or 1/d^2 weighted).  That vector is
+         continuous everywhere including the mid-line and it has no antipode.
+         SensorBus already comments that the roster AI has such a repulsion
+         query - use the same one, and expose the VECTOR, not one bearing.
+      3. If (2) is too big, at minimum PLANE HYSTERESIS in ReadWall: keep the
+         plane you are reporting until another is closer by a margin (0.5 m),
+         so a mid-line crossing cannot flip the bearing at all.
+      4. A SPEED GOVERNOR on the retreat.  7.5 m/s across a 14 m arena means
+         the robot is at the opposite wall 0.9 s after leaving this one.
+
+MAJOR 3 - SIDE TO <target> OVERSHOOTS ITS OWN 8-DEGREE CONTRACT AND STOPS,
+          ON A GOOD RIG.
+    Program: one hat, WHEN always, SIDE TO WALL / FRONT.
+    MEASURED on RIG-C (critic_r3_i.txt):
+        from -169.9 deg : ran 1.36 s, ended at bearing  32.2 deg
+        from   49.2 deg : ran 0.60 s, ended at bearing -18.2 deg
+    MEASURED on RIG-S (critic_r3_c.txt):
+        from   24.1 deg : ran 1.22 s, ended at bearing  16.8 deg (stalled out)
+        from -177.1 deg : ran 2.76 s, ended at bearing  -4.8 deg  (correct)
+    The verb declares FACE_TOL = 8 deg.  Three of the four legs finish outside
+    it, and two of them finish on the FAR SIDE of the target - the robot swung
+    past and kept going.  Cause: StepDone declares success the instant
+    |err| < 8, then ExitStep calls ZeroWheels and the machine coasts on its
+    angular momentum (RIG-C pivots at up to 156 deg/s at 65% power, and
+    wallBearingDeg only refreshes at 20 Hz, so one sensor frame is already
+    7-8 degrees wide).  There is no braking phase and no dead-band.
+    WHY NO BENCH CAUGHT IT: VerbBench asserts err1 < 35 deg, four times the
+    verb contract.  16.8 and 32.2 and 18.2 all pass.
+    FIX SHAPE: brake (command the opposite sign for a step or two, or scale the
+    pivot power by remaining error with a much lower floor than 0.20), and
+    assert the verb contract in the bench, not a number four times looser.
+
+MAJOR 4 - ON A LEGAL BUILD, THE SENSOR FRAME AND THE DRIVE FRAME DISAGREE, AND
+          LOW-POWER TURNS DO NOTHING AT ALL.
+    This is build mechanics, not the sequencer - but a player who builds it gets
+    a robot that does the opposite of what they wrote, so it belongs here.
+    RIG-S is the rig from the session handover.  Its front wheels are placed
+    with rotation 90 and its rear wheels with rotation 0, so the four roll axes
+    do not agree.
+    MEASURED, RIG-S (critic_r3_h.txt H1, critic_r3_f.txt F1):
+      The +Z wall is 4.42 m away.  The bus reports wallBearing = 17 deg, i.e.
+      -almost dead ahead-.  MOVE FORWARD 70% for 1.0 s then moves the robot
+      1.29 m in -Z and wallDist goes 4.42 -> 5.69.  Forward is backwards
+      relative to the sensor nose.
+      MOVE TOWARD WALL (HOLD) from 4.46 m ends at 5.79 m - TOWARD moves AWAY.
+      MOVE AWAY FROM WALL, started 2.26 m out with the wall astern, drove INTO
+      the wall and sat there jammed at 1.97 m for the full 16 s of the test.
+    CONTROL, RIG-C: bearing -1 deg, MOVE FORWARD 70% for 1 s -> +2.97 m,
+      wallDist 4.14 -> 1.17.  Frames agree.
+    Same rig, pivot power sweep, TURN <p>% FOR 2.0 s (never stall-checked):
+        RIG-S:  20% ->   0.0 deg/s   RIG-C:  25% ->  55.9 deg/s
+                25% ->   0.0                 40% ->  89.2
+                40% ->   2.9                 55% -> 122.9
+                55% ->   1.1                 70% -> 156.4
+                70% ->  71.2
+                85% -> 110.0
+               100% -> 159.6
+    On RIG-S, four of the six turn powers the canvas offers (25/40/55, and the
+    20% floor that TURN BY and SIDE TO use internally) produce essentially zero
+    rotation, because the mismatched wheels scrub against each other and never
+    break away.  On RIG-C the response is linear from 25% up.
+    CONSEQUENCE: TURN BY 15 (which clamps to 25% via TURNBY_MIN) turns 0.0 deg
+    on RIG-S; SIDE TO (whose floor is 20%) cannot fine-tune at all; and the
+    stall escape then reports both as done.
+    FIX SHAPE: derive SensorBus.forwardLocal from the same thing the drive
+    actually uses (the wheel roll axes) rather than from driveDir, and refuse
+    or warn on a build whose wheel roll axes disagree by more than a few
+    degrees - the builder already draws a drive arrow, so it already has the
+    information.  Separately, the pivot power floors (TURNBY_MIN 0.25,
+    FaceSide 0.20) are below break-away on real builds; they should be a
+    fraction of a MEASURED break-away, or the controller should ramp up when it
+    sees no rotation instead of giving up.
+
+MAJOR 5 - F5 QUANTIFIED: A TIMED MOVE LANDS 1.3x TO 2.5x FURTHER THAN IT READS.
+    Program: one hat, WHEN always, MOVE FORWARD 70% FOR 1.0 s ; WAIT.
+    MEASURED from a standstill:
+        RIG-S:  commanded phase 1.00 s -> 2.10 m, speed at release 4.11 m/s,
+                then coasted 3.19 m more over 1.56 s.  TOTAL 5.29 m (+152%).
+        RIG-C:  commanded phase 1.00 s -> 4.16 m, speed at release 8.37 m/s,
+                then coasted 1.27 m more.  TOTAL 5.38 m (+31%).
+        (RIG-S at 70% FOR 2.0 s coasted 5.60 m after the command ended.)
+    ExitStep calls ZeroWheels, which writes zero to the drive; nothing ever
+    commands a reverse or a brake, so the machine keeps whatever momentum it
+    had.  The arena is 14 m across.  A player who writes MOVE 70% FOR 1 s is
+    asking for a nudge and getting a third of the arena.  It also makes every
+    sequenced manoeuvre (MOVE then TURN then MOVE) land somewhere other than
+    where the program describes.
+    FIX SHAPE: brake on ExitStep for timed drive steps - command -sign(v) for
+    ~0.15 s or until |v| drops under a threshold - and say so in the block
+    label, or add a COAST/BRAKE chip so the player chooses.
+
+MINOR 6 - TURN BY overshoots by 4-9% even when everything works.
+    RIG-C: TURN BY 15 -> 16.3 deg in 0.54 s; 30 -> 32.0; 45 -> 46.8;
+           90 -> 93.6 in 0.90 s.
+    Half of it is the deliberate 0.5 deg early-out in StepDone, the rest is
+    coast.  Small, but it accumulates in a REPEAT.
+
+MINOR 7 - F7 IS NO LONGER TRUE.  R2 recorded TURN BY 180 taking 5.46 s.
+    MEASURED now: RIG-S 180 deg in 2.20 s (and 90 deg in 1.48 s); RIG-C 90 deg
+    in 0.90 s, i.e. 180 in roughly 1.8 s.  The TURNBY_MAX 0.7 / P-law is fine.
+    Nothing to fix; retire the finding.
+
+================================================================================
+SECTION 3 - THE PROGRAMCANVAS PATH, END TO END
+================================================================================
+    (critic_r3_g.txt.  The canvas is not in the scene at rest - MobileBuilderUI
+    mounts it on the career-only PROGRAM panel - so I mounted a ProgramCanvas
+    on the live mobile_builder_canvas exactly the way MobileBuilderUI does
+    (AddComponent + Init(bm)), then drove it by invoking the real Button
+    onClick of the real chips, by name, with a frame between taps.  The
+    player-s career data was snapshotted and restored, and autosave was off for
+    the duration.)
+
+  TAPS PERFORMED, and what the canvas produced after each:
+    + HAT               -> hat 0, WHEN ALWAYS, [MOVE FWD 70% 1.0 s]
+    + BLOCK             -> block 1 = MOVE FWD 70% 1.0 s
+    op chip x3          -> block 1 cycled Move -> TurnLR -> TurnBy -> Weapon ON
+    power chip x2       -> block 0 arg 70 -> 85 -> 100
+    duration chip x1    -> block 0 dur 1.0 -> 1.5
+    WHEN kind chip x1   -> Always -> ENEMY RANGE, value reset to 0.5
+    WHEN value chip x1  -> 0.5 -> 1
+    + REPEAT            -> [REPEAT 3 ; MOVE FWD 70% 1.0 s ; END]
+
+  DRAWN PROGRAM:
+    H0 WHEN EnemyRange > 1
+       0 Move   arg=100 dur=1.5
+       1 Weapon arg=100
+       2 Repeat arg=3
+       3 Move   arg=70  dur=1
+       4 End
+
+  LOAD TO ROBOT -> status: loaded to spinner1 (1 hats, 5 blocks) - TEST DRIVE
+  -> AUTO to watch it.  Robot JSON 643 bytes.
+
+  STORED ON THE ROBOT (RobotProgram.FromJson of what was written): identical in
+  every field that the runner reads - op, part, idx, arg, dur, rounds, target,
+  hat order, WHEN terms.  ARMED PROGRAM after BackToBuild + StartTest:
+  identical again, and bm.testRunner was non-null.
+
+  >>> VERDICT: the program that runs IS the program that was drawn.  The
+      canvas -> JSON -> stable robot -> ProgramRunner path is faithful.  This
+      was the highest-value untested surface and it is clean.
+
+  The only difference across the round trip is an artefact worth knowing about
+  but not worth fixing: JsonUtility never writes null for a nested serializable
+  class, so every block comes back with cond = {Always, Less, 0} instead of
+  null.  The runner only reads b.cond on POp.If, and Validate only requires it
+  to be non-null on POp.If, so it is inert.  It does mean Validate can never
+  report -IF without a condition- for a program that has been saved once.
+
+  THREE CANVAS DEFECTS FOUND WHILE DRIVING IT (none change what a valid program
+  does at run time):
+    C1  Cycling a WHEN chip off ALWAYS sets the VALUE from the new kind but
+        leaves the COMPARATOR at the ALWAYS default, which is GREATER.  So one
+        tap turns WHEN ALWAYS into WHEN ENEMY RANGE > 0.5, and a player reaching
+        for HP FRAC gets WHEN HP > 0.1, which is true always.  The first tap on
+        every new condition produces a hat that fires all the time.  A sensible
+        default per kind (ranges and hp want <, PartsLost wants >) would remove
+        a whole class of -my safety hat never stops firing- confusion.
+    C2  CycleOp sets b.part = PPart.AllWheels for EVERY op, including WEAPON and
+        FIRE.  Inert at run time (the runner ignores part for POp.Weapon) but
+        the data is wrong and Lint reasons about part.
+    C3  CycleOp resets b.arg to a positive default, so cycling a block away from
+        MOVE BACKWARD and back again silently loses the direction the player
+        chose.
+
+================================================================================
+SECTION 4 - VERIFIED CORRECT (as valuable as the bug list)
+================================================================================
+  V1  R1 fix holds: a hat with no blocking step re-arms in place and drives.
+      MOVE 50% HOLD held a non-zero wheel command every physics step over 3 s.
+  V2  R2 fix holds: the in-place re-arm costs nothing measurable (20.0 ms/frame
+      with an all-instant body vs 20.0 ms/frame with a blocking body).
+  V3  STOP ALL still clears the weapon latch (A3: actFire True at t=1.0,
+      False at t=2.2 after STOP ALL).
+  V4  The stall escape does NOT fire on slow-but-real progress.  MOVE 25% FOR
+      3 ROUNDS completed on rounds at 5.36 s / 3.04 rounds despite averaging
+      only 0.243 m/s over its first two seconds.  MOVE 40% FOR 3 ROUNDS
+      completed at 2.26 s / 3.07 rounds.
+  V5  The stall escape DOES fire correctly on a real jam: a rounds-mode move
+      driven into a wall ended 1.2 s after the machine stopped, with 0.00
+      rounds integrated, instead of burning MAX_DUR.
+  V6  Timed steps are exempt from the stall watch by construction (StepDone
+      returns on b.dur for rounds == 0), so a deliberately slow timed step
+      cannot be truncated.  MOVE 25% FOR 2.0 s held its command for 2.02 s.
+  V7  The bus hold works in the direction R2 aimed at: with the dmgbus alive
+      through the damage, the WHEN hp < 35% hat fires at a real hp of 0.25 and
+      stays in charge.
+  V8  MOVE TOWARD WALL as a standing order converges and holds: 6.94 m ->
+      1.41 m and then stable at 1.43 m against the wall, zero bearing flips.
+  V9  TURN BY is accurate on a mechanically sound build: 15/30/45/90 requested
+      gave 16.3/32.0/46.8/93.6 measured.
+  V10 Rounds are integrated from the world, not the command, as documented: my
+      independent integration of WheelRollSpeed/circumference matched the
+      runner-s termination point to within 0.07 rounds on both completing legs.
+  V11 Validate correctly rejects the things it claims to (checked by reading;
+      the F6 case is the documented hole, and it is the only one I found).
+  V12 The canvas -> save -> arm chain is faithful (Section 3).
+  V13 Preemption ordering behaves as documented: only strictly-higher hats
+      preempt, the interrupted sequence resets rather than resuming, and a
+      hat whose WHEN goes false while inside a FOREVER releases.
+
+================================================================================
+SECTION 5 - SUSPECTED BUT NOT MEASURED
+================================================================================
+  S1  A rounds-mode MOVE TOWARD/AWAY can satisfy its round count by PIVOTING.
+      RoundsDelta sums |WheelRollSpeed| over all channels, and a pure pivot has
+      non-zero roll speed on every wheel with opposite signs.  So MOVE TOWARD
+      ENEMY FOR 3 ROUNDS should be satisfiable without approaching at all.
+      Code read; I ran out of time to build the geometry for it.
+  S2  Damage-balance impact of the weapon latch.  R2 measured the spinner duty
+      going from 9% to 100% of a fight.  I measured the power cost of a latched
+      weapon (about 0.005 PowerFrac/s) but did NOT run paired fights against a
+      roster opponent, so I cannot say whether tier difficulty has actually
+      moved.  That needs a scripted best-of-N against a fixed opponent, before
+      and after.
+  S3  ApplyChannels sets drive.directWheelCmd = true on every physics step even
+      when activeHat < 0 and every channel is zero.  For a robot whose
+      controlSource is Program that is presumably intended, but it means an
+      idle program actively holds the wheels at zero rather than releasing
+      them; whether anything else wants the drive in that window I did not test.
+  S4  The 5 Hz TriggerEval and the 20 Hz wall / 10 Hz compass refresh are not
+      phase-locked.  A hat whose WHEN sits exactly on a threshold will see the
+      same sensor sample for two or four consecutive evals.  I saw no
+      misbehaviour from it, but it is the kind of thing that makes a hat look
+      sticky.
+  S5  I never tested two programmed robots fighting each other (a robot pushing
+      another robot was the specific slow-progress case I was asked about).
+      Every rig I could spawn through BuilderManager.StartTest is alone in the
+      arena with a ram dummy; setting up a second programmed CompoundRobot was
+      beyond what I could reach without touching FightManager.  The pushing
+      case for the stall watch is therefore UNTESTED - it is the one gap I
+      would close first.
+
+================================================================================
+HOUSEKEEPING
+================================================================================
+  Play mode was never exited.  No .cs file under Assets/ was created, edited or
+  deleted.  AssetDatabase.Refresh / RequestScriptCompilation were never called.
+  Career.devFreeBuild was saved and restored by every batch (it reads True now,
+  which is the value it had when I started).  Career.autosave was turned off
+  for the canvas test and restored to True.  The active stable robot-s program
+  and the saved-program library were snapshotted before the canvas test and
+  restored afterwards, so the career save is byte-identical to how I found it.
+  Ten scratch files critic_r3_a.txt .. critic_r3_j.txt were written to the
+  project root; I cannot delete them.

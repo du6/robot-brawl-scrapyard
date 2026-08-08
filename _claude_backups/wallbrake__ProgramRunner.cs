@@ -669,89 +669,51 @@ public class ProgramRunner : MonoBehaviour
     ///
     /// The verb still means exactly what it says: increase the clearance.
     /// It just knows when it has.</summary>
-    /// <summary>Drive + steer for one MOVE TOWARD/AWAY step.
-    ///
-    /// AWAY FROM WALL is the reason this wrapper exists. Every other target is
-    /// a THING with a position; the arena is not. "Get away from the nearest
-    /// plane" is unsatisfiable inside a bounded box -- there is always another
-    /// wall behind you -- and the nearest plane changes IDENTITY at the
-    /// mid-line, so the command reversed at full magnitude with nothing to
-    /// damp it. Behaviour critic R3, measured: wallDist ping-ponging
-    /// 1.02-6.91 m forever, five 180-degree flips in 11 s, peak 7.5 m/s,
-    /// ending up closer to a wall than the 1.2 m the WALL! hat exists to
-    /// defend; and a stationary robot at the arena centre chattering 40 full
-    /// reversals in 18 s.
-    ///
-    /// It took five things, and every one was found by measurement after the
-    /// previous four already looked finished:
-    ///   1. STEER ON THE FIELD, not the nearest plane -- continuous, no
-    ///      antipode, zero at the centre.
-    ///   2. GOVERN the thrust by how pinned we are: the verb's missing set
-    ///      point, and its speed limit.
-    ///   3. DAMP on the retreat already being made, or a proportional
-    ///      controller on a low-friction mass sails past and comes back.
-    ///   4. FLOOR the thrust while pivoting, or an escape that is ABEAM
-    ///      commands exactly zero and a short burst never leaves the wall.
-    ///   5. BRAKE at the end, because ceasing to command is not stopping:
-    ///      it coasted 4.88 m after going quiet.
-    ///
-    /// And one invariant under all of it, at the bottom of this method: a
-    /// retreat NEVER commands thrust toward the nearest wall.</summary>
     void RelCommand(int target, float pct, out float drive01, out float steer)
     {
-        if (pct >= 0f || target != (int)PTarget.Wall)
+        if (pct < 0f && target == (int)PTarget.Wall)
         {
-            float bear; bool sig = TargetSignal(target, out bear);
-            RelDrive(pct, bear, sig, out drive01, out steer);
-            return;
-        }
+            // You cannot flee what you cannot sense. The old fall-through hit
+            // RelDrive's no-signal branch, which drives STRAIGHT AHEAD at full
+            // power -- inside a box, that is how you hit a wall. Same lesson
+            // as the damage bus: a dead sensor must not produce confident
+            // wrong action.
+            if (bus == null || !bus.wallValid) { drive01 = 0f; steer = 0f; return; }
 
-        drive01 = 0f; steer = 0f;
+            // A STOPPING CLEARANCE, which the verb never had. Without one the
+            // only quiet point was the exact centre, within about 8 cm: after
+            // reaching 5 m of clearance at t=1.7 s the robot kept manoeuvring
+            // in a decaying spiral until t~13 s. Eleven seconds of orbiting
+            // after it had already succeeded. Beyond WALL_SAFE the measured
+            // runs gain nothing at all, so the verb is DONE and says nothing.
+            float half = BuilderManager.ARENA_HALF;
+            // LATCHED, with hysteresis. A bare threshold bang-banged: the
+            // robot hit 5 m still moving, went quiet, coasted on through the
+            // centre and out the far side until clearance fell back under 5 m
+            // -- which re-armed the retreat at full power. Measured 1.00
+            // command and 2.69 m of creep in what should have been a settled
+            // last three seconds. Latch when clear; only re-arm if something
+            // pushes us a whole metre back in.
+            float stop = Mathf.Min(WALL_SAFE, half * 0.75f);
+            if (wallRetreatDone) { if (bus.wallDist < stop - WALL_HYST) wallRetreatDone = false; }
+            else if (bus.wallDist >= stop) wallRetreatDone = true;
+            if (wallRetreatDone || !bus.wallFieldValid)
+            { drive01 = 0f; steer = 0f; return; }
 
-        // You cannot flee what you cannot sense. The old fall-through hit
-        // RelDrive's no-signal branch, which drives STRAIGHT AHEAD at full
-        // power -- inside a box, that is how you hit a wall. Same lesson as
-        // the damage bus: a dead sensor must not produce confident wrong
-        // action.
-        if (bus == null || !bus.wallValid || !bus.wallFieldValid) return;
-
-        // The stopping clearance the verb never had, LATCHED. A bare threshold
-        // bang-banged: the robot hit 5 m still moving, went quiet, coasted
-        // through the centre and out the far side until clearance fell back
-        // under 5 m, which re-armed the retreat at full power.
-        float half = BuilderManager.ARENA_HALF;
-        float stop = Mathf.Min(WALL_SAFE, half * 0.75f);
-        if (wallRetreatDone) { if (bus.wallDist < stop - WALL_HYST) wallRetreatDone = false; }
-        else if (bus.wallDist >= stop) wallRetreatDone = true;
-
-        float v = EscapeSpeed();
-
-        if (wallRetreatDone)
-        {
-            // Clear. But ceasing to COMMAND is not stopping -- the retreat has
-            // real speed in it and simply glided, 4.88 m in the three seconds
-            // after going quiet. So brake to an actual halt. This is only safe
-            // because of the invariant at the bottom of this method, which
-            // vetoes any thrust toward the nearest wall: a brake here can
-            // never turn into the bug owen reported.
-            if (Mathf.Abs(v) < BRAKE_STOP) return;
-            RelDrive(pct, bus.wallEscapeDeg + 180f, true, out drive01, out steer);
-            drive01 *= (v > 0f ? -1f : 1f) * Mathf.Clamp01(Mathf.Abs(v) / WALL_TOP_SPEED);
-            steer = 0f;
-        }
-        else
-        {
             // Driving AWAY along the escape field is the same thing as driving
             // TOWARD (escape + 180), which is exactly what RelDrive's AWAY
             // branch already computes. One controller, two framings.
             RelDrive(pct, bus.wallEscapeDeg + 180f, true, out drive01, out steer);
 
-            // THRUST FLOOR. Thrust scales by cos(escape), so with the escape
-            // ABEAM the base is exactly zero and a burst is spent pivoting and
-            // nothing else: 0.8 s at 80% gained 2.57 m with the wall dead
-            // ahead and 0.22 m abeam. Not enough for the shipped WallShy hat
-            // to clear its own 1.2 m threshold in one burst, so it re-fired
-            // every tick. Keep the SIGN and floor only the magnitude.
+            // THRUST FLOOR. RelDrive scales thrust by cos(escape), so with the
+            // escape ABEAM the base is exactly zero and a short burst is spent
+            // pivoting and nothing else: 0.8 s of AWAY at 80% gained 2.57 m
+            // with the wall dead ahead and 0.22 m abeam. Twelve times worse,
+            // and not enough for the shipped WallShy hat to clear its own
+            // 1.2 m threshold in one burst, so it re-fired every tick and held
+            // the robot for most of a fight. Keep the SIGN -- reversing the
+            // floor is what would drive us AT a wall -- and floor only the
+            // magnitude, so a pivot always creeps clear as well as turning.
             float unit = Mathf.Abs(pct) * 0.01f;
             if (unit > 1e-4f)
             {
@@ -760,21 +722,38 @@ public class ProgramRunner : MonoBehaviour
                     drive01 = unit * (c < 0f ? -WALL_FLOOR : WALL_FLOOR);
             }
 
-            // DAMPING, clamped at zero and never negative: letting it reach
-            // -0.6 as an active brake tripped owen's own regression check,
-            // flipping the command to +0.17 FORWARD with the wall dead ahead.
-            float u = Mathf.Clamp01(WallUrgency() - v / WALL_TOP_SPEED);
+            // DAMPING. Governing on CLEARANCE alone is a proportional
+            // controller on a low-friction mass, and it does what those always
+            // do: it sails past the set point and comes back. Without this
+            // term the field settled into a 3.98-6.59 m swing with 3 reversals
+            // in 8 s -- far better than the 1.02-6.91 m wall-to-wall cycle it
+            // replaced, but still hunting. So subtract the retreat already
+            // being made: thrust buys only the difference between the speed we
+            // want and the speed we have.
+            //
+            // CLAMPED AT ZERO, never negative. Letting it reach -0.6 as an
+            // active brake read better on paper and immediately tripped owen's
+            // own regression check: with the wall DEAD AHEAD the escape is
+            // astern, so a negative term flips the command to +0.17 FORWARD --
+            // thrust into the wall, the exact bug he reported. Coasting is the
+            // slower brake and it is the honest one.
+            float u = Mathf.Clamp01(WallUrgency() - EscapeSpeed() / WALL_TOP_SPEED);
             if (u <= 0.02f) { drive01 = 0f; steer = 0f; return; }
             drive01 *= u; steer *= u;
-        }
 
-        // THE INVARIANT. A retreat never commands thrust toward the nearest
-        // wall. Tested as a MAGNITUDE along the wall bearing rather than a
-        // hard ahead/behind boundary, because at exactly abeam the sign of
-        // "ahead" flips on sensor jitter and would veto the pivot creep half
-        // the time. owen's original bug, made structurally impossible.
-        if (drive01 * Mathf.Cos(bus.wallBearingDeg * Mathf.Deg2Rad) > 0.05f)
-        { drive01 = 0f; steer = 0f; }
+            // A RETREAT VERB NEVER COMMANDS THRUST TOWARD THE NEAREST WALL.
+            // owen's original bug was exactly that, and this makes it
+            // structurally impossible rather than merely absent: whatever the
+            // field, the governor, the floor and the damping conclude between
+            // them, a command that pushes at the thing we were told to flee
+            // does not leave this method.
+            bool ahead = Mathf.Abs(bus.wallBearingDeg) < 90f;
+            if ((drive01 > 0f && ahead) || (drive01 < 0f && !ahead))
+            { drive01 = 0f; steer = 0f; return; }
+            return;
+        }
+        float bear; bool sig = TargetSignal(target, out bear);
+        RelDrive(pct, bear, sig, out drive01, out steer);
     }
 
     /// <summary>How fast we are already retreating, m/s along the escape

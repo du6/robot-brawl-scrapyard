@@ -1,0 +1,7 @@
+parked: wallDist=2.83 bearing=-18
+PROGRAM h0 WHEN wall<1.5 [MOVE AWAY WALL 85% 1.0s ; TURN BY 90] ; h1 ALWAYS [WAIT 0.5]
+VALIDATE = OK
+  step RLE: h-1s-1:0.18 h1s0:3.50 h0s-1:0.02 h0s0:1.00 h0s1:10.00 h0s0:1.00 h0s1:2.28
+  wallDist range 0.64 .. 5.42
+  series: 0.0:h-1s-1 w2.8 b-18 y-3 | 0.5:h1s0 w4.1 b-163 y0 | 1.0:h1s0 w5.4 b-175 y96 | 1.5:h1s0 w4.9 b-86 y172 | 2.0:h1s0 w4.4 b88 y-4 | 2.5:h1s0 w3.9 b-83 y9 | 3.0:h1s0 w3.4 b90 y173 | 3.5:h1s0 w2.1 b11 y3 | 4.0:h0s0 w0.6 b152 y29 | 4.5:h0s0 w1.0 b146 y30 | 5.0:h0s1 w1.0 b147 y29 | 5.5:h0s1 w1.0 b147 y29 | 6.0:h0s1 w1.0 b147 y29 | 6.5:h0s1 w1.0 b147 y29 | 7.0:h0s1 w1.0 b147 y29 | 7.5:h0s1 w1.0 b147 y29 | 8.0:h0s1 w1.0 b147 y29 | 8.5:h0s1 w1.0 b147 y29 | 9.0:h0s1 w1.0 b147 y29 | 9.5:h0s1 w1.0 b147 y29 | 10.0:h0s1 w1.0 b147 y29 | 10.5:h0s1 w1.0 b147 y29 | 11.0:h0s1 w1.0 b147 y29 | 11.5:h0s1 w1.0 b147 y29 | 12.0:h0s1 w1.0 b147 y29 | 12.5:h0s1 w1.0 b147 y29 | 13.0:h0s1 w1.0 b147 y29 | 13.5:h0s1 w1.0 b147 y29 | 14.0:h0s1 w1.0 b147 y29 | 14.5:h0s1 w1.0 b147 y29 | 15.0:h0s0 w1.0 b147 y29 | 15.5:h0s0 w1.0 b147 y29 | 16.0:h0s1 w1.0 b147 y29 | 16.5:h0s1 w1.0 b147 y29 | 17.0:h0s1 w1.0 b147 y29 | 17.5:h0s1 w1.0 b147 y29 | 18.0:h0s1 w1.0 b147 y29 | 
+DONE-G

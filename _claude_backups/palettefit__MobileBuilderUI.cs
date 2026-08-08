@@ -725,26 +725,7 @@ public class MobileBuilderUI : MonoBehaviour
         grid.cellSize = new Vector2(112f, 50f);
         partGrid = grid;
         grid.spacing = new Vector2(6f, 4f);
-        // VERTICAL PADDING ZERO, and that is the whole fix for owen's
-        // 2026-08-07 report that the bottom palette row looked cut off.
-        //
-        // Four rows of 34 plus three 4-unit gaps is 148, which is exactly the
-        // viewport. Add 4+4 of vertical padding and the content is 156 into a
-        // 148 hole, so the bottom row lost 8 units — the second line of every
-        // tile, which is where the free-stock count lives. The scroller is
-        // HORIZONTAL-only, so no swipe ever revealed it.
-        //
-        // The first fix grew the dock by the missing 8 instead. It worked, and
-        // it was WRONG: a taller dock covers more of the build area, so parts
-        // could no longer be placed where they used to be. CareerSmoke went
-        // 127/127 -> 112/127, fifteen failures across buying, selling,
-        // placement, enrollment, purses and draft mode. Measured A/B with the
-        // correction pinned off. Giving the palette room by taking it from the
-        // BUILD AREA is a bad trade; giving it room by dropping cosmetic
-        // padding inside its own viewport costs nothing at all.
-        //
-        // Horizontal padding stays: that axis scrolls, so it cannot clip.
-        grid.padding = new RectOffset(4,4,0,0);
+        grid.padding = new RectOffset(4,4,4,4);
         grid.constraint = GridLayoutGroup.Constraint.FixedRowCount;
         // P1 (2026-08-05): 3 -> 4. The five sensor parts take the catalogue to
         // 24; at three rows that is 8 columns and the viewport-derived cell

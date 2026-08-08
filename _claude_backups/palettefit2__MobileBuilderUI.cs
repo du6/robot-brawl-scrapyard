@@ -679,7 +679,7 @@ public class MobileBuilderUI : MonoBehaviour
         var scroll = scrollGO.AddComponent<ScrollRect>(); scroll.horizontal = true; scroll.vertical = false;
         var viewport = MkPanel("viewport", scrollGO.transform, new Color(0f,0f,0f,0.15f));
         var vp = viewport.GetComponent<RectTransform>(); Stretch(vp);
-        vp.offsetMin = new Vector2(0f, 10f);      // leave the scrollbar its lane
+        vp.offsetMin = new Vector2(0f, PART_LANE);   // leave the scrollbar its lane
         viewport.AddComponent<Mask>().showMaskGraphic = true;
         var content = MkPanel("content", viewport.transform, new Color(0f,0f,0f,0f));
         var crt = content.GetComponent<RectTransform>();
@@ -725,26 +725,7 @@ public class MobileBuilderUI : MonoBehaviour
         grid.cellSize = new Vector2(112f, 50f);
         partGrid = grid;
         grid.spacing = new Vector2(6f, 4f);
-        // VERTICAL PADDING ZERO, and that is the whole fix for owen's
-        // 2026-08-07 report that the bottom palette row looked cut off.
-        //
-        // Four rows of 34 plus three 4-unit gaps is 148, which is exactly the
-        // viewport. Add 4+4 of vertical padding and the content is 156 into a
-        // 148 hole, so the bottom row lost 8 units — the second line of every
-        // tile, which is where the free-stock count lives. The scroller is
-        // HORIZONTAL-only, so no swipe ever revealed it.
-        //
-        // The first fix grew the dock by the missing 8 instead. It worked, and
-        // it was WRONG: a taller dock covers more of the build area, so parts
-        // could no longer be placed where they used to be. CareerSmoke went
-        // 127/127 -> 112/127, fifteen failures across buying, selling,
-        // placement, enrollment, purses and draft mode. Measured A/B with the
-        // correction pinned off. Giving the palette room by taking it from the
-        // BUILD AREA is a bad trade; giving it room by dropping cosmetic
-        // padding inside its own viewport costs nothing at all.
-        //
-        // Horizontal padding stays: that axis scrolls, so it cannot clip.
-        grid.padding = new RectOffset(4,4,0,0);
+        grid.padding = new RectOffset(4,4,4,4);
         grid.constraint = GridLayoutGroup.Constraint.FixedRowCount;
         // P1 (2026-08-05): 3 -> 4. The five sensor parts take the catalogue to
         // 24; at three rows that is 8 columns and the viewport-derived cell
@@ -1515,6 +1496,12 @@ public class MobileBuilderUI : MonoBehaviour
 
     RectTransform matRowRt, actRowRt, partScrollRt;
     UnityEngine.UI.GridLayoutGroup partGrid;
+    /// <summary>Units the palette grid needs beyond what DockH budgeted for
+    /// it. Measured, never guessed — see the note where it is computed.</summary>
+    float paletteShort;
+    /// <summary>The lane the viewport hands the horizontal scrollbar. Shared
+    /// so the layout and the fit check cannot drift apart.</summary>
+    const float PART_LANE = 10f;
     float lastScaleFactor, lastLayoutSig;
 
     /// <summary>One finger-sized row, in canvas units.
@@ -1777,6 +1764,35 @@ public class MobileBuilderUI : MonoBehaviour
                                                     / (float)partGrid.constraintCount));
             float cellW = vw > 50f ? (vw - 8f - (cols - 1) * 6f) / cols : 112f;
             partGrid.cellSize = new Vector2(Mathf.Max(84f, cellW), R);
+            // ...and the same trap ONE AXIS OVER, which the note above did not
+            // catch: the cell WIDTH is derived from the viewport, but the cell
+            // HEIGHT is just R, and nobody checked that `rows` of them FIT.
+            // They did not. DockH budgets 6*R for six rows, but the palette is
+            // a GRID: four rows also carry three 4-unit gaps, 4+4 of padding,
+            // and the 10-unit lane the viewport gives the scrollbar. Measured
+            // on the iPad — 156 units of content into a 148-unit viewport, so
+            // the BOTTOM ROW was clipped by 8 of its 34 units. That is the
+            // second line of the tile: the free-stock count, invisible on
+            // exactly the parts you run out of. (owen, 2026-08-07: "the text
+            // of the bottom rows of buttons looks cutoff a bit".) It was
+            // flagged as a risk when the grid went to four rows and shipped
+            // anyway — see the constraintCount note.
+            //
+            // Not re-fitted by hand, because that is what put it here. We
+            // MEASURE the shortfall and hand it back to DockH. `have` subtracts
+            // our own correction first, so this is a fixed point rather than a
+            // feedback loop: grow the dock, the shortfall reads the same, it
+            // settles in one pass and re-derives itself on any other device.
+            if (partScrollRt != null)
+            {
+                int rows = Mathf.Max(1, partGrid.constraintCount);
+                float need = rows * partGrid.cellSize.y
+                           + (rows - 1) * partGrid.spacing.y
+                           + partGrid.padding.top + partGrid.padding.bottom
+                           + PART_LANE;
+                float have = partScrollRt.rect.height - paletteShort;
+                paletteShort = Mathf.Max(0f, need - have);
+            }
         }
         if (handleRt != null) handleRt.sizeDelta = new Vector2(300f, R);
         ApplyDockH();
@@ -1828,7 +1844,7 @@ public class MobileBuilderUI : MonoBehaviour
             // is unchanged and still has the last word, so a device that
             // overstates its dpi cannot turn this into a dock that swallows
             // the screen.
-            float want = 6f * R + 38f + safeB;
+            float want = 6f * R + 38f + paletteShort + safeB;
             return ch1 > 100f ? Mathf.Min(want, ch1 * 0.68f) : want;
         }
         if (!Career.active) return 210f;

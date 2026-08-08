@@ -198,13 +198,6 @@ public class TouchSmoke : MonoBehaviour
         int bi = -1;
         for (int i = 1; i < bm.PaletteCount; i++)
             if (bi < 0 && bm.PartLabel(i).StartsWith("Beam")) bi = i;
-        // FIXTURE (2026-08-08): career stock is OWNED MINUS USED-IN-BUILD.
-        // The sandbox phase above leaves Aluminum beams in the build, so a
-        // flat grant of 1 can read as 0 free before this block ever taps -
-        // which is what made both career checks fail. Top up until exactly
-        // one is free, whatever the build happens to be holding.
-        for (int guard = 0; guard < 64 && bm.CareerRemaining(bi) < 1; guard++)
-            Career.AddItem("beam", "Aluminum", 1);
         yield return null;
         int nc = bm.PlacedCount;
         Tap("Beam"); yield return null;
