@@ -1,4 +1,0 @@
-A-plain-MOVE-BACK-open-floor: hat=0 step=0 src=Program directCmd=True chans=4
-   moved 1.993 units in 2.4s
-B-AWAY-FROM-WALL-nose-on: hat=0 step=0 src=Program directCmd=True chans=4
-   moved 0.001 units in 2.4s  wallDist=0.525

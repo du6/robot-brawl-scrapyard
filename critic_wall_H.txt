@@ -1,5 +1,0 @@
-== span sensitivity: same 1.50 m clearance, different ARENA_HALF
-   span = ARENA_HALF - WALL_CLEAR(3.0); ratio = WALL_TOP_SPEED(4)/span
-BOX7.0 ratio1.00 half=7.00 x0=5.50 (clearance 1.50) peak=3.31 band=5.81-7.00 flips=2 endX=0.09 endD=6.92
-BOX5.5 ratio1.60 half=5.50 x0=4.00 (clearance 1.50) peak=3.27 band=4.46-5.49 flips=2 endX=-0.02 endD=5.47
-BOX5.0 ratio2.00 half=5.00 x0=3.50 (clearance 1.50) peak=3.24 band=4.00-4.99 flips=2 endX=-0.02 endD=4.96

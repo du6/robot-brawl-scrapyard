@@ -3843,7 +3843,7 @@ public class BuilderManager : MonoBehaviour
     /// direction (decides which wheels steer); `rot` yaws the whole bot so
     /// opponents can spawn facing each other.
     /// </summary>
-    public CompoundRobot SpawnBot(List<PlacedPart> build, string botName, Vector3 xz,
+    CompoundRobot SpawnBot(List<PlacedPart> build, string botName, Vector3 xz,
                            Quaternion rot, Vector3 dDir, out RaycastWheelDrive drv)
     {
         var core = build[0];
@@ -5210,37 +5210,6 @@ public class BuilderManager : MonoBehaviour
     /// splits on '|', gets one field, and drops any line with fewer than 4 -
     /// so an OLD build of the game loads a NEW file unharmed too.</summary>
     public const string SNAP_STAMP = "#fmt3-disc";
-
-    // ============ MULTIPLAYER v3 - PHASE M0 SEAMS =====================
-    /// <summary>The build's canonical drive direction, derived from its
-    /// wheels when the snapshot loads. MatchRunner needs it to face two
-    /// independently-uploaded robots at each other; rebuilding a forward
-    /// axis from the transform instead is exactly the mistake that put the
-    /// wall limit cycle back on X-drive builds (2026-08-07).</summary>
-    public Vector3 DriveDir { get { return driveDir; } }
-
-    /// <summary>Enter fight mode with an arena and NO combatants - the seam
-    /// MatchRunner stages a snapshot-vs-snapshot bout in. This is StartFight's
-    /// preamble with the spawns, the roster opponent, the AI, the camera and
-    /// the touch dock removed, so a ladder bout fights in the SAME arena
-    /// object a career fight does rather than in a second copy of it.
-    /// Pair every call with BackToBuild(): BuildArena() is not idempotent and
-    /// a second call without teardown leaves two overlapping arenas.</summary>
-    public void EnterMatchArena(float arenaHalf)
-    {
-        if (mode == Mode.Test) BackToBuild();
-        ARENA_HALF = arenaHalf;
-        Progression.rewarded = false;
-        Progression.lastRewardLine = "";
-        Deselect();
-        SetMatView(false);
-        hoverPart = null;
-        buildRoot.SetActive(false);
-        mode = Mode.Fight;
-        message = "";
-        BuildArena();
-        ArenaHazards.Clear();
-    }
 
     public string SnapshotString()
     {

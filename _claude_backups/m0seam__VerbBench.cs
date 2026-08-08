@@ -50,7 +50,7 @@ public class VerbBench : MonoBehaviour
 
     /// <summary>The drive rig plus a live spinner and a damage bus, for the
     /// checks that need a weapon or a bus. Geometry verified 2026-08-07.</summary>
-    public const string ARMED =
+    const string ARMED =
         "core|0.000,0.700,0.000|0|0.00,0.00,0.00|Aluminum\n" +
         "beam|-0.250,0.700,0.150|0|0.00,0.00,0.00|Aluminum\n" +
         "beam|0.250,0.700,0.150|0|0.00,0.00,0.00|Aluminum\n" +

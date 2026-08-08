@@ -1,9 +1,0 @@
-=== BATCH B - stall escape false positives (rounds mode)
-channels=4 circumference=1.131 m
-TIMED  MOVE 25% FOR 2.0s: cmd-held 2.02s dist=0.49m speed=0.243m/s rounds=0.43 | COAST after stop=0.04m
-ROUNDS MOVE 25% FOR 3 ROUNDS: ran 5.36s dist=3.45m ROUNDS-DONE=3.04/3
-TIMED  MOVE 40% FOR 2.0s: cmd-held 2.02s dist=3.35m speed=1.657m/s rounds=2.96 | COAST after stop=2.09m
-ROUNDS MOVE 40% FOR 3 ROUNDS: ran 2.26s dist=3.32m ROUNDS-DONE=3.07/3
-TIMED  MOVE 70% FOR 2.0s: cmd-held 2.02s dist=3.36m speed=1.664m/s rounds=3.45 | COAST after stop=5.60m
-ROUNDS MOVE 70% FOR 3 ROUNDS: ran 1.94s dist=1.20m ROUNDS-DONE=0.00/3
-=== DONE

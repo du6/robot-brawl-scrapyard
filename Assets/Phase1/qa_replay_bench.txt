@@ -1,0 +1,67 @@
+passed 57 failed 0
+PASS  fixture rig loads (19 parts)
+PASS  sha256 is stable across two exports of the same state
+PASS  envelope hash covers the stored payload bytes
+PASS  clientVersion carries the build-format stamp (2.1.1+#fmt3-disc+p1)
+PASS  envelope opens: ok
+PASS  payload build text is byte-identical to the builder's
+PASS  payload program json is byte-identical to the program's
+PASS  a one-character payload edit is refused (snapshot: sha256 mismatch — payload altered or truncated)
+PASS  a truncated payload is refused
+PASS  a foreign envelope kind is refused
+PASS  an envelope from a newer client is refused, not half-read
+PASS  envelope survives a JSON round trip intact
+PASS  meta mass is real (924 kg)
+PASS  meta size box is real (1.42 x 0.60 x 2.13)
+PASS  meta part count matches the loaded build
+PASS  meta parts manifest lists every part
+PASS  meta program hash is the hash of the program, not of the build
+PASS  no program hashes to empty, not to a collidable constant
+PASS  the fixture rig + Brawler validates legal: no reasons
+PASS  import reconstructs a build: ok
+PASS  imported build is byte-identical to the exported one
+PASS  imported program is byte-identical to the exported one
+PASS  two different programs give two different hashes
+PASS  match completed within the bench budget
+PASS  match ran clean: 
+PASS  best-of-3 ran 3 bouts
+PASS  match has a verdict: B (by damage)
+      record A 0 / B 0 / draw 3
+PASS  different seeds produce different bouts
+      bout 0 seed 11 -> Draw (Draw, Judges' decision — damage 121 vs 122 (0.1% margin level) · pieces 18/19 vs 18/19 · aggression 14% vs 14% · on its back 0% vs 0% — too close to call, scored a draw) 90.02s  dealt A 121.37 B 121.50
+PASS  bout 0 actually simulated (90.02s)
+PASS  bout 0 had contact (4 damage exchanges)
+      bout 0 dead air after the last hit: 86.28s of 90.02s
+PASS  bout 0 wrote a replay file
+      bout 1 seed 22 -> Draw (Draw, Judges' decision — damage 121 vs 122 (0.8% margin their way) · pieces 18/19 vs 18/19 · aggression 81% vs 85% · on its back 0% vs 0% — too close to call, scored a draw) 90.00s  dealt A 120.52 B 121.50
+PASS  bout 1 actually simulated (90.00s)
+PASS  bout 1 had contact (4 damage exchanges)
+      bout 1 dead air after the last hit: 84.85s of 90.00s
+PASS  bout 1 wrote a replay file
+      bout 2 seed 33 -> Draw (Draw, Judges' decision — damage 122 vs 121 (0.0% margin level) · pieces 18/19 vs 18/19 · aggression 15% vs 15% · on its back 0% vs 0% — too close to call, scored a draw) 90.15s  dealt A 121.50 B 121.49
+PASS  bout 2 actually simulated (90.15s)
+PASS  bout 2 had contact (4 damage exchanges)
+      bout 2 dead air after the last hit: 84.99s of 90.15s
+PASS  bout 2 wrote a replay file
+      replay size 390700 B for 90.02s
+PASS  replay reads back: ok
+PASS  replay header carries its seed
+PASS  replay carries side A's build verbatim
+PASS  replay names both sides' parts
+PASS  replay verdict matches the match result (Draw vs Draw)
+PASS  recording covers the bout at 10 Hz (901 samples, expected ~900.20)
+PASS  both sides are sampled on every frame
+PASS  every side-A frame is root + 7 floats per part
+PASS  replay decompresses
+PASS  side A's program does not appear in the replay
+PASS  side B's program does not appear in the replay
+PASS  no program structure leaks into the replay at all
+PASS  playback ran to the end
+PASS  playback clean: ok
+PASS  playback applied 900 frames, coverage 99.87% (band 95-105%)
+PASS  playback hid every part the recording says was destroyed (2/2)
+      playback events: 5, destroys 2
+PASS  the match handed the career object back untouched
+PASS  fightAutonomous is not left set
+PASS  timeScale is back to 1
+PASS  the builder is back on the build it started with
