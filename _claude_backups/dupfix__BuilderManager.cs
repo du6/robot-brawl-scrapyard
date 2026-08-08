@@ -5638,6 +5638,54 @@ public class BuilderManager : MonoBehaviour
         GUI.matrix = prevM;
     }
 
+    // ---- C6.5: mode banners. The dev sandbox and the Drafting Table both
+    // grant everything - the only thing separating them from the career, for
+    // a player, is KNOWING which one they are looking at. So say it, loudly,
+    // every frame, above both UI stacks (IMGUI draws over the touch canvas).
+    // bannerNow is the harness seam: "dev" / "draft" / "".
+    public static string bannerNow = "";
+    void ModeBanner()
+    {
+        bool dev = !Career.active;
+        bool draft = Career.active && Career.Drafting;
+        bannerNow = dev ? "dev" : draft ? "draft" : "";
+        if (!dev && !draft) return;
+        // OWEN 2026-08-02: "The draft banner overlaps with other text."
+        //
+        // It did, and it always would have. This is IMGUI drawn OVER a uGUI
+        // screen at a GUESSED fraction of screen height (0.075), so it knew
+        // nothing about where the touch UI's bars actually end - and the bar
+        // stack is variable: the message bar and the tip bar come and go. Any
+        // constant here is wrong for some combination of them.
+        //
+        // The floating overlay is not the right instrument on a screen that
+        // owns its own layout. When the touch UI is up it now prints the mode
+        // in its STATUS LINE instead (MobileBuilderUI, ModeTag) - present on
+        // every tab, and part of the layout, so it cannot overlap anything by
+        // construction. bannerNow is still set above, because it is the state
+        // seam CareerSmoke asserts on and that is independent of who draws it.
+        //
+        // Desktop keeps the banner: IMGUI is the whole UI there, and it has no
+        // status line to put this in.
+        if (MobileBuilderUI.Active) return;
+        var prevM = GUI.matrix;
+        var prevC = GUI.color;
+        float sc = GuiScale;   // R4 finding 3: one rule, one place
+        GUI.matrix = Matrix4x4.Scale(new Vector3(sc, sc, 1f));
+        float bw = dev ? 430f : 350f;
+        // Below the mobile stats bar, never behind it - R1 critic caught the
+        // banner rendering tiny under the onboarding hint text.
+        float by = MobileBuilderUI.Active ? Screen.height / sc * 0.075f : 4f;
+        var r = new Rect((Screen.width / sc - bw) * 0.5f, by, bw, 30f);
+        var bst = new GUIStyle(GUI.skin.box);
+        bst.fontSize = 15; bst.fontStyle = FontStyle.Bold;
+        GUI.color = dev ? new Color(1f, 0.35f, 0.3f, 0.95f) : new Color(1f, 0.8f, 0.25f, 0.95f);
+        GUI.Box(r, dev ? "DEV SANDBOX \u2014 nothing here touches your career"
+                       : "DRAFT \u2014 parts unlimited, can't enroll", bst);
+        GUI.color = prevC;
+        GUI.matrix = prevM;
+    }
+
     void OnGUI()
     {
         // Read LAST frame's hover and clear. Doing it here rather than at the

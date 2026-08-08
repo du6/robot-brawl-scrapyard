@@ -483,41 +483,6 @@ public class CareerSmoke : MonoBehaviour
         var descT = descGO != null ? descGO.GetComponentInChildren<Text>() : null;
         Check(descT != null && descT.preferredHeight <= descT.rectTransform.rect.height + 1f,
               "the description row is tall enough for its own text");
-        // ...and it must not be BLOATED either. The check above is
-        // one-sided, so it passed all through owen's 2026-08-08 report:
-        // on the FIRST open a description row had never been laid out,
-        // measured its wrap at the default 100-wide rect and latched a
-        // 142-unit height for a 14-unit line. House rule (CriticLoop6):
-        // where a quality is measurable, measure it over EVERYTHING.
-        // Every part below is a genuine first open.
-        var bloated = new List<string>();
-        for (int pi = 1; pi < bm.PaletteCount; pi++)
-        {
-            if (GameObject.Find("shopdesc_" + pi) != null)
-            { TapNamed("shophead_" + pi); yield return null; }
-            if (!TapNamed("shophead_" + pi)) continue;
-            yield return null; yield return null;
-            var dgo = GameObject.Find("shopdesc_" + pi);
-            if (dgo == null) continue;
-            var dtx = dgo.GetComponentInChildren<Text>();
-            var drc = (RectTransform)dgo.transform;
-            if (dtx == null) continue;
-            float need = Mathf.Max(34f, dtx.preferredHeight + 8f);
-            if (Mathf.Abs(drc.rect.height - need) > 2f)
-                bloated.Add(bm.PartLabel(pi) + " row=" + drc.rect.height.ToString("F0") + " needs=" + need.ToString("F0"));
-            TapNamed("shophead_" + pi);
-            yield return null;
-        }
-        Check(bloated.Count == 0, "every SHOP description row is sized for its own text on the FIRST open" + (bloated.Count == 0 ? "" : " - " + string.Join("; ", bloated.ToArray())));
-        // The sweep above closed every part behind it. The checks that
-        // follow read the beam's MATERIAL rows, which only exist while
-        // that part is open - so put the accordion back the way this
-        // block found it before handing over.
-        if (GameObject.Find("shopdesc_" + bm.PaletteIndexOf("beam")) == null)
-        {
-            TapNamed("shophead_" + bm.PaletteIndexOf("beam"));
-            yield return null; yield return null;
-        }
 
         var beamRow = GameObject.Find("shopmat_" + bm.PaletteIndexOf("beam") + "_Aluminum");
         string rowTxt = beamRow != null ? beamRow.GetComponentInChildren<Text>().text : "";

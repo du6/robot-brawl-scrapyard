@@ -636,6 +636,7 @@ public class MobileBuilderUI : MonoBehaviour
             string k = key;
             var mb = MkButton("mat_"+k, matRow.transform, MatDB.Get(k).name, 15, () => PickMat(k));
             matButtons.Add(mb); matKeys.Add(k);
+            matSwatches.Add(AddSwatch(mb));
         }
         matSheet.SetActive(false);
         // action row (bottom)
@@ -1147,6 +1148,14 @@ public class MobileBuilderUI : MonoBehaviour
                       : new Color(0.10f,0.10f,0.12f,0.96f);
             var t = matButtons[i].GetComponentInChildren<Text>();
             if (t != null) t.color = unlocked ? Color.white : new Color(0.55f,0.55f,0.6f,1f);
+            if (i < matSwatches.Count && matSwatches[i] != null)
+            {
+                var ac = MatDB.Get(matKeys[i]).auditColor;
+                // A locked material keeps its hue but loses its punch, so the
+                // colour still teaches the mapping while the chip still reads
+                // as unavailable.
+                matSwatches[i].color = unlocked ? ac : new Color(ac.r, ac.g, ac.b, 0.35f);
+            }
         }
         // The chooser has to READ as a chooser: a button labelled "MATERIAL"
         // next to ROTATE and UNDO looks like another verb. Naming the current

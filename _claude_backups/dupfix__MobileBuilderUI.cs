@@ -636,6 +636,7 @@ public class MobileBuilderUI : MonoBehaviour
             string k = key;
             var mb = MkButton("mat_"+k, matRow.transform, MatDB.Get(k).name, 15, () => PickMat(k));
             matButtons.Add(mb); matKeys.Add(k);
+            matSwatches.Add(AddSwatch(mb));
         }
         matSheet.SetActive(false);
         // action row (bottom)
@@ -1147,6 +1148,44 @@ public class MobileBuilderUI : MonoBehaviour
                       : new Color(0.10f,0.10f,0.12f,0.96f);
             var t = matButtons[i].GetComponentInChildren<Text>();
             if (t != null) t.color = unlocked ? Color.white : new Color(0.55f,0.55f,0.6f,1f);
+            if (i < matSwatches.Count && matSwatches[i] != null)
+            {
+                var ac = MatDB.Get(matKeys[i]).auditColor;
+                // A locked material keeps its hue but loses its punch, so the
+                // colour still teaches the mapping while the chip still reads
+                // as unavailable.
+                matSwatches[i].color = unlocked ? ac : new Color(ac.r, ac.g, ac.b, 0.35f);
+            }
+        }
+        // The chooser has to READ as a chooser: a button labelled "MATERIAL"
+        // next to ROTATE and UNDO looks like another verb. Naming the current
+        // material is also the only place that state is now visible at all,
+        // since the chips it used to live on are behind the sheet.
+        //
+        // OWEN 2026-08-04: "should we add some indicator to the aluminum button
+        // to tell users that this can be expanded to a list of materials?"
+        //
+        // Yes - and the first version was worse than missing an affordance. It
+        // swapped the label to "CLOSE" when open, so the one place the selected
+        // material was visible went blank at the exact moment you were changing
+        // it, and the button stopped being a readout at all for as long as it
+        // mattered. The NAME now stays put in both states and only the caret
+        // moves, which is the part that should carry the state.
+        //
+        // The caret points UP because the sheet opens upward, over the palette.
+        // A disclosure arrow that points the wrong way is worse than none: it
+        // is a promise about where to look.
+        if (matBtn != null)
+        {
+            var bt = matBtn.GetComponentInChildren<Text>();
+            if (bt != null)
+                bt.text = MatDB.Get(cur).name.ToUpper()
+                        + (MatSheetOpen ? "  \u25be" : "  \u25b4");
+            if (matBtnSwatch != null) matBtnSwatch.color = MatDB.Get(cur).auditColor;
+            var bi = matBtn.GetComponent<Image>();
+            if (bi != null)
+                bi.color = MatSheetOpen ? new Color(0.20f,0.45f,0.65f,1f)
+                                        : new Color(0.16f,0.18f,0.22f,0.96f);
         }
         // The chooser has to READ as a chooser: a button labelled "MATERIAL"
         // next to ROTATE and UNDO looks like another verb. Naming the current

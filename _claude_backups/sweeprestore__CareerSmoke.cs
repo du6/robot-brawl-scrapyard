@@ -509,15 +509,6 @@ public class CareerSmoke : MonoBehaviour
             yield return null;
         }
         Check(bloated.Count == 0, "every SHOP description row is sized for its own text on the FIRST open" + (bloated.Count == 0 ? "" : " - " + string.Join("; ", bloated.ToArray())));
-        // The sweep above closed every part behind it. The checks that
-        // follow read the beam's MATERIAL rows, which only exist while
-        // that part is open - so put the accordion back the way this
-        // block found it before handing over.
-        if (GameObject.Find("shopdesc_" + bm.PaletteIndexOf("beam")) == null)
-        {
-            TapNamed("shophead_" + bm.PaletteIndexOf("beam"));
-            yield return null; yield return null;
-        }
 
         var beamRow = GameObject.Find("shopmat_" + bm.PaletteIndexOf("beam") + "_Aluminum");
         string rowTxt = beamRow != null ? beamRow.GetComponentInChildren<Text>().text : "";

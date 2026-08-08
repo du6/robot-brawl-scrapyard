@@ -636,6 +636,7 @@ public class MobileBuilderUI : MonoBehaviour
             string k = key;
             var mb = MkButton("mat_"+k, matRow.transform, MatDB.Get(k).name, 15, () => PickMat(k));
             matButtons.Add(mb); matKeys.Add(k);
+            matSwatches.Add(AddSwatch(mb));
         }
         matSheet.SetActive(false);
         // action row (bottom)
@@ -1147,6 +1148,44 @@ public class MobileBuilderUI : MonoBehaviour
                       : new Color(0.10f,0.10f,0.12f,0.96f);
             var t = matButtons[i].GetComponentInChildren<Text>();
             if (t != null) t.color = unlocked ? Color.white : new Color(0.55f,0.55f,0.6f,1f);
+            if (i < matSwatches.Count && matSwatches[i] != null)
+            {
+                var ac = MatDB.Get(matKeys[i]).auditColor;
+                // A locked material keeps its hue but loses its punch, so the
+                // colour still teaches the mapping while the chip still reads
+                // as unavailable.
+                matSwatches[i].color = unlocked ? ac : new Color(ac.r, ac.g, ac.b, 0.35f);
+            }
+        }
+        // The chooser has to READ as a chooser: a button labelled "MATERIAL"
+        // next to ROTATE and UNDO looks like another verb. Naming the current
+        // material is also the only place that state is now visible at all,
+        // since the chips it used to live on are behind the sheet.
+        //
+        // OWEN 2026-08-04: "should we add some indicator to the aluminum button
+        // to tell users that this can be expanded to a list of materials?"
+        //
+        // Yes - and the first version was worse than missing an affordance. It
+        // swapped the label to "CLOSE" when open, so the one place the selected
+        // material was visible went blank at the exact moment you were changing
+        // it, and the button stopped being a readout at all for as long as it
+        // mattered. The NAME now stays put in both states and only the caret
+        // moves, which is the part that should carry the state.
+        //
+        // The caret points UP because the sheet opens upward, over the palette.
+        // A disclosure arrow that points the wrong way is worse than none: it
+        // is a promise about where to look.
+        if (matBtn != null)
+        {
+            var bt = matBtn.GetComponentInChildren<Text>();
+            if (bt != null)
+                bt.text = MatDB.Get(cur).name.ToUpper()
+                        + (MatSheetOpen ? "  \u25be" : "  \u25b4");
+            if (matBtnSwatch != null) matBtnSwatch.color = MatDB.Get(cur).auditColor;
+            var bi = matBtn.GetComponent<Image>();
+            if (bi != null)
+                bi.color = MatSheetOpen ? new Color(0.20f,0.45f,0.65f,1f)
+                                        : new Color(0.16f,0.18f,0.22f,0.96f);
         }
         // The chooser has to READ as a chooser: a button labelled "MATERIAL"
         // next to ROTATE and UNDO looks like another verb. Naming the current
@@ -2219,27 +2258,6 @@ public class MobileBuilderUI : MonoBehaviour
                 if (pr.open)
                 {
                     pr.descT.text = bm.PartDesc(i);
-                    // owen, 2026-08-08: "the first time I expand an item the
-                    // description bar looks too tall; after I close it and expand
-                    // it again the bar size looks normal."
-                    //
-                    // Text.preferredHeight measures the WRAP at the rect's CURRENT
-                    // width. A row that has never been open has never been through
-                    // a layout pass, so it is still at Unity's default 100x100 and
-                    // its label is 74 units wide: the 87-character beam blurb
-                    // measured 134.7 there instead of 14.6, and the row latched
-                    // 142.7 instead of 34.0. Nothing re-measured it, because this
-                    // refresh only runs on a toggle - so the wrong height survived
-                    // until the row was closed and opened again at the real width.
-                    //
-                    // Borrow the width from the HEADER row: it is a sibling in the
-                    // same childForceExpandWidth group, so it always already
-                    // carries the width this row is about to be given. Measured:
-                    // 74 -> 1044.8 wide, preferredHeight 134.7 -> 14.6, row 34.0.
-                    var drt = (RectTransform)pr.desc.transform;
-                    var hrt = (RectTransform)pr.go.transform;
-                    if (hrt.rect.width > 1f && Mathf.Abs(drt.rect.width - hrt.rect.width) > 1f)
-                        drt.SetSizeWithCurrentAnchors(RectTransform.Axis.Horizontal, hrt.rect.width);
                     // Height from the wrapped text, so a long description gets
                     // the room it needs instead of being silently truncated -
                     // the failure mode C19 caught on the palette tiles.
