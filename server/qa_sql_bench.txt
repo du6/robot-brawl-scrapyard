@@ -1,0 +1,56 @@
+== resetting fixtures ==
+      users d9aa49e0-548e-49e0-9478-3c8de6082290 / 7ed89722-37d5-446f-b259-5b815fe73863 ; robots 3b85b4e3-78bb-45b9-b02a-fa775ee664c4 / 98bd09e8-0e19-492f-aca8-879b6c23d556
+
+== A. identity and snapshots ==
+PASS  case-insensitive email is unique (OWEN@example.com is Owen) (ERROR:  duplicate key value violates unique constraint "users_email_lowe)
+PASS  sha256 must be 64 hex chars (ERROR:  new row for relation "snapshots" violates check constraint "snap)
+PASS  a robot cannot have two ACTIVE snapshots (ERROR:  duplicate key value violates unique constraint "snapshots_one_ac)
+PASS  …but it can have any number of superseded ones
+PASS  an unknown category is refused (ERROR:  new row for relation "snapshots" violates check constraint "snap)
+
+== B. the ledger is append-only, in the database ==
+PASS  UPDATE on the ledger is refused (ERROR:  ledger is append-only (attempted UPDATE))
+PASS  DELETE on the ledger is refused (ERROR:  ledger is append-only (attempted DELETE))
+PASS  a zero-delta row is meaningless and refused (ERROR:  new row for relation "ledger" violates check constraint "ledger_)
+PASS  DEPOSIT_TO_CAREER cannot be POSITIVE — the valve is one-way (§2.3) (ERROR:  new row for relation "ledger" violates check constraint "ledger_)
+PASS  …the same reason as a withdrawal is fine
+PASS  a replayed deposit is refused by the idempotency key (ERROR:  duplicate key value violates unique constraint "ledger_idem_key")
+PASS  balance is SUM(delta): 500 signing - 200 deposit = 300 (read 300)
+PASS  an unknown ledger reason is refused (ERROR:  new row for relation "ledger" violates check constraint "ledger_)
+
+== C. matches and job shape ==
+PASS  a snapshot cannot fight itself (ERROR:  new row for relation "matches" violates check constraint "matche)
+PASS  a FIGHT job carrying a snapshot_id is not representable (ERROR:  new row for relation "match_jobs" violates check constraint "mat)
+PASS  a VALIDATE job carrying a match_id is not representable (ERROR:  new row for relation "match_jobs" violates check constraint "mat)
+PASS  a well-formed FIGHT job inserts
+PASS  …and a second live job for the same match is refused (ERROR:  duplicate key value violates unique constraint "match_jobs_one_l)
+
+== D. SKIP LOCKED under real contention ==
+      job ids claimed: 5 6 7 8 
+PASS  4 concurrent workers each claimed a job
+PASS  no job was claimed twice (4 distinct of 4)
+PASS  queue drained to 0 READY
+PASS  claiming burns exactly one attempt (read 1)
+PASS  a worker finding an empty queue returns nothing and does not block
+
+== E. ownership: a worker only touches its own job ==
+PASS  worker-9 cannot heartbeat worker-1's job (0 rows)
+PASS  worker-9 cannot complete worker-1's job (0 rows)
+PASS  worker-1 can heartbeat its own job
+
+== F. visibility timeout and retry exhaustion ==
+PASS  4 stale jobs returned to READY (attempt 1 of 3)
+PASS  after 3 attempts the jobs FAIL rather than retry forever
+      last_error: heartbeat timeout after 3 attempt(s)
+PASS  nothing is left live after exhaustion
+PASS  a FAILED job does not block re-queueing its match
+
+== G. escrow is one transaction (§5.3 step 1) ==
+PASS  an illegal match rolls the stake back with it (balance stayed 300)
+
+== H. validate-result's statement order (§1.2) ==
+PASS  activate-then-supersede is refused mid-transaction (ERROR:  duplicate key value violates unique constrai)
+PASS  supersede-then-activate leaves exactly one ACTIVE, and it is the new one
+PASS  a REJECTED upload leaves the incumbent ACTIVE (1 active, unchanged)
+
+===== passed 34  failed 0 =====
