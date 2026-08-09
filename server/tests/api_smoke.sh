@@ -402,6 +402,180 @@ else
   esac
 fi
 
+echo
+echo "== K. the fight lifecycle, walked end to end (§5.3) =="
+# 2026-08-09. §5.2's warning, taken literally: api_smoke sat at 37/37 green
+# while the claim response was unusable, because every endpoint answered
+# correctly in isolation and no consumer had ever COMPLETED a job. So this
+# section does not test endpoints - it walks the loop, and every assertion
+# is about state the previous step left behind.
+#
+# challenge -> claim -> upload replay -> post result -> settle -> job DONE
+if [ -z "${ROBOT:-}" ] || [ -z "${AUTH:-}" ] || ! command -v psql >/dev/null 2>&1; then
+  skip "the fight lifecycle (14 checks)" "needs a robot, a token and psql"
+else
+  CHSNAP=$(dbq "SELECT id FROM snapshots WHERE robot_id='$ROBOT' AND status='ACTIVE';")
+  CHCAT=$(dbq "SELECT category FROM snapshots WHERE robot_id='$ROBOT' AND status='ACTIVE';")
+
+  # A defender must belong to SOMEONE ELSE, so the section makes its own
+  # account rather than borrowing one - a challenge against your own robot is
+  # a different test (below).
+  DEMAIL="def-$STAMP@example.com"
+  S=$(req POST /v1/auth/register "{\"email\":\"$DEMAIL\",\"password\":\"$PW\",\"displayName\":\"Defender\"}")
+  DTOK=$(jget token); DUSER=$(jget userId)
+  if [ -z "$DTOK" ] || [ -z "$CHSNAP" ]; then
+    skip "the fight lifecycle (14 checks)" "no defender token (HTTP $S) or no ACTIVE challenger snapshot"
+  else
+    DAUTH="Authorization: Bearer $DTOK"
+    req POST /v1/robots '{"name":"Defiant"}' "$DAUTH" >/dev/null; DROBOT=$(jget id)
+    req POST /v1/snapshots "$(body_upload "$DROBOT" "$(envelope Defiant)")" "$DAUTH" >/dev/null
+    DSNAP=$(jget id)
+    req POST /v1/worker/jobs/claim '{"workerId":"smoke-fight"}' "X-Worker-Key: $WKEY" >/dev/null
+    DJOB=$(jget id)
+    # Same category as the challenger => gap 0, so the arithmetic below is the
+    # base case and a wrong gap shows up as a wrong stake rather than hiding.
+    req POST "/v1/worker/jobs/$DJOB/validate-result" \
+      "{\"snapshotId\":\"$DSNAP\",\"workerId\":\"smoke-fight\",\"legal\":true,\"massKg\":10,\"aabbX\":0.4,\"aabbY\":0.3,\"aabbZ\":0.5,\"category\":\"$CHCAT\",\"partsManifest\":[\"chassis_a\"],\"programHash\":\"\",\"failReasons\":[]}" \
+      "X-Worker-Key: $WKEY" >/dev/null
+    is "a defender snapshot is ACTIVE and ready to be challenged" \
+       "$(dbq "SELECT status FROM snapshots WHERE id='$DSNAP';")" ACTIVE
+
+    BAL0=$(dbq "SELECT COALESCE(SUM(delta),0) FROM ledger WHERE user_id='$USERID';")
+
+    # --- step 1: the challenge -------------------------------------------
+    S=$(req POST /v1/challenges "{\"challengerSnapshotId\":\"$CHSNAP\",\"defenderSnapshotId\":\"$DSNAP\"}" "$AUTH")
+    expect "a challenge is accepted" "$S" 200
+    MATCH=$(jget matchId); STAKE=$(jget stake)
+    is "…priced at the base stake for a same-category fight" "$STAKE" 50
+    is "…and the match is QUEUED" "$(jget status)" QUEUED
+
+    if [ -z "$MATCH" ]; then
+      skip "the rest of the lifecycle (9 checks)" "the challenge returned no matchId"
+    else
+      # The escrow debit and the match row are one transaction. Checking the
+      # balance moved is what proves the debit happened at all - the endpoint
+      # would answer 200 either way.
+      BAL1=$(dbq "SELECT COALESCE(SUM(delta),0) FROM ledger WHERE user_id='$USERID';")
+      is "…and the stake left the wallet into escrow" "$BAL1" "$((BAL0 - 50))"
+      is "…recorded as a STAKE row against this match" \
+         "$(dbq "SELECT reason FROM ledger WHERE match_id='$MATCH' AND user_id='$USERID';")" STAKE
+
+      # --- step 2: the worker claims the FIGHT job ------------------------
+      S=$(req POST /v1/worker/jobs/claim '{"workerId":"smoke-fight"}' "X-Worker-Key: $WKEY")
+      FJOB=$(jget id)
+      is "a worker claims the FIGHT job the challenge enqueued" "$(jget kind)" FIGHT
+      # The lesson from the VALIDATE contract: a claim that does not resolve to
+      # bytes cannot be worked, and the suite was green while that was true.
+      CU=$(jget challengerUrl); DU=$(jget defenderUrl)
+      if [ -n "$CU" ] && [ -n "$DU" ]; then
+        ok "…carrying BOTH robots' payload locations, so the fight can be run"
+      else
+        no "a claimed FIGHT job is missing a payload url (challenger '$CU', defender '$DU') — unworkable"
+      fi
+
+      # --- step 3: upload the replay -------------------------------------
+      S=$(req POST "/v1/worker/matches/$MATCH/replay" '{"replay":"{\"bouts\":3,\"recording\":\"opaque\"}"}' "X-Worker-Key: $WKEY")
+      expect "the worker uploads a replay" "$S" 200
+      RURL=$(jget url)
+
+      # --- step 4: post the result ---------------------------------------
+      if [ -z "$FJOB" ] || [ -z "$RURL" ]; then
+        skip "fight-result and settlement (6 checks)" "no fight job or replay url"
+      else
+        S=$(req POST "/v1/worker/jobs/$FJOB/fight-result" \
+            "{\"matchId\":\"$MATCH\",\"workerId\":\"smoke-fight\",\"verdict\":\"CHALLENGER\",\"replayUrls\":[\"$RURL\"],\"bouts\":[\"C\",\"D\",\"C\"]}" \
+            "X-Worker-Key: $WKEY")
+        expect "the worker posts the verdict" "$S" 200
+        is "…the match is COMPLETE" "$(dbq "SELECT status FROM matches WHERE id='$MATCH';")" COMPLETE
+        is "…with the verdict recorded" "$(dbq "SELECT verdict FROM matches WHERE id='$MATCH';")" CHALLENGER
+        is "…and the replay attached" \
+           "$(dbq "SELECT CASE WHEN array_length(replay_urls,1) >= 1 THEN 'yes' ELSE 'no' END FROM matches WHERE id='$MATCH';")" yes
+        # Scrap must be conserved: the stake came back and the purse was paid.
+        is "…the winner's wallet is stake-refunded and paid the purse" \
+           "$(dbq "SELECT COALESCE(SUM(delta),0) FROM ledger WHERE user_id='$USERID';")" "$((BAL0 + 100))"
+        is "…and the FIGHT job is retired, not left to spin" \
+           "$(dbq "SELECT status FROM match_jobs WHERE id=$FJOB;")" DONE
+
+        # Settling twice mints scrap from nothing. The job is no longer
+        # CLAIMED, so ownership refuses it before the money moves.
+        S=$(req POST "/v1/worker/jobs/$FJOB/fight-result" \
+            "{\"matchId\":\"$MATCH\",\"workerId\":\"smoke-fight\",\"verdict\":\"CHALLENGER\",\"replayUrls\":[\"$RURL\"],\"bouts\":[]}" \
+            "X-Worker-Key: $WKEY")
+        expect "the same result cannot be settled twice" "$S" 409
+        is "…and the wallet did not move on the second attempt" \
+           "$(dbq "SELECT COALESCE(SUM(delta),0) FROM ledger WHERE user_id='$USERID';")" "$((BAL0 + 100))"
+      fi
+    fi
+
+    S=$(req POST /v1/challenges "{\"challengerSnapshotId\":\"$CHSNAP\",\"defenderSnapshotId\":\"$CHSNAP\"}" "$AUTH")
+    expect "a robot cannot challenge itself" "$S" 400
+
+    # ---- gap pricing, the squared purse, and punching down --------------
+    # Everything above ran at gap 0, where 50*(1+gap) and 100*(1+0.5*gap)^2
+    # both collapse to their base. A swept variable producing no variance has
+    # usually not been swept: at gap 0 a wrong formula is indistinguishable
+    # from a right one. So this block fights the heaviest class there is.
+    cat_idx() { case "$1" in FEATHER) echo 0;; LIGHT) echo 1;; MIDDLE) echo 2;; HEAVY) echo 3;; SUPER) echo 4;; *) echo -1;; esac; }
+    GAP=$(( $(cat_idx SUPER) - $(cat_idx "$CHCAT") ))
+    WANT_STAKE=$(( 50 * (1 + GAP) ))
+    # (1 + 0.5*gap)^2 in integer arithmetic: 100*(2+gap)^2/4
+    WANT_PURSE=$(( 100 * (2 + GAP) * (2 + GAP) / 4 ))
+
+    req POST /v1/robots '{"name":"Colossus"}' "$DAUTH" >/dev/null; HROBOT=$(jget id)
+    req POST /v1/snapshots "$(body_upload "$HROBOT" "$(envelope Colossus)")" "$DAUTH" >/dev/null
+    HSNAP=$(jget id)
+    req POST /v1/worker/jobs/claim '{"workerId":"smoke-fight"}' "X-Worker-Key: $WKEY" >/dev/null
+    HJOB=$(jget id)
+    req POST "/v1/worker/jobs/$HJOB/validate-result" \
+      "{\"snapshotId\":\"$HSNAP\",\"workerId\":\"smoke-fight\",\"legal\":true,\"massKg\":1400,\"aabbX\":2,\"aabbY\":2,\"aabbZ\":2,\"category\":\"SUPER\",\"partsManifest\":[\"chassis_a\"],\"programHash\":\"\",\"failReasons\":[]}" \
+      "X-Worker-Key: $WKEY" >/dev/null
+
+    if [ "$GAP" -le 0 ] || [ "$(dbq "SELECT status FROM snapshots WHERE id='$HSNAP';")" != "ACTIVE" ]; then
+      skip "gap pricing and the squared purse (5 checks)" "no SUPER defender, or the challenger is already SUPER (gap $GAP)"
+    else
+      BAL2=$(dbq "SELECT COALESCE(SUM(delta),0) FROM ledger WHERE user_id='$USERID';")
+      S=$(req POST /v1/challenges "{\"challengerSnapshotId\":\"$CHSNAP\",\"defenderSnapshotId\":\"$HSNAP\"}" "$AUTH")
+      expect "a $CHCAT may punch up to a SUPER" "$S" 200
+      is "…at a gap of $GAP" "$(jget gap)" "$GAP"
+      is "…staking 50 x (1 + gap)" "$(jget stake)" "$WANT_STAKE"
+      BIGMATCH=$(jget matchId)
+      req POST /v1/worker/jobs/claim '{"workerId":"smoke-fight"}' "X-Worker-Key: $WKEY" >/dev/null
+      BIGJOB=$(jget id)
+      req POST "/v1/worker/jobs/$BIGJOB/fight-result" \
+        "{\"matchId\":\"$BIGMATCH\",\"workerId\":\"smoke-fight\",\"verdict\":\"CHALLENGER\",\"replayUrls\":[\"file:///dev/null\"],\"bouts\":[]}" \
+        "X-Worker-Key: $WKEY" >/dev/null
+      # Won it: stake back plus a purse that grows with the SQUARE of the gap.
+      is "…and winning pays 100 x (1 + 0.5 x gap)^2 = $WANT_PURSE" \
+         "$(dbq "SELECT COALESCE(SUM(delta),0) FROM ledger WHERE user_id='$USERID';")" "$((BAL2 + WANT_PURSE))"
+      # §1.2, the rule that actually protects the ladder.
+      S=$(req POST /v1/challenges "{\"challengerSnapshotId\":\"$HSNAP\",\"defenderSnapshotId\":\"$CHSNAP\"}" "$DAUTH")
+      expect "a SUPER cannot punch DOWN to a $CHCAT" "$S" 400
+    fi
+
+    # ---- the defender-wins branch ---------------------------------------
+    # Untested above: every settlement so far went to the challenger, so the
+    # DEFENSE purse and the stake-forfeit path had never run.
+    DBAL0=$(dbq "SELECT COALESCE(SUM(delta),0) FROM ledger WHERE user_id='$DUSER';")
+    CBAL0=$(dbq "SELECT COALESCE(SUM(delta),0) FROM ledger WHERE user_id='$USERID';")
+    S=$(req POST /v1/challenges "{\"challengerSnapshotId\":\"$CHSNAP\",\"defenderSnapshotId\":\"$DSNAP\"}" "$AUTH")
+    LOSTMATCH=$(jget matchId)
+    if [ "$S" != "200" ] || [ -z "$LOSTMATCH" ]; then
+      skip "the defender-wins branch (3 checks)" "second challenge did not open (HTTP $S)"
+    else
+      req POST /v1/worker/jobs/claim '{"workerId":"smoke-fight"}' "X-Worker-Key: $WKEY" >/dev/null
+      LJOB=$(jget id)
+      S=$(req POST "/v1/worker/jobs/$LJOB/fight-result" \
+          "{\"matchId\":\"$LOSTMATCH\",\"workerId\":\"smoke-fight\",\"verdict\":\"DEFENDER\",\"replayUrls\":[\"file:///dev/null\"],\"bouts\":[]}" \
+          "X-Worker-Key: $WKEY")
+      expect "a defender win settles" "$S" 200
+      is "…paying the defender the flat 40-scrap defense purse" \
+         "$(dbq "SELECT COALESCE(SUM(delta),0) FROM ledger WHERE user_id='$DUSER';")" "$((DBAL0 + 40))"
+      is "…and the challenger's stake is forfeit, not refunded" \
+         "$(dbq "SELECT COALESCE(SUM(delta),0) FROM ledger WHERE user_id='$USERID';")" "$((CBAL0 - 50))"
+    fi
+  fi
+fi
+
 rm -f "$BODY" "$VRC_SNAP_FILE" "$VRC_JOB_FILE"
 echo
 echo "===== passed $pass  failed $fail  skipped $skipped ====="

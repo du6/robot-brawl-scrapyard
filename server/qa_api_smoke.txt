@@ -15,7 +15,7 @@ PASS  a wrong password and an unknown account are indistinguishable (both 401)
 
 == D. robots ==
 PASS  a robot is created
-      robot 093bf50c-5fc4-4876-a373-70a3de4dfd5d
+      robot 32c4b81b-2c8d-48e7-9a2e-92ee98248c96
 PASS  …but not without a token
 
 == E. snapshot upload stays opaque (§5.2) ==
@@ -30,7 +30,7 @@ PASS  …and a wrong key is refused too
 PASS  a keyed worker claims a job
 PASS  …and the job is the VALIDATE the upload enqueued
 PASS  …pointing at the snapshot just uploaded
-PASS  …and carries a payload location the worker can resolve (file:///tmp/rb-blobs/snapshots/093bf50c-5fc4-4876-a373-70a3de4dfd5d/4e6639996b584c92b8e4805829fefa71.json)
+PASS  …and carries a payload location the worker can resolve (file:///tmp/rb-blobs/snapshots/32c4b81b-2c8d-48e7-9a2e-92ee98248c96/c4608022300844589fa7854ad0fef8f7.json)
 PASS  …and the payload sha256 rides along, so the worker can verify storage
 PASS  another worker cannot heartbeat a job it does not hold
 PASS  …the holder can
@@ -67,4 +67,32 @@ PASS  …carrying a last_error a human can act on
 PASS  an unknown category name is refused cleanly (HTTP 400)
 PASS  a legal robot with no category is refused (HTTP 400)
 
-===== passed 48  failed 0  skipped 0 =====
+== K. the fight lifecycle, walked end to end (§5.3) ==
+PASS  a defender snapshot is ACTIVE and ready to be challenged
+PASS  a challenge is accepted
+PASS  …priced at the base stake for a same-category fight
+PASS  …and the match is QUEUED
+PASS  …and the stake left the wallet into escrow
+PASS  …recorded as a STAKE row against this match
+PASS  a worker claims the FIGHT job the challenge enqueued
+PASS  …carrying BOTH robots' payload locations, so the fight can be run
+PASS  the worker uploads a replay
+PASS  the worker posts the verdict
+PASS  …the match is COMPLETE
+PASS  …with the verdict recorded
+PASS  …and the replay attached
+PASS  …the winner's wallet is stake-refunded and paid the purse
+PASS  …and the FIGHT job is retired, not left to spin
+PASS  the same result cannot be settled twice
+PASS  …and the wallet did not move on the second attempt
+PASS  a robot cannot challenge itself
+PASS  a FEATHER may punch up to a SUPER
+PASS  …at a gap of 4
+PASS  …staking 50 x (1 + gap)
+PASS  …and winning pays 100 x (1 + 0.5 x gap)^2 = 900
+PASS  a SUPER cannot punch DOWN to a FEATHER
+PASS  a defender win settles
+PASS  …paying the defender the flat 40-scrap defense purse
+PASS  …and the challenger's stake is forfeit, not refunded
+
+===== passed 74  failed 0  skipped 0 =====

@@ -242,7 +242,32 @@ Both need: a clean 400 with a readable reason, and **the job marked failed
 rather than left to spin.** The three failing `api_smoke` checks become
 green and are the acceptance.
 
-### 5.2 — The FIGHT half of the server contract
+### 5.2 — ✅ DONE 2026-08-09: the FIGHT half of the server contract
+
+**Built and benched.** `POST /v1/challenges`,
+`POST /v1/worker/matches/{id}/replay`, `POST /v1/worker/jobs/{id}/fight-result`,
+plus migration `002_ladder_config.sql` for §2.3's tunable constants.
+
+`sql_bench` **34 → 45**, `api_smoke` **48 → 74**, 0 failures, 0 skips, server
+log 0 errors. Section K walks the whole loop — challenge → claim → replay
+upload → verdict → settle → job DONE — and section I finally covers
+`fail_job.sql`, which shipped earlier today without any.
+
+Record: `docs/Fight_Contract_2026-08-09.md`.
+
+⚠ **M1 is still NOT reachable, and the reason is not the server.** No worker
+implements FIGHT: `ValidateWorkerLoop` handles VALIDATE only, so nothing
+claims a FIGHT job and runs `MatchRunner` over the two payloads. In the
+bench the "worker" is `api_smoke` posting a verdict it invented. M1's accept
+clause — upload two robots, trigger a match, watch the replay in-client —
+needs the client-side fight loop next.
+
+Deferred to M2 on purpose, none of it in §5.2's requirement list: Glicko-2
+rating deltas (fights settle money but move nobody on the ladder), defender
+taper, tickets (challenge frequency is unbounded), `first_blood_bonus`, and
+§5.5's per-job nonce.
+
+The original statement of the problem follows.
 
 Does not exist: no match-create, no match-result, no replay upload. §5.3 of
 `docs/Multiplayer_V3_Design_Doc.md` specifies the four-step lifecycle in

@@ -1,5 +1,5 @@
 == resetting fixtures ==
-      users be32832a-5bac-470a-b3b3-82e2d2d6b1cd / 5bd93293-4d94-4a95-887e-dcd338b2e39d ; robots c3d7be26-4e2a-4cef-9db7-69b3fe063d3c / fd02151b-a5fa-43e9-a4df-7b5889454a2f
+      users 6b217cd7-ad57-41bd-a576-568ed92cee2f / 0a310714-5e4c-4d73-a07b-6087695c0aef ; robots c52b2230-59f3-4226-8dd3-1342748cd8b4 / ef259dbd-14a7-4010-b733-bc0a1c321a78
 
 == A. identity and snapshots ==
 PASS  case-insensitive email is unique (OWEN@example.com is Owen) (ERROR:  duplicate key value violates unique constraint "users_email_lowe)
@@ -53,4 +53,19 @@ PASS  activate-then-supersede is refused mid-transaction (ERROR:  duplicate key 
 PASS  supersede-then-activate leaves exactly one ACTIVE, and it is the new one
 PASS  a REJECTED upload leaves the incumbent ACTIVE (1 active, unchanged)
 
-===== passed 34  failed 0 =====
+== I. fail_job retires a job that cannot succeed (§5.1) ==
+PASS  worker-9 cannot fail worker-1's job (0 rows)
+PASS  the holding worker can fail its own job
+PASS  …leaving it FAILED, not READY (a retry would fail identically)
+PASS  …with the claim cleared, satisfying match_jobs_claim
+PASS  …and a last_error a human can triage (category was the empty string)
+PASS  …and no worker can claim a FAILED job (the livelock is closed)
+
+== J. ladder_config, the tunable constants (§2.3) ==
+PASS  ladder_config carries stake_base (50)
+PASS  ladder_config carries win_purse_base (100)
+PASS  ladder_config carries defense_purse (40)
+PASS  ladder_config carries first_blood_bonus (50)
+PASS  a config key cannot be duplicated (ERROR:  duplicate key value violates unique constraint "ladder_config_pk)
+
+===== passed 45  failed 0 =====

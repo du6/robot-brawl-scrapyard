@@ -241,5 +241,57 @@ else
 fi
 
 echo
+echo "== I. fail_job retires a job that cannot succeed (§5.1) =="
+# 2026-08-09. fail_job.sql shipped with the validate-result livelock fix and
+# this bench is the ONLY cover for RobotBrawl.Api/Sql/*.sql — it was added
+# without cover, which is the gap this section closes.
+#
+# The distinction that matters: reap_stale_jobs returns a timed-out job to
+# READY because the worker may have died mid-flight and a retry may work.
+# fail_job goes to FAILED because the PAYLOAD is deterministic — returning it
+# to the queue is the livelock, not the cure.
+q "DELETE FROM match_jobs;" >/dev/null
+FJ=$(q "INSERT INTO match_jobs (kind,snapshot_id,status,claimed_by,claimed_at,heartbeat_at)
+        VALUES ('VALIDATE','$S1','CLAIMED','worker-1',now(),now()) RETURNING id;")
+mk_runner "$API_SQL/fail_job.sql" /tmp/fail_run.sql "EXECUTE st(:jid, :'worker', :'reason');"
+
+R=$("${PSQL[@]}" -v jid="$FJ" -v worker="worker-9" -v reason="nope" -f /tmp/fail_run.sql 2>&1 | grep -cE '^[0-9]+$')
+[ "$R" = "0" ] && ok "worker-9 cannot fail worker-1's job (0 rows)" \
+               || no "a foreign worker failed someone else's job ($R rows)"
+
+R=$("${PSQL[@]}" -v jid="$FJ" -v worker="worker-1" -v reason="category was the empty string" -f /tmp/fail_run.sql 2>&1 | grep -E '^[0-9]+$' | head -1)
+[ "$R" = "$FJ" ] && ok "the holding worker can fail its own job" || no "own failure returned '$R'"
+
+ST=$(q "SELECT status FROM match_jobs WHERE id=$FJ;")
+CB=$(q "SELECT COALESCE(claimed_by,'(null)') FROM match_jobs WHERE id=$FJ;")
+LE=$(q "SELECT COALESCE(last_error,'') FROM match_jobs WHERE id=$FJ;")
+[ "$ST" = "FAILED" ] && ok "…leaving it FAILED, not READY (a retry would fail identically)" \
+                     || no "a failed job is '$ST', so the reaper can hand it out again"
+# match_jobs_claim asserts (status='CLAIMED') = (claimed_by IS NOT NULL), so a
+# fail that forgets to clear the claim raises its own constraint violation.
+[ "$CB" = "(null)" ] && ok "…with the claim cleared, satisfying match_jobs_claim" \
+                     || no "claimed_by is still '$CB' on a FAILED job"
+[ -n "$LE" ] && ok "…and a last_error a human can triage ($(cut -c1-40 <<<"$LE"))" \
+             || no "the job failed with no last_error"
+
+# The whole point: a FAILED job must never be claimed again.
+mk_runner "$API_SQL/claim_job.sql" /tmp/claim_after_fail.sql "EXECUTE st(:'worker');"
+R=$("${PSQL[@]}" -v worker="worker-2" -f /tmp/claim_after_fail.sql 2>&1 | grep -cE '^[0-9]+\|' )
+[ "$R" = "0" ] && ok "…and no worker can claim a FAILED job (the livelock is closed)" \
+               || no "a FAILED job was handed back out ($R rows) — still livelocked"
+
+echo
+echo "== J. ladder_config, the tunable constants (§2.3) =="
+# §2.3: "All constants live in one server-side table and are tunable without a
+# client update." If a key goes missing the API prices a challenge at zero, so
+# presence is the check, not just the table's existence.
+for k in stake_base win_purse_base defense_purse first_blood_bonus; do
+  V=$(q "SELECT value FROM ladder_config WHERE key='$k';")
+  [ -n "$V" ] && ok "ladder_config carries $k ($V)" || no "ladder_config is missing $k"
+done
+check_err "a config key cannot be duplicated" \
+  "INSERT INTO ladder_config (key,value,note) VALUES ('stake_base',1,'dupe');"
+
+echo
 echo "===== passed $pass  failed $fail ====="
 [ "$fail" -eq 0 ] || exit 1

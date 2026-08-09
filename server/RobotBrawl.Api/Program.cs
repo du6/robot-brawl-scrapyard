@@ -105,6 +105,19 @@ bool WorkerAuthed(HttpContext ctx) =>
         System.Text.Encoding.UTF8.GetBytes(k.ToString()),
         System.Text.Encoding.UTF8.GetBytes(workerKey));
 
+// §2.3: "All constants live in one server-side table and are tunable without
+// a client update." Read per request rather than cached at boot — the whole
+// point is that owen can change a dial without a deploy, and a cache would
+// quietly reinstate the deploy requirement. It is one small indexed table.
+async Task<Dictionary<string,int>> LadderConfig(NpgsqlConnection c, NpgsqlTransaction? tx = null)
+{
+    var d = new Dictionary<string,int>();
+    await using var cmd = new NpgsqlCommand("SELECT key, value FROM ladder_config;", c, tx);
+    await using var r = await cmd.ExecuteReaderAsync();
+    while (await r.ReadAsync()) d[r.GetString(0)] = r.GetInt32(1);
+    return d;
+}
+
 // The five weight classes, mirroring 001_init.sql's CHECK on
 // snapshots.category and ratings.category. Kept here rather than inferred
 // from a failed INSERT so the API can refuse a bad value with a readable
@@ -430,6 +443,223 @@ app.MapPost("/v1/worker/jobs/{id:long}/validate-result",
         new { error = "this job is no longer yours — it was reclaimed" });
 }).AllowAnonymous();
 
+// ================================================================== fights
+// §5.3, the lifecycle the design doc calls "the one flow that must be
+// airtight". Three endpoints: create the match, upload the replay, post the
+// result. M1 scope — see docs/Fight_Contract_2026-08-09.md for what is
+// deliberately deferred to M2 (Glicko-2 deltas, taper, tickets).
+
+// §5.3 step 1. Every check, the escrow debit, the match row and the job are
+// one transaction: a stake debited without a match is money destroyed, and a
+// match without a stake is money created.
+app.MapPost("/v1/challenges", async (ChallengeReq req, ClaimsPrincipal user) =>
+{
+    var me = UserId(user);
+    if (req.ChallengerSnapshotId == req.DefenderSnapshotId)
+        return Bad("a robot cannot challenge itself");
+
+    await using var c = await db.OpenAsync();
+
+    // Both sides in one query so the two reads cannot straddle a change.
+    var sides = new Dictionary<Guid, (string Status, string? Category, Guid RobotId, Guid UserId)>();
+    await using (var look = new NpgsqlCommand(@"
+        SELECT s.id, s.status, s.category, r.id, r.user_id
+          FROM snapshots s JOIN robots r ON r.id = s.robot_id
+         WHERE s.id = ANY($1);", c))
+    {
+        look.Parameters.AddWithValue(new[] { req.ChallengerSnapshotId, req.DefenderSnapshotId });
+        await using var r = await look.ExecuteReaderAsync();
+        while (await r.ReadAsync())
+            sides[r.GetGuid(0)] = (r.GetString(1), r.IsDBNull(2) ? null : r.GetString(2),
+                                   r.GetGuid(3), r.GetGuid(4));
+    }
+    if (!sides.TryGetValue(req.ChallengerSnapshotId, out var ch)) return Results.NotFound(new { error = "no such challenger snapshot" });
+    if (!sides.TryGetValue(req.DefenderSnapshotId,   out var df)) return Results.NotFound(new { error = "no such defender snapshot" });
+
+    if (ch.UserId != me)          return Results.Forbid();
+    if (ch.RobotId == df.RobotId) return Bad("a robot cannot challenge itself");
+    // §1.2: only an ACTIVE snapshot is on the ladder. PENDING has not been
+    // judged and REJECTED was judged and failed.
+    if (ch.Status != "ACTIVE")    return Bad($"your snapshot is {ch.Status}, not ACTIVE");
+    if (df.Status != "ACTIVE")    return Bad($"their snapshot is {df.Status}, not ACTIVE");
+    if (ch.Category == null || df.Category == null)
+        return Bad("both robots need a weight category to meet on the ladder");
+
+    // §1.2 category legality: you may punch UP, never down. gap is how many
+    // classes up, and it prices both the stake and the purse.
+    int ci = Array.IndexOf(Categories, ch.Category), di = Array.IndexOf(Categories, df.Category);
+    if (ci < 0 || di < 0) return Bad("unknown weight category on one of the snapshots");
+    int gap = di - ci;
+    if (gap < 0) return Bad($"a {ch.Category} cannot punch down to a {df.Category}");
+
+    var cfg = await LadderConfig(c);
+    int stake = cfg["stake_base"] * (1 + gap);
+
+    // §2.3: the balance IS the sum of the ledger. There is no cached column
+    // to disagree with it.
+    long balance;
+    await using (var bal = new NpgsqlCommand(
+        "SELECT COALESCE(SUM(delta),0) FROM ledger WHERE user_id = $1;", c))
+    {
+        bal.Parameters.AddWithValue(me);
+        balance = Convert.ToInt64(await bal.ExecuteScalarAsync());
+    }
+    if (balance < stake)
+        return Bad($"this challenge stakes {stake} scrap and your wallet holds {balance}");
+
+    // Best-of-3 (§1.4). Seeds are server-chosen: a client-chosen seed is a
+    // client choosing its own fight.
+    var seeds = new[] { Random.Shared.Next(1, int.MaxValue),
+                        Random.Shared.Next(1, int.MaxValue),
+                        Random.Shared.Next(1, int.MaxValue) };
+
+    await using var tx = await c.BeginTransactionAsync();
+    Guid matchId;
+    await using (var ins = new NpgsqlCommand(@"
+        INSERT INTO matches (challenger_snapshot_id, defender_snapshot_id, category, gap, arena, seeds, status)
+        VALUES ($1,$2,$3,$4,'league',$5,'QUEUED') RETURNING id;", c, tx))
+    {
+        ins.Parameters.AddWithValue(req.ChallengerSnapshotId);
+        ins.Parameters.AddWithValue(req.DefenderSnapshotId);
+        ins.Parameters.AddWithValue(df.Category);   // you fight in THEIR class
+        ins.Parameters.AddWithValue(gap);
+        ins.Parameters.AddWithValue(seeds);
+        matchId = (Guid)(await ins.ExecuteScalarAsync())!;
+    }
+    await using (var deb = new NpgsqlCommand(
+        "INSERT INTO ledger (user_id, delta, reason, match_id) VALUES ($1,$2,'STAKE',$3);", c, tx))
+    {
+        deb.Parameters.AddWithValue(me);
+        deb.Parameters.AddWithValue(-stake);   // into escrow; settled in step 3
+        deb.Parameters.AddWithValue(matchId);
+        await deb.ExecuteNonQueryAsync();
+    }
+    await using (var job = new NpgsqlCommand(
+        "INSERT INTO match_jobs (kind, match_id) VALUES ('FIGHT', $1);", c, tx))
+    {
+        job.Parameters.AddWithValue(matchId);
+        await job.ExecuteNonQueryAsync();
+    }
+    await tx.CommitAsync();
+
+    return Results.Ok(new { matchId, status = "QUEUED", stake, gap, category = df.Category });
+}).RequireAuthorization().RequireRateLimiting("upload");
+
+// §5.3 step 2's upload half. The replay is a RECORDING of the worker's run
+// (§5.4), so it is opaque bytes to the API exactly like a snapshot payload.
+app.MapPost("/v1/worker/matches/{matchId:guid}/replay",
+    async (Guid matchId, HttpContext ctx, ReplayReq req, IBlobStore blobs) =>
+{
+    if (!WorkerAuthed(ctx)) return Results.Unauthorized();
+    if (string.IsNullOrEmpty(req.Replay)) return Bad("empty replay");
+    var bytes = System.Text.Encoding.UTF8.GetBytes(req.Replay);
+    var url = await blobs.PutAsync($"replays/{matchId}/{Guid.NewGuid():N}.json", bytes);
+    return Results.Ok(new { url, bytes = bytes.Length });
+}).AllowAnonymous();
+
+// §5.3 step 3. Verify ownership -> write result -> settle escrow -> mark
+// COMPLETE, in ONE transaction, including retiring the job: the validate
+// livelock (docs/Validate_Result_Livelock_Fixed) was exactly the failure of
+// leaving job completion outside the write.
+app.MapPost("/v1/worker/jobs/{id:long}/fight-result",
+    async (long id, HttpContext ctx, FightResult res) =>
+{
+    if (!WorkerAuthed(ctx)) return Results.Unauthorized();
+    if (res.Verdict is not ("CHALLENGER" or "DEFENDER" or "DRAW"))
+        return Bad("verdict must be CHALLENGER, DEFENDER or DRAW");
+
+    await using var c = await db.OpenAsync();
+    await using var tx = await c.BeginTransactionAsync();
+
+    // Job ownership, and the row is locked for the rest of the transaction so
+    // two workers cannot settle the same match twice.
+    Guid jobMatch;
+    await using (var own = new NpgsqlCommand(@"
+        SELECT match_id FROM match_jobs
+         WHERE id = $1 AND claimed_by = $2 AND status = 'CLAIMED' AND kind = 'FIGHT'
+           FOR UPDATE;", c, tx))
+    {
+        own.Parameters.AddWithValue(id);
+        own.Parameters.AddWithValue(res.WorkerId ?? "");
+        var got = await own.ExecuteScalarAsync();
+        if (got is null)
+            return Results.Conflict(new { error = "this job is no longer yours — it was reclaimed" });
+        jobMatch = (Guid)got;
+    }
+    // The worker must be reporting on the match it was actually given.
+    if (jobMatch != res.MatchId)
+        return Bad("this result is for a different match than the job holds");
+
+    // Everything settlement needs, read under the same transaction.
+    Guid chUser, dfUser; int gap; string status;
+    await using (var m = new NpgsqlCommand(@"
+        SELECT m.status, m.gap, rc.user_id, rd.user_id
+          FROM matches m
+          JOIN snapshots sc ON sc.id = m.challenger_snapshot_id JOIN robots rc ON rc.id = sc.robot_id
+          JOIN snapshots sd ON sd.id = m.defender_snapshot_id   JOIN robots rd ON rd.id = sd.robot_id
+         WHERE m.id = $1 FOR UPDATE OF m;", c, tx))
+    {
+        m.Parameters.AddWithValue(res.MatchId);
+        await using var r = await m.ExecuteReaderAsync();
+        if (!await r.ReadAsync()) return Results.NotFound(new { error = "no such match" });
+        status = r.GetString(0); gap = r.GetInt32(1); chUser = r.GetGuid(2); dfUser = r.GetGuid(3);
+    }
+    // Settling twice would mint scrap from nothing.
+    if (status == "COMPLETE") return Results.Conflict(new { error = "this match is already settled" });
+
+    var cfg = await LadderConfig(c, tx);
+    int stake = cfg["stake_base"] * (1 + gap);
+
+    await using (var up = new NpgsqlCommand(@"
+        UPDATE matches SET status = 'COMPLETE', verdict = $2, replay_urls = $3, completed_at = now()
+         WHERE id = $1;", c, tx))
+    {
+        up.Parameters.AddWithValue(res.MatchId);
+        up.Parameters.AddWithValue(res.Verdict!);
+        up.Parameters.AddWithValue((object?)res.ReplayUrls ?? Array.Empty<string>());
+        await up.ExecuteNonQueryAsync();
+    }
+
+    // §2.3's table, and the sums must conserve scrap: the challenger's stake
+    // already left the wallet in step 1, so a win returns it AND pays the
+    // purse, a draw returns it, and a loss keeps it.
+    async Task Credit(Guid who, int delta, string reason)
+    {
+        await using var l = new NpgsqlCommand(
+            "INSERT INTO ledger (user_id, delta, reason, match_id) VALUES ($1,$2,$3,$4);", c, tx);
+        l.Parameters.AddWithValue(who); l.Parameters.AddWithValue(delta);
+        l.Parameters.AddWithValue(reason); l.Parameters.AddWithValue(res.MatchId);
+        await l.ExecuteNonQueryAsync();
+    }
+    if (res.Verdict == "CHALLENGER")
+    {
+        // (1 + 0.5*gap)^2 — punching up two categories pays 4x base.
+        double mult = Math.Pow(1 + 0.5 * gap, 2);
+        await Credit(chUser, stake, "STAKE_REFUND");
+        await Credit(chUser, (int)Math.Round(cfg["win_purse_base"] * mult), "PURSE");
+    }
+    else if (res.Verdict == "DEFENDER")
+    {
+        await Credit(dfUser, cfg["defense_purse"], "DEFENSE");   // challenger's stake is forfeit
+    }
+    else
+    {
+        await Credit(chUser, stake, "STAKE_REFUND");
+    }
+
+    // Retire the job in the SAME transaction as the settlement.
+    await using (var done = new NpgsqlCommand(@"
+        UPDATE match_jobs SET status = 'DONE', claimed_by = NULL, claimed_at = NULL, heartbeat_at = NULL
+         WHERE id = $1;", c, tx))
+    {
+        done.Parameters.AddWithValue(id);
+        await done.ExecuteNonQueryAsync();
+    }
+
+    await tx.CommitAsync();
+    return Results.Ok(new { matchId = res.MatchId, status = "COMPLETE", verdict = res.Verdict });
+}).AllowAnonymous();
+
 app.Run();
 
 // ------------------------------------------------------------------ dtos
@@ -438,6 +668,10 @@ public record LoginReq(string? Email, string? Password);
 public record RobotReq(string? Name);
 public record SnapshotReq(Guid RobotId, string? Envelope);
 public record ClaimReq(string? WorkerId);
+public record ChallengeReq(Guid ChallengerSnapshotId, Guid DefenderSnapshotId);
+public record ReplayReq(string? Replay);
+public record FightResult(Guid MatchId, string? WorkerId, string? Verdict,
+                          string[]? ReplayUrls, string[]? Bouts);
 public record ValidateResult(
     Guid SnapshotId, string? WorkerId, bool Legal, int MassKg,
     float AabbX, float AabbY, float AabbZ, string? Category,
