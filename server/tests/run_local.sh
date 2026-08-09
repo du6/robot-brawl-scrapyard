@@ -5,7 +5,8 @@
 #
 # Writes, next to the server tree:
 #   qa_api_server.log   the API's own output, build errors and stack traces
-#   qa_api_smoke.txt    the bench result
+#   qa_sql_bench.txt    the data layer's bench
+#   qa_api_smoke.txt    the endpoint bench
 #
 # Both are files rather than console output on purpose: the Cowork session
 # can read files in this folder, so nobody has to copy a terminal into chat.
@@ -19,6 +20,7 @@ export PATH="/opt/homebrew/opt/dotnet@8/bin:/opt/homebrew/opt/postgresql@16/bin:
 export DOTNET_ROOT="/opt/homebrew/opt/dotnet@8/libexec"
 
 SRV="$PWD/qa_api_server.log"
+SQL="$PWD/qa_sql_bench.txt"
 OUT="$PWD/qa_api_smoke.txt"
 
 if lsof -nP -iTCP:5000 -sTCP:LISTEN >/dev/null 2>&1; then
@@ -57,13 +59,30 @@ for i in {1..90}; do
   [ $i -eq 90 ] && { echo " — timed out."; tail -40 "$SRV"; exit 1; }
 done
 
+# 2026-08-09. sql_bench.sh used to be missing from this script, which made
+# "one command" a promise it did not keep: a change to RobotBrawl.Api/Sql/*.sql
+# — the files sql_bench is the ONLY cover for — could come back all-green from
+# here having never been run against the bench that tests it. That is exactly
+# what happened to the claim_job.sql rewrite that added payload location to the
+# claim: api_smoke went 35/35 -> 37/37 and proved a SINGLE worker's claim,
+# while the FOUR-concurrent-worker SKIP LOCKED case sat untested.
+#
+# It runs AFTER the API boots, because the API's migration is what creates the
+# schema, and BEFORE api_smoke, because sql_bench truncates every table and
+# api_smoke builds its own fixtures afterwards.
+echo "running sql_bench.sh (result: qa_sql_bench.txt)…"
+bash tests/sql_bench.sh > "$SQL" 2>&1
+SQLRC=$?
+
 echo "running api_smoke.sh (result: qa_api_smoke.txt)…"
 bash tests/api_smoke.sh > "$OUT" 2>&1
 RC=$?
 
 kill $API_PID 2>/dev/null; wait $API_PID 2>/dev/null
 echo
+tail -1 "$SQL"
 tail -1 "$OUT"
 grep -c 'error' "$SRV" >/dev/null 2>&1 && \
   echo "server log: $(grep -ci 'exception\|error' "$SRV") line(s) mentioning error/exception"
+[ $SQLRC -ne 0 ] && exit $SQLRC
 exit $RC

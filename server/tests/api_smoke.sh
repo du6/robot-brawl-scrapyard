@@ -153,6 +153,19 @@ else
   expect "a keyed worker claims a job" "$S" 200
   JOB=$(jget id); is "…and the job is the VALIDATE the upload enqueued" "$(jget kind)" VALIDATE
   same "…pointing at the snapshot just uploaded" "$(jget snapshotId)" "$SNAP1"
+  # 2026-08-09. THIS is the assertion whose absence let the worker contract
+  # ship unfinishable. Every other check in section F confirms the endpoint
+  # ANSWERS; none confirmed the answer was usable. A claimed VALIDATE job that
+  # does not say where its payload lives cannot be worked, and the suite was
+  # 35/35 green while that was true.
+  PURL=$(jget payloadUrl); PSHA=$(jget payloadSha256)
+  [ -n "$PURL" ] && ok "…and carries a payload location the worker can resolve ($PURL)" \
+                 || no "a claimed VALIDATE job carries no payloadUrl — the worker cannot fetch what it was given"
+  case "$PSHA" in
+    ????????????????????????????????????????????????????????????????)
+      ok "…and the payload sha256 rides along, so the worker can verify storage" ;;
+    *) no "payloadSha256 is '$PSHA', not 64 hex chars — Open() cannot verify the envelope" ;;
+  esac
   if [ -z "$JOB" ]; then skip "heartbeat ownership (2 checks)" "no job id"; else
     S=$(req POST "/v1/worker/jobs/$JOB/heartbeat" '{"workerId":"smoke-9"}' "X-Worker-Key: $WKEY")
     expect "another worker cannot heartbeat a job it does not hold" "$S" 404

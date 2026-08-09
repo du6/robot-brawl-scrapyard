@@ -161,7 +161,20 @@ public sealed class FileBlobStore : IBlobStore
 }
 
 // ------------------------------------------------------------------ queue
-public sealed record ClaimedJob(long Id, string Kind, Guid? MatchId, Guid? SnapshotId, int Attempts);
+/// <summary>What a worker is handed when it claims a job. The last eight
+/// fields were added 2026-08-09: without them a worker received a snapshot
+/// UUID and had no way to resolve it to bytes, so the queue could be claimed
+/// from but never worked. See Sql/claim_job.sql for the full account.
+///
+/// Exactly one side is populated, enforced by the match_jobs CHECK: a
+/// VALIDATE job fills Payload*, a FIGHT job fills Challenger*/Defender* plus
+/// Arena and Seeds.</summary>
+public sealed record ClaimedJob(
+    long Id, string Kind, Guid? MatchId, Guid? SnapshotId, int Attempts,
+    string? PayloadUrl, string? PayloadSha256,
+    string? ChallengerUrl, string? ChallengerSha256,
+    string? DefenderUrl, string? DefenderSha256,
+    string? Arena, int[]? Seeds);
 
 /// <summary>The Postgres-as-queue half of §5.1. Every statement is loaded
 /// from Sql/*.sql rather than inlined, because those files are what
@@ -192,7 +205,15 @@ public sealed class JobQueue
             r.GetInt64(0), r.GetString(1),
             r.IsDBNull(2) ? null : r.GetGuid(2),
             r.IsDBNull(3) ? null : r.GetGuid(3),
-            r.GetInt32(4));
+            r.GetInt32(4),
+            r.IsDBNull(5)  ? null : r.GetString(5),
+            r.IsDBNull(6)  ? null : r.GetString(6),
+            r.IsDBNull(7)  ? null : r.GetString(7),
+            r.IsDBNull(8)  ? null : r.GetString(8),
+            r.IsDBNull(9)  ? null : r.GetString(9),
+            r.IsDBNull(10) ? null : r.GetString(10),
+            r.IsDBNull(11) ? null : r.GetString(11),
+            r.IsDBNull(12) ? null : r.GetFieldValue<int[]>(12));
     }
 
     public async Task<bool> HeartbeatAsync(long jobId, string workerId, CancellationToken ct = default)
