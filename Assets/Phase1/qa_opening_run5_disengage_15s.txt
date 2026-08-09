@@ -1,0 +1,74 @@
+cell L1C1  N=12/arm  cutoff=15s  interleaved
+
+  k1  ram 45% hold weap 1/0  upY 1.00  dealt  397 taken   10  [ended early]
+  k1  ram 100% hold weap 0/0  upY 0.97  dealt   20 taken   10  [ended early]
+  k1  ram 100% break weap 1/0  upY 1.00  dealt  401 taken   10  [ended early]
+  k1  ram 70% break weap 1/0  upY 1.00  dealt   15 taken   10
+  k1  ram 45% break weap 1/0  upY 0.99  dealt  353 taken   10  [ended early]
+  k2  ram 45% hold weap 1/0  upY 1.00  dealt  426 taken   10  [ended early]
+  k2  ram 100% hold weap 0/0  upY -0.43  dealt   19 taken   10  [ended early]
+  k2  ram 100% break weap 1/0  upY 0.98  dealt  142 taken   10
+  k2  ram 70% break weap 1/0  upY 1.00  dealt  192 taken   10
+  k2  ram 45% break weap 1/0  upY 1.00  dealt  467 taken   10
+  k3  ram 45% hold weap 1/0  upY 0.99  dealt  388 taken   10  [ended early]
+  k3  ram 100% hold weap 0/0  upY 0.94  dealt   19 taken   10  [ended early]
+  k3  ram 100% break weap 1/0  upY 1.00  dealt  129 taken   10
+  k3  ram 70% break weap 1/0  upY 0.99  dealt  107 taken   10
+  k3  ram 45% break weap 1/0  upY 1.00  dealt   50 taken   10
+  k4  ram 45% hold weap 1/0  upY 1.00  dealt  432 taken   10  [ended early]
+  k4  ram 100% hold weap 1/0  upY -0.43  dealt   20 taken   10
+  k4  ram 100% break weap 1/0  upY 1.00  dealt   85 taken   10
+  k4  ram 70% break weap 1/0  upY 0.99  dealt  489 taken   10  [ended early]
+  k4  ram 45% break weap 1/0  upY 0.00  dealt   91 taken   10
+  k5  ram 45% hold weap 1/0  upY 0.98  dealt  380 taken   10  [ended early]
+  k5  ram 100% hold weap 1/0  upY 1.00  dealt  309 taken   10
+  k5  ram 100% break weap 1/0  upY 0.97  dealt  311 taken   10
+  k5  ram 70% break weap 1/0  upY 0.99  dealt   15 taken   10
+  k5  ram 45% break weap 1/0  upY 0.99  dealt  108 taken   10
+  k6  ram 45% hold weap 1/0  upY 1.00  dealt  271 taken   10
+  k6  ram 100% hold weap 1/0  upY 1.00  dealt   20 taken   10
+  k6  ram 100% break weap 1/0  upY 1.00  dealt  167 taken   10
+  k6  ram 70% break weap 1/0  upY 0.98  dealt  164 taken   10
+  k6  ram 45% break weap 1/0  upY 1.00  dealt   15 taken   10
+  k7  ram 45% hold weap 1/0  upY -0.07  dealt  407 taken   10
+  k7  ram 100% hold weap 1/0  upY 1.00  dealt  259 taken   10
+  k7  ram 100% break weap 1/0  upY -0.43  dealt  288 taken   10
+  k7  ram 70% break weap 1/0  upY 1.00  dealt  302 taken   10
+  k7  ram 45% break weap 1/0  upY 1.00  dealt  153 taken   10
+  k8  ram 45% hold weap 1/0  upY 1.00  dealt  392 taken   10  [ended early]
+  k8  ram 100% hold weap 1/0  upY 1.00  dealt  184 taken   10
+  k8  ram 100% break weap 1/0  upY 1.00  dealt  265 taken   10
+  k8  ram 70% break weap 1/0  upY 0.98  dealt   73 taken   10
+  k8  ram 45% break weap 1/0  upY 1.00  dealt   86 taken   10
+  k9  ram 45% hold weap 1/0  upY 0.99  dealt  474 taken   10  [ended early]
+  k9  ram 100% hold weap 1/0  upY 1.00  dealt  436 taken   10
+  k9  ram 100% break weap 1/0  upY 0.99  dealt   75 taken   10
+  k9  ram 70% break weap 1/0  upY 1.00  dealt  108 taken   10
+  k9  ram 45% break weap 1/0  upY 0.94  dealt  298 taken   10
+  k10 ram 45% hold weap 1/0  upY 1.00  dealt  401 taken   10  [ended early]
+  k10 ram 100% hold weap 1/0  upY 0.97  dealt  371 taken   10  [ended early]
+  k10 ram 100% break weap 1/0  upY 1.00  dealt  108 taken   10
+  k10 ram 70% break weap 1/0  upY 0.99  dealt  353 taken   10  [ended early]
+  k10 ram 45% break weap 1/0  upY 0.57  dealt  298 taken   10
+  k11 ram 45% hold weap 1/0  upY 0.98  dealt  426 taken   10  [ended early]
+  k11 ram 100% hold weap 1/0  upY 0.99  dealt  113 taken   10
+  k11 ram 100% break weap 1/0  upY 0.99  dealt  468 taken   10  [ended early]
+  k11 ram 70% break weap 1/0  upY 0.97  dealt  406 taken   10
+  k11 ram 45% break weap 1/0  upY 1.00  dealt  411 taken   10  [ended early]
+  k12 ram 45% hold weap 1/0  upY 1.00  dealt  465 taken   10
+  k12 ram 100% hold weap 1/0  upY 1.00  dealt  420 taken   10  [ended early]
+  k12 ram 100% break weap 1/0  upY 1.00  dealt  215 taken   10
+  k12 ram 70% break weap 1/0  upY 1.00  dealt  280 taken   10
+  k12 ram 45% break weap 1/0  upY 1.00  dealt  391 taken   10  [ended early]
+
+ARM              n   disarmed        flipped        enemy-disarmed   dealt@15s
+ram 45% hold    12    0/12     0%     1/12     8%    12/12   100%         405
+ram 100% hold   12    3/12    25%     2/12    17%    12/12   100%         182
+ram 100% break  12    0/12     0%     1/12     8%    12/12   100%         221
+ram 70% break   12    0/12     0%     0/12     0%    12/12   100%         209
+ram 45% break   12    0/12     0%     1/12     8%    12/12   100%         227
+
+no-starts: 0
+This bench does not pass or fail. A lower disarm rate at a similar
+or higher dealt figure is the fix working; a lower disarm rate at a
+much LOWER dealt figure is a robot that stopped fighting.

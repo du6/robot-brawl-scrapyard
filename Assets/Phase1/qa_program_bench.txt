@@ -1,4 +1,4 @@
-PASS  JSON round-trip is lossless (870 chars)
+PASS  JSON round-trip is lossless (869 chars)
 PASS  junk JSON degrades to null, not a throw
 PASS  missing sensor validates false with the shop hint (hat 1 (IN RANGE): needs a Compass tracker — SHOP)
 PASS  13 hats rejected
@@ -29,10 +29,10 @@ PASS  run-to-completion: WHEN went false, the RUN keeps charge
 PASS  sequence completes and control falls back to the FOREVER hat
 PASS  RUN rounds: rotor spins under the trigger (rate measured)
 PASS  RUN rounds: 2 measured rounds complete and the trigger DROPS
-PASS  TURN BY 90° turns ~90° right on real wheels (91°)
-PASS  MOVE TOWARD ENEMY steers the nose onto the target (|bearing| 153° → min 0°)
+PASS  TURN BY 90° turns ~90° right on real wheels (90°)
+PASS  MOVE TOWARD ENEMY steers the nose onto the target (|bearing| 151° → min 1°)
 PASS  mirror: all 3 fights started
-PASS  mirror: both sides land damage in every fight (49/49 49/49 49/49)
+PASS  mirror: both sides land damage in every fight (12/12 12/12 12/12)
 PASS  MIRROR symmetry: dealt==taken within 20% every fight (the program-era ~50% contract)
 PASS  AL1 series: all 10 fights started
 PASS  Brawler beats AL1 dumb program 10/10 (need >=7)
@@ -41,18 +41,18 @@ PASS  trace covers >=20 program ticks (26)
 PASS  determinism: two spawns, identical 5 s channel trace (1066 vs 1066 chars)
 
 --- diag ---
-out=Draw Pdealt=49 Ptaken=49 t=90 viol=0 cause=Judges' decision — damage 49 vs 49 (0.0% margin level) · pieces 10/11 vs 10/11 · aggression 1% vs 1% · on its back 0% vs 0% — too close to call, scored a draw
-out=Draw Pdealt=49 Ptaken=49 t=90 viol=0 cause=Judges' decision — damage 49 vs 49 (0.0% margin level) · pieces 10/11 vs 10/11 · aggression 1% vs 1% · on its back 0% vs 0% — too close to call, scored a draw
-out=Draw Pdealt=49 Ptaken=49 t=90 viol=0 cause=Judges' decision — damage 49 vs 49 (0.0% margin level) · pieces 10/11 vs 10/11 · aggression 1% vs 1% · on its back 0% vs 0% — too close to call, scored a draw
-out=PlayerWin Pdealt=405 Ptaken=49 t=7 viol=0 cause=KO — enemy core destroyed
-out=PlayerWin Pdealt=455 Ptaken=49 t=8 viol=0 cause=KO — enemy core destroyed
-out=PlayerWin Pdealt=471 Ptaken=49 t=8 viol=0 cause=KO — enemy core destroyed
-out=PlayerWin Pdealt=425 Ptaken=49 t=7 viol=0 cause=KO — enemy core destroyed
-out=PlayerWin Pdealt=438 Ptaken=49 t=7 viol=0 cause=KO — enemy core destroyed
-out=PlayerWin Pdealt=440 Ptaken=49 t=8 viol=0 cause=KO — enemy core destroyed
-out=PlayerWin Pdealt=393 Ptaken=49 t=7 viol=0 cause=KO — enemy core destroyed
-out=PlayerWin Pdealt=411 Ptaken=49 t=7 viol=0 cause=KO — enemy core destroyed
-out=PlayerWin Pdealt=452 Ptaken=49 t=8 viol=0 cause=KO — enemy core destroyed
-out=PlayerWin Pdealt=431 Ptaken=49 t=7 viol=0 cause=KO — enemy core destroyed
+out=Draw Pdealt=12 Ptaken=12 t=13 viol=0 cause=Called early — both machines disarmed, no damage possible for 12 s · Judges' decision — damage 12 vs 12 (0.0% margin level) · pieces 10/11 vs 10/11 · aggression 33% vs 35% · on its back 0% vs 0% — both machines disarmed with nothing left to settle it, scored a draw
+out=Draw Pdealt=12 Ptaken=12 t=14 viol=0 cause=Called early — both machines disarmed, no damage possible for 12 s · Judges' decision — damage 12 vs 12 (0.0% margin level) · pieces 10/11 vs 10/11 · aggression 27% vs 36% · on its back 0% vs 2% — both machines disarmed with nothing left to settle it, scored a draw
+out=Draw Pdealt=12 Ptaken=12 t=13 viol=0 cause=Called early — both machines disarmed, no damage possible for 12 s · Judges' decision — damage 12 vs 12 (0.0% margin level) · pieces 10/11 vs 10/11 · aggression 7% vs 7% · on its back 0% vs 0% — both machines disarmed with nothing left to settle it, scored a draw
+out=PlayerWin Pdealt=667 Ptaken=12 t=9 viol=0 cause=KO — enemy core destroyed
+out=PlayerWin Pdealt=723 Ptaken=12 t=11 viol=0 cause=KO — enemy core destroyed
+out=PlayerWin Pdealt=441 Ptaken=12 t=10 viol=0 cause=KO — enemy core destroyed
+out=PlayerWin Pdealt=717 Ptaken=0 t=43 viol=0 cause=KO — enemy core destroyed
+out=PlayerWin Pdealt=622 Ptaken=12 t=11 viol=0 cause=KO — enemy core destroyed
+out=PlayerWin Pdealt=675 Ptaken=12 t=13 viol=0 cause=KO — enemy core destroyed
+out=PlayerWin Pdealt=485 Ptaken=12 t=8 viol=0 cause=KO — enemy core destroyed
+out=PlayerWin Pdealt=297 Ptaken=12 t=9 viol=0 cause=KO — enemy core destroyed
+out=PlayerWin Pdealt=554 Ptaken=12 t=8 viol=0 cause=KO — enemy core destroyed
+out=PlayerWin Pdealt=298 Ptaken=12 t=9 viol=0 cause=KO — enemy core destroyed
 out=Draw Pdealt=0 Ptaken=0 t=5 viol=0 cause=trace window done
 out=Draw Pdealt=0 Ptaken=0 t=5 viol=0 cause=trace window done

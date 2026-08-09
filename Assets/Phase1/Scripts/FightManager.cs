@@ -415,7 +415,8 @@ public class FightManager : MonoBehaviour
             WeaponsAlive(player) == 0 && WeaponsAlive(enemy) == 0)
         {
             Judge(string.Format(
-                "Called early — both machines disarmed, no damage possible for {0:F0} s", STALL_QUIET));
+                "Called early — both machines disarmed, no damage possible for {0:F0} s", STALL_QUIET),
+                true);
             return true;
         }
         return false;
@@ -786,7 +787,7 @@ public class FightManager : MonoBehaviour
     /// card. Third, not first, because it is a tie-break, not the sport.</summary>
     void Judge() { Judge(null); }
 
-    void Judge(string earlyNote)
+    void Judge(string earlyNote, bool bothDisarmed = false)
     {
         float hi = Mathf.Max(player.dealt, enemy.dealt);
         float diff = player.dealt - enemy.dealt;
@@ -830,7 +831,20 @@ public class FightManager : MonoBehaviour
                 cmp + " — structure even, decided on damage");
             return;
         }
-        if (Mathf.Abs(pMob - eMob) > AGGRESSION_BAND)
+        // MEASURED 2026-08-09 (see Opening_Disarm_Tutorial_Floor doc). When the
+        // opening exchange shears BOTH weapons, neither machine can score
+        // again - and this tie-break then hands the bout to whichever robot is
+        // lighter, because it is the one still moving. Over 20 sampled L1
+        // bouts the disarmed player went 0-for-6, and every single loss read
+        // "decided on aggression". That is not a tie-break, it is a penalty
+        // for having been disarmed by the other robot's weapon.
+        //
+        // Structure and damage above STILL decide a disarmed bout: if you
+        // broke more of them before the trade, you won it. Only "who looked
+        // busier once nobody could hurt anybody" is struck out. CONTROL below
+        // is deliberately KEPT - spending the match on your back is a real
+        // failure, weapons or no weapons, not an artefact of mass.
+        if (!bothDisarmed && Mathf.Abs(pMob - eMob) > AGGRESSION_BAND)
         {
             bool pa = pMob > eMob;
             End(pa ? Outcome.PlayerWin : Outcome.PlayerLoss,
@@ -850,7 +864,9 @@ public class FightManager : MonoBehaviour
         // resolving it on a grounded-wheel count sampled on the single expiry
         // frame — which a bot can lose to a mid-bounce, and which is a coin
         // flip dressed as a verdict.
-        End(Outcome.Draw, cmp + " — too close to call, scored a draw");
+        End(Outcome.Draw, cmp + (bothDisarmed
+            ? " — both machines disarmed with nothing left to settle it, scored a draw"
+            : " — too close to call, scored a draw"));
     }
 
     public void End(Outcome o, string cause)

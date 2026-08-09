@@ -1,0 +1,74 @@
+cell L1C1  N=12/arm  cutoff=7s  interleaved
+
+  k1  mat 100%   weap 1/0  upY 1.00  dealt   15 taken   12
+  k1  mat 70%    weap 1/0  upY 1.00  dealt   15 taken   12
+  k1  mat 55%    weap 1/0  upY 0.99  dealt   15 taken   12
+  k1  mat 45%    weap 1/0  upY 0.99  dealt   15 taken   12
+  k1  mat 30%    weap 1/0  upY 1.00  dealt   15 taken   12
+  k2  mat 100%   weap 1/0  upY 1.00  dealt   15 taken   12
+  k2  mat 70%    weap 1/0  upY 1.00  dealt   15 taken   12
+  k2  mat 55%    weap 1/0  upY 0.99  dealt   15 taken   12
+  k2  mat 45%    weap 1/0  upY 1.00  dealt   15 taken   12
+  k2  mat 30%    weap 1/0  upY 1.00  dealt   15 taken   12
+  k3  mat 100%   weap 1/0  upY 1.00  dealt   15 taken   12
+  k3  mat 70%    weap 1/0  upY 1.00  dealt   15 taken   12
+  k3  mat 55%    weap 1/0  upY 0.99  dealt   15 taken   12
+  k3  mat 45%    weap 1/0  upY 0.99  dealt   15 taken   12
+  k3  mat 30%    weap 1/0  upY 1.00  dealt   15 taken   12
+  k4  mat 100%   weap 1/0  upY 1.00  dealt   15 taken   12
+  k4  mat 70%    weap 1/0  upY 0.99  dealt   15 taken   12
+  k4  mat 55%    weap 1/0  upY 1.00  dealt   15 taken   12
+  k4  mat 45%    weap 1/0  upY 0.99  dealt   15 taken   12
+  k4  mat 30%    weap 1/0  upY 0.99  dealt   15 taken   12
+  k5  mat 100%   weap 1/0  upY 0.99  dealt   15 taken   12
+  k5  mat 70%    weap 1/0  upY 1.00  dealt   15 taken   12
+  k5  mat 55%    weap 1/0  upY 0.99  dealt   15 taken   12
+  k5  mat 45%    weap 1/0  upY 0.99  dealt   15 taken   12
+  k5  mat 30%    weap 1/0  upY 1.00  dealt   15 taken   12
+  k6  mat 100%   weap 1/0  upY 1.00  dealt   15 taken   12
+  k6  mat 70%    weap 1/0  upY 0.99  dealt   15 taken   12
+  k6  mat 55%    weap 1/0  upY 1.00  dealt   15 taken   12
+  k6  mat 45%    weap 1/0  upY 1.00  dealt   15 taken   12
+  k6  mat 30%    weap 1/0  upY 1.00  dealt   15 taken   12
+  k7  mat 100%   weap 1/0  upY 1.00  dealt   15 taken   12
+  k7  mat 70%    weap 1/0  upY 1.00  dealt   15 taken   12
+  k7  mat 55%    weap 1/0  upY 0.99  dealt   15 taken   12
+  k7  mat 45%    weap 1/0  upY 1.00  dealt   15 taken   12
+  k7  mat 30%    weap 1/0  upY 0.99  dealt   15 taken   12
+  k8  mat 100%   weap 1/0  upY 0.99  dealt   15 taken   12
+  k8  mat 70%    weap 1/0  upY 1.00  dealt   15 taken   12
+  k8  mat 55%    weap 1/0  upY 1.00  dealt   15 taken   12
+  k8  mat 45%    weap 1/0  upY 1.00  dealt   15 taken   12
+  k8  mat 30%    weap 1/0  upY 1.00  dealt   15 taken   12
+  k9  mat 100%   weap 1/0  upY 1.00  dealt   15 taken   12
+  k9  mat 70%    weap 1/0  upY 1.00  dealt   15 taken   12
+  k9  mat 55%    weap 1/0  upY 0.99  dealt   15 taken   12
+  k9  mat 45%    weap 1/0  upY 1.00  dealt   15 taken   12
+  k9  mat 30%    weap 1/0  upY 1.00  dealt   15 taken   12
+  k10 mat 100%   weap 1/0  upY 0.99  dealt   15 taken   12
+  k10 mat 70%    weap 1/0  upY 1.00  dealt   15 taken   12
+  k10 mat 55%    weap 1/0  upY 1.00  dealt   15 taken   12
+  k10 mat 45%    weap 1/0  upY 1.00  dealt   15 taken   12
+  k10 mat 30%    weap 1/0  upY 1.00  dealt   15 taken   12
+  k11 mat 100%   weap 1/0  upY 1.00  dealt   15 taken   12
+  k11 mat 70%    weap 1/0  upY 1.00  dealt   15 taken   12
+  k11 mat 55%    weap 1/0  upY 1.00  dealt   15 taken   12
+  k11 mat 45%    weap 1/0  upY 1.00  dealt   15 taken   12
+  k11 mat 30%    weap 1/0  upY 0.99  dealt   15 taken   12
+  k12 mat 100%   weap 1/0  upY 1.00  dealt   15 taken   12
+  k12 mat 70%    weap 1/0  upY 0.99  dealt   15 taken   12
+  k12 mat 55%    weap 1/0  upY 0.99  dealt   15 taken   12
+  k12 mat 45%    weap 1/0  upY 1.00  dealt   15 taken   12
+  k12 mat 30%    weap 1/0  upY 1.00  dealt   15 taken   12
+
+ARM              n   disarmed        flipped        enemy-disarmed   dealt@7s
+mat 100%        12    0/12     0%     0/12     0%    12/12   100%          15
+mat 70%         12    0/12     0%     0/12     0%    12/12   100%          15
+mat 55%         12    0/12     0%     0/12     0%    12/12   100%          15
+mat 45%         12    0/12     0%     0/12     0%    12/12   100%          15
+mat 30%         12    0/12     0%     0/12     0%    12/12   100%          15
+
+no-starts: 0
+This bench does not pass or fail. A lower disarm rate at a similar
+or higher dealt figure is the fix working; a lower disarm rate at a
+much LOWER dealt figure is a robot that stopped fighting.

@@ -735,7 +735,27 @@ public class RobotProgram
         var close = new PHat { name = "IN RANGE" };
         close.when.Add(PCondTerm.Mk(PCond.EnemyRange, PCmp.Less, 2.2f));
         close.body.Add(PBlock.MkWeapon(true));
-        close.body.Add(PBlock.MkMoveRel(PTarget.Enemy, 100f, 1.0f, 0));
+        // MEASURED 2026-08-09 (OpeningBench, two independent interleaved
+        // runs, N=12/arm). This number was 100f, and full throttle inside
+        // 2.2 m was the ENTIRE opening-disarm bug: at 100% the player's own
+        // disc sheared off in 42% of L1 openings -- 5/12, twice, independently
+        // -- and the build dealt 107 damage in the first 7 s. At 45% it sheared
+        // in 0% and dealt 358. The sweep 100/70/55/45/30 puts the cliff between
+        // 100 and 70 and the damage plateau at 45-30; 45 is the FASTEST closing
+        // speed that scored 0% disarmed AND 0% flipped, i.e. the most closing
+        // authority the fix can keep.
+        //
+        // Why the ram was wrong: a spinner does its damage with the disc, and
+        // a full-speed hull ram adds its impulse to the disc's own contact
+        // impulse at the weapon mount. The preset was paying for its own
+        // disarm, and the tutorial handed that preset to a new player.
+        //
+        // The approach GEOMETRY, which the 08-09 handover named first, was
+        // tested separately (OpeningBench run 1, arm C: a deliberately
+        // non-pursuit angled approach at the shipped 100% ram) and moved
+        // nothing -- 42% either way. "Nose-to-nose at full closing speed"
+        // named two things and only the second half was load bearing.
+        close.body.Add(PBlock.MkMoveRel(PTarget.Enemy, 45f, 1.0f, 0));
         p.hats.Add(close);
         var seek = new PHat { name = "SEEK" };
         seek.when.Add(PCondTerm.Always());
