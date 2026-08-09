@@ -1,3 +1,0 @@
-﻿<Project>
-  <Import Project="../build/RobotBrawl.Api.props" />
-</Project>
