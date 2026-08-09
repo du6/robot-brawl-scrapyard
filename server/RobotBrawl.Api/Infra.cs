@@ -183,7 +183,7 @@ public sealed record ClaimedJob(
 public sealed class JobQueue
 {
     readonly Db _db;
-    readonly string _claim, _heartbeat, _complete, _reap;
+    readonly string _claim, _heartbeat, _complete, _fail, _reap;
 
     public JobQueue(Db db, string sqlDir)
     {
@@ -191,6 +191,7 @@ public sealed class JobQueue
         _claim     = File.ReadAllText(Path.Combine(sqlDir, "claim_job.sql"));
         _heartbeat = File.ReadAllText(Path.Combine(sqlDir, "heartbeat_job.sql"));
         _complete  = File.ReadAllText(Path.Combine(sqlDir, "complete_job.sql"));
+        _fail      = File.ReadAllText(Path.Combine(sqlDir, "fail_job.sql"));
         _reap      = File.ReadAllText(Path.Combine(sqlDir, "reap_stale_jobs.sql"));
     }
 
@@ -221,6 +222,22 @@ public sealed class JobQueue
 
     public async Task<bool> CompleteAsync(long jobId, string workerId, CancellationToken ct = default)
         => await OneRow(_complete, jobId, workerId, ct);
+
+    /// <summary>Retires a job the worker cannot succeed at. Unlike the reaper's
+    /// timeout path this does NOT return the job to the queue: the payload is
+    /// deterministic, so a retry produces the same refusal. Returns false if
+    /// the job was already reclaimed, exactly like CompleteAsync.</summary>
+    public async Task<bool> FailAsync(long jobId, string workerId, string reason,
+                                      CancellationToken ct = default)
+    {
+        await using var c = await _db.OpenAsync(ct);
+        await using var cmd = new NpgsqlCommand(_fail, c);
+        cmd.Parameters.AddWithValue(jobId);
+        cmd.Parameters.AddWithValue(workerId);
+        cmd.Parameters.AddWithValue(reason);
+        await using var r = await cmd.ExecuteReaderAsync(ct);
+        return await r.ReadAsync(ct);
+    }
 
     async Task<bool> OneRow(string sql, long jobId, string workerId, CancellationToken ct)
     {

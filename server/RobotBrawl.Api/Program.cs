@@ -105,6 +105,37 @@ bool WorkerAuthed(HttpContext ctx) =>
         System.Text.Encoding.UTF8.GetBytes(k.ToString()),
         System.Text.Encoding.UTF8.GetBytes(workerKey));
 
+// The five weight classes, mirroring 001_init.sql's CHECK on
+// snapshots.category and ratings.category. Kept here rather than inferred
+// from a failed INSERT so the API can refuse a bad value with a readable
+// reason instead of letting Postgres raise 23514 from inside an UPDATE.
+// If this list and the migration ever disagree, sql_bench catches the
+// migration and api_smoke catches this one.
+string[] Categories = { "FEATHER", "LIGHT", "MIDDLE", "HEAVY", "SUPER" };
+
+/// <summary>Null if the result is storable; otherwise the reason it is not,
+/// phrased for a worker author reading a 400.</summary>
+string? ValidateResultShape(ValidateResult r)
+{
+    // NULL is legal in the schema and means "no category". The empty string
+    // is NOT — it is the JsonUtility null-string trap, and it is the whole
+    // reason this check exists.
+    if (r.Category != null && Array.IndexOf(Categories, r.Category) < 0)
+        return r.Category.Length == 0
+            ? "category was the empty string; send a bare JSON null for \"no category\" "
+            + "(Unity's JsonUtility serialises a null string as \"\" — hand-build this field)"
+            : $"category '{r.Category}' is not one of {string.Join(", ", Categories)}";
+
+    // ratings.category is NOT NULL, so a legal snapshot with no category can
+    // never be placed on a ladder — it would be ACTIVE and unrateable. Refuse
+    // it here rather than storing a row nothing downstream can use.
+    if (r.Legal && r.Category == null)
+        return "a legal robot must carry a weight category; "
+             + "ratings.category is NOT NULL, so a legal snapshot without one can never be rated";
+
+    return null;
+}
+
 // ---------------------------------------------------------------- health
 app.MapGet("/healthz", async () =>
 {
@@ -332,6 +363,31 @@ app.MapPost("/v1/worker/jobs/{id:long}/validate-result",
     async (long id, HttpContext ctx, JobQueue q, ValidateResult res) =>
 {
     if (!WorkerAuthed(ctx)) return Results.Unauthorized();
+
+    // 2026-08-09. Check the result BEFORE writing it. snapshots.category is
+    // TEXT CHECK (category IS NULL OR category IN (…)), and until now a value
+    // the CHECK forbids reached the UPDATE, raised an unhandled 23514 and
+    // returned 500 — WITHOUT completing the job, so the reaper handed it back
+    // and the next worker failed identically, forever. A malformed result
+    // livelocked a worker slot instead of failing loudly.
+    //
+    // "" is not hypothetical: Unity's JsonUtility serialises a null string as
+    // "", so it is exactly what a worker written the obvious way emits. The
+    // shipped worker hand-builds its JSON to send a bare null, but the API
+    // must not depend on one client being careful.
+    string? badResult = ValidateResultShape(res);
+    if (badResult != null)
+    {
+        // Retire the job rather than leaving it to spin. Not READY: the
+        // payload is deterministic, so a retry buys nothing. If the job was
+        // already reclaimed this returns false and we say so instead —
+        // a late malformed result must not knock over someone else's work.
+        bool wasOurs = await q.FailAsync(id, res.WorkerId ?? "", badResult);
+        if (!wasOurs)
+            return Results.Conflict(new { error = "this job is no longer yours — it was reclaimed" });
+        return Results.BadRequest(new { error = badResult, jobStatus = "FAILED" });
+    }
+
     await using var c = await db.OpenAsync();
     await using var tx = await c.BeginTransactionAsync();
 

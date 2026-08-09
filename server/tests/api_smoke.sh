@@ -98,9 +98,10 @@ dbq() { PGPASSWORD=rb psql -h localhost -U rb -d rb -qtA -c "$1" 2>/dev/null | t
 # a subshell does not survive. The first cut used a plain variable and lost
 # both storage checks to SKIP.
 VRC_SNAP_FILE="/tmp/rb_vrcsnap.$$"
+VRC_JOB_FILE="/tmp/rb_vrcjob.$$"
 vr_category() { # <raw-json-value> [legal=true]
   local rawcat="$1" legal="${2:-true}" snap job got i
-  : > "$VRC_SNAP_FILE"
+  : > "$VRC_SNAP_FILE"; : > "$VRC_JOB_FILE"
   req POST /v1/snapshots "$(body_upload "$ROBOT" "$(envelope "Cat-$RANDOM-$RANDOM")")" "$AUTH" >/dev/null
   snap=$(jget id); [ -z "$snap" ] && { echo "NO-SNAPSHOT"; return; }
   # Claim until we hold the job for OUR snapshot: earlier sections may have
@@ -117,6 +118,7 @@ vr_category() { # <raw-json-value> [legal=true]
   done
   [ -z "$job" ] && { echo "NO-JOB"; return; }
   printf '%s' "$snap" > "$VRC_SNAP_FILE"
+  printf '%s' "$job"  > "$VRC_JOB_FILE"
   req POST "/v1/worker/jobs/$job/validate-result" \
     "{\"snapshotId\":\"$snap\",\"workerId\":\"smoke-cat\",\"legal\":$legal,\"massKg\":9,
       \"aabbX\":0.4,\"aabbY\":0.3,\"aabbZ\":0.5,\"category\":$rawcat,
@@ -357,12 +359,31 @@ else
 
   # The two that must be refused. 4xx is the contract: the worker sent
   # something the schema forbids and deserves to be told so.
-  S=$(vr_category '""' false)
+  S=$(vr_category '""' false); EMPTY_JOB=$(cat "$VRC_JOB_FILE" 2>/dev/null)
   case "$S" in
     4??) ok "the empty-string category is refused cleanly (HTTP $S)" ;;
     5??) no "the empty-string category is refused as a SERVER error (HTTP $S) -- the CHECK fires inside the UPDATE and nothing catches it; a worker's verdict is lost to a stack trace" ;;
     *)   no "the empty-string category was ACCEPTED (HTTP $S) -- snapshots.category's CHECK should have forbidden it" ;;
   esac
+
+  # THE LIVELOCK CHECK. Refusing the result is only half the fix. Before
+  # 2026-08-09 the job was never completed either, so the reaper returned it
+  # to the queue on the visibility timeout and the next worker failed on it
+  # identically — forever. A refused result must RETIRE the job, and it must
+  # go to FAILED rather than READY: the payload is deterministic, so a retry
+  # buys nothing. Asserting "not READY" alone would pass while the job sat
+  # CLAIMED and leaked a worker slot a slower way.
+  if [ -z "$EMPTY_JOB" ]; then
+    skip "…and the job is retired, not left to spin (2 checks)" "no job id from the empty-string case"
+  else
+    is "…and the job is marked FAILED, so the reaper cannot hand it out again" \
+       "$(dbq "SELECT status FROM match_jobs WHERE id=$EMPTY_JOB;")" FAILED
+    if [ -n "$(dbq "SELECT last_error FROM match_jobs WHERE id=$EMPTY_JOB;")" ]; then
+      ok "…carrying a last_error a human can act on"
+    else
+      no "the job failed with an empty last_error -- nothing says why, so it cannot be triaged"
+    fi
+  fi
 
   S=$(vr_category '"BANTAM"')
   case "$S" in
@@ -381,7 +402,7 @@ else
   esac
 fi
 
-rm -f "$BODY" "$VRC_SNAP_FILE"
+rm -f "$BODY" "$VRC_SNAP_FILE" "$VRC_JOB_FILE"
 echo
 echo "===== passed $pass  failed $fail  skipped $skipped ====="
 [ "$fail" -eq 0 ] || exit 1

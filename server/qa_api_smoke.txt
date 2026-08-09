@@ -15,7 +15,7 @@ PASS  a wrong password and an unknown account are indistinguishable (both 401)
 
 == D. robots ==
 PASS  a robot is created
-      robot bcfbd1f0-dcf2-4dec-b486-fb8dc759d0d5
+      robot 093bf50c-5fc4-4876-a373-70a3de4dfd5d
 PASS  …but not without a token
 
 == E. snapshot upload stays opaque (§5.2) ==
@@ -30,7 +30,7 @@ PASS  …and a wrong key is refused too
 PASS  a keyed worker claims a job
 PASS  …and the job is the VALIDATE the upload enqueued
 PASS  …pointing at the snapshot just uploaded
-PASS  …and carries a payload location the worker can resolve (file:///tmp/rb-blobs/snapshots/bcfbd1f0-dcf2-4dec-b486-fb8dc759d0d5/60739edc3eb2417a80aba29df299d4e9.json)
+PASS  …and carries a payload location the worker can resolve (file:///tmp/rb-blobs/snapshots/093bf50c-5fc4-4876-a373-70a3de4dfd5d/4e6639996b584c92b8e4805829fefa71.json)
 PASS  …and the payload sha256 rides along, so the worker can verify storage
 PASS  another worker cannot heartbeat a job it does not hold
 PASS  …the holder can
@@ -61,8 +61,10 @@ PASS  a valid category is accepted
 PASS  …and stored verbatim
 PASS  an illegal robot may report no category
 PASS  …and it is stored as SQL NULL, not the empty string
-FAIL  the empty-string category is refused as a SERVER error (HTTP 500) -- the CHECK fires inside the UPDATE and nothing catches it; a worker's verdict is lost to a stack trace
-FAIL  an unknown category name is refused as a SERVER error (HTTP 500) -- same unhandled 23514 as the empty string
-FAIL  a legal robot with NO category was accepted (HTTP 200) -- ratings.category is NOT NULL, so this snapshot can never be rated; it is unplaceable the moment it is stored
+PASS  the empty-string category is refused cleanly (HTTP 400)
+PASS  …and the job is marked FAILED, so the reaper cannot hand it out again
+PASS  …carrying a last_error a human can act on
+PASS  an unknown category name is refused cleanly (HTTP 400)
+PASS  a legal robot with no category is refused (HTTP 400)
 
-===== passed 43  failed 3  skipped 0 =====
+===== passed 48  failed 0  skipped 0 =====

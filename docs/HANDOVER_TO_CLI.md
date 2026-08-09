@@ -203,7 +203,22 @@ TouchSmoke · HazardBench · SensorProbe · CareerBench.
 
 ## 5. The work queue, in order
 
-### 5.1 — FIRST: the validate-result 500 that livelocks
+### 5.1 — ✅ DONE 2026-08-09: the validate-result 500 that livelocks
+
+**Fixed. `api_smoke` 48 pass / 0 fail / 0 skipped** (was 43/3/0),
+`sql_bench` 34/34 unchanged, `qa_api_server.log` back to **0 error lines**
+and 0 occurrences of `23514`. The queue ends a full run `DONE 5 / FAILED 3`
+with **zero `READY` and zero `CLAIMED`** — nothing spinning. Record and the
+three refusal messages: `docs/Validate_Result_Livelock_Fixed_2026-08-09.md`.
+
+Two things worth carrying forward: the fix validates *before* the write
+rather than catching `23514` after, so the 400 can name the trap; and a
+refused result retires the job to `FAILED` rather than `READY`, because a
+deterministic payload gains nothing from a retry. **The snapshot is left
+`PENDING`** — visible-stuck rather than invisibly-retrying — and whether it
+should become `REJECTED` is a product question left open.
+
+The original statement of the problem follows.
 
 Found by the server-side checks and **deliberately left unfixed** so it
 would get its own commit.
