@@ -52,6 +52,9 @@ New (Assets/Phase1/Scripts/):
                      shipped presets over two seeds, 30 bouts, reporting
                      contact, dead air and weapon survival per bout.
 
+server/scripts/gcp_bootstrap.zsh: M1 step 0, idempotent, creates nothing that
+costs money, arms the $25/mo budget alert before anything can spend.
+
 Seams (small on purpose - a parallel spawn path is how you get a robot that
 fights differently from the one the builder drew):
 - BuilderManager.SpawnBot made public
@@ -70,12 +73,33 @@ Career save byte-identical (md5 18614d0e).
 Also sweeps 42 stale _claude_*/critic_* scratch files that earlier sessions
 could not delete over the desktop bridge.
 
-Finding, recorded in Ladder_Sweep_Weapon_Trade_2026-08-08.md and measured over
-30 bouts: the weapon is the fragile thing, not the robot. 26/30 bouts end with
-a weapon destroyed, 15/30 with both sides disarmed, and all 11 bouts with an
-asymmetric weapon count were won by the side that kept one - the loser losing
-18-19 of 19 parts. Mirror matches are deterministic mutual disarm. Mean dead
-air 53.0 s of a 66.8 s bout (79.3%). Ladder-design question, not a runner bug.
+Ladder sweep finding (Ladder_Sweep_Weapon_Trade_2026-08-08.md), measured over
+30 bouts: the weapon was the most fragile thing in the game. 26/30 bouts ended
+with a weapon destroyed, 15/30 with both sides disarmed, all 11 bouts with an
+asymmetric weapon count won by the side that kept one, and 53.0 s of dead air
+in a 66.8 s bout.
+
+Fixed in the same session (Weapon_Trade_Fix_Shipped_2026-08-08.md):
+- MatchRunner.Decide now uses FightManager.DrawBand (made public, not
+  reimplemented) instead of splitting any margin - a 0.13 damage difference no
+  longer decides a match, and Glicko-2 gets a 0.5.
+- DamageResolver.WEAPON_VS_WEAPON = 0.25: weapon-on-weapon HP damage is
+  quartered, keyed off IsEdge/edgeHardness on BOTH sides so there is no second
+  definition of weapon-ness. Weapon-vs-body is untouched.
+- FightManager.TickStalemate: a bout where both machines are disarmed and
+  nothing has landed for 12 s goes to the existing judges, as does one with no
+  contact at all by 30 s. Not a boredom rule - STRUCT_RAM_DMG is 0, so once
+  both edges are gone no further damage is physically possible.
+
+Measured over the same 30 bouts: mean bout 66.8 -> 25.0 s, dead air 53.0 s
+(79.3%) -> 10.4 s (41.5%), Matador v Matador from mutual-disarm draws to
+decisive both seeds, and the post-disarm shoving wins are gone. 0.10 was also
+tested and rejected: it only stretched the mirror grind to 41 s without
+changing the outcome, so mirror lock is a behaviour problem, not a damage
+constant.
+
+MatrixBench 9/9, ReplayBench 57/57, AutonomyBench 24/24, CareerSmoke 128/128
+(the latter must run in its own play session - see the doc).
 MSG_EOF
 
 TOK=$(tr -d '\r\n' < .gh_token.local)

@@ -1,0 +1,32 @@
+# Local dev: the whole Phase-1 system is two moving parts (§7), and this is
+# both of them. `docker compose up` gives you the same API the cloud runs.
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: rb
+      POSTGRES_PASSWORD: rb
+      POSTGRES_DB: rb
+    ports: ["5432:5432"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U rb"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+    volumes: ["rbdata:/var/lib/postgresql/data"]
+
+  api:
+    build: .
+    depends_on:
+      db: { condition: service_healthy }
+    environment:
+      PG_CONN: "Host=db;Username=rb;Password=rb;Database=rb"
+      # Dev-only values. The API refuses to boot without them, deliberately:
+      # a default signing key is a key everyone has.
+      JWT_SECRET: "dev-only-change-me-0123456789abcdef"
+      WORKER_KEY: "dev-only-worker-key"
+      BLOB_ROOT: "/var/lib/robotbrawl/blobs"
+    ports: ["8080:8080"]
+
+volumes:
+  rbdata:

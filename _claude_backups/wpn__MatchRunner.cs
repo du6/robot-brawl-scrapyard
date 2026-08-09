@@ -126,7 +126,13 @@ namespace RobotBrawl.Phase0
             if (bot == null) return 0;
             int n = 0;
             foreach (var p in bot.parts)
-                if (p != null && !p.detached && DamageResolver.IsEdge(p.spec.edgeHardness)) n++;
+            {
+                if (p == null || p.detached) continue;
+                string id = p.spec.id;
+                if (string.IsNullOrEmpty(id)) continue;
+                if (id.StartsWith("spinner") || id.StartsWith("disc") ||
+                    id.StartsWith("hammer") || id.StartsWith("spike") || id.StartsWith("blade")) n++;
+            }
             return n;
         }
 
@@ -263,29 +269,15 @@ namespace RobotBrawl.Phase0
             if (cb != null) cb(result);
         }
 
-        /// <summary>Bouts first; then total damage, but ONLY if the margin is
-        /// one the judges would call a margin.
-        ///
-        /// It used to split on any difference at all, which on the first real
-        /// match handed the tie to B off 0.13 total damage across three draws —
-        /// noise, promoted to a ladder position. §2.1 feeds this into Glicko-2,
-        /// and a rating system fed noise learns noise.
-        ///
-        /// The band is FightManager.DrawBand, not a second threshold invented
-        /// here: "ahead" means the same thing to the ladder as it does to the
-        /// referee and to the scorecard. Inside the band the match is a Draw,
-        /// which Glicko-2 takes as 0.5.</summary>
         void Decide()
         {
             if (result.aWins > result.bWins) { result.verdict = "A"; result.decidedBy = "bouts"; return; }
             if (result.bWins > result.aWins) { result.verdict = "B"; result.decidedBy = "bouts"; return; }
             float a = 0f, b = 0f;
             foreach (var x in result.bouts) { a += x.aDealt; b += x.bDealt; }
-            float band = FightManager.DrawBand(a, b);
-            if (a - b >= band) { result.verdict = "A"; result.decidedBy = "damage"; return; }
-            if (b - a >= band) { result.verdict = "B"; result.decidedBy = "damage"; return; }
-            result.verdict = "Draw";
-            result.decidedBy = Mathf.Abs(a - b) < 0.01f ? "tied" : "inside the draw band";
+            if (a > b + 0.01f) { result.verdict = "A"; result.decidedBy = "damage"; return; }
+            if (b > a + 0.01f) { result.verdict = "B"; result.decidedBy = "damage"; return; }
+            result.verdict = "Draw"; result.decidedBy = "tied";
         }
 
         void Fail(string err)

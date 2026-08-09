@@ -65,11 +65,19 @@ if gcloud billing budgets list --billing-account="$BILLING_ACCOUNT" \
       --format="value(displayName)" 2>/dev/null | grep -qx "robot-brawl ${BUDGET_USD}/mo"; then
   echo "-- budget 'robot-brawl ${BUDGET_USD}/mo' already exists"
 else
+  # --credit-types-treatment=exclude-all-credits is NOT cosmetic. By default a
+  # budget measures spend NET of credits, so for the whole 90 days of the $300
+  # free trial your net cost is ~$0 and this alarm would never fire - during
+  # exactly the window you are experimenting, and exactly on the thing §7 warns
+  # about ("an idle-spinning Unity worker is exactly the thing that quietly
+  # eats a budget"). Excluding credits makes it track GROSS usage, so it tells
+  # you what you are burning while the credit is paying for it.
   gcloud billing budgets create \
     --billing-account="$BILLING_ACCOUNT" \
     --display-name="robot-brawl ${BUDGET_USD}/mo" \
     --budget-amount="${BUDGET_USD}USD" \
     --filter-projects="projects/${PROJECT_ID}" \
+    --credit-types-treatment=exclude-all-credits \
     --threshold-rule=percent=0.5 \
     --threshold-rule=percent=0.9 \
     --threshold-rule=percent=1.0 \

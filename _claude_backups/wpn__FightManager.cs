@@ -97,27 +97,6 @@ public class FightManager : MonoBehaviour
     public static float INCAP_GRACE = 2f;   // s flipped/immobile before the count starts
     public static float COUNT_OUT = 10f;    // s of visible count-out
     public static float DEFAULT_MATCH_TIME = 90f;
-
-    /// <summary>========== END A BOUT THAT IS OVER (owen, 2026-08-08) =======
-    /// The ladder sweep measured a mean of 53.0 s of dead air in a 66.8 s bout
-    /// — 79% of what §1.1 of the multiplayer design doc asks players to watch.
-    ///
-    /// This rule is NOT "it looks boring". It is stricter than that, and that
-    /// is what makes it safe: STRUCT_RAM_DMG is 0, so a part with no weapon
-    /// edge cannot deal HP damage at all (DamageResolver, "bumps are not
-    /// attacks"). Once BOTH machines have lost every edge part, no further
-    /// damage is PHYSICALLY POSSIBLE between them — the remaining clock cannot
-    /// change the scorecard, only pad it. The quiet window is what keeps it
-    /// honest in a hazard arena, where the environment can still deal damage:
-    /// any damage at all, from any source, resets it.
-    ///
-    /// It ends through the existing judges, so the verdict is decided by the
-    /// same criteria as any timeout — nothing new scores a fight.</summary>
-    public static float STALL_QUIET = 12f;
-    /// <summary>...and the other tail: nobody has landed anything at all.
-    /// Every first hit in the 30-bout sweep landed by 5.3 s, so 30 s is far
-    /// outside the distribution of a fight that is merely slow to start.</summary>
-    public static float STALL_NO_CONTACT = 30f;
     /// <summary>Round-1 fix 1: pre-bell settle window. Both bots spawn with
     /// damage + joint-stress DISABLED (CompoundRobot.combatEnabled), drop the
     /// few cm onto their suspension, and only at the bell do velocities zero,
@@ -371,54 +350,8 @@ public class FightManager : MonoBehaviour
         if (eOut) { End(Outcome.PlayerWin, "Enemy counted out — " + enemy.incapReason); return; }
         if (pOut) { End(Outcome.PlayerLoss, "Counted out — " + player.incapReason); return; }
 
-        // --- the fight is over before the clock is (2026-08-08) ---
-        if (TickStalemate()) return;
-
         // --- timeout → judges ---
         if (timer <= 0f) Judge();
-    }
-
-    /// <summary>Live weapon parts on this side. `IsEdge` is the codebase's
-    /// own definition of weapon-ness (PartSpec.edgeHardness), the same one
-    /// DamageResolver gates bump damage on.</summary>
-    int WeaponsAlive(Side s)
-    {
-        if (s.bot == null) return 0;
-        int n = 0;
-        foreach (var p in s.bot.parts)
-            if (!p.detached && DamageResolver.IsEdge(p.spec.edgeHardness)) n++;
-        return n;
-    }
-
-    float damageSeen;
-    float lastDamageAt;
-    bool anyDamage;
-
-    /// <summary>See STALL_QUIET. Returns true if it called the fight.
-    /// Watches damage TAKEN, not dealt, so environmental damage with no
-    /// attacker (hazards) still counts as the fight being alive.</summary>
-    bool TickStalemate()
-    {
-        float total = player.taken + enemy.taken;
-        if (total > damageSeen + 0.01f) { damageSeen = total; lastDamageAt = elapsed; anyDamage = true; }
-
-        if (!anyDamage)
-        {
-            if (elapsed >= STALL_NO_CONTACT)
-            {
-                Judge(string.Format("Called early — no contact in {0:F0} s", STALL_NO_CONTACT));
-                return true;
-            }
-            return false;
-        }
-        if (elapsed - lastDamageAt >= STALL_QUIET &&
-            WeaponsAlive(player) == 0 && WeaponsAlive(enemy) == 0)
-        {
-            Judge(string.Format(
-                "Called early — both machines disarmed, no damage possible for {0:F0} s", STALL_QUIET));
-            return true;
-        }
-        return false;
     }
 
     /// <summary>Round-4 fix 7 (critic finding 7: "on a KO the results screen
@@ -730,7 +663,7 @@ public class FightManager : MonoBehaviour
         int n = Mathf.Max(1, Mathf.Min(player.startParts, enemy.startParts));
         return Mathf.Max(STRUCT_BAND, (MIN_STRUCT_PARTS - 0.5f) / n);
     }
-    public static float DrawBand(float a, float b)
+    static float DrawBand(float a, float b)
     { return Mathf.Max(DRAW_BAND_MIN, DRAW_BAND_FRAC * Mathf.Max(a, b)); }
 
     /// <summary>Is this side clear of the draw band? Used by both the judges and
@@ -784,9 +717,7 @@ public class FightManager : MonoBehaviour
     /// and runs the clock down can no longer bank the draw, and a wedge bot
     /// that puts its opponent down now has something to show for it on the
     /// card. Third, not first, because it is a tie-break, not the sport.</summary>
-    void Judge() { Judge(null); }
-
-    void Judge(string earlyNote)
+    void Judge()
     {
         float hi = Mathf.Max(player.dealt, enemy.dealt);
         float diff = player.dealt - enemy.dealt;
@@ -814,8 +745,6 @@ public class FightManager : MonoBehaviour
             player.dealt, enemy.dealt, pct,
             player.partsNow, player.startParts, enemy.partsNow, enemy.startParts,
             100f * pFlip, 100f * eFlip, lead, 100f * pMob, 100f * eMob);
-
-        if (!string.IsNullOrEmpty(earlyNote)) cmp = earlyNote + " · " + cmp;
 
         if (Mathf.Abs(player.structFrac - enemy.structFrac) > StructBand())
         {

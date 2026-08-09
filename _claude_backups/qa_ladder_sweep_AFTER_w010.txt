@@ -1,0 +1,75 @@
+passed 31 failed 0
+PASS  fixture rig loads (19 parts, one chassis both sides)
+
+  matchup                    seed  verdict   hits  1st    last   deadair  lost A/B  wpn A/B
+  ---------------------------------------------------------------------------------------
+  Brawler    v Brawler      101  Draw      24    1.4   41.6    13.3   1/1      0/0
+PASS  Brawler v Brawler seed 101 simulated
+  Brawler    v Brawler      202  Draw      24    1.4   41.5    13.6   1/1      0/0
+PASS  Brawler v Brawler seed 202 simulated
+  Brawler    v WallShy      101  Draw      24    1.4   41.3    13.3   1/1      0/0
+PASS  Brawler v WallShy seed 101 simulated
+  Brawler    v WallShy      202  Draw      24    1.4   41.7    14.0   1/1      0/0
+PASS  Brawler v WallShy seed 202 simulated
+  Brawler    v Matador      101  B         24    1.5   23.7     2.1   19/5      0/1
+PASS  Brawler v Matador seed 101 simulated
+  Brawler    v Matador      202  A         21    1.5   45.4     1.4   0/19      1/0
+PASS  Brawler v Matador seed 202 simulated
+  Brawler    v Rusher       101  Draw       8    1.2    2.2    13.4   1/1      0/0
+PASS  Brawler v Rusher seed 101 simulated
+  Brawler    v Rusher       202  Draw       6    1.2    2.4    13.6   1/1      0/0
+PASS  Brawler v Rusher seed 202 simulated
+  Brawler    v Statue       101  A         32    5.2   19.5     1.6   0/19      1/0
+PASS  Brawler v Statue seed 101 simulated
+  Brawler    v Statue       202  A         30    4.2   23.4     1.4   0/19      1/0
+PASS  Brawler v Statue seed 202 simulated
+  WallShy    v WallShy      101  Draw      24    1.4   41.5    13.8   1/1      0/0
+PASS  WallShy v WallShy seed 101 simulated
+  WallShy    v WallShy      202  Draw      24    1.4   41.0    13.3   1/1      0/0
+PASS  WallShy v WallShy seed 202 simulated
+  WallShy    v Matador      101  B         17    1.5   17.9     1.4   19/3      0/1
+PASS  WallShy v Matador seed 101 simulated
+  WallShy    v Matador      202  B         32    1.5   10.1     1.7   19/0      0/1
+PASS  WallShy v Matador seed 202 simulated
+  WallShy    v Rusher       101  Draw       8    1.2    2.3    13.9   1/1      0/0
+PASS  WallShy v Rusher seed 101 simulated
+  WallShy    v Rusher       202  B          7    1.2    2.3    13.6   1/1      0/0
+PASS  WallShy v Rusher seed 202 simulated
+  WallShy    v Statue       101  A         12    5.3    9.0     1.4   0/19      1/0
+PASS  WallShy v Statue seed 101 simulated
+  WallShy    v Statue       202  A         36    2.3   33.9    13.0   0/18      1/0
+PASS  WallShy v Statue seed 202 simulated
+  Matador    v Matador      101  A         26    1.6   13.2     1.8   0/19      1/0
+PASS  Matador v Matador seed 101 simulated
+  Matador    v Matador      202  A         23    1.7   28.7     1.3   4/19      1/0
+PASS  Matador v Matador seed 202 simulated
+  Matador    v Rusher       101  A         25    1.3   17.1     1.3   0/19      1/0
+PASS  Matador v Rusher seed 101 simulated
+  Matador    v Rusher       202  A          2    1.3    1.3    13.4   1/1      0/0
+PASS  Matador v Rusher seed 202 simulated
+  Matador    v Statue       101  A         15    5.3    9.2     1.3   0/19      1/0
+PASS  Matador v Statue seed 101 simulated
+  Matador    v Statue       202  A         30    4.4   25.5     1.5   0/19      1/0
+PASS  Matador v Statue seed 202 simulated
+  Rusher     v Rusher       101  Draw       6    1.1    2.1    13.6   1/1      0/0
+PASS  Rusher v Rusher seed 101 simulated
+  Rusher     v Rusher       202  Draw       6    1.1    2.1    13.4   1/1      0/0
+PASS  Rusher v Rusher seed 202 simulated
+  Rusher     v Statue       101  Draw       0      -      -    31.4   0/0      1/1
+PASS  Rusher v Statue seed 101 simulated
+  Rusher     v Statue       202  A          4    1.6    2.1    89.2   0/2      1/1
+PASS  Rusher v Statue seed 202 simulated
+  Statue     v Statue       101  Draw       0      -      -    32.0   0/0      1/1
+PASS  Statue v Statue seed 101 simulated
+  Statue     v Statue       202  Draw       0      -      -    31.4   0/0      1/1
+PASS  Statue v Statue seed 202 simulated
+  ---------------------------------------------------------------------------------------
+
+      bouts run: 30 over 2 seeds x 15 pairings
+      mean hits per bout ......... 17.1
+      mean bout length .......... 31.1 s
+      mean LAST hit at .......... 20.1 s
+      mean DEAD AIR ............. 11.0 s  (35.3% of the bout)
+      bouts with NO contact at all: 3/30
+      bouts ending with BOTH sides disarmed: 13/30  (43.3%)
+      bouts ending with EITHER side disarmed: 26/30  (86.7%)

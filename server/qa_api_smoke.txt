@@ -1,0 +1,55 @@
+== A. health ==
+PASS  healthz answers, which means the API reached Postgres
+
+== B. registration (§2.3) ==
+PASS  a new account registers
+PASS  …and comes back with a token
+PASS  the same email cannot register twice
+PASS  a 5-character password is refused
+
+== C. login is not an account-enumeration oracle ==
+PASS  the right password logs in
+PASS  a wrong password and an unknown account are indistinguishable (both 401)
+
+== D. robots ==
+PASS  a robot is created
+      robot dbbfb826-0aaa-478d-b22e-3eac3e65a5e1
+PASS  …but not without a token
+
+== E. snapshot upload stays opaque (§5.2) ==
+PASS  a well-formed snapshot uploads
+PASS  …and lands PENDING, waiting on a worker
+PASS  a payload whose sha256 does not match is refused
+PASS  an unreadable envelope is refused
+
+== F. the worker path is key-gated (§5.5) ==
+PASS  claiming without the worker key is refused
+PASS  …and a wrong key is refused too
+PASS  a keyed worker claims a job
+PASS  …and the job is the VALIDATE the upload enqueued
+PASS  …pointing at the snapshot just uploaded
+PASS  another worker cannot heartbeat a job it does not hold
+PASS  …the holder can
+
+== G. the worker decides legality, the API records it (§5.2) ==
+PASS  a validate result is accepted
+PASS  the snapshot reads back
+PASS  …now ACTIVE
+PASS  …carrying the worker's mass
+PASS  …and its category
+
+== H. the second upload supersedes the first (§1.2) ==
+PASS  a second snapshot uploads for the same robot
+PASS  validating it does NOT collide with the incumbent
+PASS  the new snapshot is ACTIVE and the old one SUPERSEDED
+
+== I. the privacy boundary (§1.3) ==
+PASS  an anonymous scout can read the scouting card
+PASS  the payload URL is NOT in the response, for anyone
+PASS  the payload itself is not there either
+PASS  …and it is not marked as the scout's own
+PASS  the owner is told why their own upload was rejected
+PASS  a scout cannot read the fail reasons
+PASS  a REJECTED upload left the incumbent ACTIVE
+
+===== passed 35  failed 0  skipped 0 =====

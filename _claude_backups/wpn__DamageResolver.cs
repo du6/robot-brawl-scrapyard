@@ -110,38 +110,6 @@ public static class DamageResolver
     /// — the visible knockback can never explode the solver.</summary>
     public static float SHOVE_CAP = 500f;
 
-    /// <summary>========= WEAPON ON WEAPON (owen, 2026-08-08) =============
-    /// Multiplier on HP damage when a WEAPON part is struck by a WEAPON part.
-    ///
-    /// Measured problem (`Ladder_Sweep_Weapon_Trade_2026-08-08.md`, 30 bouts
-    /// across every preset pairing): the weapon was the most fragile thing in
-    /// the game. 26/30 bouts ended with a weapon destroyed and 15/30 with BOTH
-    /// sides disarmed; every mirror match was a deterministic mutual kill in
-    /// four hits — two spinners meeting head-on traded exactly their own HP
-    /// (121.5 each) and both died inside five seconds. All 11 bouts with an
-    /// asymmetric weapon count were won by the side that still had one, with
-    /// the loser dismantled 18-19 parts of 19. So the match was decided in the
-    /// first 1.4 seconds by approach geometry, and the remaining 85 seconds
-    /// were two disarmed robots shoving.
-    ///
-    /// The fix is deliberately narrow: it does NOT make weapons tougher in
-    /// general (losing a weapon to a determined opponent is a legitimate and
-    /// readable outcome, and armour-vs-weapon is the sport). It only says that
-    /// two hardened edges meeting each other is a glancing, sparking exchange
-    /// rather than a mutual kill — which is also what real robot combat looks
-    /// like. Weapon-vs-BODY damage is untouched.
-    ///
-    /// Both sides of the test use `IsEdge`, which is already this codebase's
-    /// definition of "is this a weapon" (AIController's threat model and
-    /// STRUCT_RAM_DMG both key off it), so there is no second notion of
-    /// weapon-ness to drift.
-    ///
-    /// 0.25 means a spinner survives four exchanges with another spinner
-    /// instead of two — swept over the same 30 bouts before and after via
-    /// LadderSweepBench, which is how any change to this number should be
-    /// argued.</summary>
-    public static float WEAPON_VS_WEAPON = 0.25f;
-
     /// <summary>Floating-damage-number hook for Phase 2B:
     /// (worldPos, amount, destroyedFlag, victimPartKey). Fired once per
     /// applied hit; the key (the victim's Part object) lets the HUD aggregate
@@ -251,8 +219,6 @@ public static class DamageResolver
         if (src == SRC_LIMB) immPassLimb++; else immPassRam++;
 
         float dmg = effImpulse * hardness * DMG_K;
-        // Weapon on weapon is a glancing exchange, not a mutual kill (2026-08-08).
-        if (IsEdge(hardness) && IsEdge(p.spec.edgeHardness)) dmg *= WEAPON_VS_WEAPON;
         // Round-2-critic CRITICAL 3: the underside is not armour.
         if (victim.Flipped) dmg *= EXPOSED_MULT;
         if (dmg <= 0f) return;
