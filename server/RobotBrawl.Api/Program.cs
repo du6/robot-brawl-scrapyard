@@ -123,23 +123,34 @@ app.MapPost("/v1/auth/register", async (RegisterReq req) =>
     if (name.Length is < 2 or > 24) return Bad("display name must be 2-24 characters");
 
     await using var c = await db.OpenAsync();
-    await using var cmd = new NpgsqlCommand(
-        "INSERT INTO users (email, pw_hash, display_name) VALUES ($1,$2,$3) RETURNING id;", c);
-    cmd.Parameters.AddWithValue(req.Email.Trim());
-    cmd.Parameters.AddWithValue(Passwords.Hash(req.Password!));
-    cmd.Parameters.AddWithValue(name);
     try
     {
-        var id = (Guid)(await cmd.ExecuteScalarAsync())!;
+        // The account and its wallet commit together or not at all. §2.3 makes
+        // the balance SUM(ledger.delta) over an append-only table, so a torn
+        // write here is not a transient glitch — it is a permanently wrong
+        // balance whose only repair is another row.
+        await using var tx = await c.BeginTransactionAsync();
+        Guid id;
+        await using (var cmd = new NpgsqlCommand(
+            "INSERT INTO users (email, pw_hash, display_name) VALUES ($1,$2,$3) RETURNING id;", c, tx))
+        {
+            cmd.Parameters.AddWithValue(req.Email.Trim());
+            cmd.Parameters.AddWithValue(Passwords.Hash(req.Password!));
+            cmd.Parameters.AddWithValue(name);
+            id = (Guid)(await cmd.ExecuteScalarAsync())!;
+        }
         // §2.3: a fresh wallet gets the signing bonus, in the same breath as
         // the account, so "registered" and "can afford a challenge" are the
         // same state.
-        await using var l = new NpgsqlCommand(
-            "INSERT INTO ledger (user_id, delta, reason, idem_key) VALUES ($1,$2,'SIGNING_BONUS',$3);", c);
-        l.Parameters.AddWithValue(id);
-        l.Parameters.AddWithValue(500);
-        l.Parameters.AddWithValue("signup:" + id);
-        await l.ExecuteNonQueryAsync();
+        await using (var l = new NpgsqlCommand(
+            "INSERT INTO ledger (user_id, delta, reason, idem_key) VALUES ($1,$2,'SIGNING_BONUS',$3);", c, tx))
+        {
+            l.Parameters.AddWithValue(id);
+            l.Parameters.AddWithValue(500);
+            l.Parameters.AddWithValue("signup:" + id);
+            await l.ExecuteNonQueryAsync();
+        }
+        await tx.CommitAsync();
         return Results.Ok(new { token = tokens.Issue(id, req.Email!), userId = id });
     }
     catch (PostgresException ex) when (ex.SqlState == "23505")

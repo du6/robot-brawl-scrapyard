@@ -6,6 +6,8 @@ PASS  a new account registers
 PASS  …and comes back with a token
 PASS  the same email cannot register twice
 PASS  a 5-character password is refused
+PASS  a new account has exactly one ledger row
+PASS  …and it is the 500-scrap SIGNING_BONUS
 
 == C. login is not an account-enumeration oracle ==
 PASS  the right password logs in
@@ -13,7 +15,7 @@ PASS  a wrong password and an unknown account are indistinguishable (both 401)
 
 == D. robots ==
 PASS  a robot is created
-      robot f84f13b4-b42a-44fc-8a7d-edbcdc30595a
+      robot bcfbd1f0-dcf2-4dec-b486-fb8dc759d0d5
 PASS  …but not without a token
 
 == E. snapshot upload stays opaque (§5.2) ==
@@ -28,7 +30,7 @@ PASS  …and a wrong key is refused too
 PASS  a keyed worker claims a job
 PASS  …and the job is the VALIDATE the upload enqueued
 PASS  …pointing at the snapshot just uploaded
-PASS  …and carries a payload location the worker can resolve (file:///tmp/rb-blobs/snapshots/f84f13b4-b42a-44fc-8a7d-edbcdc30595a/f17c98da67fa4af4916ef749700a0f91.json)
+PASS  …and carries a payload location the worker can resolve (file:///tmp/rb-blobs/snapshots/bcfbd1f0-dcf2-4dec-b486-fb8dc759d0d5/60739edc3eb2417a80aba29df299d4e9.json)
 PASS  …and the payload sha256 rides along, so the worker can verify storage
 PASS  another worker cannot heartbeat a job it does not hold
 PASS  …the holder can
@@ -54,4 +56,13 @@ PASS  the owner is told why their own upload was rejected
 PASS  a scout cannot read the fail reasons
 PASS  a REJECTED upload left the incumbent ACTIVE
 
-===== passed 37  failed 0  skipped 0 =====
+== J. the category contract, pinned from the server side (§5.2) ==
+PASS  a valid category is accepted
+PASS  …and stored verbatim
+PASS  an illegal robot may report no category
+PASS  …and it is stored as SQL NULL, not the empty string
+FAIL  the empty-string category is refused as a SERVER error (HTTP 500) -- the CHECK fires inside the UPDATE and nothing catches it; a worker's verdict is lost to a stack trace
+FAIL  an unknown category name is refused as a SERVER error (HTTP 500) -- same unhandled 23514 as the empty string
+FAIL  a legal robot with NO category was accepted (HTTP 200) -- ratings.category is NOT NULL, so this snapshot can never be rated; it is unplaceable the moment it is stored
+
+===== passed 43  failed 3  skipped 0 =====

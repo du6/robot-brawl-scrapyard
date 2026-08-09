@@ -82,6 +82,48 @@ PYEOF
 }
 body_upload() { "$PY" -c "import json,sys;print(json.dumps({'robotId':sys.argv[1],'envelope':sys.argv[2]}))" "$1" "$2"; }
 
+# Ask the database directly. Some contracts are invisible from the HTTP side:
+# a torn write still answers 200, and SQL NULL and the empty string are the
+# same three characters in a JSON response. Same credentials run_local.sh uses.
+dbq() { PGPASSWORD=rb psql -h localhost -U rb -d rb -qtA -c "$1" 2>/dev/null | tr -d '[:space:]'; }
+
+# Post a validate-result carrying a RAW JSON category value, on its own fresh
+# snapshot and job, and echo the HTTP status. The category argument is spliced
+# in unquoted so a caller can pass a bare null, an empty string, or a bad
+# name — which is the whole point: JsonUtility on the Unity side serialises a
+# null string as "", so "" is what a worker written the obvious way sends.
+# Records the snapshot it made in $VRC_SNAP_FILE so the caller can read the
+# row back. It goes through a FILE, not a variable: every caller invokes this
+# as S=$(vr_category ...), which runs it in a subshell, and a variable set in
+# a subshell does not survive. The first cut used a plain variable and lost
+# both storage checks to SKIP.
+VRC_SNAP_FILE="/tmp/rb_vrcsnap.$$"
+vr_category() { # <raw-json-value> [legal=true]
+  local rawcat="$1" legal="${2:-true}" snap job got i
+  : > "$VRC_SNAP_FILE"
+  req POST /v1/snapshots "$(body_upload "$ROBOT" "$(envelope "Cat-$RANDOM-$RANDOM")")" "$AUTH" >/dev/null
+  snap=$(jget id); [ -z "$snap" ] && { echo "NO-SNAPSHOT"; return; }
+  # Claim until we hold the job for OUR snapshot: earlier sections may have
+  # left a pending job, and claim() hands out the oldest one first.
+  job=""
+  for i in 1 2 3 4 5; do
+    req POST /v1/worker/jobs/claim '{"workerId":"smoke-cat"}' "X-Worker-Key: $WKEY" >/dev/null
+    got=$(jget id); [ -z "$got" ] && break
+    if [ "$(jget snapshotId)" = "$snap" ]; then job="$got"; break; fi
+    # not ours — retire it so the queue advances, then try again
+    req POST "/v1/worker/jobs/$got/validate-result" \
+      "{\"snapshotId\":\"$(jget snapshotId)\",\"workerId\":\"smoke-cat\",\"legal\":false,\"massKg\":1,\"aabbX\":0.1,\"aabbY\":0.1,\"aabbZ\":0.1,\"category\":null,\"partsManifest\":[],\"programHash\":\"\",\"failReasons\":[\"drained by vr_category\"]}" \
+      "X-Worker-Key: $WKEY" >/dev/null
+  done
+  [ -z "$job" ] && { echo "NO-JOB"; return; }
+  printf '%s' "$snap" > "$VRC_SNAP_FILE"
+  req POST "/v1/worker/jobs/$job/validate-result" \
+    "{\"snapshotId\":\"$snap\",\"workerId\":\"smoke-cat\",\"legal\":$legal,\"massKg\":9,
+      \"aabbX\":0.4,\"aabbY\":0.3,\"aabbZ\":0.5,\"category\":$rawcat,
+      \"partsManifest\":[\"chassis_a\"],\"programHash\":\"\",\"failReasons\":[]}" \
+    "X-Worker-Key: $WKEY"
+}
+
 STAMP=$($PY -c "import time;print(int(time.time()))")
 EMAIL="smoke-$STAMP@example.com"
 PW="correct-horse-battery"
@@ -100,6 +142,23 @@ S=$(req POST /v1/auth/register "{\"email\":\"$EMAIL\",\"password\":\"$PW\",\"dis
 expect "the same email cannot register twice" "$S" 409
 S=$(req POST /v1/auth/register "{\"email\":\"x-$STAMP@example.com\",\"password\":\"short\",\"displayName\":\"Sh\"}")
 expect "a 5-character password is refused" "$S" 400
+
+# 2026-08-09 (relay 003). Register was two INSERTs — the user and the
+# 500-scrap SIGNING_BONUS — sharing one connection with NO transaction. §2.3
+# makes a wallet balance SUM(ledger.delta) over an append-only table, so a
+# tear between them is not a transient glitch: it is a permanently wrong
+# balance whose only repair is another row. The checks above could not see
+# it, because every one of them asks the API a question and the API answered
+# 200 either way. This asks the DATABASE.
+if ! command -v psql >/dev/null 2>&1; then
+  skip "the signing bonus is atomic with the account (2 checks)" "psql is not on PATH"
+elif [ -z "$USERID" ]; then
+  skip "the signing bonus is atomic with the account (2 checks)" "registration returned no userId"
+else
+  is "a new account has exactly one ledger row" "$(dbq "SELECT count(*) FROM ledger WHERE user_id='$USERID';")" 1
+  is "…and it is the 500-scrap SIGNING_BONUS" \
+     "$(dbq "SELECT reason||':'||delta FROM ledger WHERE user_id='$USERID';")" "SIGNING_BONUS:500"
+fi
 
 echo
 echo "== C. login is not an account-enumeration oracle =="
@@ -263,7 +322,66 @@ else
   fi
 fi
 
-rm -f "$BODY"
+echo
+echo "== J. the category contract, pinned from the server side (§5.2) =="
+# 2026-08-09 (relay 003). snapshots.category is
+#   TEXT CHECK (category IS NULL OR category IN ('FEATHER','LIGHT','MIDDLE','HEAVY','SUPER'))
+# and a robot with no weight category is a REJECTION, not "unrated" —
+# ratings.category is NOT NULL. So the API has exactly four cases to honour,
+# and the third is the one that bites: Unity's JsonUtility serialises a null
+# string as "", so "" is precisely what a worker written the obvious way
+# sends, and it fails INSIDE the UPDATE, after the job has done all its work.
+#
+# These assert the CONTRACT, not today's behaviour. A refusal that arrives as
+# an unhandled 23514 is still a refusal, but it is a 500 with a stack trace
+# where a 400 belongs — if that is what happens, this section fails loudly and
+# names the bug rather than being loosened to accommodate it.
+if [ -z "${ROBOT:-}" ] || [ -z "${AUTH:-}" ]; then
+  skip "the category contract (6 checks)" "no robot or token -- an earlier section did not complete"
+else
+  S=$(vr_category '"FEATHER"'); VRC_SNAP=$(cat "$VRC_SNAP_FILE" 2>/dev/null)
+  expect "a valid category is accepted" "$S" 200
+  if [ -n "$VRC_SNAP" ]; then
+    is "…and stored verbatim" "$(dbq "SELECT category FROM snapshots WHERE id='$VRC_SNAP';")" FEATHER
+  else skip "…and stored verbatim" "no snapshot from the FEATHER case"; fi
+
+  S=$(vr_category 'null' false); VRC_SNAP=$(cat "$VRC_SNAP_FILE" 2>/dev/null)
+  expect "an illegal robot may report no category" "$S" 200
+  if [ -n "$VRC_SNAP" ]; then
+    # -qtA prints SQL NULL as the empty string, so count the NULLs instead of
+    # comparing text — otherwise NULL and '' are indistinguishable here, which
+    # is the exact confusion this section exists to rule out.
+    is "…and it is stored as SQL NULL, not the empty string" \
+       "$(dbq "SELECT count(*) FROM snapshots WHERE id='$VRC_SNAP' AND category IS NULL;")" 1
+  else skip "…and it is stored as SQL NULL" "no snapshot from the null case"; fi
+
+  # The two that must be refused. 4xx is the contract: the worker sent
+  # something the schema forbids and deserves to be told so.
+  S=$(vr_category '""' false)
+  case "$S" in
+    4??) ok "the empty-string category is refused cleanly (HTTP $S)" ;;
+    5??) no "the empty-string category is refused as a SERVER error (HTTP $S) -- the CHECK fires inside the UPDATE and nothing catches it; a worker's verdict is lost to a stack trace" ;;
+    *)   no "the empty-string category was ACCEPTED (HTTP $S) -- snapshots.category's CHECK should have forbidden it" ;;
+  esac
+
+  S=$(vr_category '"BANTAM"')
+  case "$S" in
+    4??) ok "an unknown category name is refused cleanly (HTTP $S)" ;;
+    5??) no "an unknown category name is refused as a SERVER error (HTTP $S) -- same unhandled 23514 as the empty string" ;;
+    *)   no "an unknown category name was ACCEPTED (HTTP $S) -- the CHECK constraint is not doing its job" ;;
+  esac
+
+  # legal:true with no category is nonsense: ratings.category is NOT NULL, so
+  # such a snapshot can never be placed on a ladder. The Cowork worker cannot
+  # produce it, but the API should not depend on being the only client.
+  S=$(vr_category 'null' true)
+  case "$S" in
+    4??) ok "a legal robot with no category is refused (HTTP $S)" ;;
+    *)   no "a legal robot with NO category was accepted (HTTP $S) -- ratings.category is NOT NULL, so this snapshot can never be rated; it is unplaceable the moment it is stored" ;;
+  esac
+fi
+
+rm -f "$BODY" "$VRC_SNAP_FILE"
 echo
 echo "===== passed $pass  failed $fail  skipped $skipped ====="
 [ "$fail" -eq 0 ] || exit 1
