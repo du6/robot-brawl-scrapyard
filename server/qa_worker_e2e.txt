@@ -1,0 +1,55 @@
+== VALIDATE worker against the LIVE API — first end-to-end run ==
+   2026-08-09, Claude Code CLI on owen's Mac.
+   HANDOVER_TO_CLI.md §5.3. Never done before this run.
+
+   Setup: dev DB truncated; API started by hand (dotnet run, not run_local.sh,
+   because the worker needs the server up while the editor drives it);
+   ValidateWorkerLoop.RunOnce + HttpWorkerTransport in Unity play mode,
+   pointed at http://localhost:5000. Snapshots uploaded through the real
+   /v1/snapshots endpoint, exactly as a client would.
+
+== A. the transport, first request it has ever made ==
+PASS  HttpWorkerTransport claimed a job over HTTP        (postsOK 1/1)
+PASS  fetched the payload from a file:// blob URL         (UnityWebRequest.Get)
+PASS  the sha256 in the claim matched the fetched bytes   (judging was reached)
+PASS  posted a validate-result the API ACCEPTED           (no 4xx, no 5xx)
+PASS  the job was COMPLETED, not left to spin             (status DONE)
+      3 jobs handled, 3 posts succeeded, 0 posts failed, 0 left for retry.
+
+== B. three payloads, three different verdicts ==
+      A synthetic envelope, a real one-core export, and one of owen's own
+      stable robots. Three verdicts, all correct, all round-tripped.
+
+PASS  unreadable payload  -> REJECTED, cat=NULL,    mass=0,   parts=0
+      fail: "snapshot: payload is not a readable snapshot"
+PASS  bare core, no wheels-> REJECTED, cat=FEATHER, mass=73,  parts=1
+      fail: "Needs at least 1 wheel."
+PASS  spinner1 (16 parts) -> ACTIVE,   cat=FEATHER, mass=799, parts=16
+      fail: (none)
+
+      The middle row is the design doc's M1 accept clause "reject a
+      program-gate-failing snapshot with the same message strings the
+      builder shows". "Needs at least 1 wheel." is the builder's own string,
+      carried intact from the worker's judgement to snapshots.fail_reasons.
+
+== C. the queue and the server ==
+PASS  every job reached DONE                             (DONE 3)
+PASS  no job left READY or CLAIMED                       (0 / 0)
+PASS  no job FAILED                                      (0)
+PASS  server log clean across the whole run              (10 lines, 0 errors)
+
+      The category the worker computed was stored verbatim in every case,
+      and the illegal-with-NULL-category row is the shape the API now
+      refuses when legal=true (see Validate_Result_Livelock_Fixed).
+
+== D. owner state ==
+PASS  career save byte-identical   18614d0e6603869f28fb65992b7d1484
+PASS  career mtime unchanged       2026-08-05 21:57  (never written)
+PASS  owen's bay untouched         ExportRaw used; the builder was never driven
+PASS  editor restored              isPlaying=False, scene Main, not dirty,
+                                   no stray e2e_worker object
+
+ RESULT: the VALIDATE half of M1 is proven end to end - client upload,
+         queue, worker claim/fetch/verify/judge, API accept, job complete.
+         NOT a bench: this is a hand-run, not yet automated. See the
+         record for what that leaves open.

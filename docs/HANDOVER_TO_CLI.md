@@ -260,7 +260,26 @@ was unusable** — every endpoint answered correctly in isolation and no
 consumer had ever tried to *complete* a job. An endpoint suite that never
 runs the loop it exists to serve is testing its own reachability.
 
-### 5.3 — The worker against the live API, end to end
+### 5.3 — ✅ DONE 2026-08-09: the worker against the live API, end to end
+
+**Proven.** 3 jobs handled, 3 posts succeeded, 0 failed, 0 left for retry.
+A legal robot (`spinner1`, 16 parts) went **ACTIVE** with `category=FEATHER`,
+`mass=799`; a wheel-less core was REJECTED carrying the builder's own string
+*"Needs at least 1 wheel."*; an unreadable payload was REJECTED cleanly.
+Queue ended `DONE 3` with zero `READY`/`CLAIMED`/`FAILED`, server log 0
+errors, career save byte-identical with mtime unchanged.
+
+Record: `docs/Worker_Live_API_E2E_2026-08-09.md` ·
+evidence: `server/qa_worker_e2e.txt`.
+
+⚠ **Still open even though §5.3 is done:** this is a **hand-run, not a
+bench** — it catches nothing tomorrow. Nothing was killed mid-flight, so
+M1's *"kill a worker mid-fight; job retries and completes"* clause is
+untested. `RunForever` was never exercised, only `RunOnce` three times. And
+it is localhost only: the `file://` blob URL becomes a signed cloud URL in
+production and is unproven there.
+
+The original statement of the problem follows.
 
 `run_local.sh` in one terminal, `ValidateWorkerLoop` pointed at
 `http://localhost:5000` with `HttpWorkerTransport` in the editor. **This
