@@ -1,0 +1,57 @@
+== A. the table itself ==
+PASS  the ladder has exactly 5 classes (has 5)
+PASS  every id matches 001_init.sql's CHECK set, in order
+PASS  caps are STRICTLY ascending — the scan order is the rule
+PASS  caps are the five shipped league caps, in order — one definition, not two
+      table: FEATHER 1500 / LIGHT 2000 / MIDDLE 2800 / HEAVY 4000 / SUPER 5500
+      career league L1 (Scrapyard Open) cap 1500 kg
+      career league L2 (Garage League) cap 2000 kg
+      career league L3 (Regional Circuit) cap 2800 kg
+      career league L4 (National Series) cap 4000 kg
+      career league L5 (World Championship) cap 5500 kg
+== B. every cap, from both sides ==
+PASS  a robot exactly ON the FEATHER cap (1500 kg) is FEATHER
+PASS  one kilogram under the FEATHER cap is still FEATHER
+PASS  one kilogram over the FEATHER cap is LIGHT (got LIGHT)
+PASS  a robot exactly ON the LIGHT cap (2000 kg) is LIGHT
+PASS  one kilogram under the LIGHT cap is still LIGHT
+PASS  one kilogram over the LIGHT cap is MIDDLE (got MIDDLE)
+PASS  a robot exactly ON the MIDDLE cap (2800 kg) is MIDDLE
+PASS  one kilogram under the MIDDLE cap is still MIDDLE
+PASS  one kilogram over the MIDDLE cap is HEAVY (got HEAVY)
+PASS  a robot exactly ON the HEAVY cap (4000 kg) is HEAVY
+PASS  one kilogram under the HEAVY cap is still HEAVY
+PASS  one kilogram over the HEAVY cap is SUPER (got SUPER)
+PASS  a robot exactly ON the SUPER cap (5500 kg) is SUPER
+PASS  one kilogram under the SUPER cap is still SUPER
+PASS  one kilogram over the heaviest cap has NO category (got none)
+== C. refusals carry a reason ==
+PASS  1 kg is a Featherweight, not a rounding error
+PASS  a 0 kg build has no category
+PASS  a negative mass has no category
+PASS  0 kg is refused WITH a reason
+PASS  negative mass is refused WITH a reason
+PASS  the over-cap reason names the shortfall: 1 kg over the heaviest category (5500 kg limit, build is 5501 kg).
+PASS  a robot that HAS a category is given no rejection reason
+PASS  neither end of the legal range is refused
+== D. helpers ==
+PASS  CapKg reads the table
+PASS  CapKg says -1 for an id that is not a class
+PASS  ids are case sensitive — the DB CHECK is too
+PASS  empty and null are not categories
+PASS  Label is the player-facing name
+PASS  an unknown id renders as itself, never as an empty slot
+PASS  a Featherweight may challenge up to Super-heavy
+PASS  a robot may challenge in its own category
+PASS  a Super-heavy may NOT punch down
+PASS  a Middleweight may NOT punch down
+PASS  an unknown category may not challenge and may not be challenged into
+== E. every integer mass from -10 to 7000 kg ==
+PASS  every assigned category is one of the five (0 bad)
+PASS  every assigned class actually holds its robot (0 bad)
+PASS  no robot was put in a class heavier than it needed (0 bad)
+PASS  every refusal across the sweep carries a reason (0 silent)
+      swept 7011 masses: 5500 assigned, 1511 refused
+PASS  the sweep saw BOTH outcomes — 5500 assigned / 1511 refused
+PASS  exactly 5500 masses are placeable (1 kg .. the top cap), got 5500
+ RESULT: 44 pass, 0 fail - ALL GREEN

@@ -94,6 +94,14 @@ namespace RobotBrawl.Phase0
         public int massKg;
         public Vector3 aabb;
         public int partCount;
+        /// <summary>RobotCategory.Assign(massKg) — the ladder this robot is
+        /// placed on (§1.2). "" means NO category, which is a rejection and
+        /// not an "unrated" state: ratings.category is NOT NULL, so there is
+        /// no ladder row for a categoryless snapshot. The invariant Describe()
+        /// maintains and CategoryBench asserts is `legal` implies non-empty.
+        /// Server-computed on purpose — §1.2 forbids trusting a client's
+        /// claim, and the worker running this code IS the server.</summary>
+        public string category = "";
         public string programHash = "";
         public bool hasProgram;
         public List<string> partsManifest = new List<string>();
@@ -218,8 +226,10 @@ namespace RobotBrawl.Phase0
         /// <summary>What a validate job reports (§5.2). Requires the build to
         /// be loaded in `bm` already — it reads the real builder state so the
         /// same code that refuses an illegal robot in the builder refuses it
-        /// here. Category assignment lives server-side in M1; this is the
-        /// client-side half that produces the numbers it decides from.</summary>
+        /// here. As of 2026-08-09 this also assigns the weight category
+        /// (RobotCategory) — §5.2's worker runs this method, so "server-side"
+        /// and "this file" are the same place. Everything returned is derived
+        /// from the loaded build; nothing is read from the payload's claims.</summary>
         public static SnapshotMeta Describe(BuilderManager bm, SnapshotPayload p)
         {
             var m = new SnapshotMeta();
@@ -236,6 +246,20 @@ namespace RobotBrawl.Phase0
 
             string buildErr = bm.Validate();
             if (buildErr != null) m.failReasons.Add(buildErr);
+
+            // §1.2, and the reason this runs BEFORE m.legal is set: a robot
+            // heavier than the top cap has no ladder to stand on, so "no
+            // category" has to be a fail reason rather than a quiet null. The
+            // alternative — legal with category NULL — passes the snapshots
+            // CHECK, is accepted by validate-result, and then has nowhere to be
+            // rated. Category comes from the VALIDATED mass read off the real
+            // builder above, never from anything the payload claims.
+            m.category = RobotCategory.Assign(m.massKg) ?? "";
+            if (m.category.Length == 0)
+            {
+                string why = RobotCategory.Reason(m.massKg);
+                m.failReasons.Add(why ?? ("no weight category for " + m.massKg + " kg"));
+            }
 
             if (m.hasProgram)
             {

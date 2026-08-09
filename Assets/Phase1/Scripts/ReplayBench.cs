@@ -126,6 +126,20 @@ namespace RobotBrawl.Phase0
             Check(meta.legal, "the fixture rig + Brawler validates legal: " +
                   (meta.failReasons.Count == 0 ? "no reasons" : string.Join(" / ", meta.failReasons.ToArray())));
 
+            // Category (M1, §1.2). CategoryBench proves the TABLE over the whole
+            // mass domain with no scene; these three prove the SEAM — that
+            // Describe actually calls it, feeds it the validated mass off the
+            // real builder, and never reports a legal robot the ladder cannot
+            // place. Checked here rather than in a second fixture because this
+            // is the only place a real build is already loaded.
+            Check(meta.category == RobotCategory.Assign(meta.massKg),
+                  "meta category is RobotCategory's answer for the validated mass (" +
+                  meta.massKg + " kg -> " + (meta.category.Length == 0 ? "none" : meta.category) + ")");
+            Check(!meta.legal || meta.category.Length > 0,
+                  "a legal snapshot always has a ladder to stand on");
+            Check(meta.category.Length == 0 || RobotCategory.IsKnown(meta.category),
+                  "the category is one of the five names the schema will accept");
+
             // Import round trip: the builder can be rebuilt from the envelope.
             bm.LoadSnapshot(VerbBench.ARMED);
             yield return null;

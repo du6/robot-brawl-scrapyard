@@ -1,4 +1,4 @@
-passed 57 failed 0
+passed 60 failed 0
 PASS  fixture rig loads (19 parts)
 PASS  sha256 is stable across two exports of the same state
 PASS  envelope hash covers the stored payload bytes
@@ -18,6 +18,9 @@ PASS  meta parts manifest lists every part
 PASS  meta program hash is the hash of the program, not of the build
 PASS  no program hashes to empty, not to a collidable constant
 PASS  the fixture rig + Brawler validates legal: no reasons
+PASS  meta category is RobotCategory's answer for the validated mass (924 kg -> FEATHER)
+PASS  a legal snapshot always has a ladder to stand on
+PASS  the category is one of the five names the schema will accept
 PASS  import reconstructs a build: ok
 PASS  imported build is byte-identical to the exported one
 PASS  imported program is byte-identical to the exported one
@@ -28,28 +31,28 @@ PASS  best-of-3 ran 3 bouts
 PASS  match has a verdict: Draw (by inside the draw band)
       record A 0 / B 0 / draw 3
 PASS  different seeds produce different bouts
-      bout 0 seed 11 -> Draw (Draw, Called early — both machines disarmed, no damage possible for 12 s · Judges' decision — damage 76 vs 76 (0.0% margin level) · pieces 18/19 vs 18/19 · aggression 17% vs 17% · on its back 0% vs 0% — too close to call, scored a draw) 27.90s  dealt A 75.90 B 75.94
-PASS  bout 0 actually simulated (27.90s)
+      bout 0 seed 11 -> Draw (Draw, Called early — both machines disarmed, no damage possible for 12 s · Judges' decision — damage 76 vs 76 (0.0% margin level) · pieces 18/19 vs 18/19 · aggression 15% vs 15% · on its back 0% vs 0% — both machines disarmed with nothing left to settle it, scored a draw) 26.45s  dealt A 75.90 B 75.94
+PASS  bout 0 actually simulated (26.45s)
 PASS  bout 0 had contact (10 damage exchanges)
-      bout 0 dead air after the last hit: 12.05s of 27.90s
+      bout 0 dead air after the last hit: 12.02s of 26.45s
 PASS  bout 0 wrote a replay file
-      bout 1 seed 22 -> Draw (Draw, Called early — both machines disarmed, no damage possible for 12 s · Judges' decision — damage 76 vs 76 (0.3% margin level) · pieces 18/19 vs 18/19 · aggression 19% vs 17% · on its back 0% vs 0% — too close to call, scored a draw) 28.05s  dealt A 75.69 B 75.94
-PASS  bout 1 actually simulated (28.05s)
+      bout 1 seed 22 -> Draw (Draw, Called early — both machines disarmed, no damage possible for 12 s · Judges' decision — damage 76 vs 76 (0.3% margin level) · pieces 18/19 vs 18/19 · aggression 23% vs 22% · on its back 0% vs 0% — both machines disarmed with nothing left to settle it, scored a draw) 28.88s  dealt A 75.69 B 75.94
+PASS  bout 1 actually simulated (28.88s)
 PASS  bout 1 had contact (10 damage exchanges)
-      bout 1 dead air after the last hit: 12.03s of 28.05s
+      bout 1 dead air after the last hit: 12.17s of 28.88s
 PASS  bout 1 wrote a replay file
-      bout 2 seed 33 -> Draw (Draw, Called early — both machines disarmed, no damage possible for 12 s · Judges' decision — damage 76 vs 76 (0.0% margin level) · pieces 18/19 vs 18/19 · aggression 17% vs 23% · on its back 0% vs 0% — too close to call, scored a draw) 27.66s  dealt A 75.94 B 75.93
-PASS  bout 2 actually simulated (27.66s)
+      bout 2 seed 33 -> Draw (Draw, Called early — both machines disarmed, no damage possible for 12 s · Judges' decision — damage 76 vs 76 (0.0% margin level) · pieces 18/19 vs 18/19 · aggression 16% vs 16% · on its back 0% vs 0% — both machines disarmed with nothing left to settle it, scored a draw) 27.87s  dealt A 75.94 B 75.93
+PASS  bout 2 actually simulated (27.87s)
 PASS  bout 2 had contact (10 damage exchanges)
-      bout 2 dead air after the last hit: 12.00s of 27.66s
+      bout 2 dead air after the last hit: 12.04s of 27.87s
 PASS  bout 2 wrote a replay file
-      replay size 94799 B for 27.90s
+      replay size 91942 B for 26.45s
 PASS  replay reads back: ok
 PASS  replay header carries its seed
 PASS  replay carries side A's build verbatim
 PASS  replay names both sides' parts
 PASS  replay verdict matches the match result (Draw vs Draw)
-PASS  recording covers the bout at 10 Hz (280 samples, expected ~279.00)
+PASS  recording covers the bout at 10 Hz (266 samples, expected ~264.50)
 PASS  both sides are sampled on every frame
 PASS  every side-A frame is root + 7 floats per part
 PASS  replay decompresses
@@ -58,7 +61,7 @@ PASS  side B's program does not appear in the replay
 PASS  no program structure leaks into the replay at all
 PASS  playback ran to the end
 PASS  playback clean: ok
-PASS  playback applied 279 frames, coverage 99.64% (band 95-105%)
+PASS  playback applied 265 frames, coverage 99.81% (band 95-105%)
 PASS  playback hid every part the recording says was destroyed (2/2)
       playback events: 11, destroys 2
 PASS  the match handed the career object back untouched
