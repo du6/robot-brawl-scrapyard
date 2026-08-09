@@ -1,0 +1,18 @@
+PASS  BuilderManager present
+PASS  fixture loads (14 parts, got 14)
+PASS  all three presets validate on the matrix body
+        bout 1  PlayerWin  dealt 157 taken 10  23s  its gyro had already been sheared off, leaving only the slow emergency
+        bout 2  PlayerWin  dealt 409 taken 10  21s  enemy core destroyed
+        bout 3  PlayerWin  dealt 493 taken 5  90s  decided on structure destroyed
+        bout 4  PlayerWin  dealt 437 taken 10  30s  enemy core destroyed
+        bout 5  PlayerWin  dealt 236 taken 10  22s  its gyro had already been sheared off, leaving only the slow emergency
+      FLOOR Brawler L1C1 scout-R  W5/L0/D0  dealt~346 taken~9
+        bout 1  PlayerWin  dealt 503 taken 25  47s  fit a gyro, or build an arm that can push you back over
+        bout 2  PlayerWin  dealt 747 taken 68  17s  enemy core destroyed
+        bout 3  PlayerLoss  dealt 28 taken 32  15s  structure and damage even, decided on aggression: the enemy kept movin
+        bout 4  PlayerWin  dealt 368 taken 37  58s  fit a gyro, or build an arm that can push you back over
+        bout 5  Draw  dealt 34 taken 27  16s  too close to call, scored a draw
+      FLOOR Brawler L1C2 tipper-R  W3/L1/D1  dealt~336 taken~38
+PASS  FLOOR: Brawler clears the L1 sample 8/10 (need >=7/10)
+PASS  every scheduled fight started (0 no-starts)
+PASS  player controlSource==Program held during sampled frames (0 violations)

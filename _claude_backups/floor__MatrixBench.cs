@@ -33,22 +33,6 @@ public class MatrixBench : MonoBehaviour
     public static MatrixBench Run()
     { return new GameObject("matrix_bench").AddComponent<MatrixBench>(); }
 
-    /// <summary>The FLOOR claim on its own: 10 bouts, about a minute, instead
-    /// of the full 46-bout matrix. Added 2026-08-09 because FLOOR turned out
-    /// to be the claim that needs REPEATING rather than running once - two
-    /// back-to-back full runs scored it 6/10 then 8/10 with no code change
-    /// between them, so the number only means something as a distribution.
-    /// Writes qa_matrix_floor.txt so it never clobbers the full run's
-    /// artifact.</summary>
-    public static MatrixBench RunFloor()
-    {
-        var b = new GameObject("matrix_bench").AddComponent<MatrixBench>();
-        b.floorOnly = true;
-        return b;
-    }
-
-    public bool floorOnly;
-
     public int passed, failed;
     public bool finished;
     readonly List<string> log = new List<string>();
@@ -159,7 +143,7 @@ public class MatrixBench : MonoBehaviour
         foreach (var cell in FLOOR)
         {
             var r = new int[3]; var d = new float[2];
-            yield return StartCoroutine(RunCell(RobotProgram.Brawler(), cell, r, d, true));
+            yield return StartCoroutine(RunCell(RobotProgram.Brawler(), cell, r, d));
             floorW += r[0]; floorN += cell.n;
             Note("FLOOR Brawler " + cell.name + "  W" + r[0] + "/L" + r[1] + "/D" + r[2]
                  + "  dealt~" + d[0].ToString("F0") + " taken~" + d[1].ToString("F0"));
@@ -167,9 +151,7 @@ public class MatrixBench : MonoBehaviour
         Check(floorW >= 7, "FLOOR: Brawler clears the L1 sample " + floorW + "/" + floorN + " (need >=7/10)");
 
         // ---- SWEEP: every preset vs the upper sample ----------------------
-        var presets = floorOnly
-            ? new System.Func<RobotProgram>[0]
-            : new System.Func<RobotProgram>[] { RobotProgram.Brawler, RobotProgram.WallShy, RobotProgram.Matador };
+        var presets = new System.Func<RobotProgram>[] { RobotProgram.Brawler, RobotProgram.WallShy, RobotProgram.Matador };
         foreach (var mk in presets)
         {
             var prog = mk();
@@ -198,7 +180,7 @@ public class MatrixBench : MonoBehaviour
 
     /// <summary>One matrix cell: n autonomy fights of `prog` in contest
     /// (li,ci). r = {wins, losses, draws}; d = {mean dealt, mean taken}.</summary>
-    IEnumerator RunCell(RobotProgram prog, Cell cell, int[] r, float[] d, bool detail = false)
+    IEnumerator RunCell(RobotProgram prog, Cell cell, int[] r, float[] d)
     {
         float sumDealt = 0f, sumTaken = 0f; int measured = 0;
         for (int k = 0; k < cell.n; k++)
@@ -240,21 +222,6 @@ public class MatrixBench : MonoBehaviour
                 else r[2]++;
                 sumDealt += fm.player.dealt; sumTaken += fm.player.taken;
                 measured++;
-                // A W/L/D tally cannot tell a bout that was FOUGHT from one the
-                // judges resolved on a tie-break. causeLine's last clause names
-                // the criterion that actually decided it, and that distinction
-                // is the whole question about the L1 floor.
-                if (detail)
-                {
-                    string cl = fm.causeLine == null ? "" : fm.causeLine;
-                    int cut = cl.LastIndexOf(" \u2014 ");
-                    string why = cut >= 0 ? cl.Substring(cut + 3) : cl;
-                    if (why.Length > 70) why = why.Substring(0, 70);
-                    Note("  bout " + (k + 1) + "  " + fm.outcome
-                         + "  dealt " + fm.player.dealt.ToString("F0")
-                         + " taken " + fm.player.taken.ToString("F0")
-                         + "  " + fm.elapsed.ToString("F0") + "s  " + why);
-                }
             }
             Time.timeScale = 1f;
             bm.BackToBuild();
@@ -277,8 +244,7 @@ public class MatrixBench : MonoBehaviour
         Debug.Log(string.Format("[MatrixBench] RESULT: {0} pass, {1} fail{2}",
                   passed, failed, failed == 0 ? " - ALL GREEN" : " - OWNER DECISION NEEDED"));
         try { System.IO.File.WriteAllText(
-                  Application.dataPath + "/Phase1/"
-                  + (floorOnly ? "qa_matrix_floor.txt" : "qa_matrix_bench.txt"), sb.ToString()); }
+                  Application.dataPath + "/Phase1/qa_matrix_bench.txt", sb.ToString()); }
         catch { }
         finished = true;
     }
