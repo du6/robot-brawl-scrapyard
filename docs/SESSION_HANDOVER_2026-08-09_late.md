@@ -248,3 +248,117 @@ first instruction a new session followed.** Same failure as §1.2's size
 box, one day later and in our own records rather than the design doc:
 **a to-do list is evidence about when it was written.** Check the artifact,
 not the note about the artifact.
+
+---
+
+# FINAL UPDATE — the handover, and everything after the first draft
+
+Written at the close of the Cowork session, 2026-08-09. **This project is
+now driven by Claude Code on owen's Mac. Read `docs/HANDOVER_TO_CLI.md`
+first — it supersedes this document for anything operational.**
+
+## The VALIDATE worker shipped
+
+**WorkerBench 39/39**, predicted before running. Full record:
+`docs/Validate_Worker_Shipped_2026-08-09.md`. Three traps, two of which
+would have shipped as bugs if the worker had been written against the
+design doc instead of against the other side of the seam:
+
+- **`payloadSha256` is not the hash of the bytes you fetch.** The API
+  stores the whole envelope as the blob but records the envelope's own
+  inner `sha256` field. Hashing the download and comparing would have
+  **rejected every legitimate snapshot.** Verification needs two claims:
+  `Open()` for integrity, `env.sha256 == job.payloadSha256` for identity.
+- **A fetch failure is not an illegal robot.** `Judge()` returns an action
+  as well as a verdict; storage being unreachable posts *nothing* and lets
+  the timeout requeue the job. Posting `legal:false` would mark a good
+  snapshot REJECTED forever on a network blip.
+- **`JsonUtility` cannot send `null`**, and `snapshots.category` accepts
+  NULL but rejects `""`. The result JSON is hand-built; the bench asserts
+  the literal bytes.
+
+## The relay, and what the CLI found
+
+`_relay/` carried four requests between this session and a Claude Code
+session. All four produced real results.
+
+- **001** — a fresh clone **builds the API**: `dotnet build` exit 0, 0
+  warnings, 0 errors. The git thread is closed.
+- **002** — **7 commits, `fbd2706..028522e`**, working tree 70 → 15 lines.
+  All 10 Unity scripts went in **with their `.meta`**, verified both
+  directions. It caught that `CLAUDE.md` was missing from my commit plan
+  and gave it commit 7.
+- **003** — `4653009`. `/v1/auth/register` is transactional; `api_smoke`
+  **37 → 43 checks**, `sql_bench` 34/34 unchanged. **3 checks fail on
+  purpose** — see below.
+- **004** — the CLI **can** drive the Unity editor.
+
+### ⚠ The 003 findings — top of the work queue
+
+**Posting `"category":""` or `"BANTAM"` to validate-result raises an
+unhandled `23514` → HTTP 500, *and the job is never completed*.** It
+returns on the visibility timeout and retries **forever**. A malformed
+result does not fail loudly, it **livelocks a worker slot**. `""` is
+exactly what `JsonUtility` emits for a null string, so it is the value a
+worker written the obvious way would send.
+
+Second: **`legal:true` with `category:null` is currently ACCEPTED**, and
+can never be placed — `ratings.category` is NOT NULL.
+
+Both left unfixed deliberately, so they get their own commit. Fix these
+**before** pointing a worker at the live API.
+
+## ⚠ The correction: I wrote a false limitation into two documents
+
+`CLAUDE.md` and `docs/CLI_SESSION_BRIEF_2026-08-09.md` both said a CLI
+session **"probably cannot run any Unity bench."** I wrote it, from a
+handover written by a session that could not check. A CLI session then
+reported *"I did not run a single Unity bench **and cannot**"* — as a
+capability, not as something tried.
+
+**It was false.** `unity-mcp` was registered in `/Users/leondu/.claude.json`
+and connected with 7 tools the entire time. Asked directly whether it had
+ever tested the claim, the CLI said plainly that it had not — the tools
+were in its list from its first message. It ran `CategoryBench.RunPure()`
+and got **44 pass, 0 fail**, career md5 unchanged, no play mode.
+
+**That false sentence shaped how this project was organised for a day.**
+It is the fourth stale document to cost real time on 2026-08-09, and the
+only one authored here rather than inherited. Both files are corrected.
+
+**Still genuinely open, and the CLI raised it unprompted:** play-mode
+benches have not been run from a CLI session. `CategoryBench` is
+edit-mode; `ReplayBench`, `WorkerBench`, `ProgramBench`, `MatrixBench` and
+`CareerSmoke` need play mode, a domain reload that resets every static,
+and coroutine polling. **Measure that before relying on it** — it is the
+first item in `docs/HANDOVER_TO_CLI.md` §0.
+
+## What ends with the handover
+
+Owen chose a full handover knowing the cost: **no unattended work, no
+Telegram, and the claude.ai Project frozen.** `docs/` in git is the source
+of truth; the Project carries a `READ_FIRST_source_of_truth_moved.md`
+notice. Nothing progresses unless owen is running the CLI.
+
+If he later wants work continuing while he is away, a Cowork session must
+exist again, and its first act is reading `docs/` — never the Project.
+
+## Method notes from the second half
+
+**A doc that describes capability is evidence about the day it was
+written** — including one you wrote yourself an hour ago. Three of the
+four stale-document failures today were inherited. The fourth was mine.
+
+**Ask a subordinate whether it measured or inherited.** "Can you do X" got
+a confident wrong answer for a day. "Did you ever test that, or did you
+take my word for it?" got the truth immediately, and the answer calibrated
+everything else it had reported.
+
+**A channel that only carries compliance teaches nothing.** Every relay
+result was required to say what the request got wrong. Two did, and both
+corrections were right.
+
+**Stopping beats improvising.** The first relay attempt was sandbox-blocked
+mid-protocol and stopped rather than working around it. That report exposed
+a design flaw — the protocol depended on `mv`, the operation most likely to
+be gated — which a partial success would have hidden.

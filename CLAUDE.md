@@ -6,14 +6,21 @@ playable; **Multiplayer v3** (cloud ladder) is mid-build.
 
 ## Read this first
 
-1. **`docs/SESSION_HANDOVER_2026-08-09_late.md`** — the current handover.
+1. **`docs/HANDOVER_TO_CLI.md`** — **START HERE.** As of 2026-08-09 this
+   project is driven by a Claude Code session on owen's Mac. That document
+   is the takeover brief: what to verify before trusting anything, the
+   editor discipline, the hard rules, full M1 state, and the work queue in
+   order.
+2. **`docs/SESSION_HANDOVER_2026-08-09_late.md`** — the current handover.
    It supersedes only Part 2 (multiplayer) of
    `docs/SESSION_HANDOVER_2026-08-09_evening.md`; that document's Part 1
    is still the live guidance for single player, so read both.
-2. **`docs/CLI_SESSION_BRIEF_2026-08-09.md`** — read this if you are
-   Claude Code on owen's Mac. It is scoped to what a real shell does
-   better, and it explains how to get the Unity bridge so you are not
-   limited to that.
+3. `docs/CLI_SESSION_BRIEF_2026-08-09.md` — superseded by (1), kept for the
+   record. It contains one claim now known to be false; see the note in it.
+
+⚠ **The claude.ai Project that these `docs/` were mirrored from is
+FROZEN.** `docs/` in git is the source of truth. A change to the code and a
+change to its record can now land in the same commit — which is the point.
 
 The records, most recent first:
 
@@ -48,7 +55,8 @@ Two kinds of session work on this project, and neither can do everything.
 | edit files here | yes | yes |
 | `git`, `rm` | **no** | yes |
 | `dotnet`, `psql`, `curl localhost:5000` | **no** | yes |
-| run a Unity bench | **yes**, via the MCP bridge | **probably not** |
+| run an edit-mode Unity bench | **yes** | **yes — measured 2026-08-09** |
+| run a PLAY-MODE Unity bench | **yes** | **unproven — go measure it** |
 
 A Cowork session's `bash` is a **separate Linux VM** with this folder
 mounted and no network, no `dotnet`, no `psql`, no Homebrew and no route
@@ -56,6 +64,20 @@ to the Mac's `localhost:5000`. Confirmed empirically. It reaches the Mac
 only through the mounted folder and the **Unity MCP bridge**, which
 compiles and runs C# in owen's live editor — which is how every bench in
 this project gets run.
+
+⚠ **CORRECTION, 2026-08-09.** This file used to say a CLI session
+"probably cannot" run a Unity bench. **That was never tested by anyone who
+wrote it**, and it is false: `unity-mcp` is registered as a user MCP in
+`/Users/leondu/.claude.json`, and a CLI session has now run
+`CategoryBench.RunPure()` to **44 pass, 0 fail** through its own bridge.
+The false sentence was inherited from a handover, repeated into two
+documents, and shaped how the work was divided for a day. **Check the
+artifact, not the note about the artifact.**
+
+Still genuinely open: **play-mode benches have not been run from a CLI
+session.** `CategoryBench` is edit-mode; `ReplayBench`, `WorkerBench`,
+`ProgramBench`, `MatrixBench` and `CareerSmoke` need play mode, a domain
+reload and coroutine polling. Measure that before relying on it.
 
 **If you cannot run the benches, do not report Unity-side work as
 verified.** Say what you changed and that it is unverified, and leave the

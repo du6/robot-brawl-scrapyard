@@ -52,7 +52,15 @@ So:
 | edit files here | yes | yes |
 | `git`, `rm` | **no** (see §5) | yes |
 | `dotnet`, `psql`, `curl localhost:5000` | **no** | yes |
-| run any Unity bench | **yes** | **probably not** — see §2 |
+| run an edit-mode Unity bench | **yes** | **yes — measured** |
+| run a PLAY-MODE Unity bench | **yes** | **unproven** |
+
+> ⚠ **SUPERSEDED — read `docs/HANDOVER_TO_CLI.md` instead.** The paragraph
+> below is wrong and is kept only as the record of how it went wrong. A CLI
+> session CAN drive the editor: `unity-mcp` was registered and connected the
+> whole time, and `CategoryBench.RunPure()` returned **44 pass, 0 fail**
+> from one. Nobody who wrote "probably cannot" ever tested it. Play-mode
+> benches remain unproven from a CLI session — that part is still open.
 
 **The consequence you must internalise: you probably cannot verify
 Unity-side work.** VerbBench, ReplayBench, MatrixBench, ProgramBench,
