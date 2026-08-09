@@ -1,0 +1,47 @@
+== A. the wire format — where JsonUtility would have lied ==
+      {"snapshotId":"11111111-2222-3333-4444-555555555555","workerId":"bench","legal":true,"massKg":1234,"aabbX":1.5,"aabbY":0.75,"aabbZ":2,"category":"FEATHER","partsManifest":["core","beam"],"programHash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","failReasons":[]}
+PASS  a category is sent as a string
+PASS  legal is a JSON bool, not "True"
+PASS  mass is a bare number
+PASS  the manifest is a JSON array
+      {"snapshotId":"11111111-2222-3333-4444-555555555555","workerId":"bench","legal":false,"massKg":1234,"aabbX":1.5,"aabbY":0.75,"aabbZ":2,"category":null,"partsManifest":["core","beam"],"programHash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","failReasons":["1 kg over the heaviest category (5500 kg limit, build is 5501 kg)."]}
+PASS  NO category is sent as a bare null — the value the CHECK accepts
+PASS  and never as "" — the value the CHECK rejects
+PASS  an over-cap robot is reported illegal
+PASS  quotes, newlines, tabs and backslashes are escaped, not passed through
+PASS  floats use an invariant decimal point regardless of locale
+== B. reading the claim response ==
+PASS  job id parses
+PASS  kind VALIDATE is recognised
+PASS  payloadUrl survives its slashes and colons
+PASS  payloadSha256 parses whole
+PASS  a JSON null reads as null, not as the string "null"
+PASS  an empty body is not a job
+PASS  a FIGHT job is distinguishable from a VALIDATE one
+== C. a real robot, end to end through the loop ==
+PASS  fixture rig loads (19 parts)
+PASS  a readable snapshot produces a verdict
+PASS  the fixture validates legal: legal: 924 kg, FEATHER, 19 parts
+PASS  category came back from the real game code (924 kg)
+PASS  exactly one result was posted, for the right job
+PASS  the posted JSON carries the category
+PASS  the job was heartbeated before the result went up
+PASS  the bay came back byte-identical after the measurement
+== D. the four ways this goes wrong ==
+PASS  storage being down leaves the job for retry
+PASS  and posts NOTHING — a fetch failure must never reject a snapshot
+PASS  the tamper actually changed the payload (bench self-check)
+PASS  an altered payload is REJECTED, not retried — the bytes will not improve
+PASS  and the reason names the hash: snapshot: sha256 mismatch — payload altered or truncated
+PASS  a rejected snapshot carries no category — there is no ladder for it
+PASS  which reaches the API as null, the value the CHECK accepts
+PASS  a valid snapshot at the wrong key is rejected on identity
+PASS  and says so plainly, rather than blaming the robot
+PASS  a claim with no payloadUrl is a server fault, not an illegal robot
+== E. an empty queue, and a job that is not ours ==
+PASS  an empty queue returns nothing and is not an error
+PASS  and does no work
+PASS  a FIGHT job is left alone — the endpoints for it do not exist yet
+PASS  the bay is still owen's after every failure path
+PASS  the career object was never swapped
+RESULT: 39 pass, 0 fail - ALL GREEN
