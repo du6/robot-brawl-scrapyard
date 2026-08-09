@@ -27,16 +27,31 @@ this and reported **`44 pass, 0 fail`** through its own `unity-mcp` bridge,
 with the career save md5 unchanged and without entering play mode. So the
 edit-mode path is proven, not assumed.
 
-⚠ **But play mode is NOT proven, and that is where the risk is.**
-`CategoryBench` is pure data. `ReplayBench`, `WorkerBench`, `ProgramBench`,
-`MatrixBench` and `CareerSmoke` all run *inside play mode* — which means
-entering play mode over the bridge, surviving the domain reload that resets
-every static, and polling a coroutine to completion. None of that has been
-done from a CLI session. **Prove it before you rely on it:** enter play
-mode, run `RobotBrawl.Phase0.WorkerBench.Run()`, poll until `finished`,
-expect **39 pass, 0 fail**, exit play mode, and re-check the career md5. If
-that works you have the whole bench suite. If it does not, say so loudly —
-most of this project's verification lives in there.
+✅ **AND PLAY MODE IS NOW PROVEN TOO — done 2026-08-09, the run this
+section asked for.** A CLI session entered play mode over the bridge,
+survived the domain reload, ran `RobotBrawl.Phase0.WorkerBench.Run()`,
+polled to `finished`, and got exactly **39 pass, 0 fail** — then exited
+cleanly, leaving `isPlaying=False`, the scene undirtied and no stray bench
+object. **Career save byte-identical AND mtime unchanged**, so it was never
+written at all.
+
+**So you have the whole bench suite.** Method, the five-call split the
+domain reload forces, and the traps are in
+`docs/Play_Mode_From_CLI_Proven_2026-08-09.md`. Read it before your first
+play-mode run rather than rediscovering that `EnterPlaymode()` returns
+before `isPlaying` is true.
+
+⚠ **What that run did NOT cover.** `WorkerBench` is a well-behaved
+play-mode bench: no fight, no arena, a stub transport, and it isolates
+`Career.Data` itself. The benches that run **real fights** —
+`MatrixBench`, `LadderSweepBench`, `OpeningBench` — plus `CareerSmoke`,
+which is documented as not isolated, are still unmeasured from a CLI
+session, and they are where isolation actually bites:
+`FightManager.End()` calls `Progression.OnMatchEnd` unconditionally.
+Also note the window nothing protects: `BuilderManager` saves the career on
+nine paths gated only on `Career.autosave`, which stays `True` from
+play-mode entry until a bench's own `Start()` clears it. **Fingerprint
+either side, mtime included.**
 
 ### ⚠ And the correction that produced that caution
 

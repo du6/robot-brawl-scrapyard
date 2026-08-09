@@ -56,7 +56,7 @@ Two kinds of session work on this project, and neither can do everything.
 | `git`, `rm` | **no** | yes |
 | `dotnet`, `psql`, `curl localhost:5000` | **no** | yes |
 | run an edit-mode Unity bench | **yes** | **yes — measured 2026-08-09** |
-| run a PLAY-MODE Unity bench | **yes** | **unproven — go measure it** |
+| run a PLAY-MODE Unity bench | **yes** | **yes — measured 2026-08-09** |
 
 A Cowork session's `bash` is a **separate Linux VM** with this folder
 mounted and no network, no `dotnet`, no `psql`, no Homebrew and no route
@@ -74,10 +74,18 @@ The false sentence was inherited from a handover, repeated into two
 documents, and shaped how the work was divided for a day. **Check the
 artifact, not the note about the artifact.**
 
-Still genuinely open: **play-mode benches have not been run from a CLI
-session.** `CategoryBench` is edit-mode; `ReplayBench`, `WorkerBench`,
-`ProgramBench`, `MatrixBench` and `CareerSmoke` need play mode, a domain
-reload and coroutine polling. Measure that before relying on it.
+✅ **And play mode is now proven too, 2026-08-09.** A CLI session entered
+play mode over the bridge, ran `WorkerBench.Run()`, polled the coroutine to
+`finished`, got **39 pass, 0 fail**, and exited — with the career save
+byte-identical **and its mtime unchanged**, meaning it was never written.
+See `docs/Play_Mode_From_CLI_Proven_2026-08-09.md` for the method and the
+traps. **A CLI session can run this project's whole bench suite.**
+
+Still unmeasured: the benches that run real **fights** — `MatrixBench`,
+`LadderSweepBench`, `OpeningBench` — and `CareerSmoke`, which is documented
+as not isolated. `FightManager.End()` calls `Progression.OnMatchEnd`
+unconditionally, so those are where isolation actually matters. Fingerprint
+the career save either side, **mtime included**, every time.
 
 **If you cannot run the benches, do not report Unity-side work as
 verified.** Say what you changed and that it is unverified, and leave the
