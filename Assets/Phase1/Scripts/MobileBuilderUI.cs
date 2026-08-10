@@ -2874,6 +2874,28 @@ public class MobileBuilderUI : MonoBehaviour
         close.GetComponent<Image>().color = new Color(0.16f,0.17f,0.21f,1f);
     }
 
+    /// <summary>Set the ARENA's status line, and in a DEVELOPMENT BUILD say
+    /// WHICH SERVER it is talking to.
+    ///
+    /// ⚠ THIS EXISTS BECAUSE THE ARTEFACT COULD NOT ANSWER IT. LadderClient
+    /// defaults to LOCAL_DEV in the editor and PRODUCTION in a build, and the
+    /// il2cpp output PROVES the #if resolved to a single unconditional return
+    /// — but the literal it returns is a metadata index, so which one it is
+    /// cannot be read out of the Xcode project. Rather than assert it, the
+    /// app now says it out loud on the device, where the question is settled
+    /// in one glance.
+    ///
+    /// Debug.isDebugBuild is false in a release build, so a shipped player
+    /// never shows a player a URL — that was one of the ARENA's judged
+    /// defects (docs/ARENA_Judged_2026-08-10 §2.3) and is not being
+    /// reintroduced.</summary>
+    void SetArenaStatus(string s)
+    {
+        if (arenaStatus == null) return;
+        arenaStatus.text = Debug.isDebugBuild ? s + "   ·   [dev] " + LadderClient.BaseUrl : s;
+        arenaStatus.color = new Color(0.80f, 0.88f, 1f);
+    }
+
     /// <summary>Repaint the ARENA board. Cheap every frame EXCEPT when the
     /// board actually changed — rebuilding a scrolled list under the player's
     /// finger every frame is how a list stops being scrollable.</summary>
@@ -2925,9 +2947,8 @@ public class MobileBuilderUI : MonoBehaviour
             {
                 bool own = arenaScreen.StatusScope == ArenaScreen.SC_ACCOUNT
                            && !string.IsNullOrEmpty(arenaScreen.Status);
-                arenaStatus.text = own ? arenaScreen.Status
-                    : LadderClient.SignedIn ? "signed in" : "the board is public — signing in lets you play";
-                arenaStatus.color = new Color(0.80f, 0.88f, 1f);
+                SetArenaStatus(own ? arenaScreen.Status
+                    : LadderClient.SignedIn ? "signed in" : "the board is public — signing in lets you play");
             }
             return;
         }
@@ -2948,10 +2969,9 @@ public class MobileBuilderUI : MonoBehaviour
                 string rl = arenaScreen.ReplayLine;
                 bool ownStatus = arenaScreen.StatusScope == ArenaScreen.SC_INBOX
                                  && !string.IsNullOrEmpty(arenaScreen.Status);
-                arenaStatus.text = !string.IsNullOrEmpty(rl) ? rl
-                                 : ownStatus ? arenaScreen.Status
-                                 : arenaScreen.Inbox.Count + " fight(s)";
-                arenaStatus.color = new Color(0.80f, 0.88f, 1f);
+                SetArenaStatus(!string.IsNullOrEmpty(rl) ? rl
+                               : ownStatus ? arenaScreen.Status
+                               : arenaScreen.Inbox.Count + " fight(s)");
             }
             return;
         }
@@ -2962,9 +2982,8 @@ public class MobileBuilderUI : MonoBehaviour
             // wrote, and otherwise says its own count.
             bool ownStatus = arenaScreen.StatusScope == ArenaScreen.SC_BOARD
                              && !string.IsNullOrEmpty(arenaScreen.Status);
-            arenaStatus.text = ownStatus ? arenaScreen.Status
-                : arenaScreen.CategoryLabel + " · " + arenaScreen.Board.Count + " ranked";
-            arenaStatus.color = new Color(0.80f, 0.88f, 1f);
+            SetArenaStatus(ownStatus ? arenaScreen.Status
+                : arenaScreen.CategoryLabel + " · " + arenaScreen.Board.Count + " ranked");
         }
         for (int i = 0; i < arenaCatBtns.Count; i++)
         {
