@@ -257,7 +257,10 @@ public class CareerBench : MonoBehaviour
         if (bm == null) { Check(false, "builder present"); Finish(); yield break; }
         stamp = bm.SnapshotString().Split('\n')[0];
         var savedData = Career.Data; bool savedActive = Career.active;
-        Career.autosave = false;
+        // A COUNTED hold, not a flag swap: two harnesses overlapping each
+        // captured `true`, and the first to finish restored it while the other
+        // was still fighting. See Career.SuspendAutosave.
+        var autosaveHold = Career.SuspendAutosave();
         Career.Data = new CareerData();
         Career.active = true;
         Career.devFreeBuild = true;   // the matrix tests fights, not inventory
@@ -271,7 +274,7 @@ public class CareerBench : MonoBehaviour
             var wm = new int[2];
             yield return StartCoroutine(Series(mref, 2, 0, 10, wm));
             Check(true, string.Format("MIRROR bulwark-Steel vs bulwark-V (L3C1): {0}/10 player wins, {1} non-starts", wm[0], wm[1]));
-            Career.active = savedActive; Career.Data = savedData; Career.autosave = true;
+            Career.active = savedActive; Career.Data = savedData; autosaveHold.Dispose();
             Finish();
             yield break;
         }
@@ -292,7 +295,7 @@ public class CareerBench : MonoBehaviour
                 Check(true, string.Format("{0} vs {1} (L{2}C{3}): {4}/{5} wins, {6} non-starts",
                     playerLabel, who[q], LI[q] + 1, CI[q] + 1, wq[0], playerN, wq[1]));
             }
-            Career.active = savedActive; Career.Data = savedData; Career.autosave = true;
+            Career.active = savedActive; Career.Data = savedData; autosaveHold.Dispose();
             Finish();
             yield break;
         }
@@ -304,7 +307,7 @@ public class CareerBench : MonoBehaviour
             yield return StartCoroutine(Series(pref, probeLi, probeCi, probeN, wp));
             Check(true, string.Format("PROBE {0}-{1} vs L{2}C{3}: {4}/{5} player wins, {6} non-starts",
                 probeRecipe, probeMat, probeLi + 1, probeCi + 1, wp[0], probeN, wp[1]));
-            Career.active = savedActive; Career.Data = savedData; Career.autosave = true;
+            Career.active = savedActive; Career.Data = savedData; autosaveHold.Dispose();
             Finish();
             yield break;
         }
@@ -483,7 +486,14 @@ public class CareerBench : MonoBehaviour
 
         Career.active = savedActive;
         Career.Data = savedData;
-        Career.autosave = true;
+        // ⚠ RESTORE WHAT WAS FOUND, never a literal. This used to set
+        // `Career.autosave = true`, which is not a restore — it is an
+        // assumption that autosave was on when the bench started, and it turns
+        // this bench into something that ENABLES writes to owen's save on its
+        // way out. On 2026-08-10 that wrote the real career: 65 fights where
+        // there were 11, 218,361 scrap where there were 6,513, and the medals
+        // and stable wiped. Hard rule 5 exists for exactly this.
+        autosaveHold.Dispose();
         Finish();
     }
 

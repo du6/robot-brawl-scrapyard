@@ -514,6 +514,55 @@ public static class Career
     /// <summary>Harness seam: CareerSmoke turns this off so test purchases
     /// never touch the owner's career file.</summary>
     public static bool autosave = true;
+
+    /// <summary>How many harnesses currently require autosave OFF.
+    ///
+    /// A plain save-and-restore of `autosave` is not safe when two harnesses
+    /// overlap, and on 2026-08-10 that wrote the real career: HazardBench,
+    /// CareerBench and TouchSmoke were started in the same frame, each
+    /// captured the flag as TRUE, and the first one to finish restored it to
+    /// TRUE while the others were still running fights. The save came back
+    /// with 65 fights where there were 11, 218,361 scrap where there were
+    /// 6,513, and the medals and stable wiped.
+    ///
+    /// Restoring the CAPTURED value instead of a literal `true` fixes the
+    /// sequential case and does nothing for that one — every capture said
+    /// true, so every restore said true. The only thing that closes it is
+    /// counting: the flag goes back on when the LAST holder lets go.
+    ///
+    ///     using (Career.SuspendAutosave()) { ... }        // preferred
+    ///     var h = Career.SuspendAutosave(); ... h.Dispose();
+    ///
+    /// Hard rule 5 is "owner state is sacred", and a mechanism that only works
+    /// when harnesses politely take turns is not a mechanism.</summary>
+    static int autosaveHolds;
+
+    /// <summary>Suspend autosave until every holder has released it. Disposing
+    /// twice is harmless; the count floors at zero rather than going negative
+    /// and re-arming writes early.</summary>
+    public static System.IDisposable SuspendAutosave()
+    {
+        autosaveHolds++;
+        autosave = false;
+        return new AutosaveHold();
+    }
+
+    sealed class AutosaveHold : System.IDisposable
+    {
+        bool released;
+        public void Dispose()
+        {
+            if (released) return;
+            released = true;
+            autosaveHolds = Mathf.Max(0, autosaveHolds - 1);
+            if (autosaveHolds == 0) autosave = true;
+        }
+    }
+
+    /// <summary>Test/diagnostic read: how many harnesses are holding autosave
+    /// off right now. Non-zero after a bench has finished means that bench
+    /// leaked a hold, which is worth failing on.</summary>
+    public static int AutosaveHolds { get { return autosaveHolds; } }
     /// <summary>P4: true while the CURRENT contest fight runs under the
     /// autopilot (the player's controlSource is Program and the keyboard is
     /// dead). Written EXPLICITLY by every StartCareerFight call — false for

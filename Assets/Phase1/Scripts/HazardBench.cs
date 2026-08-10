@@ -56,7 +56,10 @@ public class HazardBench : MonoBehaviour
 
         var savedData = Career.Data;
         bool savedActive = Career.active;
-        Career.autosave = false;
+        // A COUNTED hold, not a flag swap: two harnesses overlapping each
+        // captured `true`, and the first to finish restored it while the other
+        // was still fighting. See Career.SuspendAutosave.
+        var autosaveHold = Career.SuspendAutosave();
         Career.Data = new CareerData();
         Career.active = true;
         Career.Txn(5000, "bench grant");
@@ -175,7 +178,14 @@ public class HazardBench : MonoBehaviour
         if (!string.IsNullOrEmpty(savedBay)) bm.LoadSnapshot(savedBay);
         Career.active = savedActive;
         Career.Data = savedData;
-        Career.autosave = true;
+        // ⚠ RESTORE WHAT WAS FOUND, never a literal. This used to set
+        // `Career.autosave = true`, which is not a restore — it is an
+        // assumption that autosave was on when the bench started, and it turns
+        // this bench into something that ENABLES writes to owen's save on its
+        // way out. On 2026-08-10 that wrote the real career: 65 fights where
+        // there were 11, 218,361 scrap where there were 6,513, and the medals
+        // and stable wiped. Hard rule 5 exists for exactly this.
+        autosaveHold.Dispose();
         Finish();
     }
 

@@ -96,7 +96,10 @@ public class CareerSmoke : MonoBehaviour
 
         var savedData = Career.Data;
         bool savedActive = Career.active;
-        Career.autosave = false;
+        // A COUNTED hold, not a flag swap: two harnesses overlapping each
+        // captured `true`, and the first to finish restored it while the other
+        // was still fighting. See Career.SuspendAutosave.
+        var autosaveHold = Career.SuspendAutosave();
         Career.Data = new CareerData();
         Career.active = true;
         int exp = 0;
@@ -1292,7 +1295,10 @@ public class CareerSmoke : MonoBehaviour
         // ---- restore: career off puts the sandbox back ----
         Career.active = savedActive;
         Career.Data = savedData;
-        Career.autosave = true;
+        // Restore what was found, not a literal true — see HazardBench's note.
+        // A bench that ENABLES autosave on its way out is a bench that arms
+        // the next thing to write owen's save.
+        autosaveHold.Dispose();
         yield return null; yield return null;
         var shopTab2 = Btn("SHOP");
         Check(savedActive || shopTab2 == null || !shopTab2.gameObject.activeInHierarchy,
