@@ -1,0 +1,22 @@
+== taking the backup ==
+PASS  pg_dump wrote a custom-format backup ( 40K)
+
+== restoring into a SEPARATE database ==
+PASS  created rb_restore_drill
+PASS  pg_restore completed
+
+== is the restored copy the same database? ==
+PASS  every table restored with the same row count (12 tables)
+PASS  the ledger totals the same in both (2940 scrap)
+PASS  …across the same number of wallets (3)
+
+== did the RULES come back, or only the rows? ==
+PASS  ledger_delta_nonzero survived the restore
+PASS  the one-way career valve survived
+PASS  snapshots_category_check survived
+
+== cleaning up ==
+PASS  drill database dropped
+      backup file removed
+
+===== passed 10  failed 0 =====

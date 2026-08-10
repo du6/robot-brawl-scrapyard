@@ -7,6 +7,7 @@
 #   qa_api_server.log   the API's own output, build errors and stack traces
 #   qa_sql_bench.txt    the data layer's bench
 #   qa_api_smoke.txt    the endpoint bench
+#   qa_restore_drill.txt  the backup/restore drill (§M4)
 #
 # Both are files rather than console output on purpose: the Cowork session
 # can read files in this folder, so nobody has to copy a terminal into chat.
@@ -76,6 +77,14 @@ SQLRC=$?
 
 echo "running api_smoke.sh (result: qa_api_smoke.txt)…"
 bash tests/api_smoke.sh > "$OUT" 2>&1
+
+# The restore drill runs LAST and against the database the benches just
+# filled: a backup of an empty schema proves nothing, and by now this one
+# holds accounts, matches, ratings, cosmetics and a settled season. It
+# restores into a SEPARATE database and drops it again, so it never touches
+# what it is checking.
+echo "running restore_drill.sh (result: qa_restore_drill.txt)…"
+bash tests/restore_drill.sh > "$PWD/qa_restore_drill.txt" 2>&1
 RC=$?
 
 kill $API_PID 2>/dev/null; wait $API_PID 2>/dev/null
