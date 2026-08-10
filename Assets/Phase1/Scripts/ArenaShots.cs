@@ -121,6 +121,33 @@ namespace RobotBrawl.Phase0
                 yield return new WaitForSeconds(1.2f);
                 yield return Shot(dir, "07_arena_tab");
 
+                // The dock builds ArenaScreen on first open, so it only exists
+                // now — grabbing it earlier would find nothing.
+                var arena = UnityEngine.Object.FindFirstObjectByType<ArenaScreen>();
+
+                // The SCOUTING CARD, surface 2. Scouted through the board's own
+                // button rather than by poking state, because "the card opens
+                // when you tap SCOUT" is the half a screenshot of the panel
+                // alone would not prove.
+                if (arena != null && arena.Board.Count > 0)
+                {
+                    LadderEntry target = null;
+                    foreach (var e in arena.Board)
+                        if (!string.IsNullOrEmpty(e.activeSnapshotId)) { target = e; break; }
+                    if (target != null)
+                    {
+                        arena.ScoutNow(target);
+                        float t2 = 0f;
+                        while (arena.Card == null && t2 < 8f) { t2 += Time.deltaTime; yield return null; }
+                        yield return new WaitForSeconds(0.8f);
+                        yield return Shot(dir, "12_arena_scout_card");
+                        log.Add("  card=" + (arena.Card != null ? arena.Card.robotName : "(none)")
+                                + " blocker=" + (arena.ChallengeBlocker(arena.Card) ?? "(none — can challenge)"));
+                        arena.CloseCard();
+                        yield return null;
+                    }
+                }
+
                 ui.TestShowTab(1);
                 yield return null; yield return null;
                 yield return new WaitForSeconds(0.6f);

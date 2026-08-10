@@ -320,6 +320,90 @@ namespace RobotBrawl.Phase0
         public void WatchNow(InboxEntry m) { if (!busy) StartCoroutine(Watch(m)); }
         public void CloseCard() { card = null; pending = false; }
 
+        // ---- the challenge gate, in ONE place ------------------------------
+        // Surface 2 of the port. The eligibility rule and its three DISTINCT
+        // refusals are the valuable part of this screen, so they are lifted
+        // out of DrawCard and both renderers ask the same question. Copying
+        // "you can punch up, never down" into a second painter is how the two
+        // drift until one of them tells a player the wrong reason — which has
+        // already happened once here, when a player with NO robots was told
+        // they could not punch down.
+        //
+        // Named for BuilderManager.AutonomyBlocker, the same idiom: null means
+        // "nothing is stopping you".
+
+        /// <summary>Your robots that may legally answer this card. §1.2: you
+        /// may punch UP, never down, so a robot's class index must be ≤ the
+        /// card's.</summary>
+        public List<MyRobot> EligibleFor(ScoutCard c)
+        {
+            var eligible = new List<MyRobot>();
+            if (c == null) return eligible;
+            int b = System.Array.IndexOf(Order, c.category);
+            foreach (var m in mine)
+            {
+                int a = System.Array.IndexOf(Order, m.category);
+                if (m.CanFight && a >= 0 && b >= 0 && a <= b) eligible.Add(m);
+            }
+            return eligible;
+        }
+
+        /// <summary>Why this card cannot be challenged, or null if it can.
+        /// The three cases are deliberately different sentences: they are
+        /// three different problems with three different fixes.</summary>
+        public string ChallengeBlocker(ScoutCard c)
+        {
+            if (c == null) return "no robot is selected.";
+            if (c.mine) return "this is yours.";
+            if (!LadderClient.SignedIn) return "sign in to challenge.";
+            if (mine.Count == 0)
+                return "you have no robot on the ladder yet — use ENLIST to send the build on your bench.";
+            if (EligibleFor(c).Count == 0)
+            {
+                // ⚠ WORK OUT WHICH REFUSAL IT ACTUALLY IS. "You can punch up,
+                // never down" was returned for BOTH of these, and for one of
+                // them it is a sentence about a rule the player did not break:
+                // a robot still waiting on a worker is the RIGHT WEIGHT and
+                // simply unjudged. The remedies are opposite — one is "pick a
+                // heavier opponent", the other is "wait" — so telling a
+                // waiting player to punch up sends them to do the one thing
+                // that cannot help. Caught by ChallengeGateBench; it is the
+                // third time this screen has answered with the wrong reason.
+                bool anyReady = false;
+                foreach (var m in mine) if (m.CanFight) { anyReady = true; break; }
+                if (!anyReady)
+                    return "your robot is still being checked — a match worker sets its "
+                         + "weight class before it can fight. try again shortly.";
+                return "no robot of yours may fight a " + c.category + " — you can punch up, never down.";
+            }
+            return null;
+        }
+
+        public int StakeForPick(ScoutCard c)
+        {
+            var el = EligibleFor(c);
+            if (el.Count == 0) return 0;
+            return StakeFor(el[Mathf.Clamp(myPick, 0, el.Count - 1)], c);
+        }
+
+        public bool Pending { get { return pending; } }
+        public long Balance { get { return balance; } }
+        public int Pick { get { return myPick; } }
+        public void SetPick(int i) { myPick = Mathf.Max(0, i); }
+        public void ArmChallenge() { if (!busy) pending = true; }
+        public void CancelChallenge() { pending = false; }
+
+        /// <summary>Confirm. Refuses rather than throws if the gate has moved
+        /// under it — the board reloads while this panel is open, and a pick
+        /// that was legal a second ago may not be.</summary>
+        public void ConfirmChallenge()
+        {
+            if (busy || card == null) return;
+            if (ChallengeBlocker(card) != null) { pending = false; return; }
+            var el = EligibleFor(card);
+            StartCoroutine(DoChallenge(el[Mathf.Clamp(myPick, 0, el.Count - 1)], card));
+        }
+
         void OnGUI()
         {
             if (SuppressImgui) return;
@@ -539,52 +623,35 @@ namespace RobotBrawl.Phase0
             // Whether they have a program, never WHAT it is.
             GUILayout.Label(card.hasProgram ? "has a program (contents private)" : "no program");
 
-            if (card.mine) GUILayout.Label("this is yours.");
-            else if (string.IsNullOrEmpty(LadderClient.Token)) GUILayout.Label("sign in to challenge.");
+            // ONE gate, two renderers. This used to inline the eligibility
+            // rule and its three refusals; they now live in ChallengeBlocker /
+            // EligibleFor so the UGUI card asks the same question rather than
+            // carrying a second copy that can drift.
+            string blocked = ChallengeBlocker(card);
+            if (blocked != null) GUILayout.Label(blocked);
             else
             {
-                var eligible = new List<MyRobot>();
-                foreach (var m in mine)
-                    if (m.CanFight && System.Array.IndexOf(Order, m.category) >= 0
-                        && System.Array.IndexOf(Order, m.category) <= System.Array.IndexOf(Order, card.category))
-                        eligible.Add(m);
+                var eligible = EligibleFor(card);
+                myPick = Mathf.Clamp(myPick, 0, eligible.Count - 1);
+                GUILayout.BeginHorizontal();
+                for (int i = 0; i < eligible.Count && i < 4; i++)
+                    if (GUILayout.Toggle(myPick == i, eligible[i].name, GUI.skin.button)) myPick = i;
+                GUILayout.EndHorizontal();
 
-                if (mine.Count == 0)
-                    // NOT the same refusal, and saying the wrong one is how
-                    // the missing enlist flow stayed invisible: a player with
-                    // no robot at all was told they could not punch down,
-                    // which is the one thing that cannot be their problem.
-                    GUILayout.Label("you have no robot on the ladder yet — "
-                                    + "use ENLIST to send the build on your bench.");
-                else if (eligible.Count == 0)
-                    // §1.2: you may punch up, never down. Say which it is
-                    // rather than greying a button with no explanation.
-                    GUILayout.Label("no robot of yours may fight a " + card.category
-                                    + " — you can punch up, never down.");
+                int stake = StakeForPick(card);
+                if (!pending)
+                {
+                    if (GUILayout.Button("challenge for " + stake + " scrap") && !busy) ArmChallenge();
+                }
                 else
                 {
-                    myPick = Mathf.Clamp(myPick, 0, eligible.Count - 1);
+                    GUILayout.Label("stake " + stake + " scrap"
+                                    + (balance >= 0 ? " of your " + balance : "")
+                                    + " — returned if you win or draw, lost if you do not.");
                     GUILayout.BeginHorizontal();
-                    for (int i = 0; i < eligible.Count && i < 4; i++)
-                        if (GUILayout.Toggle(myPick == i, eligible[i].name, GUI.skin.button)) myPick = i;
+                    if (GUILayout.Button("confirm") && !busy) ConfirmChallenge();
+                    if (GUILayout.Button("cancel")) CancelChallenge();
                     GUILayout.EndHorizontal();
-
-                    var me = eligible[myPick];
-                    int stake = StakeFor(me, card);
-                    if (!pending)
-                    {
-                        if (GUILayout.Button("challenge for " + stake + " scrap") && !busy) pending = true;
-                    }
-                    else
-                    {
-                        GUILayout.Label("stake " + stake + " scrap"
-                                        + (balance >= 0 ? " of your " + balance : "")
-                                        + " — returned if you win or draw, lost if you do not.");
-                        GUILayout.BeginHorizontal();
-                        if (GUILayout.Button("confirm") && !busy) StartCoroutine(DoChallenge(me, card));
-                        if (GUILayout.Button("cancel")) pending = false;
-                        GUILayout.EndHorizontal();
-                    }
                 }
             }
             if (GUILayout.Button("close card")) { card = null; pending = false; }
@@ -620,6 +687,13 @@ namespace RobotBrawl.Phase0
         // can only be driven by a human is a UI path nothing ever checks —
         // which is exactly how ENLIST shipped with its network half proven
         // 21/21 and the button itself never once pressed.
+        /// <summary>Seed the ladder-robot list. The challenge gate reads it,
+        /// and a gate that can only be exercised by first enlisting two robots
+        /// against a live server is a gate nothing checks cheaply.</summary>
+        public void TestSetMine(List<MyRobot> rows)
+        { mine.Clear(); if (rows != null) mine.AddRange(rows); }
+        public void TestSetCard(ScoutCard c) { card = c; pending = false; }
+
         public string TestStatus { get { return status; } }
         public bool TestBusy { get { return busy; } }
         public bool TestShowEnlist { get { return showEnlist; } set { showEnlist = value; } }

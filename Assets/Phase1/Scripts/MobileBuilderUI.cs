@@ -117,6 +117,13 @@ public class MobileBuilderUI : MonoBehaviour
     readonly List<Button> arenaCatBtns = new List<Button>();
     LayoutElement arenaCatLE;
     int arenaBoardStamp = -1;   // rebuild the rows only when the board changes
+    // Surface 2: the scouting card and the challenge flow. It replaces the
+    // board list rather than floating over it — the dock has one column and a
+    // card that covers the thing it came from is how you lose your place.
+    GameObject arenaBoardRoot;
+    GameObject arenaCardRoot;
+    Transform arenaCardContent;
+    string arenaCardStamp = "";
     // ---- P3a: the Program Bench canvas (career-only tab, index 5) ----
     GameObject programPanel; ProgramCanvas programCanvas;
     InputField nameInput;
@@ -2360,6 +2367,7 @@ public class MobileBuilderUI : MonoBehaviour
         }
 
         var scrollGO = MkPanel("arenascroll", arenaPanel.transform, new Color(0f,0f,0f,0f));
+        arenaBoardRoot = scrollGO;
         var sle = scrollGO.AddComponent<LayoutElement>(); sle.flexibleHeight = 1f; sle.minHeight = 96f;
         var scroll = scrollGO.AddComponent<ScrollRect>(); scroll.horizontal = false; scroll.vertical = true;
         var viewport = MkPanel("arenaviewport", scrollGO.transform, new Color(0f,0f,0f,0.15f));
@@ -2377,6 +2385,148 @@ public class MobileBuilderUI : MonoBehaviour
         scroll.viewport = vp; scroll.content = crt;
         AddListOverflow(scrollGO, scroll, vp);   // R2 finding 8: ARENA
         arenaBoardContent = content.transform;
+
+        // ---- the scouting card, surface 2 ------------------------------
+        arenaCardRoot = MkPanel("arenacardroot", arenaPanel.transform, new Color(0f,0f,0f,0f));
+        var crle = arenaCardRoot.AddComponent<LayoutElement>(); crle.flexibleHeight = 1f; crle.minHeight = 96f;
+        var crv = arenaCardRoot.AddComponent<VerticalLayoutGroup>();
+        crv.childForceExpandWidth = true; crv.childForceExpandHeight = true;
+
+        var cScrollGO = MkPanel("arenacardscroll", arenaCardRoot.transform, new Color(0f,0f,0f,0f));
+        var cScroll = cScrollGO.AddComponent<ScrollRect>(); cScroll.horizontal = false; cScroll.vertical = true;
+        var cVp = MkPanel("arenacardviewport", cScrollGO.transform, new Color(0f,0f,0f,0.15f));
+        var cVpRt = cVp.GetComponent<RectTransform>(); Stretch(cVpRt);
+        cVp.AddComponent<Mask>().showMaskGraphic = true;
+        var cContent = MkPanel("arenacardcontent", cVp.transform, new Color(0f,0f,0f,0f));
+        var cCrt = cContent.GetComponent<RectTransform>();
+        cCrt.anchorMin = new Vector2(0f,1f); cCrt.anchorMax = new Vector2(1f,1f);
+        cCrt.pivot = new Vector2(0.5f,1f); cCrt.anchoredPosition = Vector2.zero;
+        cCrt.sizeDelta = new Vector2(0f, 0f);
+        var cClg = cContent.AddComponent<VerticalLayoutGroup>();
+        cClg.spacing = 4f; cClg.childForceExpandWidth = true; cClg.childForceExpandHeight = false;
+        cClg.padding = new RectOffset(4,4,4,4);
+        var cCsf = cContent.AddComponent<ContentSizeFitter>(); cCsf.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+        cScroll.viewport = cVpRt; cScroll.content = cCrt;
+        AddListOverflow(cScrollGO, cScroll, cVpRt);
+        arenaCardContent = cContent.transform;
+        arenaCardRoot.SetActive(false);
+    }
+
+    /// <summary>The scouting card, in UGUI. §1.3: everything on it is public
+    /// BY DESIGN — the program's contents and the payload url are not here,
+    /// and that omission is the rule, not an oversight.
+    ///
+    /// ⚠ IT ASKS ArenaScreen FOR THE GATE. Eligibility and the three refusals
+    /// live in ChallengeBlocker/EligibleFor, because this is the surface that
+    /// SPENDS SCRAP and a second copy of "you can punch up, never down" is a
+    /// second chance to tell a player the wrong reason.</summary>
+    void RefreshArenaCard()
+    {
+        if (arenaScreen == null || arenaCardContent == null) return;
+        var card = arenaScreen.Card;
+        if (card == null) return;
+
+        // Rebuild only on a real change: the card, the pick, the confirm step
+        // and the wallet are the whole of its state.
+        string stamp = card.snapshotId + "|" + arenaScreen.Pick + "|" + arenaScreen.Pending
+                     + "|" + arenaScreen.Balance + "|" + arenaScreen.MyRobots.Count;
+        if (stamp == arenaCardStamp) return;
+        arenaCardStamp = stamp;
+
+        for (int i = arenaCardContent.childCount - 1; i >= 0; i--)
+            Destroy(arenaCardContent.GetChild(i).gameObject);
+
+        var head = MkText("cardhead", arenaCardContent,
+            card.robotName + "   ·   " + card.category + "   ·   " + card.massKg + " kg",
+            16, TextAnchor.MiddleLeft);
+        head.color = new Color(0.90f, 0.94f, 1f);
+        head.gameObject.AddComponent<LayoutElement>().minHeight = 26f;
+
+        var parts = MkText("cardparts", arenaCardContent,
+            card.parts.Count + " parts: " + string.Join(", ", card.parts.ToArray()),
+            13, TextAnchor.UpperLeft);
+        parts.color = new Color(0.74f, 0.80f, 0.90f);
+        var ple = parts.gameObject.AddComponent<LayoutElement>(); ple.minHeight = 34f;
+
+        // WHETHER they have a program, never WHAT it is.
+        var prog = MkText("cardprog", arenaCardContent,
+            card.hasProgram ? "has a program (contents private)" : "no program — it will not move",
+            13, TextAnchor.MiddleLeft);
+        prog.color = card.hasProgram ? new Color(0.72f, 0.86f, 0.76f) : new Color(0.86f, 0.78f, 0.62f);
+        prog.gameObject.AddComponent<LayoutElement>().minHeight = 20f;
+
+        string blocked = arenaScreen.ChallengeBlocker(card);
+        if (blocked != null)
+        {
+            var b = MkText("cardblocked", arenaCardContent, blocked, 14, TextAnchor.UpperLeft);
+            b.color = new Color(0.86f, 0.82f, 0.68f);
+            b.gameObject.AddComponent<LayoutElement>().minHeight = 40f;
+        }
+        else
+        {
+            var eligible = arenaScreen.EligibleFor(card);
+            int stake = arenaScreen.StakeForPick(card);
+
+            // Which of yours answers. One row of buttons, capped at four —
+            // past that the row stops being tappable and starts being a list.
+            var pickRow = MkPanel("cardpicks", arenaCardContent, new Color(0f,0f,0f,0f));
+            var prle = pickRow.AddComponent<LayoutElement>();
+            prle.flexibleHeight = 0f; prle.minHeight = TouchRow(); prle.preferredHeight = TouchRow();
+            var prh = pickRow.AddComponent<HorizontalLayoutGroup>();
+            prh.spacing = 3f; prh.childForceExpandWidth = true; prh.childForceExpandHeight = true;
+            for (int i = 0; i < eligible.Count && i < 4; i++)
+            {
+                int idx = i;
+                bool on = i == Mathf.Clamp(arenaScreen.Pick, 0, eligible.Count - 1);
+                var pb = MkButton("cardpick_" + i, pickRow.transform, eligible[i].name, 13,
+                                  () => { if (arenaScreen != null) { arenaScreen.SetPick(idx); arenaCardStamp = ""; } });
+                var pimg = pb.GetComponent<Image>();
+                if (pimg != null) pimg.color = on ? new Color(0.20f,0.45f,0.65f,1f) : new Color(0.16f,0.17f,0.21f,1f);
+                var pt = pb.GetComponentInChildren<Text>();
+                if (pt != null) pt.color = on ? Color.white : new Color(0.72f,0.78f,0.88f);
+            }
+
+            if (!arenaScreen.Pending)
+            {
+                var cb = MkButton("cardchallenge", arenaCardContent,
+                                  "CHALLENGE FOR " + stake + " SCRAP", 14,
+                                  () => { if (arenaScreen != null) { arenaScreen.ArmChallenge(); arenaCardStamp = ""; } });
+                var cle2 = cb.gameObject.AddComponent<LayoutElement>();
+                cle2.flexibleHeight = 0f; cle2.minHeight = TouchRow(); cle2.preferredHeight = TouchRow();
+                cb.GetComponent<Image>().color = new Color(0.20f,0.45f,0.65f,1f);
+            }
+            else
+            {
+                // The confirm step spells out what is at risk and what comes
+                // back. A stake is the only thing on this screen that can cost
+                // the player something, so it never happens on one tap.
+                var warn = MkText("cardstake", arenaCardContent,
+                    "stake " + stake + " scrap"
+                    + (arenaScreen.Balance >= 0 ? " of your " + arenaScreen.Balance : "")
+                    + " — returned if you win or draw, lost if you do not.",
+                    13, TextAnchor.UpperLeft);
+                warn.color = new Color(1f, 0.87f, 0.55f);
+                warn.gameObject.AddComponent<LayoutElement>().minHeight = 34f;
+
+                var row = MkPanel("cardconfirmrow", arenaCardContent, new Color(0f,0f,0f,0f));
+                var rle2 = row.AddComponent<LayoutElement>();
+                rle2.flexibleHeight = 0f; rle2.minHeight = TouchRow(); rle2.preferredHeight = TouchRow();
+                var rh = row.AddComponent<HorizontalLayoutGroup>();
+                rh.spacing = 4f; rh.childForceExpandWidth = true; rh.childForceExpandHeight = true;
+                var ok = MkButton("cardconfirm", row.transform, "CONFIRM", 14,
+                                  () => { if (arenaScreen != null) { arenaScreen.ConfirmChallenge(); arenaCardStamp = ""; } });
+                ok.GetComponent<Image>().color = new Color(0.18f,0.42f,0.28f,1f);
+                var no = MkButton("cardcancel", row.transform, "CANCEL", 14,
+                                  () => { if (arenaScreen != null) { arenaScreen.CancelChallenge(); arenaCardStamp = ""; } });
+                no.GetComponent<Image>().color = new Color(0.30f,0.18f,0.18f,1f);
+            }
+        }
+
+        var close = MkButton("cardclose", arenaCardContent, "BACK TO THE BOARD", 13,
+                             () => { if (arenaScreen != null) { arenaScreen.CloseCard(); arenaCardStamp = ""; } });
+        var xle = close.gameObject.AddComponent<LayoutElement>();
+        xle.flexibleHeight = 0f; xle.minHeight = TouchRow(); xle.preferredHeight = TouchRow();
+        close.GetComponent<Image>().color = new Color(0.16f,0.17f,0.21f,1f);
     }
 
     /// <summary>Repaint the ARENA board. Cheap every frame EXCEPT when the
@@ -2385,6 +2535,22 @@ public class MobileBuilderUI : MonoBehaviour
     void RefreshArena()
     {
         if (arenaScreen == null || arenaBoardContent == null) return;
+
+        // The card REPLACES the board rather than floating over it. One
+        // column, one thing at a time; a card that covers the list it came
+        // from is how a player loses their place on a phone.
+        bool onCard = arenaScreen.Card != null;
+        if (arenaCardRoot != null && arenaCardRoot.activeSelf != onCard)
+        {
+            arenaCardRoot.SetActive(onCard);
+            arenaCardStamp = "";                 // force a repaint on the way in
+        }
+        // Held as a reference, not walked to. content->viewport->scroll is two
+        // hops today and would be a silent mis-toggle the moment a wrapper is
+        // added; the first version of this line counted three.
+        if (arenaBoardRoot != null && arenaBoardRoot.activeSelf == onCard)
+            arenaBoardRoot.SetActive(!onCard);
+        if (onCard) { RefreshArenaCard(); return; }
 
         if (arenaStatus != null)
         {
