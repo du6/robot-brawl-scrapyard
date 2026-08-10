@@ -838,6 +838,59 @@ else
   expect "…and a deposit without an idempotency key is refused outright" "$S" 400
 fi
 
+echo
+echo "== N. ledger conservation, over everything this run just did (§8/M3) =="
+# M3's acceptance: "every scrap created is accounted to a config'd faucet".
+# This runs LAST on purpose - by now the bench has registered accounts, fought
+# matches, tapered a win, hit a defense floor and made a deposit, so these are
+# invariants over ~100 real operations rather than over a fixture.
+#
+# Every check here is a question the ledger should be able to answer about
+# itself. If one fails, scrap was minted or destroyed by a path nobody meant
+# to write.
+if ! command -v psql >/dev/null 2>&1; then
+  skip "ledger conservation (8 checks)" "psql is not on PATH"
+else
+  is "every CREDIT is a faucet the design doc names" \
+     "$(dbq "SELECT count(*) FROM ledger WHERE delta > 0 AND reason NOT IN
+              ('SIGNING_BONUS','PURSE','DEFENSE','FIRST_BLOOD','SEASON','STAKE_REFUND','ADJUSTMENT');")" 0
+  is "every DEBIT is a stake or the one-way career valve" \
+     "$(dbq "SELECT count(*) FROM ledger WHERE delta < 0 AND reason NOT IN
+              ('STAKE','DEPOSIT_TO_CAREER','ADJUSTMENT');")" 0
+  is "no ledger row is worth zero scrap" \
+     "$(dbq "SELECT count(*) FROM ledger WHERE delta = 0;")" 0
+  is "every ledger row that names a match points at a real one" \
+     "$(dbq "SELECT count(*) FROM ledger l LEFT JOIN matches m ON m.id = l.match_id
+              WHERE l.match_id IS NOT NULL AND m.id IS NULL;")" 0
+  # One stake per challenge. Two would mean a challenge was billed twice; the
+  # settlement path refunds against the stake, so a double stake is a real
+  # way to lose money.
+  is "no match was staked more than once" \
+     "$(dbq "SELECT count(*) FROM (SELECT match_id FROM ledger WHERE reason='STAKE'
+              GROUP BY match_id HAVING count(*) > 1) d;")" 0
+  is "no refund ever exceeds the stake it returns" \
+     "$(dbq "SELECT count(*) FROM (
+               SELECT match_id,
+                      SUM(CASE WHEN reason='STAKE' THEN -delta ELSE 0 END) AS staked,
+                      SUM(CASE WHEN reason='STAKE_REFUND' THEN delta ELSE 0 END) AS refunded
+                 FROM ledger WHERE match_id IS NOT NULL GROUP BY match_id) t
+              WHERE refunded > staked;")" 0
+  # A forfeit is the point of losing: if the defender won, the challenger's
+  # stake must NOT have come back.
+  is "a challenger who lost never got their stake back" \
+     "$(dbq "SELECT count(*) FROM ledger l JOIN matches m ON m.id = l.match_id
+              WHERE m.verdict = 'DEFENDER' AND l.reason = 'STAKE_REFUND';")" 0
+  is "a drawn match never paid a purse" \
+     "$(dbq "SELECT count(*) FROM ledger l JOIN matches m ON m.id = l.match_id
+              WHERE m.verdict = 'DRAW' AND l.reason IN ('PURSE','DEFENSE');")" 0
+  # The invariant that catches everything else: a wallet is SUM(delta), and a
+  # negative one means somebody staked or deposited scrap they never had.
+  is "no wallet is overdrawn" \
+     "$(dbq "SELECT count(*) FROM (SELECT user_id, SUM(delta) b FROM ledger
+              GROUP BY user_id) w WHERE b < 0;")" 0
+  note "ledger: $(dbq "SELECT count(*) FROM ledger;") rows, net $(dbq "SELECT COALESCE(SUM(delta),0) FROM ledger;") scrap across $(dbq "SELECT count(DISTINCT user_id) FROM ledger;") wallets"
+fi
+
 rm -f "$BODY" "$VRC_SNAP_FILE" "$VRC_JOB_FILE"
 echo
 echo "===== passed $pass  failed $fail  skipped $skipped ====="

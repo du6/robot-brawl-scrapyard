@@ -15,7 +15,7 @@ PASS  a wrong password and an unknown account are indistinguishable (both 401)
 
 == D. robots ==
 PASS  a robot is created
-      robot 6e93f606-5d0d-490c-9b79-08774e373856
+      robot 82e907f5-6016-4dfa-9505-72b11d581c3f
 PASS  …but not without a token
 
 == E. snapshot upload stays opaque (§5.2) ==
@@ -30,7 +30,7 @@ PASS  …and a wrong key is refused too
 PASS  a keyed worker claims a job
 PASS  …and the job is the VALIDATE the upload enqueued
 PASS  …pointing at the snapshot just uploaded
-PASS  …and carries a payload location the worker can resolve (file:///tmp/rb-blobs/snapshots/6e93f606-5d0d-490c-9b79-08774e373856/52f0a972231c4254bbcf096ed05230e3.json)
+PASS  …and carries a payload location the worker can resolve (file:///tmp/rb-blobs/snapshots/82e907f5-6016-4dfa-9505-72b11d581c3f/2f0117803a454a8b918aa30c2dd24272.json)
 PASS  …and the payload sha256 rides along, so the worker can verify storage
 PASS  another worker cannot heartbeat a job it does not hold
 PASS  …the holder can
@@ -141,4 +141,16 @@ PASS  a NEGATIVE deposit cannot be used to mint scrap into the wallet
 PASS  …and you cannot deposit scrap you do not have
 PASS  …and a deposit without an idempotency key is refused outright
 
-===== passed 115  failed 0  skipped 0 =====
+== N. ledger conservation, over everything this run just did (§8/M3) ==
+PASS  every CREDIT is a faucet the design doc names
+PASS  every DEBIT is a stake or the one-way career valve
+PASS  no ledger row is worth zero scrap
+PASS  every ledger row that names a match points at a real one
+PASS  no match was staked more than once
+PASS  no refund ever exceeds the stake it returns
+PASS  a challenger who lost never got their stake back
+PASS  a drawn match never paid a purse
+PASS  no wallet is overdrawn
+      ledger: 19 rows, net 2250 scrap across 3 wallets
+
+===== passed 124  failed 0  skipped 0 =====
