@@ -98,7 +98,15 @@ gcloud services enable \
   artifactregistry.googleapis.com \
   compute.googleapis.com \
   monitoring.googleapis.com \
-  billingbudgets.googleapis.com
+  billingbudgets.googleapis.com \
+  secretmanager.googleapis.com \
+  cloudbuild.googleapis.com
+
+# 2026-08-09: the last two were MISSING, and this script is the documented
+# path to a working project. deploy_api.zsh runs `gcloud builds submit` and
+# `--set-secrets=...`, so anyone following these scripts in order hit a wall
+# at the deploy step with an error about an API that was never mentioned.
+# Found by running them for real against a project owen had already made.
 
 # ------------------------------------------------------------------- buckets
 # §5.1: snapshots/ private, replays/ public-read via signed URLs. Uniform
@@ -131,6 +139,14 @@ echo "region         ${REGION}"
 echo "buckets        gs://${PROJECT_ID}-snapshots  gs://${PROJECT_ID}-replays"
 echo "images         ${REGION}-docker.pkg.dev/${PROJECT_ID}/rb"
 echo "budget         \$${BUDGET_USD}/mo, alerts at 50/90/100% spend + 100% forecast"
+echo ""
+echo "NEXT, and this script does NOT do it: deploy_api.zsh reads three secrets"
+echo "from Secret Manager, which do not exist until you make them."
+echo "  gcloud secrets create rb-jwt-secret  --data-file=- --replication-policy=automatic   # < openssl rand -base64 48"
+echo "  gcloud secrets create rb-worker-key  --data-file=- --replication-policy=automatic   # < openssl rand -base64 48"
+echo "  gcloud secrets create rb-pg-conn     --data-file=- --replication-policy=automatic   # the Postgres connection string"
+echo "Pipe the value in; never pass it as an argument, where it lands in your"
+echo "shell history and in the process list."
 echo ""
 echo "Nothing here costs money yet. The first spend will be whichever of these"
 echo "you create next: a Cloud SQL instance (~\$10-15/mo) or the worker VM"
