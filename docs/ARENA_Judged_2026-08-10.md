@@ -1,5 +1,14 @@
 # The ARENA, photographed and judged — 2026-08-10
 
+> ⚠ **SUPERSEDED THE SAME DAY, and deliberately kept.** Everything §1 and §2
+> describe was fixed on 2026-08-10: the ARENA got an entry point (the ARENA
+> tab), and then all five surfaces were ported to UGUI inside the dock. The
+> screenshots this document refers to are gone; `docs/shots/07..16` are the
+> ported screens. It is kept because the FINDINGS are why the port happened,
+> and because §2.4's shared-status leak was reproduced in the port hours after
+> being written down here — a document is not a defence against rebuilding the
+> thing it describes. See `Assets/Phase1/qa_arena_ugui.txt`.
+
 `docs/shots/*.png`, produced by `RobotBrawl.Phase0.ArenaShots.Run("/tmp/arena_shots")`
 in play mode against a local API. Re-runnable; that is the point.
 

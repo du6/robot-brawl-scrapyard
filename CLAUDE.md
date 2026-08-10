@@ -344,19 +344,20 @@ Things explicitly NOT done:
 1. **Point-in-time recovery is off** on `rb-db`. Daily backups (09:00 UTC,
    7 retained) are on and the restore drill passes, but a restore loses up
    to 24h. It costs WAL storage against a $25/mo budget — **owen's call.**
-2. **ARENA styling.** ✅ The entry point LANDED 2026-08-10 — the ladder had
-   no way in at all until then (`ArenaScreen` was in no scene, no prefab, and
-   nothing constructed it), which is why the missing enlist flow survived two
-   days. The tab bar is now **BUILD/LEAGUE/ROBOTS/SHOP/ARENA/PROGRAM**;
-   TROPHIES gave up index 4 and its medals moved onto the LEAGUE board.
-   What remains is the LAYOUT, and it is judged with pictures:
-   `docs/ARENA_Judged_2026-08-10.md`, `docs/shots/`. Re-shoot with
-   `ArenaShots.Run(dir)` and `ArenaShots.RunMobileTab(dir)` in play mode —
-   the MCP capture tools render from a camera and never see IMGUI.
-   ⚠ Still open and owen's: the IMGUI panel is drawn at a fixed top-left rect,
-   so an OPEN dock pushes the tab strip underneath it; and **`SHOP` is a tab
-   while `ArenaScreen` draws a second shop of its own** — two shops, different
-   currencies. Worth settling before either gets styled.
+2. ✅ **ARENA STYLING — DONE 2026-08-10.** All five surfaces (board,
+   scouting card + challenge, MY FIGHTS + replay launcher, ENLIST, sign-in)
+   are UGUI **in the dock**, so they inherit the safe-area insets, the 44 pt
+   touch floor and the benches that measure both — `TouchSmoke`'s fixed-axis
+   invariant now covers all four ARENA scrollers and could see none of them as
+   IMGUI. `ArenaScreen` keeps its OnGUI only for the standalone
+   `ArenaScreen.Open()` path and cannot drift, because both renderers share
+   one model and one set of flows.
+   Pictures: `docs/shots/07..16`, re-shoot with `ArenaShots.RunMobileTab(dir)`.
+   ⚠ **The password is PUSHED, never pulled** — `SetPassword` has no getter and
+   the panel's rebuild key is not derived from it. Keep it that way; this dock
+   is screenshotted on purpose.
+   Still owen's, and only styling now: every text field in this dock is a dark
+   box on a dark row and is near-invisible until focused.
 3. ~~**The worker fight path has no BENCH.**~~ **CLOSED 2026-08-10** —
    `EnlistLiveBench` 21/21 drives the real `HttpWorkerTransport` against a
    live API for both halves: validate, then a real best-of-3 fought and posted
