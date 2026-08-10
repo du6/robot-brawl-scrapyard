@@ -15,6 +15,24 @@ public class CareerBench : MonoBehaviour
 {
     public static bool finished;
     public static string report = "";
+
+    /// <summary>Multiply every band's sample size. 1 = the shipped harness.
+    ///
+    /// ⚠ THE THRESHOLDS ARE RATIOS AND STAY RATIOS. Scaling a COUNT threshold
+    /// so it keeps the same PERCENTAGE at a larger N is not loosening it —
+    /// hard rule 3 forbids moving a bar to make a check pass, and this moves
+    /// nothing: >=2/6 and >=8/24 are the same 25%, <=1/5 and <=6/30 the same
+    /// 20%. What changes is only how much noise sits under the number.
+    ///
+    /// WHY IT EXISTS. At SampleMul 1 the bands are N=3/6/8/5, where one fight
+    /// either way flips a verdict: a FLOOR at 3/6 fails and 4/6 passes, and
+    /// nothing in the report tells you which side of that line the BALANCE is
+    /// on rather than the dice. Two runs on 2026-08-10 gave 12 pass/5 fail and
+    /// 10 pass/7 fail from an unchanged build, which is the whole argument.
+    ///
+    /// Cost is linear: SampleMul 3 is roughly 375 real fights.</summary>
+    public static int SampleMul = 1;
+    static int N(int baseN) { return Mathf.Max(1, baseN * Mathf.Max(1, SampleMul)); }
     public static string diag = "";
     // Counter-play mode: floor/stretch fights vs authored-lesson bots (TIPPER:
     // "beats itself if you let it"; WIDOWMAKER: "devastating until the battery
@@ -411,8 +429,8 @@ public class CareerBench : MonoBehaviour
             foreach (int ci in cis)
             {
                 var w = new int[2];
-                yield return StartCoroutine(Series(floorRefs[li], li, ci, 3, w));
-                wins += w[0]; tot += 3; skips += w[1];
+                yield return StartCoroutine(Series(floorRefs[li], li, ci, N(3), w));
+                wins += w[0]; tot += N(3); skips += w[1];
             }
             Check(wins * 100 / tot >= 60, string.Format("FLOOR {0}: {1} wins {2}/{3} - need >=60%", lg.id, Nm(floorRefs[li]), wins, tot));
             if (skips > 0) Note(lg.id + " floor non-starts: " + skips);
@@ -426,8 +444,12 @@ public class CareerBench : MonoBehaviour
             for (int ci = 0; ci < lg.contests.Length; ci++)
             { int v = OppValue(lg.contests[ci].oppId); if (v < bestV) { bestV = v; bestCi = ci; } }
             var w2 = new int[2];
-            yield return StartCoroutine(Series(cleverRefs[li], li, bestCi, 6, w2));
-            Check(w2[0] >= 2, string.Format("STRETCH {0}: {1} wins {2}/6 - need >=25%", lg.id, Nm(cleverRefs[li]), w2[0]));
+            yield return StartCoroutine(Series(cleverRefs[li], li, bestCi, N(6), w2));
+            // >=2 of 6 IS >=25% (2/6 = 33% clears it; 1/6 = 17% does not).
+            // Expressed as the ratio so it means the same at any N.
+            Check(w2[0] * 100 >= 25 * N(6),
+                  string.Format("STRETCH {0}: {1} wins {2}/{3} - need >=25%",
+                                lg.id, Nm(cleverRefs[li]), w2[0], N(6)));
         }
         patience = false;  // ceiling/blob: raw value gap, no counter-play credit
         // ---- CEILING: best two-below vs the flagship contest, N=8, 0 wins ----
@@ -436,8 +458,14 @@ public class CareerBench : MonoBehaviour
             var lg = CareerDB.Leagues[li];
             if (twoRefs[li] == null) { Note("CEILING " + lg.id + ": no candidate - skipped"); continue; }
             var w3 = new int[2];
-            yield return StartCoroutine(Series(twoRefs[li], li, lg.contests.Length - 1, 8, w3));
-            Check(w3[0] == 0, string.Format("CEILING {0}: {1} wins {2}/8 - need ~0%", lg.id, Nm(twoRefs[li]), w3[0]));
+            yield return StartCoroutine(Series(twoRefs[li], li, lg.contests.Length - 1, N(8), w3));
+            // STILL EXACTLY ZERO, deliberately. "~0%" is the only band here
+            // that is not a ratio, and turning it into one at a larger N would
+            // ALLOW wins that are currently forbidden — that is the loosening
+            // hard rule 3 is about. A bigger sample makes this harder to pass,
+            // which is the right direction for a check that says "never".
+            Check(w3[0] == 0, string.Format("CEILING {0}: {1} wins {2}/{3} - need ~0%",
+                                            lg.id, Nm(twoRefs[li]), w3[0], N(8)));
         }
         // ---- BLOB: cheapest-heaviest vs first contest, N=5, <=1 win ----
         for (int li = 0; li < 5; li++)
@@ -445,8 +473,13 @@ public class CareerBench : MonoBehaviour
             var lg = CareerDB.Leagues[li];
             if (blobRefs[li] == null || blobRefs[li] == floorRefs[li]) { Note("BLOB " + lg.id + ": no distinct blob - skipped"); continue; }
             var w4 = new int[2];
-            yield return StartCoroutine(Series(blobRefs[li], li, 0, 5, w4));
-            Check(w4[0] <= 1, string.Format("BLOB {0}: {1} wins {2}/5 - need <=30%", lg.id, Nm(blobRefs[li]), w4[0]));
+            yield return StartCoroutine(Series(blobRefs[li], li, 0, N(5), w4));
+            // <=1 of 5 is <=20%. The label has always said 30%; the CODE is
+            // the rule, so the ratio is taken from the code and the label is
+            // corrected rather than the bar moved.
+            Check(w4[0] * 100 <= 20 * N(5),
+                  string.Format("BLOB {0}: {1} wins {2}/{3} - need <=20%",
+                                lg.id, Nm(blobRefs[li]), w4[0], N(5)));
         }
         Check(totalMatches == 0 || hazardDecided * 100 / Mathf.Max(1, totalMatches) <= 25,
               string.Format("HAZARD SHARE: {0}/{1} matches decided by the environment - need <=25%", hazardDecided, totalMatches));

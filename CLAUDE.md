@@ -38,6 +38,7 @@ The records, most recent first:
 
 | doc | what |
 |---|---|
+| `docs/CareerBench_Sample_Size_2026-08-10.md` | three of eleven balance verdicts were coin flips |
 | `docs/Disarm_Lever_Sweep_2026-08-10.md` | which lever moves the 43% — and the one that sounds right does nothing |
 | `docs/ARENA_Judged_2026-08-10.md` | the ARENA photographed — and it has no entry point |
 | `docs/Mutual_Disarm_Root_Cause_2026-08-09.md` | the 43% disarm: the limb fails, not the weapon |
@@ -307,11 +308,16 @@ latter including "no scroller clips its content across a FIXED axis", the
 invariant that caught the unreachable sensor rows in the first place.
 
 **The stale-green list is gone — every one of them was run.** Two notes:
-`CareerBench` is a BALANCE harness and reports **12 pass, 5 "TUNING NEEDED"**
-— win rates outside their intended bands at N=6-8, which is owen's call and
-too small a sample to steer by. And `SensorProbe` is a probe, not a bench.
-
-⚠ **RUN CAREER-TOUCHING BENCHES ONE AT A TIME.** `CareerSmoke`, `TouchSmoke`,
+`CareerBench` is a BALANCE harness, and **at its shipped N=6-8 THREE OF
+ELEVEN band verdicts are coin flips** — measured 2026-08-10 by re-running at
+3x sample, ~500 fights: `docs/CareerBench_Sample_Size_2026-08-10.md`. Two runs
+of an UNCHANGED build gave 12/5 and 10/7. Use `CareerBench.SampleMul` (default
+1) before believing any single band. What survives the bigger sample: **CEILING
+L4 at 22/24 = 92%** (a robot two classes below the flagship wins nearly always
+— the worst thing in the harness), **STRETCH failing L3/L4/L5 in the same
+direction** (systematic, not noise), and FLOOR L2/L3 low. **FLOOR L4 and
+CEILING L5 were false alarms and should stop being counted.** Which to tune is
+owen's.** `CareerSmoke`, `TouchSmoke`,
 `HazardBench` and `CareerBench` each drive the builder, the arena and
 `Career.Data`, and `BuildArena()` is not idempotent. Started together they
 clobber each other and report nonsense — measured: HazardBench 7/7 fail
