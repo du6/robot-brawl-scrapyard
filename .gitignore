@@ -66,6 +66,13 @@ Assets/Phase1/.bundle*/
 # away from being pushed to a remote.
 .gh_token.local
 
+# Telegram bot token for @OwensClaudeBot, same rule as the GitHub token above:
+# pasted by owen, read as $(cat .telegram_token.local), never printed. A bot
+# token is a full credential - anyone holding it can read and send everything
+# the bot can - so it is ignored BEFORE the file is created, not after.
+.telegram_token.local
+.telegram_chat.local
+
 # scratch used to defeat the stale-file cache in device_stage_files
 Assets/Phase1/.push_tmp/
 

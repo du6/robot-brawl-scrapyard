@@ -83,7 +83,14 @@ Everything. Owen chose a full handover, knowing what it ends:
 - **No unattended work.** A Cowork session could schedule itself awake and
   keep working while he was away. You end when your terminal does. Nothing
   progresses unless he is running you.
-- **No phone alerts.** Telegram belonged to the Cowork session.
+- ~~**No phone alerts.**~~ ✅ **Fixed 2026-08-09.** Telegram is wired up to
+  this session: `zsh notify.zsh "message"`, or pipe into it. Bot is
+  **@OwensClaudeBot**; token in `.telegram_token.local`, chat id in
+  `.telegram_chat.local`, both gitignored and never printed. Run
+  `telegram_link.zsh` once if the chat id is ever lost.
+  ⚠ This closes the **notification** gap, not the unattended-work gap: a CLI
+  session can now reach owen's phone, but it still ends when its terminal
+  does. Pushing a message is not the same as being awake.
 - **The claude.ai Project is frozen.** `docs/` in git is now the source of
   truth. The Project carries a `READ_FIRST_source_of_truth_moved.md` notice
   saying so. Do not treat anything in it as current; you cannot read it
