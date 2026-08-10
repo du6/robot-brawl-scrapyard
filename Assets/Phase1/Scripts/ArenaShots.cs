@@ -125,6 +125,38 @@ namespace RobotBrawl.Phase0
                 yield return null; yield return null;
                 yield return new WaitForSeconds(0.6f);
                 yield return Shot(dir, "08_league_with_trophy_case");
+
+                // The one SHOP, both shelves. COSMETICS is the half that used
+                // to be a second shop inside the ARENA.
+                ui.TestShowTab(3);
+                yield return null; yield return null;
+                yield return new WaitForSeconds(0.5f);
+                yield return Shot(dir, "09_shop_parts");
+
+                // SIGNED OUT first: cosmetics need an account, and that state
+                // has to read as an instruction rather than an error.
+                LadderClient.Logout();
+                ui.TestShowShopSection(1);
+                yield return new WaitForSeconds(1.5f);
+                yield return Shot(dir, "10_shop_cosmetics_signed_out");
+
+                // ...then SIGNED IN, which is the state the consolidation was
+                // actually for: the shelf, the wallet, and the one-way valve
+                // that had been buried in a shop with no entry point. A
+                // screenshot of the signed-out panel proves none of that.
+                string tag = DateTime.UtcNow.ToString("HHmmss") + "-" + UnityEngine.Random.Range(1000, 9999);
+                string rerr = null;
+                yield return LadderClient.Register("shopshots-" + tag + "@example.test",
+                                                   "bench-password-1", "Shop " + tag,
+                                                   (who, e) => { rerr = e; });
+                if (!string.IsNullOrEmpty(rerr)) log.Add("  (register failed: " + rerr + ")");
+                ui.TestShowShopSection(0);
+                yield return null;
+                ui.TestShowShopSection(1);
+                yield return new WaitForSeconds(2.0f);
+                yield return Shot(dir, "11_shop_cosmetics_signed_in");
+                ui.TestShowShopSection(0);
+
                 ui.TestShowTab(0);
                 yield return null;
             }
@@ -196,12 +228,10 @@ namespace RobotBrawl.Phase0
                 yield return Shot(dir, "05_enlist_nothing_saved");
                 ui.TestShowEnlist = false;
 
-                // ---- 6. the shop ------------------------------------------
-                ui.ShowShop();
-                yield return new WaitForSeconds(1.5f);
-                yield return Shot(dir, "06_shop");
-                ui.ShowLadder();
-                yield return new WaitForSeconds(0.5f);
+                // The shop used to be shot here. It left this screen on
+                // 2026-08-10 — cosmetics, the wallet and the deposit valve now
+                // live on the career SHOP tab — so it is photographed through
+                // the dock in RunMobileTab instead, where it now is.
             }
             finally
             {

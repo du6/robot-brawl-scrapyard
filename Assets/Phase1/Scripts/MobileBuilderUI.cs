@@ -51,6 +51,30 @@ public class MobileBuilderUI : MonoBehaviour
     readonly List<Button> tabBtns = new List<Button>();
     int armSell = -1; string armSellMat = "";
     string shopNote = ""; bool shopNoteBad;
+
+    // ---- ONE SHOP, TWO SHELVES (owen, 2026-08-10) -----------------------
+    // There were two shops: this tab, selling PARTS for career SCRAP, and a
+    // second one inside ArenaScreen selling COSMETICS for the LADDER WALLET.
+    // Two shops is a navigation bug, not a design — but they are NOT the same
+    // shop, and merging the currencies would delete a decision: §2.3 makes the
+    // ladder wallet one-way into career scrap on purpose. So the LOCATION is
+    // consolidated and the two balances are kept apart, with the one-way valve
+    // sitting at the seam between them — which is also the only place a player
+    // ever sees both numbers at once, and so the only place the valve is
+    // legible. It used to be buried in a shop nobody could open.
+    int shopSection;                       // 0 = PARTS, 1 = COSMETICS
+    GameObject shopPartsRoot, cosmeticsRoot;
+    Transform cosmeticsContent;
+    Button shopSecParts, shopSecCosmetics;
+    LayoutElement shopSecLE;               // re-sized in ApplyTouchSizes, like every other row
+    readonly List<Cosmetic> cosmetics = new List<Cosmetic>();
+    long ladderBalance = -1;               // -1 = not read yet, never "0"
+    string depositText = "";
+    // A STABLE idempotency key per deposit ATTEMPT. Regenerating per retry
+    // defeats the guarantee: the API uses it to make a dropped response safe
+    // to retry, so the retry must carry the SAME key. Rolled only on success.
+    string depositKey = System.Guid.NewGuid().ToString();
+    bool cosmeticsBusy;
     // ---- C3: career league board ----
     GameObject careerBoard; Transform careerBoardContent;
     Button ladderBtn, exhibBtn;
@@ -1750,6 +1774,11 @@ public class MobileBuilderUI : MonoBehaviour
         LayoutTabs();
         if (matRowRt != null) matRowRt.sizeDelta = new Vector2(-12f, R);
         if (actRowRt != null) actRowRt.sizeDelta = new Vector2(0f, R);
+        // The SHOP's PARTS/COSMETICS switch. It lives in a VerticalLayoutGroup
+        // so it is held by a LayoutElement rather than a sizeDelta, but it is
+        // the same rule: one touch row, tracked against the scale factor.
+        if (shopSecLE != null)
+        { shopSecLE.flexibleHeight = 0f; shopSecLE.minHeight = R; shopSecLE.preferredHeight = R; }
         if (partScrollRt != null)
         {
             partScrollRt.offsetMin = new Vector2(0f, R + 4f);
@@ -2139,7 +2168,42 @@ public class MobileBuilderUI : MonoBehaviour
         var v = shopPanel.AddComponent<VerticalLayoutGroup>(); v.spacing = 4f; v.childForceExpandWidth = true; v.childForceExpandHeight = false; v.padding = new RectOffset(4,4,4,4);
         shopHeader = MkText("shopheader", shopPanel.transform, "", 15, TextAnchor.MiddleLeft);
         var hle = shopHeader.gameObject.AddComponent<LayoutElement>(); hle.minHeight = 20f; hle.preferredHeight = 20f;
-        var scrollGO = MkPanel("shopscroll", shopPanel.transform, new Color(0f,0f,0f,0f));
+
+        // The two shelves. A row of two buttons rather than a second tab,
+        // because PARTS and COSMETICS are the same errand — spending — and the
+        // tab bar is full at six.
+        var secRow = MkPanel("shopsections", shopPanel.transform, new Color(0f,0f,0f,0f));
+        var secLE = secRow.AddComponent<LayoutElement>();
+        var secH = secRow.AddComponent<HorizontalLayoutGroup>();
+        secH.spacing = 4f; secH.childForceExpandWidth = true; secH.childForceExpandHeight = true;
+        shopSecParts = MkButton("shopsec_parts", secRow.transform, "PARTS", 14, () => ShowShopSection(0));
+        shopSecCosmetics = MkButton("shopsec_cos", secRow.transform, "COSMETICS", 14, () => ShowShopSection(1));
+        // Sized like every other tap target in this dock, and it has to be:
+        // CareerSmoke measures NAMED build controls, and a control invented
+        // after that list was written is one nothing checks.
+        //
+        // ⚠ flexibleHeight MUST BE 0, and the screenshot is why. A
+        // LayoutElement leaves it at -1 ("unset"), the VerticalLayoutGroup
+        // read that as "take the slack", and the two section buttons came out
+        // roughly THREE TIMES the height of the tab row above them — a third
+        // of the dock spent on a switch. min/preferred alone do not hold a row
+        // down; something has to decline the leftover space.
+        //
+        // Re-applied in ApplyTouchSizes rather than only here, because
+        // TouchRow() depends on the canvas scale factor and this runs before
+        // the canvas has one. Sizing a touch target once, at construction, is
+        // how it ends up right on the machine that built it and wrong on a
+        // phone.
+        shopSecLE = secLE;
+        secLE.flexibleHeight = 0f;
+        secLE.minHeight = TouchRow(); secLE.preferredHeight = TouchRow();
+
+        shopPartsRoot = MkPanel("shoppartsroot", shopPanel.transform, new Color(0f,0f,0f,0f));
+        var prle = shopPartsRoot.AddComponent<LayoutElement>(); prle.flexibleHeight = 1f; prle.minHeight = 96f;
+        var prv = shopPartsRoot.AddComponent<VerticalLayoutGroup>();
+        prv.childForceExpandWidth = true; prv.childForceExpandHeight = true;
+
+        var scrollGO = MkPanel("shopscroll", shopPartsRoot.transform, new Color(0f,0f,0f,0f));
         var sle = scrollGO.AddComponent<LayoutElement>(); sle.flexibleHeight = 1f; sle.minHeight = 96f;
         var scroll = scrollGO.AddComponent<ScrollRect>(); scroll.horizontal = false; scroll.vertical = true;
         var viewport = MkPanel("shopviewport", scrollGO.transform, new Color(0f,0f,0f,0.15f));
@@ -2241,7 +2305,215 @@ public class MobileBuilderUI : MonoBehaviour
                 shopMats.Add(mr);
             }
         }
+        BuildCosmeticsShelf();
+        ShowShopSection(0);
         RefreshShop();
+    }
+
+    /// <summary>The COSMETICS shelf: same dock, different currency. Its rows
+    /// are built at REFRESH rather than here, because the catalogue comes off
+    /// the network and this runs before anyone has signed in.</summary>
+    void BuildCosmeticsShelf()
+    {
+        cosmeticsRoot = MkPanel("shopcosroot", shopPanel.transform, new Color(0f,0f,0f,0f));
+        var rle = cosmeticsRoot.AddComponent<LayoutElement>(); rle.flexibleHeight = 1f; rle.minHeight = 96f;
+        var rv = cosmeticsRoot.AddComponent<VerticalLayoutGroup>();
+        rv.spacing = 4f; rv.childForceExpandWidth = true; rv.childForceExpandHeight = false;
+
+        var scrollGO = MkPanel("cosscroll", cosmeticsRoot.transform, new Color(0f,0f,0f,0f));
+        var sle = scrollGO.AddComponent<LayoutElement>(); sle.flexibleHeight = 1f; sle.minHeight = 96f;
+        var scroll = scrollGO.AddComponent<ScrollRect>(); scroll.horizontal = false; scroll.vertical = true;
+        var viewport = MkPanel("cosviewport", scrollGO.transform, new Color(0f,0f,0f,0.15f));
+        var vp = viewport.GetComponent<RectTransform>(); Stretch(vp);
+        viewport.AddComponent<Mask>().showMaskGraphic = true;
+        var content = MkPanel("coscontent", viewport.transform, new Color(0f,0f,0f,0f));
+        var crt = content.GetComponent<RectTransform>();
+        crt.anchorMin = new Vector2(0f,1f); crt.anchorMax = new Vector2(1f,1f);
+        crt.pivot = new Vector2(0.5f,1f); crt.anchoredPosition = Vector2.zero;
+        crt.sizeDelta = new Vector2(0f, 0f);
+        var clg = content.AddComponent<VerticalLayoutGroup>();
+        clg.spacing = 4f; clg.childForceExpandWidth = true; clg.childForceExpandHeight = false;
+        clg.padding = new RectOffset(4,4,4,4);
+        var csf = content.AddComponent<ContentSizeFitter>(); csf.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+        scroll.viewport = vp; scroll.content = crt;
+        AddListOverflow(scrollGO, scroll, vp);   // R2 finding 8: COSMETICS
+        cosmeticsContent = content.transform;
+    }
+
+    /// <summary>PARTS or COSMETICS. Loads the cosmetics shelf on the way in —
+    /// its catalogue and the wallet are both network reads, and a shelf that
+    /// shows an empty list while it fetches reads as "you own nothing".</summary>
+    void ShowShopSection(int s)
+    {
+        shopSection = s;
+        if (shopPartsRoot != null) shopPartsRoot.SetActive(s == 0);
+        if (cosmeticsRoot != null) cosmeticsRoot.SetActive(s == 1);
+        TintSection(shopSecParts, s == 0);
+        TintSection(shopSecCosmetics, s == 1);
+        if (s == 1 && !cosmeticsBusy) StartCoroutine(LoadCosmetics());
+        else RefreshShop();
+    }
+
+    void TintSection(Button b, bool on)
+    {
+        if (b == null) return;
+        var img = b.GetComponent<Image>();
+        if (img != null) img.color = on ? new Color(0.20f,0.45f,0.65f,1f) : new Color(0.16f,0.17f,0.21f,1f);
+        var t = b.GetComponentInChildren<Text>();
+        if (t != null) t.color = on ? Color.white : new Color(0.72f,0.78f,0.88f);
+    }
+
+    /// <summary>Wallet THEN catalogue, both before drawing. Affordability greys
+    /// the BUY buttons, and `ladderBalance` starts at -1 meaning "unknown" — a
+    /// shelf drawn without a wallet read shows every item disabled with no
+    /// explanation. That exact bug was caught once already by screenshotting
+    /// the ARENA shop's deep-link path: six items, six dead buttons.</summary>
+    System.Collections.IEnumerator LoadCosmetics()
+    {
+        cosmeticsBusy = true;
+        RefreshShop();                       // paint "loading…" before the wait
+        if (LadderClient.SignedIn)
+        {
+            yield return LadderClient.Wallet((b, err) => { if (err == null) ladderBalance = b; });
+            yield return LadderClient.Cosmetics((rows, err) =>
+            {
+                cosmetics.Clear();
+                if (err == null && rows != null) cosmetics.AddRange(rows);
+            });
+        }
+        cosmeticsBusy = false;
+        RefreshCosmetics();
+        RefreshShop();
+    }
+
+    System.Collections.IEnumerator BuyCosmetic(Cosmetic c)
+    {
+        cosmeticsBusy = true; RefreshShop();
+        yield return LadderClient.BuyCosmetic(c.id, (bal, err) =>
+        {
+            if (err != null) { shopNote = "shop: " + err; shopNoteBad = true; }
+            else { ladderBalance = bal; shopNote = "bought " + c.name; shopNoteBad = false; }
+        });
+        cosmeticsBusy = false;
+        yield return LoadCosmetics();
+    }
+
+    /// <summary>The one-way valve, §2.3. Ladder winnings move INTO career
+    /// scrap and never back.</summary>
+    System.Collections.IEnumerator DepositToCareer()
+    {
+        int amt;
+        if (!int.TryParse(depositText, out amt) || amt <= 0)
+        { shopNote = "enter a positive amount to move"; shopNoteBad = true; RefreshShop(); yield break; }
+        cosmeticsBusy = true; RefreshShop();
+        yield return LadderClient.Deposit(amt, depositKey, (bal, err) =>
+        {
+            if (err != null) { shopNote = "deposit: " + err; shopNoteBad = true; return; }
+            ladderBalance = bal;
+            depositText = "";
+            depositKey = System.Guid.NewGuid().ToString();   // only now is a new key correct
+            shopNote = "moved " + amt + " to career scrap; " + bal + " left on the ladder";
+            shopNoteBad = false;
+        });
+        cosmeticsBusy = false;
+        RefreshCosmetics();
+        RefreshShop();
+    }
+
+    void RefreshCosmetics()
+    {
+        if (cosmeticsContent == null) return;
+        for (int i = cosmeticsContent.childCount - 1; i >= 0; i--)
+            Destroy(cosmeticsContent.GetChild(i).gameObject);
+
+        if (!LadderClient.SignedIn)
+        {
+            // Not an error, and it must not look like one. Cosmetics are bought
+            // with ladder winnings, and you cannot have any until you have an
+            // account — so this says what to do, in the ARENA, by name.
+            var row = MkPanel("cos_signedout", cosmeticsContent, new Color(0.13f,0.14f,0.18f,0.9f));
+            var le = row.AddComponent<LayoutElement>(); le.minHeight = 64f; le.preferredHeight = 64f;
+            var t = MkText("lbl", row.transform,
+                "cosmetics are bought with LADDER winnings.\n"
+                + "sign in on the ARENA tab, then come back.", 14, TextAnchor.MiddleLeft);
+            t.color = new Color(0.80f, 0.86f, 0.96f);
+            Stretch(t.rectTransform);
+            t.rectTransform.offsetMin = new Vector2(10f, 2f); t.rectTransform.offsetMax = new Vector2(-10f, -2f);
+            return;
+        }
+
+        // ---- the valve, at the seam ------------------------------------
+        // This is the only screen that shows BOTH balances, so it is the only
+        // place moving one into the other is legible. It lived in the ARENA
+        // shop, which had no entry point, so a player with ladder winnings had
+        // no way to discover they could be spent in the career at all.
+        var vrow = MkPanel("cos_deposit", cosmeticsContent, new Color(0.10f,0.16f,0.13f,0.95f));
+        var vle = vrow.AddComponent<LayoutElement>(); vle.minHeight = TouchRow(); vle.preferredHeight = TouchRow();
+        var vh = vrow.AddComponent<HorizontalLayoutGroup>();
+        vh.spacing = 6f; vh.childForceExpandHeight = true; vh.childForceExpandWidth = false;
+        vh.padding = new RectOffset(8,6,2,2);
+        var vlbl = MkText("lbl", vrow.transform, "move ladder scrap to career", 13, TextAnchor.MiddleLeft);
+        vlbl.gameObject.AddComponent<LayoutElement>().flexibleWidth = 1f;
+        var fieldGO = MkPanel("cos_deposit_field", vrow.transform, new Color(0.06f,0.07f,0.09f,1f));
+        fieldGO.AddComponent<LayoutElement>().minWidth = 90f;
+        var ftxt = MkText("lbl", fieldGO.transform, "", 14, TextAnchor.MiddleCenter);
+        Stretch(ftxt.rectTransform);
+        var fin = fieldGO.AddComponent<InputField>();
+        fin.textComponent = ftxt; fin.text = depositText ?? "";
+        fin.contentType = InputField.ContentType.IntegerNumber;
+        fin.onValueChanged.AddListener(s => depositText = s);
+        var dbtn = MkButton("cos_deposit_go", vrow.transform, "TO CAREER", 13,
+                            () => { if (!cosmeticsBusy) StartCoroutine(DepositToCareer()); });
+        dbtn.gameObject.AddComponent<LayoutElement>().minWidth = 110f;
+        dbtn.GetComponent<Image>().color = new Color(0.18f,0.42f,0.28f,1f);
+
+        var note = MkText("cos_oneway", cosmeticsContent,
+            "one-way: ladder winnings become career scrap, never the other way.",
+            12, TextAnchor.MiddleLeft);
+        note.color = new Color(0.62f, 0.70f, 0.62f);
+        note.gameObject.AddComponent<LayoutElement>().minHeight = 18f;
+
+        if (cosmetics.Count == 0)
+        {
+            var erow = MkPanel("cos_empty", cosmeticsContent, new Color(0.13f,0.14f,0.18f,0.9f));
+            var ele = erow.AddComponent<LayoutElement>(); ele.minHeight = 44f; ele.preferredHeight = 44f;
+            var et = MkText("lbl", erow.transform,
+                cosmeticsBusy ? "loading the shelf…" : "nothing on the shelf yet.",
+                14, TextAnchor.MiddleLeft);
+            et.color = new Color(0.78f, 0.82f, 0.90f);
+            Stretch(et.rectTransform);
+            et.rectTransform.offsetMin = new Vector2(10f, 2f); et.rectTransform.offsetMax = new Vector2(-10f, -2f);
+            return;
+        }
+
+        for (int i = 0; i < cosmetics.Count; i++)
+        {
+            var c = cosmetics[i];
+            var row = MkPanel("cos_" + c.id, cosmeticsContent,
+                c.owned ? new Color(0.14f,0.20f,0.16f,0.95f) : new Color(0.10f,0.11f,0.14f,1f));
+            var rle = row.AddComponent<LayoutElement>(); rle.minHeight = TouchRow(); rle.preferredHeight = TouchRow();
+            var rh = row.AddComponent<HorizontalLayoutGroup>();
+            rh.spacing = 4f; rh.childForceExpandHeight = true; rh.childForceExpandWidth = false;
+            rh.padding = new RectOffset(8,4,2,2);
+            var lbl = MkText("lbl", row.transform,
+                c.name + "  ·  " + c.kind + (c.owned ? "  ·  owned" : "  ·  " + c.price),
+                14, TextAnchor.MiddleLeft);
+            lbl.color = c.owned ? new Color(0.72f, 0.92f, 0.78f) : new Color(0.86f, 0.90f, 0.96f);
+            lbl.gameObject.AddComponent<LayoutElement>().flexibleWidth = 1f;
+
+            if (!c.owned)
+            {
+                var cc = c;
+                bool afford = ladderBalance < 0 || ladderBalance >= c.price;
+                var bb = MkButton("cosbuy_" + c.id, row.transform, "BUY", 13,
+                                  () => { if (!cosmeticsBusy) StartCoroutine(BuyCosmetic(cc)); });
+                bb.gameObject.AddComponent<LayoutElement>().minWidth = 76f;
+                bb.GetComponent<Image>().color = afford ? new Color(0.20f,0.45f,0.65f,1f)
+                                                        : new Color(0.20f,0.21f,0.25f,1f);
+                var bt = bb.GetComponentInChildren<Text>();
+                if (bt != null) bt.color = afford ? Color.white : new Color(0.55f,0.58f,0.64f);
+            }
+        }
     }
 
     /// <summary>Accordion: open this part, close the others. Re-tapping the
@@ -2310,11 +2582,29 @@ public class MobileBuilderUI : MonoBehaviour
     public void RefreshShop()
     {
         if (bm == null || shopHeader == null) return;
-        shopHeader.text = !string.IsNullOrEmpty(shopNote)
-            ? (shopNoteBad ? "\u26a0 " : "") + shopNote + "   \u00b7   SCRAP " + Career.Data.scrap
-            : "SCRAP " + Career.Data.scrap
-              + "   \u00b7   tap a part to compare its materials   \u00b7   HP/kg is what a weight cap buys"
-              + "   \u00b7   SELL returns 50%; to change a material, SELL and BUY";
+
+        // \u26a0 THE HEADER NAMES THE CURRENCY OF THE SHELF YOU ARE ON. Two
+        // balances in one tab is only safe while it is never ambiguous which
+        // one a price is in \u2014 the cosmetics shelf must never read "SCRAP N"
+        // and charge the ladder wallet.
+        if (shopSection == 1)
+        {
+            string bal = !LadderClient.SignedIn ? "not signed in"
+                       : ladderBalance < 0      ? "reading\u2026"
+                                                : "LADDER " + ladderBalance;
+            shopHeader.text = !string.IsNullOrEmpty(shopNote)
+                ? (shopNoteBad ? "\u26a0 " : "") + shopNote + "   \u00b7   " + bal
+                : bal + (cosmeticsBusy ? "   \u00b7   loading\u2026" : "")
+                      + "   \u00b7   cosmetic only \u2014 nothing here touches a fight";
+        }
+        else
+        {
+            shopHeader.text = !string.IsNullOrEmpty(shopNote)
+                ? (shopNoteBad ? "\u26a0 " : "") + shopNote + "   \u00b7   SCRAP " + Career.Data.scrap
+                : "SCRAP " + Career.Data.scrap
+                  + "   \u00b7   tap a part to compare its materials   \u00b7   HP/kg is what a weight cap buys"
+                  + "   \u00b7   SELL returns 50%; to change a material, SELL and BUY";
+        }
         shopHeader.color = shopNoteBad ? new Color(1f, 0.82f, 0.25f) : new Color(0.80f, 0.88f, 1f);
 
         for (int k = 0; k < shopParts.Count; k++)
@@ -2757,6 +3047,12 @@ public class MobileBuilderUI : MonoBehaviour
     /// instead of the screen.</summary>
     public void TestShowTab(int i) { ShowTab(i); }
     public int TestTab { get { return tab; } }
+    /// <summary>PARTS (0) or COSMETICS (1) within the one SHOP tab. A seam,
+    /// not a shortcut: the cosmetics shelf is a network read behind a section
+    /// button, and a harness that cannot reach it is a harness that will keep
+    /// reporting the parts shelf as if it were the whole shop.</summary>
+    public void TestShowShopSection(int s) { ShowShopSection(s); }
+    public int TestShopSection { get { return shopSection; } }
     /// <summary>R1 fix 2 evidence seam. The dock height drives BOTH the panel
     /// layout and the pointer-blocking boundary; if they ever disagree, taps
     /// inside the expanded panel place parts on the robot behind it. These

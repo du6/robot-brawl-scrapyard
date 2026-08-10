@@ -63,43 +63,21 @@ namespace RobotBrawl.Phase0
         bool showEnlist;
         string enlistName = "";
 
-        // The shop (§2.3's scrap sinks) and the one-way deposit valve.
-        bool showShop;
-        List<Cosmetic> shop = new List<Cosmetic>();
-        Vector2 shopScroll;
-        string depositText = "";
-        // A STABLE idempotency key per deposit attempt. Regenerating it per
-        // retry would defeat the guarantee entirely: the API uses it to make a
-        // dropped response safe to retry, so the retry must carry the SAME
-        // key. Rolled only after a deposit actually succeeds.
-        string depositKey = Guid.NewGuid().ToString();
+        // THE SHOP LEFT THIS SCREEN, 2026-08-10 (owen: "consolidate the shops
+        // into a single shop tab"). Cosmetics, the wallet and the one-way
+        // deposit valve now live on the career SHOP tab beside the parts
+        // shelf, because two shops is a navigation bug — and because the valve
+        // is only legible where BOTH balances are on screen, which is there
+        // and was never here. The currencies stay separate: §2.3 makes the
+        // ladder wallet one-way into career scrap on purpose, and merging them
+        // would delete that decision rather than implement it.
+        //
+        // What is gone with it: showShop, LoadShop, OpenShop, DoBuy, DoDeposit
+        // and DrawShop. There is now exactly ONE implementation of buying a
+        // cosmetic, which is the point — this project calls a one-side-only
+        // fix its signature bug.
 
         void Start() { StartCoroutine(Refresh()); }
-
-        /// <summary>Open the ARENA directly on the shop. The career's own SHOP
-        /// tab is the obvious caller — "spend your ladder scrap" should not
-        /// require finding a button inside another screen — and it is also how
-        /// the surface gets screenshotted without a synthetic click.</summary>
-        public void ShowShop()
-        {
-            showShop = true;
-            StartCoroutine(OpenShop());
-        }
-
-        /// <summary>The wallet is loaded with the stock, and that is not
-        /// incidental. Affordability greys out the BUY buttons, and `balance`
-        /// starts at -1 meaning "unknown" — so a shop opened without a wallet
-        /// read shows every item disabled with no explanation. Caught by
-        /// screenshotting the deep-link path: six items, six dead buttons.</summary>
-        IEnumerator OpenShop()
-        {
-            if (LadderClient.SignedIn)
-                yield return LadderClient.Wallet((b, err) => { if (err == null) balance = b; });
-            yield return LoadShop();
-        }
-
-        /// <summary>Back to the board.</summary>
-        public void ShowLadder() { showShop = false; }
 
         IEnumerator DoAuth()
         {
@@ -116,48 +94,6 @@ namespace RobotBrawl.Phase0
             else             yield return LadderClient.Login(email, pw, done);
             busy = false;
             if (LadderClient.SignedIn) yield return Refresh();
-        }
-
-        IEnumerator DoDeposit()
-        {
-            int amt;
-            if (!int.TryParse(depositText, out amt) || amt <= 0)
-            { status = "enter a positive amount of scrap to deposit"; yield break; }
-            busy = true; status = "depositing " + amt + "…";
-            yield return LadderClient.Deposit(amt, depositKey, (bal, err) =>
-            {
-                if (err != null) { status = "deposit: " + err; return; }
-                balance = bal;
-                depositText = "";
-                // Only now is a new key correct — the old one is spent.
-                depositKey = Guid.NewGuid().ToString();
-                status = "deposited " + amt + " scrap to your career; " + bal + " left on the ladder";
-            });
-            busy = false;
-        }
-
-        IEnumerator LoadShop()
-        {
-            busy = true; status = "loading the shop…";
-            yield return LadderClient.Cosmetics((rows, err) =>
-            {
-                if (err != null) status = "shop: " + err;
-                else { shop = rows; status = rows.Count + " items"; }
-            });
-            busy = false;
-        }
-
-        IEnumerator DoBuy(Cosmetic c)
-        {
-            busy = true; status = "buying " + c.name + "…";
-            yield return LadderClient.BuyCosmetic(c.id, (bal, err) =>
-            {
-                if (err != null) { status = "buy: " + err; return; }
-                balance = bal;
-                status = "bought " + c.name + "; " + bal + " scrap left";
-            });
-            busy = false;
-            if (string.IsNullOrEmpty(LadderClient.LastError)) yield return LoadShop();
         }
 
         IEnumerator Refresh()
@@ -381,8 +317,6 @@ namespace RobotBrawl.Phase0
             GUILayout.EndHorizontal();
 
             GUILayout.BeginHorizontal();
-            if (GUILayout.Button(showShop ? "close shop" : "shop") && !busy)
-            { showShop = !showShop; if (showShop) StartCoroutine(LoadShop()); }
             if (LadderClient.SignedIn && GUILayout.Button(showEnlist ? "close enlist" : "enlist"))
                 showEnlist = !showEnlist;
             if (LadderClient.SignedIn && GUILayout.Button("sign out"))
@@ -392,7 +326,6 @@ namespace RobotBrawl.Phase0
             GUILayout.Label(status);
 
             if (!LadderClient.SignedIn) { DrawSignIn(); GUILayout.EndArea(); GUI.matrix = prev; return; }
-            if (showShop) { DrawShop(); GUILayout.EndArea(); GUI.matrix = prev; return; }
             if (showEnlist) { DrawEnlist(); GUILayout.EndArea(); GUI.matrix = prev; return; }
 
             if (!showInbox) DrawBoard(); else DrawInbox();
@@ -515,55 +448,6 @@ namespace RobotBrawl.Phase0
                     GUILayout.Label("  " + m.name
                         + (m.CanFight ? "  " + m.category : "  waiting to be checked"));
             }
-        }
-
-        void DrawShop()
-        {
-            GUILayout.Space(4);
-            GUILayout.Label("<b>SHOP</b>   " + (balance >= 0 ? balance + " scrap" : ""),
-                            new GUIStyle(GUI.skin.label) { richText = true });
-
-            GUILayout.BeginHorizontal();
-            GUILayout.Label("deposit", GUILayout.Width(56));
-            depositText = GUILayout.TextField(depositText ?? "", GUILayout.Width(64));
-            GUI.enabled = !busy;
-            if (GUILayout.Button("to career", GUILayout.Width(80))) StartCoroutine(DoDeposit());
-            GUI.enabled = true;
-            GUILayout.EndHorizontal();
-            // Say it out loud. §2.3 makes this one-way on purpose and a player
-            // who learns that afterwards has been robbed by the interface.
-            GUILayout.Label("scrap moved to your career CANNOT come back.");
-
-            if (balance < 0)
-                GUILayout.Label("(wallet not loaded — buying is disabled until it is)");
-
-            GUILayout.Space(4);
-            shopScroll = GUILayout.BeginScrollView(shopScroll);
-            if (shop.Count == 0) GUILayout.Label(busy ? "loading…" : "nothing for sale.");
-            foreach (var c in shop)
-            {
-                GUILayout.BeginHorizontal();
-                GUILayout.Label(c.name, GUILayout.Width(ROW_NAME));
-                GUILayout.Label(c.kind, GUILayout.Width(ROW_OWNER));
-                GUILayout.Label(c.price + "", GUILayout.Width(ROW_RATING));
-                if (c.owned) GUILayout.Label("owned", GUILayout.Width(ROW_SCOUT + 20));
-                else
-                {
-                    // Affordability is the server's call, but showing an
-                    // enabled BUY the wallet cannot cover just invites a
-                    // refusal the player has to decode.
-                    // balance < 0 means "not read yet", which is NOT the same
-                    // as "cannot afford". Disabling on unknown is right, but it
-                    // has to be legible or the shop just looks broken.
-                    GUI.enabled = !busy && balance >= c.price;
-                    if (GUILayout.Button("buy", GUILayout.Width(ROW_SCOUT + 20))) StartCoroutine(DoBuy(c));
-                    GUI.enabled = true;
-                    if (balance >= 0 && balance < c.price)
-                        GUILayout.Label("need " + (c.price - balance), GUILayout.Width(70));
-                }
-                GUILayout.EndHorizontal();
-            }
-            GUILayout.EndScrollView();
         }
 
         void DrawBoard()

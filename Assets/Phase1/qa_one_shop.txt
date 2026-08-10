@@ -1,0 +1,67 @@
+One SHOP, two shelves — 2026-08-10
+
+owen: "consolidate the shops into a single shop tab."
+
+There were two: the career SHOP tab (PARTS, career SCRAP) and a second shop
+inside ArenaScreen (COSMETICS, LADDER WALLET). Two shops is a navigation bug.
+They are NOT the same shop, though, so the LOCATION is consolidated and the
+currencies are not: §2.3 makes the ladder wallet one-way into career scrap on
+purpose, and merging them would delete that decision rather than implement it.
+
+SHOP tab now carries a PARTS / COSMETICS switch. Proven through the real dock
+(docs/shots/):
+  09_shop_parts.png                 SCRAP 6513 header, Beam accordion, BUY/SELL
+  10_shop_cosmetics_signed_out.png  "cosmetics are bought with LADDER winnings.
+                                     sign in on the ARENA tab, then come back."
+  11_shop_cosmetics_signed_in.png   LADDER 500 header · the one-way valve
+                                     ("move ladder scrap to career" + TO CAREER)
+                                     · Brushed Steel PLATE 60 · Scrapper TITLE 60
+                                     · Hazard Stripe PLATE 120, all with BUY
+
+THE VALVE IS THE POINT. It used to live in the ARENA shop, which had no entry
+point at all, so a player with ladder winnings had no way to discover they
+could be spent in the career. It now sits between the two balances, on the
+only screen that shows both — which is the only place it is legible.
+
+The header names the CURRENCY OF THE SHELF YOU ARE ON. Two balances in one tab
+is only safe while it is never ambiguous which one a price is in.
+
+ArenaScreen lost showShop, LoadShop, OpenShop, DoBuy, DoDeposit and DrawShop.
+There is now exactly ONE implementation of buying a cosmetic — this project
+calls a one-side-only fix its signature bug.
+
+TWO THINGS THE SCREENSHOTS CAUGHT, both mine:
+
+ 1. The section row came out ~3x the height of the tab strip above it — a
+    third of the dock spent on a switch. A LayoutElement leaves flexibleHeight
+    at -1 ("unset") and the VerticalLayoutGroup read that as "take the slack".
+    min/preferred alone do not hold a row down; something must DECLINE the
+    leftover. It is now flexibleHeight 0, and re-applied in ApplyTouchSizes
+    like every other row — TouchRow() depends on the canvas scale factor, and
+    BuildShopTab runs before the canvas has one. A touch target sized once at
+    construction is right on the machine that built it and wrong on a phone.
+
+ 2. The first capture proved only the SIGNED-OUT shelf. The wallet, the valve
+    and the item rows — the entire reason for the consolidation — were still
+    unproven, and a screenshot of an empty-state panel would have been filed
+    as evidence. RunMobileTab now registers an account and shoots both.
+
+CareerSmoke, ALONE in a fresh play session:  128 pass, 0 fail — ALL GREEN
+  PASS  workshop tabs: LEAGUE / ROBOTS / SHOP / ARENA / PROGRAM in career,
+        and no PARTS or TROPHIES  (got ARENA at index 4)
+
+⚠ THAT CHECK WENT RED FIRST, and it was the CHECK. Btn() matches ANY button
+whose label starts with the prefix, so the new PARTS section button matched
+`Btn("PARTS")` and the bench reported the DELETED PARTS TAB as resurrected. It
+was not — a different control shares a word with it. The assertion now
+addresses the tab strip by GameObject name via a TabLabel(i) helper, which is
+what TapNamed's own comment has said to do since the shop rows hit the same
+problem: "labels repeat, so prefix search cannot address a specific part."
+
+Career save 18614d0e, size 5438, mtime 1786354063 UNCHANGED throughout —
+including the capture runs, which forced career mode under a counted autosave
+hold and photographed owen's real career.
+
+KNOWN, NOT FIXED: the deposit amount field is a dark box against a dark row
+and is nearly invisible until focused. Styling, and it belongs with the ARENA
+UGUI port rather than ahead of it.

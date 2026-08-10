@@ -65,6 +65,19 @@ public class CareerSmoke : MonoBehaviour
             if (b.gameObject.name == goName) return b;
         return null;
     }
+    /// <summary>The LABEL on tab N of the dock strip, or "" if that tab does
+    /// not exist. Addresses the tab by its GameObject name ("tab4"), because
+    /// a label search cannot tell a TAB called PARTS from a SHOP SECTION
+    /// called PARTS — which is precisely how this bench once reported a
+    /// deleted tab as resurrected.</summary>
+    static string TabLabel(int i)
+    {
+        var b = ByName("tab" + i);
+        if (b == null) return "";
+        var t = b.GetComponentInChildren<Text>(true);
+        return t != null ? t.text : "";
+    }
+
     /// <summary>Screen position of the core (true) or the most recently
     /// placed part (false); zero when unavailable.</summary>
     static Vector3 PartOnScreen(bool core)
@@ -337,13 +350,23 @@ public class CareerSmoke : MonoBehaviour
         foreach (var it in bm.CareerShortfallItems()) Career.AddItem(it.partId, it.mat, it.count);
         bm.LoadSnapshot(bm.SnapshotString());
         yield return null; yield return null;
-        // ARENA replaced TROPHIES at index 4 (owen, 2026-08-10). TROPHIES is
-        // asserted ABSENT rather than simply dropped from the list: a tab that
-        // comes back by accident is exactly the kind of thing this check is
-        // for, and the medals now live on the LEAGUE board instead.
-        Check(Btn("LEAGUE") != null && Btn("ROBOTS") != null && Btn("SHOP") != null
-              && Btn("ARENA") != null && Btn("PARTS") == null && Btn("TROPHIES") == null,
-              "workshop tabs: LEAGUE / ROBOTS / SHOP / ARENA in career, and no PARTS or TROPHIES");
+        // ARENA replaced TROPHIES at index 4 (owen, 2026-08-10). TROPHIES and
+        // PARTS are asserted ABSENT rather than just dropped from the list: a
+        // tab that comes back by accident is exactly what this check is for.
+        //
+        // ⚠ ADDRESSED BY TAB, NOT BY LABEL, and this check FAILED the moment
+        // it was not. Btn() finds ANY button whose text starts with the
+        // prefix, so the SHOP tab's new PARTS/COSMETICS section switch matched
+        // `Btn("PARTS")` and this read as "the deleted PARTS tab is back".
+        // It was not — a different control simply shares a word with it.
+        // TapNamed's own comment says exactly this one row down ("labels
+        // repeat per row, so prefix search cannot address a specific part");
+        // it is just as true of a tab as of a shop row.
+        Check(TabLabel(1) == "LEAGUE" && TabLabel(2) == "ROBOTS"
+              && TabLabel(3) == "SHOP" && TabLabel(4) == "ARENA"
+              && TabLabel(5) == "PROGRAM" && ByName("tab6") == null,
+              "workshop tabs: LEAGUE / ROBOTS / SHOP / ARENA / PROGRAM in career,"
+              + " and no PARTS or TROPHIES  (got " + TabLabel(4) + " at index 4)");
         Check(Career.Data.tutorialStep == 0, "fresh career starts at onboarding step 0");
 
         Tap("ROBOTS"); yield return null;
