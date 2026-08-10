@@ -191,3 +191,19 @@ fi
 
 echo
 echo "done. review at https://console.cloud.google.com/monitoring/alerting?project=${PROJECT_ID}"
+echo
+# PROVEN BY DRILL, 2026-08-09: a job was queued and deliberately left unworked
+# until oldest_ready_s held above 900 for 8 minutes. "ladder: jobs are not
+# being worked" fired and the email arrived — owen confirmed it.
+#
+# That confirmation is the only kind available. Cloud Monitoring does not
+# expose incidents through its public API, so a script cannot check whether a
+# policy delivers; it can only check that one exists. If you change the
+# channel, the extractor, or the log line, RE-RUN THE DRILL rather than
+# trusting that this still works:
+#
+#   1. POST /v1/snapshots on the live API and do not work the job
+#   2. watch GET /v1/admin/metrics until oldestReadyAgeS > 900
+#   3. wait 5 more minutes, then ask owen whether the mail arrived
+#   4. retire the fixture: claim the job and POST validate-result legal:false
+echo "to prove it still DELIVERS, run the drill — see the comment at the end of this script."

@@ -101,13 +101,19 @@ were absent.**
 1. **Point-in-time recovery on `rb-db` is OFF.** Daily backups are on and the
    restore drill passes, but a restore loses up to 24h. It costs WAL storage
    against the $25/mo budget, which is why it was not simply switched on.
-2. **Did the alert email arrive?** The chain is verified as far as it can be
-   from here — the line is emitted, extracted into a metric, and the metric
-   sat above 900 for 8 minutes with an enabled policy pointing at a channel.
-   **Cloud Monitoring does not expose incidents through its public API**, so
-   the last link — delivery to `leondu167@gmail.com` — is the one thing only
-   owen can confirm. A deliberately stuck job was created for this drill and
-   has been retired; the production queue is clean.
+2. ~~**Did the alert email arrive?**~~ ✅ **RESOLVED — owen confirmed
+   delivery.** The whole chain is now proven end to end by a real drill: a
+   deliberately stuck job → the reaper's `rbmetrics` line → the regex
+   extractor → the log-based metric → 900s threshold held for 8 minutes →
+   the policy → the email channel → owen's inbox. **Cloud Monitoring does
+   not expose incidents through its public API**, so this last link cannot be
+   checked from a shell — it needs a human, and it got one. The fixture has
+   been retired and the production queue is clean.
+
+   ⚠ **Keep this in mind before "improving" the alerting**: the only way to
+   know a policy actually delivers is to make something fail on purpose and
+   ask whoever owns the inbox. A policy that exists, is enabled, and has a
+   channel attached is *not* evidence that anyone will ever be told.
 3. **ARENA layout.** A clipped `scout` button and a stray scrollbar are fixed;
    the panel is still OnGUI placeholder, still tall and mostly empty, still
    shows the base URL in its header, and shows two robots both called "Smoky"
