@@ -233,15 +233,29 @@ in `.gitignore` (ignore rules do not untrack), and
 
 ## Current state, briefly
 
-**Green at last measurement (2026-08-09, late):** CategoryBench 44/44 ·
-ReplayBench 60/60 · ProgramBench 40/40 · MatrixBench 10/10 FLOOR + 3/3
-SWEEP · `sql_bench.sh` **48/48** · `api_smoke.sh` **185/185** ·
-`restore_drill.sh` 10/10 · WorkerBench 39/39 · FuzzBench 25/25 ·
-FightWorkerBench 21/21 play + 26/26 pure · LadderClientBench 18/18.
+**Green, all re-measured 2026-08-10:** CategoryBench 44/44 · ReplayBench 60/60
+· ProgramBench 40/40 · MatrixBench 10/10 FLOOR + 3/3 SWEEP · `sql_bench.sh`
+**53/53** · `api_smoke.sh` **198/198** (and **196/196 against docker
+compose**) · `restore_drill.sh` 10/10 · WorkerBench **47/47** · FuzzBench
+25/25 · FightWorkerBench 21/21 play + 26/26 pure · LadderClientBench **28/28**
+· LadderLiveBench 11/11 · DisarmBench 32/32 · **CareerSmoke 128/128** ·
+**VerbBench 32/32** · **AutonomyBench 24/24** · **CanvasDragBench 31/31** ·
+**TestDebugBench 30/30** · **TouchSmoke 29/29** · **HazardBench 23/23**.
 
-**Stale-green, verify before trusting:** VerbBench (32) · AutonomyBench
-(24) · CareerSmoke (128) · CanvasDragBench (31) · TestDebugBench (30) ·
-TouchSmoke · HazardBench · SensorProbe · CareerBench.
+**The stale-green list is gone — every one of them was run.** Two notes:
+`CareerBench` is a BALANCE harness and reports **12 pass, 5 "TUNING NEEDED"**
+— win rates outside their intended bands at N=6-8, which is owen's call and
+too small a sample to steer by. And `SensorProbe` is a probe, not a bench.
+
+⚠ **RUN CAREER-TOUCHING BENCHES ONE AT A TIME.** `CareerSmoke`, `TouchSmoke`,
+`HazardBench` and `CareerBench` each drive the builder, the arena and
+`Career.Data`, and `BuildArena()` is not idempotent. Started together they
+clobber each other and report nonsense — measured: HazardBench 7/7 fail
+concurrently, **23/23 green alone**; TouchSmoke 17/12 concurrently, **29/29
+alone**. Worse, on 2026-08-10 a concurrent run **overwrote owen's career
+save**. It is recoverable (`career_backups/`, baseline md5 `18614d0e`) and the
+mechanism is now closed — `Career.SuspendAutosave()` is a COUNTED hold, so
+autosave returns only when the last holder releases — but the rule stands.
 
 **The ladder API is LIVE**: `https://rb-api-902243335343.us-central1.run.app`
 on Cloud Run, against Cloud SQL over a unix socket, with blobs in GCS.
@@ -254,20 +268,29 @@ cloud, and breaks GREEN.** Four such defects landed on 08-09 —
 `docs/Cloud_Only_Defects_2026-08-09.md`. Read it before touching blob
 storage, `Request.Scheme`, or anything that partitions on a client address.
 
+**The ladder runs unattended.** A Cloud Run JOB (`rb-worker`) drains the queue
+and exits; Cloud Scheduler starts it every 5 minutes, so it bills only while
+there is work. `server/scripts/build_worker.zsh` builds the Linux player from
+a CLONE (never owen's copy — building switches the active target, and this
+project's is iOS); `deploy_worker.zsh` packages, deploys and schedules it.
+Proven end to end: a robot uploaded to the live API was validated by the
+container, and two accounts have fought a real cloud match with replays in GCS.
+
 Things explicitly NOT done:
 
-1. **The Docker image builds and deploys now** (colima + Cloud Build), but
-   `docker-compose.yml` and its `db` service are still unproven —
-   `docker compose` needs `brew install docker-compose`.
-2. **Point-in-time recovery is off** on `rb-db`. Daily backups (09:00 UTC,
+1. **Point-in-time recovery is off** on `rb-db`. Daily backups (09:00 UTC,
    7 retained) are on and the restore drill passes, but a restore loses up
    to 24h. It costs WAL storage against a $25/mo budget — **owen's call.**
-3. **ARENA styling.** Four of five surfaces exist and work; the layout is
-   OnGUI placeholder and largely unjudged. Screenshot with
+2. **ARENA styling.** The board, scouting card, challenge flow, inbox, replay
+   launcher, sign-in and shop all exist and work; the layout is OnGUI
+   placeholder and largely unjudged. Screenshot with
    `RobotBrawl.Phase0.UiShot.Take(path)` in play mode — the MCP capture
    tools render from a camera and never see IMGUI.
-4. **The end-to-end worker↔API runs are hand-run, not benches.** That path
-   has no regression cover.
+3. **The worker fight path has no BENCH.** `LadderLiveBench` covers the client
+   against a live server; the worker half is proven by hand, not by a bench.
+4. **The worker latency/cost trade is a dial.** 5 minutes was chosen because
+   an always-on worker service costs ~$35/mo against a $25 budget. If owen
+   wants instant fights, that is a scheduler change and a bill.
 5. **The ladder's 43% mutual disarm — ROOT CAUSE FOUND 2026-08-09**, see
    `docs/Mutual_Disarm_Root_Cause_2026-08-09.md`. **The weapon is not the
    fragile thing; the limb carrying it is.** 69% of weapons leave with a
