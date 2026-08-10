@@ -401,9 +401,12 @@ public sealed class ReaperService : BackgroundService
                 // HONEST LIMITATION: this only runs while an instance is
                 // alive, and min-instances=0 means that is "while there is
                 // traffic". A queue that backs up with nothing polling emits
-                // nothing at all — absence of the metric is itself the
-                // signal, which is why the alert policies below fire on
-                // missing data as well as on high values.
+                // nothing at all, and the alert policies treat missing data
+                // as INACTIVE — firing on absence would page for an idle
+                // ladder every night. What covers the gap is the uptime
+                // check in scripts/gcp_monitoring.zsh: its probe wakes an
+                // instance every 5 minutes, which runs a pass, which emits
+                // this line. The metrics exist because something is polling.
                 var s = await _q.StatsAsync(ct);
                 _log.LogInformation(
                     "rbmetrics ready={Ready} claimed={Claimed} failed={Failed} done={Done} " +
