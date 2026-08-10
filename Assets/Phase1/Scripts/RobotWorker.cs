@@ -96,7 +96,34 @@ namespace RobotBrawl.Phase0
         public string payloadUrl = "";
         public string payloadSha256 = "";
 
+        // A FIGHT job fills these instead — exactly one side is populated,
+        // enforced server-side by the match_jobs CHECK. See ClaimedJob in
+        // Infra.cs: a VALIDATE job fills Payload*, a FIGHT job fills
+        // Challenger*/Defender* plus arena and seeds.
+        public string challengerUrl = "";
+        public string challengerSha256 = "";
+        public string defenderUrl = "";
+        public string defenderSha256 = "";
+        public string arena = "";
+        public int[] seeds = new int[0];
+
         public bool IsValidate { get { return kind == "VALIDATE"; } }
+        public bool IsFight { get { return kind == "FIGHT"; } }
+    }
+
+    /// <summary>What gets POSTed to fight-result. Mirrors the API's
+    /// FightResult record field for field. Same hand-built-JSON rule as
+    /// ValidateOutcome: JsonUtility cannot emit a bare null and would send ""
+    /// where the server expects nothing.</summary>
+    public class FightOutcome
+    {
+        public string matchId = "";
+        public string workerId = "";
+        /// <summary>"CHALLENGER" | "DEFENDER" | "DRAW" — the API rejects
+        /// anything else with a 400 before it touches the database.</summary>
+        public string verdict = "";
+        public List<string> replayUrls = new List<string>();
+        public List<string> bouts = new List<string>();
     }
 
     /// <summary>What gets POSTed to validate-result. Mirrors the API's
@@ -320,7 +347,64 @@ namespace RobotBrawl.Phase0
             int att; int.TryParse(Field(json, "attempts"), out att); j.attempts = att;
             j.payloadUrl = Field(json, "payloadUrl") ?? "";
             j.payloadSha256 = Field(json, "payloadSha256") ?? "";
+            j.challengerUrl = Field(json, "challengerUrl") ?? "";
+            j.challengerSha256 = Field(json, "challengerSha256") ?? "";
+            j.defenderUrl = Field(json, "defenderUrl") ?? "";
+            j.defenderSha256 = Field(json, "defenderSha256") ?? "";
+            j.arena = Field(json, "arena") ?? "";
+            j.seeds = IntArrayField(json, "seeds");
             return j;
+        }
+
+        /// <summary>Top-level int array, e.g. "seeds":[7,8,9]. Field() stops at
+        /// the first delimiter and would return "[7" — seeds are the one
+        /// non-scalar in the claim response, so they get their own reader
+        /// rather than a JSON library.</summary>
+        public static int[] IntArrayField(string json, string key)
+        {
+            string needle = "\"" + key + "\"";
+            int k = json.IndexOf(needle, StringComparison.Ordinal);
+            if (k < 0) return new int[0];
+            int open = json.IndexOf('[', k + needle.Length);
+            if (open < 0) return new int[0];
+            int close = json.IndexOf(']', open);
+            if (close < 0) return new int[0];
+            string body = json.Substring(open + 1, close - open - 1).Trim();
+            if (body.Length == 0) return new int[0];
+            var parts = body.Split(',');
+            var outv = new List<int>();
+            for (int i = 0; i < parts.Length; i++)
+            {
+                int v;
+                if (int.TryParse(parts[i].Trim(), out v)) outv.Add(v);
+            }
+            return outv.ToArray();
+        }
+
+        /// <summary>Hand-built for the same reason ResultJson is: a verdict is
+        /// a bare string and replayUrls is a real array, and JsonUtility's
+        /// idea of both is wrong on the wire.</summary>
+        public static string FightResultJson(FightOutcome o)
+        {
+            var sb = new StringBuilder();
+            sb.Append('{');
+            sb.Append("\"matchId\":").Append(Str(o.matchId)).Append(',');
+            sb.Append("\"workerId\":").Append(Str(o.workerId)).Append(',');
+            sb.Append("\"verdict\":").Append(Str(o.verdict)).Append(',');
+            sb.Append("\"replayUrls\":[");
+            for (int i = 0; i < o.replayUrls.Count; i++)
+            {
+                if (i > 0) sb.Append(',');
+                sb.Append(Str(o.replayUrls[i]));
+            }
+            sb.Append("],\"bouts\":[");
+            for (int i = 0; i < o.bouts.Count; i++)
+            {
+                if (i > 0) sb.Append(',');
+                sb.Append(Str(o.bouts[i]));
+            }
+            sb.Append("]}");
+            return sb.ToString();
         }
 
         /// <summary>Value of a top-level key; null when absent or JSON null.
@@ -386,8 +470,23 @@ namespace RobotBrawl.Phase0
         IEnumerator Heartbeat(long jobId, string workerId, Action<bool> done);
     }
 
+    /// <summary>The FIGHT half, added 2026-08-09. Deliberately a SEPARATE
+    /// interface that extends the validate one rather than two more methods on
+    /// it: StubWorkerTransport implements IWorkerTransport and is what
+    /// WorkerBench's 39/39 runs against. Widening the base interface would
+    /// have broken that bench to add a feature it does not test, and a green
+    /// bench you had to edit to keep compiling is a bench you have stopped
+    /// trusting.</summary>
+    public interface IFightTransport : IWorkerTransport
+    {
+        /// <summary>done(url, err). The replay is opaque bytes to the API
+        /// (§5.4: it is a recording, never re-simulated).</summary>
+        IEnumerator UploadReplay(string matchId, string replayJson, Action<string, string> done);
+        IEnumerator PostFight(long jobId, string resultJson, Action<bool, string> done);
+    }
+
     /// <summary>The real one. First UnityWebRequest in this client.</summary>
-    public class HttpWorkerTransport : IWorkerTransport
+    public class HttpWorkerTransport : IFightTransport
     {
         readonly string _baseUrl, _workerKey;
         public HttpWorkerTransport(string baseUrl, string workerKey)
@@ -436,6 +535,31 @@ namespace RobotBrawl.Phase0
         public IEnumerator PostValidate(long jobId, string resultJson, Action<bool, string> done)
         {
             using (var req = Post("/v1/worker/jobs/" + jobId + "/validate-result", resultJson))
+            {
+                yield return req.SendWebRequest();
+                bool ok = req.result == UnityWebRequest.Result.Success;
+                done(ok, ok ? null : (req.downloadHandler != null ? req.downloadHandler.text : req.error));
+            }
+        }
+
+        public IEnumerator UploadReplay(string matchId, string replayJson, Action<string, string> done)
+        {
+            // The replay travels as a JSON STRING inside the request, the same
+            // shape a snapshot payload uses: the API stores bytes and never
+            // parses them.
+            string body = "{\"replay\":" + RobotWorker.Str(replayJson) + "}";
+            using (var req = Post("/v1/worker/matches/" + matchId + "/replay", body))
+            {
+                yield return req.SendWebRequest();
+                if (req.result != UnityWebRequest.Result.Success)
+                { done(null, req.downloadHandler != null ? req.downloadHandler.text : req.error); yield break; }
+                done(RobotWorker.Field(req.downloadHandler.text, "url"), null);
+            }
+        }
+
+        public IEnumerator PostFight(long jobId, string resultJson, Action<bool, string> done)
+        {
+            using (var req = Post("/v1/worker/jobs/" + jobId + "/fight-result", resultJson))
             {
                 yield return req.SendWebRequest();
                 bool ok = req.result == UnityWebRequest.Result.Success;

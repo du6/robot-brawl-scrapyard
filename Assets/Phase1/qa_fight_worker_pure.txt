@@ -1,0 +1,33 @@
+== A. the verdict mapping (§5.3) ==
+PASS  runner 'A' is the CHALLENGER
+PASS  runner 'B' is the DEFENDER
+PASS  runner 'Draw' is a DRAW
+PASS  an empty verdict is a DRAW, never a win
+PASS  an unknown verdict is a DRAW, never a win
+== B. the wire format — where JsonUtility would have lied ==
+      {"matchId":"m-1","workerId":"bench","verdict":"CHALLENGER","replayUrls":["file:///tmp/a.json"],"bouts":["A:KO","B:JD"]}
+PASS  the verdict is a JSON string
+PASS  replayUrls is a real array
+PASS  bouts is a real array
+PASS  no stringified booleans leaked in
+PASS  a match with no replay sends an EMPTY array, not null
+PASS  …and an empty bouts array
+== C. seeds — the one non-scalar in a claim ==
+PASS  seeds parse to 3 ints
+PASS  an empty seeds array is empty, not a crash
+PASS  a missing seeds key is empty, not a crash
+PASS  whitespace inside the array is tolerated
+== D. a FIGHT claim parses into both sides ==
+PASS  the job id parses
+PASS  it is a FIGHT, not a VALIDATE
+PASS  BOTH payload locations survive the parse
+PASS  and the seeds come with it
+PASS  a VALIDATE claim is still a VALIDATE
+PASS  …and carries no fight fields
+== E. both sides are verified BEFORE a fight is spent ==
+PASS  a good envelope whose sha matches the claim opens
+PASS  an envelope whose sha does NOT match the claim is refused
+PASS  …and says storage was altered
+PASS  an unreadable payload is refused
+PASS  an empty payload is refused
+ RESULT: 26 pass, 0 fail - ALL GREEN
