@@ -1,0 +1,59 @@
+EnlistUiBench — 2026-08-10
+RobotBrawl.Phase0.EnlistUiBench.Run()   (play mode, local API on :5000)
+
+Cover for the ENLIST BUTTON, not the client under it. EnlistLiveBench proves
+LadderClient.Enlist over the real transport; it bypasses ArenaScreen.DoEnlist
+on purpose, because DoEnlist reads Career.Data and a bench that touched owner
+state to test a button would trade the thing this project protects for the
+thing it was measuring.
+
+Safe via the §5 mechanism used as intended: a COUNTED SuspendAutosave hold for
+the whole run, Career.Data swapped for a scratch and restored in a finally,
+Career.active restored rather than assumed.
+
+      server: http://localhost:5000
+PASS  the API answers
+PASS  the autosave hold is COUNTED, not a boolean anyone can stamp on
+== A. what it refuses, and whether it says why ==
+PASS  with no career it names the CAREER as the missing thing
+PASS  with no saved build it tells the player to SAVE
+PASS  no robot was uploaded by either refusal
+== B. the button a player actually presses ==
+PASS  signed in
+PASS  the BUTTON uploaded the saved career robot under its own name
+PASS  …and says a worker still has to check it
+PASS  a robot with NO PROGRAM is warned it will stand still
+PASS  …and it is uploaded anyway, because "" is a legal choice
+== C. the panel itself ==
+PASS  the panel draws with NO CAREER
+PASS  the panel draws with a career but NO SAVED BUILD
+PASS  the panel draws with a saved robot
+== D. owner state ==
+PASS  career state was restored in a finally, not on the happy path
+PASS  Career.Data is the object it was before
+PASS  Career.active is what it was, restored not assumed
+PASS  the autosave hold was released — count is back to 0
+===== passed 17  failed 0  skipped 0 =====
+
+Career save either side: 18614d0e6603869f28fb65992b7d1484, size 5438,
+mtime 1786354063 UNCHANGED.
+
+IT FOUND A REAL BUG ON ITS FIRST RUN, and it was mine, one commit old.
+
+DoEnlist set the confirmation message and THEN called Refresh(), which ends by
+setting status to "<n> ranked". Pressing ENLIST showed "8 ranked" and nothing
+else: no confirmation, and the no-program warning — the one message that is
+only actionable at that exact moment — destroyed.
+
+The same function already carried a comment about this exact failure ("a
+status written before the upload is overwritten by its result, which is
+precisely how a warning that matters goes unread"). I fixed that case and
+introduced the identical bug on the other side of the call. A status line with
+two writers and no ordering rule loses the message that mattered, every time.
+
+Fixed by refreshing FIRST and speaking afterwards.
+
+One red was the bench's own: GUILayout outside OnGUI throws "You can only call
+GUI functions from inside OnGUI", which looked like three broken panel states
+and was one broken harness. The draw is now serviced from the bench
+component's own OnGUI.

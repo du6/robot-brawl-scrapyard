@@ -251,6 +251,19 @@ namespace RobotBrawl.Phase0
                 busy = false; yield break;
             }
 
+            // ⚠ REFRESH FIRST, THEN SPEAK. Refresh() ends by setting status to
+            // "<n> ranked", so writing the confirmation before it threw the
+            // confirmation away: pressing ENLIST showed "8 ranked" and nothing
+            // else. Measured by EnlistUiBench, which is the only thing that
+            // has ever pressed this button.
+            //
+            // This is the SECOND time this function lost a message that way —
+            // the no-program warning above is carried down here rather than
+            // set early for exactly the same reason. A status line with two
+            // writers and no ordering rule loses, every time, the message that
+            // mattered.
+            yield return Refresh();
+
             // PENDING, not ranked. A worker decides whether the build is legal
             // and which weight category it lands in, and that is a separate
             // trip through the queue — up to one scheduler period in the
@@ -259,7 +272,6 @@ namespace RobotBrawl.Phase0
             status = name + " uploaded — a match worker checks it is legal and "
                    + "sets its weight class before it appears on the board." + note;
             busy = false;
-            yield return Refresh();
         }
 
         IEnumerator Scout(LadderEntry e)
@@ -665,6 +677,30 @@ namespace RobotBrawl.Phase0
                 GUILayout.EndHorizontal();
             }
             GUILayout.EndScrollView();
+        }
+
+        // ---- harness seams -------------------------------------------------
+        // The ProgramCanvas Test* precedent: plain accessors, no reflection.
+        // The bridge refuses System.Reflection outright, and a UI path that
+        // can only be driven by a human is a UI path nothing ever checks —
+        // which is exactly how ENLIST shipped with its network half proven
+        // 21/21 and the button itself never once pressed.
+        public string TestStatus { get { return status; } }
+        public bool TestBusy { get { return busy; } }
+        public bool TestShowEnlist { get { return showEnlist; } set { showEnlist = value; } }
+        public void TestSetEnlistName(string n) { enlistName = n; }
+        public void TestEnlist() { StartCoroutine(DoEnlist()); }
+        /// <summary>Draw one frame of the enlist panel off-screen, so a bench
+        /// can prove it does not throw against whatever career state it is
+        /// handed. DrawEnlist reads Career directly and an OnGUI exception is
+        /// silent to everything except the console.</summary>
+        public void TestDrawEnlistOnce()
+        {
+            var prev = GUI.matrix;
+            GUILayout.BeginArea(new Rect(-4000, -4000, 400, 800));
+            DrawEnlist();
+            GUILayout.EndArea();
+            GUI.matrix = prev;
         }
 
         void OnDestroy() { if (player != null) player.Close(); }
