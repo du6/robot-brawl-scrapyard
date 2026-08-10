@@ -1337,6 +1337,129 @@ app.MapPost("/v1/admin/league-night/{category}", async (string category, HttpCon
     return Results.Ok(new { category, field = field.Count, matches = created.Count, matchIds = created });
 }).AllowAnonymous();
 
+// ======================================================== season rollover
+// §2.4: "At rollover: ratings compress 50% toward 1200, deviation resets
+// high, wallet scrap persists, season badges + payouts awarded. Seasons are
+// what keep a solved ladder from fossilizing and give lapsed players a
+// re-entry point."
+//
+// One transaction for the whole rollover. A season that half-happened - some
+// categories paid, some ratings carried, the config pointing at a season that
+// does not exist - is not a state anyone could unpick afterwards.
+app.MapPost("/v1/admin/season/rollover", async (HttpContext ctx) =>
+{
+    if (!WorkerAuthed(ctx)) return Results.Unauthorized();
+
+    await using var c = await db.OpenAsync();
+    var cfg = await LadderConfig(c);
+    int from = cfg.TryGetValue("current_season", out var cs) ? (int)cs : 1;
+    int to = from + 1;
+    double keep = (cfg.TryGetValue("season_compress_pct", out var cp) ? cp : 50) / 100.0;
+    int payBase = (int)(cfg.TryGetValue("season_payout_base", out var pb) ? pb : 300);
+    int places = (int)(cfg.TryGetValue("season_payout_places", out var pl) ? pl : 3);
+    int weeks = (int)(cfg.TryGetValue("season_weeks", out var sw) ? sw : 4);
+
+    await using var tx = await c.BeginTransactionAsync();
+
+    // Refuse to roll into a season that already exists. Rolling over twice
+    // would pay every podium a second time out of a faucet, and the ledger
+    // has no way to tell the duplicate from a legitimate award.
+    await using (var dup = new NpgsqlCommand("SELECT 1 FROM seasons WHERE id = $1;", c, tx))
+    {
+        dup.Parameters.AddWithValue(to);
+        if (await dup.ExecuteScalarAsync() is not null)
+            return Results.Conflict(new { error = $"season {to} already exists — this rollover has already run" });
+    }
+
+    // ---- payouts, before the ratings are compressed ---------------------
+    // The standings being paid are the FINAL ones, so this has to read them
+    // before the compression rewrites them.
+    var awards = new List<object>();
+    await using (var top = new NpgsqlCommand(@"
+        SELECT category, robot_id, rating,
+               ROW_NUMBER() OVER (PARTITION BY category ORDER BY rating DESC) AS place
+          FROM ratings WHERE season_id = $1;", c, tx))
+    {
+        top.Parameters.AddWithValue(from);
+        var rows = new List<(string Cat, Guid Robot, double Rating, long Place)>();
+        await using (var r = await top.ExecuteReaderAsync())
+            while (await r.ReadAsync())
+                rows.Add((r.GetString(0), r.GetGuid(1), r.GetDouble(2), r.GetInt64(3)));
+
+        foreach (var row in rows)
+        {
+            if (row.Place > places) continue;
+            int amount = payBase / (int)row.Place;      // 300 / 150 / 100
+            if (amount <= 0) continue;
+            Guid owner;
+            await using (var o = new NpgsqlCommand("SELECT user_id FROM robots WHERE id = $1;", c, tx))
+            {
+                o.Parameters.AddWithValue(row.Robot);
+                owner = (Guid)(await o.ExecuteScalarAsync())!;
+            }
+            await using (var l = new NpgsqlCommand(
+                "INSERT INTO ledger (user_id, delta, reason, idem_key) VALUES ($1,$2,'SEASON',$3);", c, tx))
+            {
+                l.Parameters.AddWithValue(owner);
+                l.Parameters.AddWithValue(amount);
+                // The idempotency key is the real guard: even if the season
+                // check above were bypassed, the unique index refuses a
+                // second payout for the same podium.
+                //
+                // The CATEGORY is part of the key because a robot can place
+                // in more than one - §2.1 rates per robot PER CATEGORY, and a
+                // featherweight that punched up is ranked in both. Keying on
+                // robot alone collided the moment that happened, which is the
+                // ledger's unique index doing exactly its job.
+                l.Parameters.AddWithValue($"season:{from}:{row.Cat}:{row.Robot}");
+                await l.ExecuteNonQueryAsync();
+            }
+            awards.Add(new { category = row.Cat, place = row.Place, robotId = row.Robot, scrap = amount });
+        }
+    }
+
+    // ---- the new season, and the compressed carry-over -------------------
+    await using (var ins = new NpgsqlCommand(
+        "INSERT INTO seasons (id, starts_at, ends_at) VALUES ($1, now(), now() + make_interval(weeks => $2));", c, tx))
+    {
+        ins.Parameters.AddWithValue(to);
+        ins.Parameters.AddWithValue(weeks);
+        await ins.ExecuteNonQueryAsync();
+    }
+
+    int carried;
+    await using (var carry = new NpgsqlCommand(@"
+        INSERT INTO ratings (robot_id, category, season_id, rating, deviation, volatility)
+        SELECT robot_id, category, $2,
+               1200 + (rating - 1200) * $3,   -- compress toward the placement rating
+               350,                            -- §2.4: deviation resets HIGH, so a
+                                               -- new season is genuinely open again
+               volatility
+          FROM ratings WHERE season_id = $1
+        RETURNING robot_id;", c, tx))
+    {
+        carry.Parameters.AddWithValue(from);
+        carry.Parameters.AddWithValue(to);
+        carry.Parameters.AddWithValue(keep);
+        carried = 0;
+        await using var r = await carry.ExecuteReaderAsync();
+        while (await r.ReadAsync()) carried++;
+    }
+
+    await using (var bump = new NpgsqlCommand(
+        "UPDATE ladder_config SET value = $1, updated_at = now() WHERE key = 'current_season';", c, tx))
+    {
+        bump.Parameters.AddWithValue(to);
+        await bump.ExecuteNonQueryAsync();
+    }
+
+    await tx.CommitAsync();
+    // Wallet scrap persisting needed no code: the ledger is append-only and
+    // this never touched it.
+    return Results.Ok(new { fromSeason = from, toSeason = to, ratingsCarried = carried,
+                            compressedToPct = keep * 100, awards });
+}).AllowAnonymous();
+
 app.Run();
 
 // ------------------------------------------------------------------ dtos

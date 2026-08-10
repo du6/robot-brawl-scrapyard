@@ -944,6 +944,66 @@ else
 fi
 
 echo
+echo "== P. season rollover (§2.4) =="
+# "ratings compress 50% toward 1200, deviation resets high, wallet scrap
+# persists, season badges + payouts awarded."
+#
+# M3's acceptance asks for a forced rollover on a staging DB producing correct
+# compression and payouts. This is that, on the dev DB, at the end of a run
+# that has already produced real ratings to compress.
+if ! command -v psql >/dev/null 2>&1; then
+  skip "season rollover (8 checks)" "psql is not on PATH"
+else
+  S0=$(dbq "SELECT value::int FROM ladder_config WHERE key='current_season';")
+  # Pick a rating that is NOT 1200, or compression is unobservable - halving
+  # the distance to 1200 from 1200 is 1200, and the check would pass on a
+  # no-op.
+  PICK=$(dbq "SELECT robot_id||'|'||category||'|'||round(rating) FROM ratings WHERE season_id=$S0 AND abs(rating-1200) > 20 ORDER BY abs(rating-1200) DESC LIMIT 1;")
+  PR=${PICK%%|*}; REST=${PICK#*|}; PC=${REST%%|*}; PRATE=${REST##*|}
+  WALLET_BEFORE=$(dbq "SELECT COALESCE(SUM(delta),0) FROM ledger;")
+
+  S=$(req POST /v1/admin/season/rollover '{}' "X-Worker-Key: $WKEY")
+  expect "a season rolls over" "$S" 200
+  S1=$(jget toSeason)
+  is "…into the next season" "$S1" "$((S0 + 1))"
+  is "…and the config now points at it" \
+     "$(dbq "SELECT value::int FROM ladder_config WHERE key='current_season';")" "$S1"
+  is "…with a seasons row to point at" "$(dbq "SELECT count(*) FROM seasons WHERE id=$S1;")" 1
+
+  if [ -z "$PR" ]; then
+    skip "compression and deviation reset (2 checks)" "no rating far enough from 1200 to observe"
+  else
+    # 1200 + (r - 1200) * 0.5, rounded — halfway back to placement.
+    WANT=$(( 1200 + (PRATE - 1200) / 2 ))
+    GOT=$(dbq "SELECT round(rating) FROM ratings WHERE robot_id='$PR' AND category='$PC' AND season_id=$S1;")
+    if [ -n "$GOT" ] && [ "$GOT" -ge "$((WANT - 1))" ] && [ "$GOT" -le "$((WANT + 1))" ]; then
+      ok "…compressing $PRATE halfway toward 1200 -> $GOT"
+    else
+      no "compression is wrong: $PRATE should become about $WANT, got '$GOT'"
+    fi
+    is "…and resetting deviation HIGH, so the new season is genuinely open" \
+       "$(dbq "SELECT round(deviation) FROM ratings WHERE robot_id='$PR' AND category='$PC' AND season_id=$S1;")" 350
+  fi
+
+  # §2.4: "wallet scrap persists". The only ledger movement may be the
+  # SEASON payouts themselves — nothing is reset, nothing is cleared.
+  PAID=$(dbq "SELECT COALESCE(SUM(delta),0) FROM ledger WHERE reason='SEASON';")
+  is "…leaving wallets intact apart from the season payouts" \
+     "$(dbq "SELECT COALESCE(SUM(delta),0) FROM ledger;")" "$((WALLET_BEFORE + PAID))"
+  # Re-running THE SAME rollover would pay every podium again out of a faucet.
+  # Calling the endpoint a second time is NOT that - it advances to the next
+  # season, which is legitimate. The real test is to point the config back at
+  # the season just closed and try to close it again, which is what a retried
+  # cron job or a double-clicked operator button actually does.
+  dbq "UPDATE ladder_config SET value=$S0 WHERE key='current_season';" >/dev/null
+  S=$(req POST /v1/admin/season/rollover '{}' "X-Worker-Key: $WKEY")
+  expect "…and closing the SAME season twice is refused" "$S" 409
+  dbq "UPDATE ladder_config SET value=$S1 WHERE key='current_season';" >/dev/null
+  is "…so nobody was paid for that season twice" \
+     "$(dbq "SELECT count(*) FROM (SELECT idem_key FROM ledger WHERE reason='SEASON' GROUP BY idem_key HAVING count(*)>1) d;")" 0
+fi
+
+echo
 echo "== N. ledger conservation, over everything this run just did (§8/M3) =="
 # M3's acceptance: "every scrap created is accounted to a config'd faucet".
 # This runs LAST on purpose - by now the bench has registered accounts, fought
