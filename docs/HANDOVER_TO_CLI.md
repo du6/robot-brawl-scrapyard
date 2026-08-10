@@ -208,6 +208,7 @@ TouchSmoke · HazardBench · SensorProbe · CareerBench.
 | §2.2 tickets / defense floor / repeat taper | ✅ done 2026-08-09 |
 | Leaderboard / match view / inbox / wallet | ✅ done 2026-08-09 |
 | Client ARENA tab (Unity) | **absent — the server side of M2 is complete** |
+| Replays are playable end to end | ✅ done 2026-08-09 — reopened by ReplayFile.Read |
 | Worker image / Docker / GCP | not started |
 | Client login + ENLIST UI | not started — zero `UnityWebRequest` in the client |
 

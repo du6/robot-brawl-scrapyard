@@ -1,0 +1,46 @@
+== The stored replay is PLAYABLE — end to end against the live API ==
+   2026-08-09, Claude Code CLI on owen's Mac.
+   The proof that commit 424d6d0 actually fixed something, rather than
+   moving bytes around.
+
+   Before that commit every replay_url on every match pointed at a JSON
+   scorecard. ReplayPlayer cannot open one, so M1's accept clause "watch the
+   replay in-client from the cloud URL" was unreachable — not one screen
+   away, unreachable. Nothing noticed because nothing had ever tried to PLAY
+   a replay; the gap appears the moment you build the launcher.
+
+== A. a real match, real worker, live API ==
+PASS  two accounts, two robots, both snapshots ACTIVE FEATHER
+PASS  challenge accepted            match 6bf45144, stake 50, gap 0
+PASS  the REAL FightWorkerLoop claimed and ran it
+PASS  verdict DEFENDER              a full best-of-3, all three bouts fought
+
+== B. what the server actually stored ==
+PASS  4 replay urls on the match
+PASS  three .rbr.gz RECORDINGS      185694, 181954, 160009 bytes
+PASS  one .json summary             768 bytes
+PASS  replay_urls[1] is a .rbr.gz   the playable one comes FIRST, so a client
+                                    that takes the first url and hands it to
+                                    ReplayPlayer is never given a scorecard
+
+== C. the definitive check — the game's own reader opens it ==
+      Took the url the SERVER stored, stripped file://, and called
+      ReplayFile.Read. This call could not have succeeded before 424d6d0.
+
+PASS  ReplayFile.Read returned true on the server-stored blob
+PASS  header intact                 "ReplayProof vs ReplayProof", v=1, bout=0
+PASS  708 frames decoded
+PASS  27 events decoded
+PASS  seed 1324659838, arenaHalf 7  survived the round trip
+
+== D. what this proves that the bench could not ==
+      FightWorkerBench drives a STUB transport that only counts bytes. The
+      raw application/octet-stream upload over real HTTP — the exact path the
+      scorecard bug lived in — is only exercised here. A ~186 KB gzip body
+      went out over UnityWebRequest, through the API's content-type branch,
+      into the blob store, and came back readable.
+
+ RESULT: a replay recorded by MatchRunner, uploaded by the real worker,
+         stored by the real API, and reopened by the real reader.
+         M1's "watch the replay from the cloud URL" is now reachable;
+         what remains is a client screen to play it in.
