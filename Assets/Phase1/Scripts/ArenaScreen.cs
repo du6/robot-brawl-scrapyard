@@ -270,8 +270,59 @@ namespace RobotBrawl.Phase0
         // expected does not clip.
         const int ROW_CHROME = 6 * 4 + 16 + 12 + 18;
 
+        // ===================================================================
+        // THE UGUI SEAM — 2026-08-10, and the port begins here.
+        //
+        // owen: "redesign the arena UI to be consistent with other tabs."
+        // Every other tab is UGUI in the dock; this screen is IMGUI drawn over
+        // the top at a fixed rect, which is why it collides with the tab strip
+        // and the tutorial banner, ignores the notch, and is invisible to
+        // TouchSmoke — none of which is fixable by moving numbers.
+        //
+        // ⚠ THE PORT REPLACES THE DRAWING AND NOTHING ELSE. Refresh, Scout,
+        // DoChallenge, DoEnlist, Watch and DoAuth stay exactly where they are,
+        // and the UGUI renderer drives them through the surface below. A
+        // second copy of the challenge flow is the "one-side-only fix" this
+        // project calls its signature bug, and a ladder that settles stakes
+        // is the worst possible place to keep two of them.
+        //
+        // So this class becomes the MODEL and the OPERATIONS; who draws it is
+        // now a caller's problem. Surfaces are ported one at a time and the
+        // IMGUI stays live for whatever is not ported yet.
+        // ===================================================================
+
+        /// <summary>Stop drawing, keep working. The dock sets this when it
+        /// renders the ARENA itself; unset, the IMGUI fallback still draws,
+        /// so a surface that has not been ported is never simply missing.</summary>
+        public bool SuppressImgui;
+
+        public IReadOnlyList<LadderEntry> Board { get { return board; } }
+        public IReadOnlyList<InboxEntry> Inbox { get { return inbox; } }
+        public IReadOnlyList<MyRobot> MyRobots { get { return mine; } }
+        public ScoutCard Card { get { return card; } }
+        public string Status { get { return status; } }
+        public bool Busy { get { return busy; } }
+        public string CategoryLabel { get { return Cats[catIndex] == "" ? "P4P" : Cats[catIndex]; } }
+        public static string[] Categories { get { return Cats; } }
+        public int CategoryIndex { get { return catIndex; } }
+
+        /// <summary>Switch the board's weight class and reload it. Ignores a
+        /// repeat of the current class rather than spending a request on it.</summary>
+        public void SetCategory(int i)
+        {
+            if (i < 0 || i >= Cats.Length || i == catIndex || busy) return;
+            catIndex = i;
+            StartCoroutine(Refresh());
+        }
+
+        public void RefreshNow() { if (!busy) StartCoroutine(Refresh()); }
+        public void ScoutNow(LadderEntry e) { if (!busy) StartCoroutine(Scout(e)); }
+        public void WatchNow(InboxEntry m) { if (!busy) StartCoroutine(Watch(m)); }
+        public void CloseCard() { card = null; pending = false; }
+
         void OnGUI()
         {
+            if (SuppressImgui) return;
             float scale = Screen.height / VirtualH;
             var prev = GUI.matrix;
             GUI.matrix = Matrix4x4.TRS(Vector3.zero, Quaternion.identity,

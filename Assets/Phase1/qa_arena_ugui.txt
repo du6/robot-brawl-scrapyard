@@ -1,0 +1,59 @@
+ARENA → UGUI, surface 1 of 5: the BOARD — 2026-08-10
+
+owen: "redesign the arena UI to be consistent with other tabs."
+
+The ARENA was IMGUI drawn over the top of the game at a fixed rect. That is
+why it collided with the tab strip and the tutorial banner, ignored the notch,
+and was invisible to TouchSmoke — none of which is reachable by moving numbers.
+It is now built in the dock like every other tab.
+
+docs/shots/07_arena_tab.png — the board, in UGUI, inside the dock:
+  · six weight-class filters (P4P/FEATHER/LIGHT/MIDDLE/HEAVY/SUPER), each one
+    TouchRow() tall, FEATHER selected in the same blue the tab strip uses
+  · rows at touch height: rank, name · owner, rating + confidence + category,
+    and a SCOUT button styled like the LEAGUE board's
+  · the dock's own "more below" overflow hint
+  · no overlay, no collision with the tab strip or the tip banner
+
+THE PORT REPLACES THE DRAWING AND NOTHING ELSE. Refresh, Scout, DoChallenge,
+DoEnlist, Watch and DoAuth stay in ArenaScreen; it now exposes Board, Status,
+Busy, Card, MyRobots, CategoryIndex and SetCategory/RefreshNow/ScoutNow/
+WatchNow, and the dock renders from that. A second copy of the challenge flow
+is the "one-side-only fix" this project calls its signature bug, and a ladder
+that settles STAKES is the worst place to keep two of them.
+
+`SuppressImgui` is set only while the dock is showing a surface it can draw.
+The four un-ported surfaces (scouting card, inbox, sign-in, enlist) still come
+up in IMGUI, so nothing is ever simply missing mid-port.
+
+MEASURED, each ALONE in its own fresh play session:
+  TouchSmoke   29 pass, 0 fail  — including "no scroller clips its content
+                                  across a FIXED axis", which now covers the
+                                  ARENA list. That cover is the whole point:
+                                  the IMGUI board could not be measured by it.
+  CareerSmoke 128 pass, 0 fail
+
+Career save 18614d0e, size 5438, mtime 1786354063 UNCHANGED.
+
+TWO THINGS CARRIED OVER FROM THE SHOP SWITCH, deliberately:
+  · the filter row is flexibleHeight 0. A LayoutElement leaves it at -1 and a
+    VerticalLayoutGroup reads that as "take the slack" — that is how the SHOP
+    section switch came out three times the tab strip's height.
+  · it is re-applied in ApplyTouchSizes, because TouchRow() needs a canvas
+    scale factor that does not exist when the tab is built.
+
+The board is REBUILT ONLY WHEN IT CHANGES (count + category + first snapshot
+id). Rebuilding a scrolled list every frame is how a list stops being
+scrollable under a finger.
+
+The empty state says "nobody ranked in <class> yet — ENLIST a robot to be the
+first" and never doubles as an error. LadderClientBench's own header calls
+that out as this client's worst failure mode: a wrong key or an unhandled
+shape returns an EMPTY LIST, which renders exactly like a fresh ladder. The
+error goes on the status line; the empty row only ever means empty.
+
+STILL IMGUI, in the order I would port them:
+  2. scouting card + challenge flow   (the one that spends scrap)
+  3. inbox + replay launcher
+  4. enlist panel
+  5. sign-in

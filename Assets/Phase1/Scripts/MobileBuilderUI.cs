@@ -105,6 +105,18 @@ public class MobileBuilderUI : MonoBehaviour
     // the network in Start(), and constructing it for a player who never
     // opens the tab would be a request nobody asked for.
     ArenaScreen arenaScreen;
+    // ---- the ARENA, ported to UGUI one surface at a time -----------------
+    // The BOARD is first: it is the surface the tab opens on, the one every
+    // other ARENA surface is reached THROUGH, and the one a player looks at
+    // for longest. Whatever is not ported yet still draws in IMGUI —
+    // ArenaScreen.SuppressImgui is only set once the dock can render the
+    // surface being shown, so nothing is ever simply missing.
+    GameObject arenaPanel;
+    Transform arenaBoardContent;
+    Text arenaStatus;
+    readonly List<Button> arenaCatBtns = new List<Button>();
+    LayoutElement arenaCatLE;
+    int arenaBoardStamp = -1;   // rebuild the rows only when the board changes
     // ---- P3a: the Program Bench canvas (career-only tab, index 5) ----
     GameObject programPanel; ProgramCanvas programCanvas;
     InputField nameInput;
@@ -409,9 +421,9 @@ public class MobileBuilderUI : MonoBehaviour
         garagePanel = MkPanel("garage", dock.transform, new Color(0f, 0f, 0f, 0f));
         shopPanel = MkPanel("shop", dock.transform, new Color(0f, 0f, 0f, 0f));
         robotsPanel = MkPanel("robots", dock.transform, new Color(0f, 0f, 0f, 0f));
-        // no trophies panel: ARENA is index 4 and draws in OnGUI, not UGUI.
+        arenaPanel = MkPanel("arena", dock.transform, new Color(0f, 0f, 0f, 0f));
         programPanel = MkPanel("program", dock.transform, new Color(0f, 0f, 0f, 0f));   // P3a
-        foreach (var p in new[] { buildPanel, fightPanel, garagePanel, shopPanel, robotsPanel, programPanel })
+        foreach (var p in new[] { buildPanel, fightPanel, garagePanel, shopPanel, robotsPanel, arenaPanel, programPanel })
         {
             var rt = p.GetComponent<RectTransform>();
             rt.anchorMin = new Vector2(0f, 0f); rt.anchorMax = new Vector2(1f, 1f);
@@ -427,8 +439,7 @@ public class MobileBuilderUI : MonoBehaviour
         if (!Career.active) BuildGarageTab();
         BuildShopTab();
         BuildRobotsTab();
-        // BuildTrophiesTab() is gone: ARENA owns index 4 and builds itself in
-        // ShowTab, and the medals moved into the LEAGUE board.
+        BuildArenaTab();
         // P3a: career-only, the C6.5 rule (never build career UI the sandbox
         // can mis-hit; the garage is the same rule in reverse).
         if (Career.active) BuildProgramTab();
@@ -1760,7 +1771,7 @@ public class MobileBuilderUI : MonoBehaviour
             if (rt != null) rt.sizeDelta = new Vector2(-4f, R);
         }
         foreach (var pn in new[] { buildPanel, fightPanel, garagePanel, shopPanel,
-                                   robotsPanel })
+                                   robotsPanel, arenaPanel })
         {
             if (pn == null) continue;
             var rt = pn.GetComponent<RectTransform>();
@@ -1779,6 +1790,9 @@ public class MobileBuilderUI : MonoBehaviour
         // the same rule: one touch row, tracked against the scale factor.
         if (shopSecLE != null)
         { shopSecLE.flexibleHeight = 0f; shopSecLE.minHeight = R; shopSecLE.preferredHeight = R; }
+        // Same rule for the ARENA's weight-class filters.
+        if (arenaCatLE != null)
+        { arenaCatLE.flexibleHeight = 0f; arenaCatLE.minHeight = R; arenaCatLE.preferredHeight = R; }
         if (partScrollRt != null)
         {
             partScrollRt.offsetMin = new Vector2(0f, R + 4f);
@@ -2308,6 +2322,152 @@ public class MobileBuilderUI : MonoBehaviour
         BuildCosmeticsShelf();
         ShowShopSection(0);
         RefreshShop();
+    }
+
+    /// <summary>The ARENA tab, in UGUI. Surface 1 of 5: the BOARD.
+    ///
+    /// Built like every other tab — a header, a row of weight-class filters
+    /// sized to TouchRow(), and a scrolled list — so it inherits the dock's
+    /// safe-area handling, its touch floor, and the benches that measure both.
+    /// The IMGUI ArenaScreen keeps the surfaces that are not ported yet.</summary>
+    void BuildArenaTab()
+    {
+        var v = arenaPanel.AddComponent<VerticalLayoutGroup>();
+        v.spacing = 4f; v.childForceExpandWidth = true; v.childForceExpandHeight = false;
+        v.padding = new RectOffset(4,4,4,4);
+
+        arenaStatus = MkText("arenastatus", arenaPanel.transform, "", 15, TextAnchor.MiddleLeft);
+        var hle = arenaStatus.gameObject.AddComponent<LayoutElement>();
+        hle.minHeight = 20f; hle.preferredHeight = 20f; hle.flexibleHeight = 0f;
+
+        // The weight classes. P4P first — it is the board the tab opens on,
+        // and "everyone, pound for pound" is the only view that is never empty.
+        var catRow = MkPanel("arenacats", arenaPanel.transform, new Color(0f,0f,0f,0f));
+        arenaCatLE = catRow.AddComponent<LayoutElement>();
+        arenaCatLE.flexibleHeight = 0f;                 // see the SHOP switch: -1 eats the dock
+        arenaCatLE.minHeight = TouchRow(); arenaCatLE.preferredHeight = TouchRow();
+        var ch = catRow.AddComponent<HorizontalLayoutGroup>();
+        ch.spacing = 3f; ch.childForceExpandWidth = true; ch.childForceExpandHeight = true;
+        arenaCatBtns.Clear();
+        var cats = ArenaScreen.Categories;
+        for (int i = 0; i < cats.Length; i++)
+        {
+            int idx = i;
+            string label = cats[i] == "" ? "P4P" : cats[i];
+            var b = MkButton("arenacat_" + label, catRow.transform, label, 13,
+                             () => { if (arenaScreen != null) arenaScreen.SetCategory(idx); });
+            arenaCatBtns.Add(b);
+        }
+
+        var scrollGO = MkPanel("arenascroll", arenaPanel.transform, new Color(0f,0f,0f,0f));
+        var sle = scrollGO.AddComponent<LayoutElement>(); sle.flexibleHeight = 1f; sle.minHeight = 96f;
+        var scroll = scrollGO.AddComponent<ScrollRect>(); scroll.horizontal = false; scroll.vertical = true;
+        var viewport = MkPanel("arenaviewport", scrollGO.transform, new Color(0f,0f,0f,0.15f));
+        var vp = viewport.GetComponent<RectTransform>(); Stretch(vp);
+        viewport.AddComponent<Mask>().showMaskGraphic = true;
+        var content = MkPanel("arenacontent", viewport.transform, new Color(0f,0f,0f,0f));
+        var crt = content.GetComponent<RectTransform>();
+        crt.anchorMin = new Vector2(0f,1f); crt.anchorMax = new Vector2(1f,1f);
+        crt.pivot = new Vector2(0.5f,1f); crt.anchoredPosition = Vector2.zero;
+        crt.sizeDelta = new Vector2(0f, 0f);
+        var clg = content.AddComponent<VerticalLayoutGroup>();
+        clg.spacing = 3f; clg.childForceExpandWidth = true; clg.childForceExpandHeight = false;
+        clg.padding = new RectOffset(4,4,4,4);
+        var csf = content.AddComponent<ContentSizeFitter>(); csf.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+        scroll.viewport = vp; scroll.content = crt;
+        AddListOverflow(scrollGO, scroll, vp);   // R2 finding 8: ARENA
+        arenaBoardContent = content.transform;
+    }
+
+    /// <summary>Repaint the ARENA board. Cheap every frame EXCEPT when the
+    /// board actually changed — rebuilding a scrolled list under the player's
+    /// finger every frame is how a list stops being scrollable.</summary>
+    void RefreshArena()
+    {
+        if (arenaScreen == null || arenaBoardContent == null) return;
+
+        if (arenaStatus != null)
+        {
+            string s = arenaScreen.Status;
+            arenaStatus.text = string.IsNullOrEmpty(s)
+                ? arenaScreen.CategoryLabel + " · " + arenaScreen.Board.Count + " ranked"
+                : s;
+            arenaStatus.color = new Color(0.80f, 0.88f, 1f);
+        }
+        for (int i = 0; i < arenaCatBtns.Count; i++)
+        {
+            var b = arenaCatBtns[i];
+            if (b == null) continue;
+            bool on = i == arenaScreen.CategoryIndex;
+            var img = b.GetComponent<Image>();
+            if (img != null) img.color = on ? new Color(0.20f,0.45f,0.65f,1f) : new Color(0.16f,0.17f,0.21f,1f);
+            var t = b.GetComponentInChildren<Text>();
+            if (t != null) t.color = on ? Color.white : new Color(0.72f,0.78f,0.88f);
+        }
+
+        // A cheap identity for "the list changed": count, category, and the
+        // first row's snapshot. Enough to catch a reload, and it costs nothing.
+        var board = arenaScreen.Board;
+        int stamp = board.Count * 31 + arenaScreen.CategoryIndex * 7
+                  + (board.Count > 0 ? board[0].activeSnapshotId.GetHashCode() : 0);
+        if (stamp == arenaBoardStamp) return;
+        arenaBoardStamp = stamp;
+
+        for (int i = arenaBoardContent.childCount - 1; i >= 0; i--)
+            Destroy(arenaBoardContent.GetChild(i).gameObject);
+
+        if (board.Count == 0)
+        {
+            // ⚠ "nobody ranked here yet" and "the request failed" look
+            // identical in an empty list, and LadderClientBench's header calls
+            // that out as the worst failure mode this client has. The status
+            // line above carries the error; this says only what an EMPTY board
+            // means, and never pretends a failure is an empty ladder.
+            var erow = MkPanel("arena_empty", arenaBoardContent, new Color(0.13f,0.14f,0.18f,0.9f));
+            var ele = erow.AddComponent<LayoutElement>(); ele.minHeight = 52f; ele.preferredHeight = 52f;
+            var et = MkText("lbl", erow.transform,
+                "nobody ranked in " + arenaScreen.CategoryLabel + " yet.\n"
+                + "ENLIST a robot to be the first.", 14, TextAnchor.MiddleLeft);
+            et.color = new Color(0.78f, 0.82f, 0.90f);
+            Stretch(et.rectTransform);
+            et.rectTransform.offsetMin = new Vector2(10f, 2f); et.rectTransform.offsetMax = new Vector2(-10f, -2f);
+            return;
+        }
+
+        for (int i = 0; i < board.Count; i++)
+        {
+            var e = board[i];
+            var row = MkPanel("arenarow_" + i, arenaBoardContent, new Color(0.10f,0.11f,0.14f,1f));
+            var rle = row.AddComponent<LayoutElement>(); rle.minHeight = TouchRow(); rle.preferredHeight = TouchRow();
+            var rh = row.AddComponent<HorizontalLayoutGroup>();
+            rh.spacing = 4f; rh.childForceExpandHeight = true; rh.childForceExpandWidth = false;
+            rh.padding = new RectOffset(8,4,2,2);
+
+            var rank = MkText("rank", row.transform, e.rank + ".", 14, TextAnchor.MiddleLeft);
+            rank.color = new Color(0.62f, 0.68f, 0.78f);
+            rank.gameObject.AddComponent<LayoutElement>().minWidth = 34f;
+
+            // Name and owner on one line, the rating and its CONFIDENCE on the
+            // next. A 1400 at RD 350 has not earned what a 1400 at RD 60 has,
+            // and the board must not flatter the difference away.
+            var lbl = MkText("lbl", row.transform,
+                e.robotName + "  ·  " + e.owner + "\n"
+                + Mathf.RoundToInt(e.rating) + "  "
+                + (e.provisional ? "provisional" : "±" + Mathf.RoundToInt(e.deviation))
+                + "  ·  " + e.category,
+                13, TextAnchor.MiddleLeft);
+            lbl.color = e.provisional ? new Color(0.80f, 0.80f, 0.72f) : new Color(0.88f, 0.92f, 1f);
+            lbl.gameObject.AddComponent<LayoutElement>().flexibleWidth = 1f;
+
+            if (!string.IsNullOrEmpty(e.activeSnapshotId))
+            {
+                var ee = e;
+                var sb = MkButton("arenascout_" + i, row.transform, "SCOUT", 13,
+                                  () => { if (arenaScreen != null) arenaScreen.ScoutNow(ee); });
+                sb.gameObject.AddComponent<LayoutElement>().minWidth = 86f;
+                sb.GetComponent<Image>().color = new Color(0.20f,0.45f,0.65f,1f);
+            }
+        }
     }
 
     /// <summary>The COSMETICS shelf: same dock, different currency. Its rows
@@ -3097,7 +3257,17 @@ public class MobileBuilderUI : MonoBehaviour
             ago.transform.SetParent(transform, false);
             arenaScreen = ago.AddComponent<ArenaScreen>();
         }
-        if (arenaScreen != null) arenaScreen.enabled = wantArena;
+        if (arenaScreen != null)
+        {
+            arenaScreen.enabled = wantArena;
+            // The BOARD is ported, so the IMGUI must not also draw it — two
+            // renderers of one list is a doubled screen, not a fallback. The
+            // un-ported surfaces (card, inbox, sign-in, enlist) still need it,
+            // so this flips back the moment one of them is asked for.
+            arenaScreen.SuppressImgui = wantArena;
+        }
+        if (arenaPanel != null) arenaPanel.SetActive(wantArena);
+        if (wantArena) { arenaBoardStamp = -1; RefreshArena(); }
 
         if (i == 3) { shopNote = ""; shopNoteBad = false; RefreshShop(); }
         if (robots) RefreshRobots();
@@ -3150,6 +3320,11 @@ public class MobileBuilderUI : MonoBehaviour
     void Update()
     {
         if (bm == null) { bm = Object.FindFirstObjectByType<BuilderManager>(); if (bm == null) return; }
+        // The ARENA board arrives from the network, so it lands mid-frame with
+        // nobody to tell. Polled rather than pushed: RefreshArena is a no-op
+        // unless the list actually changed, and a callback into a UI that may
+        // have been torn down by a tab switch is the more expensive mistake.
+        if (tab == 4 && dockOpen && arenaPanel != null && arenaPanel.activeSelf) RefreshArena();
         // Watch the canvas SIZE as well as the scale factor. Switching the
         // simulated device changes both, but a rotation changes only the size,
         // and the palette's column width is derived from the viewport width -
