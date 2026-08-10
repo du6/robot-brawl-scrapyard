@@ -884,6 +884,66 @@ else
 fi
 
 echo
+echo "== O. league night: the ladder moves with nobody watching (§M3) =="
+# Server-initiated round-robin. The acceptance clause names 28 matches, which
+# is 8 robots paired every way; this bench has fewer robots, so it checks the
+# ARITHMETIC (n*(n-1)/2) rather than the literal 28 - a check that only passes
+# at one field size would be a check that never runs again.
+#
+# The dangerous part is not generating matches, it is SETTLING them. Nobody
+# staked, so a settlement that refunds a recomputed stake would credit scrap
+# against a debit that never happened. That is what migration 006 exists for
+# and what the last two checks here are really testing.
+if ! command -v psql >/dev/null 2>&1; then
+  skip "league night (7 checks)" "psql is not on PATH"
+else
+  S=$(req POST "/v1/admin/league-night/$CHCAT" '{}' "X-Worker-Key: $WKEY")
+  expect "a league night is generated for $CHCAT" "$S" 200
+  FIELD=$(jget field); MADE=$(jget matches)
+  if [ -n "$FIELD" ] && [ "$FIELD" -ge 2 ]; then
+    WANT=$(( FIELD * (FIELD - 1) / 2 ))
+    is "…pairing every robot in the field exactly once ($FIELD robots)" "$MADE" "$WANT"
+  else
+    no "the league night found a field of '$FIELD' — needs at least 2 rated robots with an ACTIVE snapshot"
+  fi
+  is "…every match staked ZERO, because nobody challenged" \
+     "$(dbq "SELECT count(*) FROM matches WHERE arena='league_night' AND stake <> 0;")" 0
+  is "…and each one queued a FIGHT job" \
+     "$(dbq "SELECT count(*) FROM match_jobs j JOIN matches m ON m.id=j.match_id WHERE m.arena='league_night';")" "$MADE"
+  # A league night must not consume anybody's daily challenge allowance:
+  # §2.2 caps what a robot INITIATES, and a robot did not initiate this.
+  TICKETS_BEFORE=$(dbq "SELECT COALESCE(SUM(used),0) FROM tickets WHERE day=CURRENT_DATE;")
+  req POST "/v1/admin/league-night/$CHCAT" '{}' "X-Worker-Key: $WKEY" >/dev/null
+  is "…and spends no challenge tickets, since no robot initiated it" \
+     "$(dbq "SELECT COALESCE(SUM(used),0) FROM tickets WHERE day=CURRENT_DATE;")" "$TICKETS_BEFORE"
+
+  # Settle one, unattended, and prove no scrap appeared from nowhere.
+  WALL_BEFORE=$(dbq "SELECT COALESCE(SUM(delta),0) FROM ledger;")
+  LNJOB=""
+  for i in 1 2 3 4 5 6; do
+    req POST /v1/worker/jobs/claim '{"workerId":"smoke-league"}' "X-Worker-Key: $WKEY" >/dev/null
+    G=$(jget id); [ -z "$G" ] && break
+    LNM=$(jget matchId)
+    if [ -n "$LNM" ] && [ "$(dbq "SELECT arena FROM matches WHERE id='$LNM';")" = "league_night" ]; then
+      LNJOB="$G"; break
+    fi
+  done
+  if [ -z "$LNJOB" ]; then
+    skip "settling a league-night match (2 checks)" "could not claim one"
+  else
+    S=$(req POST "/v1/worker/jobs/$LNJOB/fight-result" \
+        "{\"matchId\":\"$LNM\",\"workerId\":\"smoke-league\",\"verdict\":\"CHALLENGER\",\"replayUrls\":[],\"bouts\":[]}" \
+        "X-Worker-Key: $WKEY")
+    expect "a league-night match settles unattended" "$S" 200
+    # THE ONE THAT MATTERS. No stake went in, so nothing may come out.
+    is "…without creating a single scrap of currency from nothing" \
+       "$(dbq "SELECT COALESCE(SUM(delta),0) FROM ledger;")" "$WALL_BEFORE"
+    is "…while still moving the ladder, which is the entire point" \
+       "$(dbq "SELECT CASE WHEN rating_deltas IS NOT NULL THEN 'yes' ELSE 'no' END FROM matches WHERE id='$LNM';")" yes
+  fi
+fi
+
+echo
 echo "== N. ledger conservation, over everything this run just did (§8/M3) =="
 # M3's acceptance: "every scrap created is accounted to a config'd faucet".
 # This runs LAST on purpose - by now the bench has registered accounts, fought

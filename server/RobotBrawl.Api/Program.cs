@@ -638,14 +638,16 @@ app.MapPost("/v1/challenges", async (ChallengeReq req, ClaimsPrincipal user) =>
 
     Guid matchId;
     await using (var ins = new NpgsqlCommand(@"
-        INSERT INTO matches (challenger_snapshot_id, defender_snapshot_id, category, gap, arena, seeds, status)
-        VALUES ($1,$2,$3,$4,'league',$5,'QUEUED') RETURNING id;", c, tx))
+        INSERT INTO matches (challenger_snapshot_id, defender_snapshot_id, category, gap, arena, seeds, status, stake)
+        VALUES ($1,$2,$3,$4,'league',$5,'QUEUED',$6) RETURNING id;", c, tx))
     {
         ins.Parameters.AddWithValue(req.ChallengerSnapshotId);
         ins.Parameters.AddWithValue(req.DefenderSnapshotId);
         ins.Parameters.AddWithValue(df.Category);   // you fight in THEIR class
         ins.Parameters.AddWithValue(gap);
         ins.Parameters.AddWithValue(seeds);
+        // What is CHARGED is what gets refunded. See migration 006.
+        ins.Parameters.AddWithValue(stake);
         matchId = (Guid)(await ins.ExecuteScalarAsync())!;
     }
     await using (var deb = new NpgsqlCommand(
@@ -747,9 +749,9 @@ app.MapPost("/v1/worker/jobs/{id:long}/fight-result",
     // Everything settlement needs, read under the same transaction. The ROBOT
     // ids come along too: scrap belongs to a user, but a rating belongs to a
     // robot (§2.1 is per-robot, not per-account).
-    Guid chUser, dfUser, chRobot, dfRobot; int gap; string status, category;
+    Guid chUser, dfUser, chRobot, dfRobot; int gap, stakePaid; string status, category;
     await using (var m = new NpgsqlCommand(@"
-        SELECT m.status, m.gap, m.category, rc.user_id, rd.user_id, rc.id, rd.id
+        SELECT m.status, m.gap, m.category, rc.user_id, rd.user_id, rc.id, rd.id, m.stake
           FROM matches m
           JOIN snapshots sc ON sc.id = m.challenger_snapshot_id JOIN robots rc ON rc.id = sc.robot_id
           JOIN snapshots sd ON sd.id = m.defender_snapshot_id   JOIN robots rd ON rd.id = sd.robot_id
@@ -761,12 +763,16 @@ app.MapPost("/v1/worker/jobs/{id:long}/fight-result",
         status = r.GetString(0); gap = r.GetInt32(1); category = r.GetString(2);
         chUser = r.GetGuid(3); dfUser = r.GetGuid(4);
         chRobot = r.GetGuid(5); dfRobot = r.GetGuid(6);
+        stakePaid = r.GetInt32(7);
     }
     // Settling twice would mint scrap from nothing.
     if (status == "COMPLETE") return Results.Conflict(new { error = "this match is already settled" });
 
     var cfg = await LadderConfig(c, tx);
-    int stake = (int)cfg["stake_base"] * (1 + gap);
+    // What was CHARGED, not what the config says today. A league night
+    // charges nothing, and a tuned stake_base must not change a refund for a
+    // challenge that was already priced. Migration 006.
+    int stake = stakePaid;
 
     // §2.2 repeat-opponent taper: "rating and scrap gains vs the same opponent
     // taper to zero after 3 wins in a rolling 24 h (kills win-trading and
@@ -814,13 +820,27 @@ app.MapPost("/v1/worker/jobs/{id:long}/fight-result",
     // purse, a draw returns it, and a loss keeps it.
     async Task Credit(Guid who, int delta, string reason)
     {
+        // ledger_delta_nonzero: a zero-value row is not a transaction, it is
+        // noise in an audit trail. The schema refuses one, and rightly.
+        if (delta == 0) return;
         await using var l = new NpgsqlCommand(
             "INSERT INTO ledger (user_id, delta, reason, match_id) VALUES ($1,$2,$3,$4);", c, tx);
         l.Parameters.AddWithValue(who); l.Parameters.AddWithValue(delta);
         l.Parameters.AddWithValue(reason); l.Parameters.AddWithValue(res.MatchId);
         await l.ExecuteNonQueryAsync();
     }
-    if (res.Verdict == "CHALLENGER")
+    // NO STAKE, NO SETTLEMENT. A league night is server-initiated: nobody
+    // chose the fight and nobody paid for it, so there is nothing to return
+    // and nothing to win. Paying a purse here would be a faucet attached to
+    // content the server generates on a timer, which is exactly the
+    // one-way door §2.3 warns about. The ladder still moves - rating is the
+    // reward for a league night, and scrap can be added later if it needs it.
+    bool escrowed = stakePaid > 0;
+    if (!escrowed)
+    {
+        // nothing to settle
+    }
+    else if (res.Verdict == "CHALLENGER")
     {
         // The stake always comes back — it is escrow, not a fee, and §2.2
         // tapers GAINS. Confiscating the stake on a tapered win would be a
@@ -1218,6 +1238,104 @@ app.MapPost("/v1/wallet/deposit", async (DepositReq req, ClaimsPrincipal user) =
 
     return Results.Ok(new { deposited = req.Amount, balance = balance - req.Amount });
 }).RequireAuthorization().RequireRateLimiting("wallet");
+
+// ========================================================= league nights
+// §M3: "Scheduled league nights (server-initiated round-robin among top 8 per
+// category, weekly) — passive content that makes the ladder move even when
+// nobody challenges, and produces featured replays for the ARENA tab's front
+// page."
+//
+// Server-initiated, so THREE of the challenge rules deliberately do not
+// apply, and each omission is a decision rather than an oversight:
+//
+//   * No stake. Nobody chose this fight, so nobody pays for it. The match
+//     records stake = 0 and settlement refunds exactly that, which is why
+//     migration 006 had to land first — a recomputed stake would have minted
+//     a refund against a debit that never happened.
+//   * No tickets. §2.2 caps challenges a robot INITIATES; a robot did not
+//     initiate this, the league did.
+//   * No purse. §2.3 says the faucets start conservative and inflating career
+//     progression from the ladder is a one-way door. Rating movement is the
+//     content here; scrap can be added later if it turns out to need it.
+//
+// What DOES apply is everything about rating: same-category pairs, so gap 0,
+// both sides updated, the defense floor and the repeat taper both live.
+app.MapPost("/v1/admin/league-night/{category}", async (string category, HttpContext ctx, int? top) =>
+{
+    // Worker-key gated, not player-authenticated: this is an operator action.
+    if (!WorkerAuthed(ctx)) return Results.Unauthorized();
+    if (Array.IndexOf(Categories, category) < 0)
+        return Bad($"'{category}' is not one of {string.Join(", ", Categories)}");
+    int n = Math.Clamp(top ?? 8, 2, 16);
+
+    await using var c = await db.OpenAsync();
+    int season = 1;
+    {
+        var cfg0 = await LadderConfig(c);
+        if (cfg0.TryGetValue("current_season", out var sv)) season = (int)sv;
+    }
+
+    // The top N by rating who still have an ACTIVE snapshot to fight with. A
+    // rating with no active snapshot is a robot that has been superseded or
+    // retired; inviting it would queue a match nothing can run.
+    var field = new List<(Guid Robot, Guid Snap, double Rating)>();
+    await using (var q = new NpgsqlCommand(@"
+        SELECT ra.robot_id, s.id, ra.rating
+          FROM ratings ra
+          JOIN snapshots s ON s.robot_id = ra.robot_id AND s.status = 'ACTIVE'
+         WHERE ra.category = $1 AND ra.season_id = $2
+         ORDER BY ra.rating DESC
+         LIMIT $3;", c))
+    {
+        q.Parameters.AddWithValue(category);
+        q.Parameters.AddWithValue(season);
+        q.Parameters.AddWithValue(n);
+        await using var r = await q.ExecuteReaderAsync();
+        while (await r.ReadAsync())
+            field.Add((r.GetGuid(0), r.GetGuid(1), r.GetDouble(2)));
+    }
+    if (field.Count < 2)
+        return Bad($"a league night needs at least 2 rated {category} robots with an active snapshot; found {field.Count}");
+
+    // Every pair once: n*(n-1)/2 matches. Eight robots is 28, which is the
+    // number §M3's acceptance names.
+    var created = new List<Guid>();
+    await using var tx = await c.BeginTransactionAsync();
+    for (int i = 0; i < field.Count; i++)
+        for (int j = i + 1; j < field.Count; j++)
+        {
+            // The LOWER-rated robot is the challenger. Arbitrary but not
+            // random: the roles decide who the taper and the defense floor
+            // apply to, so they have to be deterministic or two identical
+            // league nights would settle differently.
+            var (a, b) = field[i].Rating >= field[j].Rating ? (field[j], field[i]) : (field[i], field[j]);
+            var seeds = new[] { Random.Shared.Next(1, int.MaxValue),
+                                Random.Shared.Next(1, int.MaxValue),
+                                Random.Shared.Next(1, int.MaxValue) };
+            Guid id;
+            await using (var ins = new NpgsqlCommand(@"
+                INSERT INTO matches (challenger_snapshot_id, defender_snapshot_id, category, gap,
+                                     arena, seeds, status, stake)
+                VALUES ($1,$2,$3,0,'league_night',$4,'QUEUED',0) RETURNING id;", c, tx))
+            {
+                ins.Parameters.AddWithValue(a.Snap);
+                ins.Parameters.AddWithValue(b.Snap);
+                ins.Parameters.AddWithValue(category);
+                ins.Parameters.AddWithValue(seeds);
+                id = (Guid)(await ins.ExecuteScalarAsync())!;
+            }
+            await using (var job = new NpgsqlCommand(
+                "INSERT INTO match_jobs (kind, match_id) VALUES ('FIGHT', $1);", c, tx))
+            {
+                job.Parameters.AddWithValue(id);
+                await job.ExecuteNonQueryAsync();
+            }
+            created.Add(id);
+        }
+    await tx.CommitAsync();
+
+    return Results.Ok(new { category, field = field.Count, matches = created.Count, matchIds = created });
+}).AllowAnonymous();
 
 app.Run();
 
