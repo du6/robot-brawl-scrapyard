@@ -7,7 +7,13 @@ services:
       POSTGRES_USER: rb
       POSTGRES_PASSWORD: rb
       POSTGRES_DB: rb
-    ports: ["5432:5432"]
+    # Host port 5433, NOT 5432: a Mac running its own Postgres holds
+    # 127.0.0.1:5432, which shadows Docker's 0.0.0.0:5432 forward on
+    # loopback. `psql -h localhost` then reads the WRONG database while
+    # the API writes to this one — measured 2026-08-09: api_smoke's db
+    # checks failed against live data because they were comparing against
+    # the host's stale dev db. From the host: psql -h localhost -p 5433.
+    ports: ["5433:5432"]
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U rb"]
       interval: 3s
