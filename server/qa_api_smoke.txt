@@ -15,7 +15,7 @@ PASS  a wrong password and an unknown account are indistinguishable (both 401)
 
 == D. robots ==
 PASS  a robot is created
-      robot 5af9983c-f1d7-44a5-8612-38af28fd5f09
+      robot 52ff0d16-1aad-4308-b43e-14cdcdb39cf3
 PASS  …but not without a token
 
 == E. snapshot upload stays opaque (§5.2) ==
@@ -30,7 +30,7 @@ PASS  …and a wrong key is refused too
 PASS  a keyed worker claims a job
 PASS  …and the job is the VALIDATE the upload enqueued
 PASS  …pointing at the snapshot just uploaded
-PASS  …and carries a payload location the worker can resolve (file:///tmp/rb-blobs/snapshots/5af9983c-f1d7-44a5-8612-38af28fd5f09/77be32e1206c41acb256af5d1cae7a1e.json)
+PASS  …and carries a payload location the worker can resolve (file:///tmp/rb-blobs/snapshots/52ff0d16-1aad-4308-b43e-14cdcdb39cf3/ed916fd166b8479f8497c380c6d32a61.json)
 PASS  …and the payload sha256 rides along, so the worker can verify storage
 PASS  another worker cannot heartbeat a job it does not hold
 PASS  …the holder can
@@ -167,6 +167,20 @@ PASS  …leaving wallets intact apart from the season payouts
 PASS  …and closing the SAME season twice is refused
 PASS  …so nobody was paid for that season twice
 
+== Q. cosmetics: the economy finally has a sink (§M3) ==
+PASS  the catalogue is public — you can window-shop signed out
+PASS  …and v1 stocks six items
+PASS  …none of which carries a stat, because the table has no column for one
+PASS  a title can be bought
+PASS  …debiting exactly its price
+PASS  …as a NEGATIVE COSMETIC row, which the schema also enforces
+PASS  …and buying it twice is refused
+PASS  …with the wallet unmoved by the second attempt
+PASS  …and one you cannot afford is refused, whatever you happen to hold
+PASS  an owned title equips to your robot
+PASS  …but one you do not own does not
+PASS  …and the title shows on the leaderboard, which is what makes it worth buying
+
 == N. ledger conservation, over everything this run just did (§8/M3) ==
 PASS  every CREDIT is a faucet the design doc names
 PASS  every DEBIT is a stake or the one-way career valve
@@ -177,6 +191,6 @@ PASS  no refund ever exceeds the stake it returns
 PASS  a challenger who lost never got their stake back
 PASS  a drawn match never paid a purse
 PASS  no wallet is overdrawn
-      ledger: 24 rows, net 3000 scrap across 3 wallets
+      ledger: 25 rows, net 2940 scrap across 3 wallets
 
-===== passed 146  failed 0  skipped 0 =====
+===== passed 158  failed 0  skipped 0 =====

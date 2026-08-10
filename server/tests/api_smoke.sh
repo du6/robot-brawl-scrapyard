@@ -1004,6 +1004,60 @@ else
 fi
 
 echo
+echo "== Q. cosmetics: the economy finally has a sink (§M3) =="
+# Every faucet here is live and the only way scrap could LEAVE a wallet was a
+# stake you usually got back or a one-way career deposit. An economy with
+# faucets and no sinks inflates until the numbers stop meaning anything.
+#
+# "no balance impact" is enforced by there being nowhere to put a stat: the
+# catalogue has a name, a kind and a price, and no column that could affect a
+# fight.
+if [ -z "${AUTH:-}" ] || ! command -v psql >/dev/null 2>&1; then
+  skip "cosmetics (9 checks)" "needs a token and psql"
+else
+  S=$(req GET /v1/cosmetics)
+  expect "the catalogue is public — you can window-shop signed out" "$S" 200
+  is "…and v1 stocks six items" "$(jget count)" 6
+  is "…none of which carries a stat, because the table has no column for one" \
+     "$(dbq "SELECT count(*) FROM information_schema.columns WHERE table_name='cosmetics' AND column_name NOT IN ('id','kind','name','price');")" 0
+
+  CBAL=$(dbq "SELECT COALESCE(SUM(delta),0) FROM ledger WHERE user_id='$USERID';")
+  S=$(req POST /v1/cosmetics/title_scrapper/buy '{}' "$AUTH")
+  expect "a title can be bought" "$S" 200
+  is "…debiting exactly its price" \
+     "$(dbq "SELECT COALESCE(SUM(delta),0) FROM ledger WHERE user_id='$USERID';")" "$((CBAL - 60))"
+  is "…as a NEGATIVE COSMETIC row, which the schema also enforces" \
+     "$(dbq "SELECT count(*) FROM ledger WHERE user_id='$USERID' AND reason='COSMETIC' AND delta > 0;")" 0
+  # Charging twice for something you already own is the failure that actually
+  # costs a player money, and the primary key refuses it rather than a code
+  # path that could be skipped.
+  S=$(req POST /v1/cosmetics/title_scrapper/buy '{}' "$AUTH")
+  expect "…and buying it twice is refused" "$S" 409
+  is "…with the wallet unmoved by the second attempt" \
+     "$(dbq "SELECT COALESCE(SUM(delta),0) FROM ledger WHERE user_id='$USERID';")" "$((CBAL - 60))"
+  # Affordability, tested independently of how rich this account happens to
+  # be. The first version bought the most expensive item in the catalogue and
+  # expected a refusal - then season payouts landed, the wallet hit 1400, and
+  # the purchase legitimately succeeded. A check that depends on the tester
+  # being poor is a check that breaks when the economy works.
+  NOW=$(dbq "SELECT COALESCE(SUM(delta),0) FROM ledger WHERE user_id='$USERID';")
+  dbq "INSERT INTO cosmetics (id,kind,name,price) VALUES ('test_unaffordable','PLATE','Priced Beyond You',$((NOW + 1)))
+       ON CONFLICT (id) DO UPDATE SET price=$((NOW + 1));" >/dev/null
+  S=$(req POST /v1/cosmetics/test_unaffordable/buy '{}' "$AUTH")
+  expect "…and one you cannot afford is refused, whatever you happen to hold" "$S" 400
+  dbq "DELETE FROM cosmetics WHERE id='test_unaffordable';" >/dev/null
+
+  # Equipping: you may only wear what you bought. A cosmetic you do not own
+  # is not a display bug, it is a free item.
+  S=$(req POST "/v1/robots/$ROBOT/equip" '{"titleId":"title_scrapper"}' "$AUTH")
+  expect "an owned title equips to your robot" "$S" 200
+  S=$(req POST "/v1/robots/$ROBOT/equip" '{"titleId":"title_ironclad"}' "$AUTH")
+  expect "…but one you do not own does not" "$S" 400
+  is "…and the title shows on the leaderboard, which is what makes it worth buying" \
+     "$(req GET "/v1/leaderboard/$CHCAT" >/dev/null; dbq "SELECT c.name FROM robots r JOIN cosmetics c ON c.id=r.title_id WHERE r.id='$ROBOT';")" "Scrapper"
+fi
+
+echo
 echo "== N. ledger conservation, over everything this run just did (§8/M3) =="
 # M3's acceptance: "every scrap created is accounted to a config'd faucet".
 # This runs LAST on purpose - by now the bench has registered accounts, fought
@@ -1021,7 +1075,7 @@ else
               ('SIGNING_BONUS','PURSE','DEFENSE','FIRST_BLOOD','SEASON','STAKE_REFUND','ADJUSTMENT');")" 0
   is "every DEBIT is a stake or the one-way career valve" \
      "$(dbq "SELECT count(*) FROM ledger WHERE delta < 0 AND reason NOT IN
-              ('STAKE','DEPOSIT_TO_CAREER','ADJUSTMENT');")" 0
+              ('STAKE','DEPOSIT_TO_CAREER','ADJUSTMENT','COSMETIC');")" 0
   is "no ledger row is worth zero scrap" \
      "$(dbq "SELECT count(*) FROM ledger WHERE delta = 0;")" 0
   is "every ledger row that names a match points at a real one" \

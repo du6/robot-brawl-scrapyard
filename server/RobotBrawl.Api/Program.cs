@@ -1020,10 +1020,13 @@ app.MapGet("/v1/leaderboard/{category?}", async (string? category, int? limit) =
         SELECT ra.category, ra.rating, ra.deviation, ra.volatility, ra.updated_at,
                r.id, r.name, u.display_name,
                (SELECT s.id FROM snapshots s
-                 WHERE s.robot_id = r.id AND s.status = 'ACTIVE' LIMIT 1)
+                 WHERE s.robot_id = r.id AND s.status = 'ACTIVE' LIMIT 1),
+               ct.name, cp.name
           FROM ratings ra
           JOIN robots r ON r.id = ra.robot_id
           JOIN users  u ON u.id = r.user_id
+          LEFT JOIN cosmetics ct ON ct.id = r.title_id
+          LEFT JOIN cosmetics cp ON cp.id = r.plate_id
          WHERE ($1::text IS NULL OR ra.category = $1)
          ORDER BY ra.rating DESC, ra.deviation ASC
          LIMIT $2;", c);
@@ -1047,6 +1050,10 @@ app.MapGet("/v1/leaderboard/{category?}", async (string? category, int? limit) =
             robotName = r.GetString(6),
             owner = r.GetString(7),
             activeSnapshotId = r.IsDBNull(8) ? (Guid?)null : r.GetGuid(8),
+            // Cosmetic only, and visibly so — a title on the board is what
+            // makes the scrap sink worth spending into.
+            title = r.IsDBNull(9) ? null : r.GetString(9),
+            plate = r.IsDBNull(10) ? null : r.GetString(10),
             updatedAt = r.GetDateTime(4),
         });
     return Results.Ok(new { category = category ?? "ALL", count = rows.Count, entries = rows });
@@ -1460,6 +1467,131 @@ app.MapPost("/v1/admin/season/rollover", async (HttpContext ctx) =>
                             compressedToPct = keep * 100, awards });
 }).AllowAnonymous();
 
+// ============================================================== cosmetics
+// §M3's scrap sink. Every faucet in this economy is live and until now the
+// only way scrap could leave a wallet was a stake you usually got back or a
+// one-way deposit into the career save.
+
+app.MapGet("/v1/cosmetics", async (ClaimsPrincipal user) =>
+{
+    await using var c = await db.OpenAsync();
+    var owned = new HashSet<string>();
+    if (user.Identity?.IsAuthenticated == true)
+    {
+        await using var o = new NpgsqlCommand(
+            "SELECT cosmetic_id FROM user_cosmetics WHERE user_id = $1;", c);
+        o.Parameters.AddWithValue(UserId(user));
+        await using var r0 = await o.ExecuteReaderAsync();
+        while (await r0.ReadAsync()) owned.Add(r0.GetString(0));
+    }
+    var list = new List<object>();
+    await using (var q = new NpgsqlCommand("SELECT id, kind, name, price FROM cosmetics ORDER BY price;", c))
+    await using (var r = await q.ExecuteReaderAsync())
+        while (await r.ReadAsync())
+            list.Add(new
+            {
+                id = r.GetString(0), kind = r.GetString(1),
+                name = r.GetString(2), price = r.GetInt32(3),
+                owned = owned.Contains(r.GetString(0)),
+            });
+    return Results.Ok(new { count = list.Count, cosmetics = list });
+}).AllowAnonymous();
+
+app.MapPost("/v1/cosmetics/{id}/buy", async (string id, ClaimsPrincipal user) =>
+{
+    var me = UserId(user);
+    await using var c = await db.OpenAsync();
+    await using var tx = await c.BeginTransactionAsync();
+
+    int price;
+    await using (var p = new NpgsqlCommand("SELECT price FROM cosmetics WHERE id = $1;", c, tx))
+    {
+        p.Parameters.AddWithValue(id);
+        var got = await p.ExecuteScalarAsync();
+        if (got is null) return Results.NotFound(new { error = "no such cosmetic" });
+        price = (int)got;
+    }
+
+    // The balance IS the ledger (§2.3), read inside the transaction so two
+    // concurrent purchases cannot both see the same scrap.
+    long balance;
+    await using (var b = new NpgsqlCommand(
+        "SELECT COALESCE(SUM(delta),0) FROM ledger WHERE user_id = $1;", c, tx))
+    {
+        b.Parameters.AddWithValue(me);
+        balance = Convert.ToInt64(await b.ExecuteScalarAsync());
+    }
+    if (balance < price)
+        return Bad($"{price} scrap and your wallet holds {balance}");
+
+    try
+    {
+        await using (var own = new NpgsqlCommand(
+            "INSERT INTO user_cosmetics (user_id, cosmetic_id) VALUES ($1,$2);", c, tx))
+        {
+            own.Parameters.AddWithValue(me);
+            own.Parameters.AddWithValue(id);
+            await own.ExecuteNonQueryAsync();
+        }
+    }
+    catch (PostgresException ex) when (ex.SqlState == "23505")
+    {
+        // The primary key refuses it, not a code path that could be skipped.
+        // Charging twice for a thing you already own is the failure that
+        // actually costs a player something.
+        return Results.Conflict(new { error = "you already own that" });
+    }
+
+    await using (var l = new NpgsqlCommand(
+        "INSERT INTO ledger (user_id, delta, reason) VALUES ($1,$2,'COSMETIC');", c, tx))
+    {
+        l.Parameters.AddWithValue(me);
+        l.Parameters.AddWithValue(-price);
+        await l.ExecuteNonQueryAsync();
+    }
+    await tx.CommitAsync();
+    return Results.Ok(new { bought = id, paid = price, balance = balance - price });
+}).RequireAuthorization().RequireRateLimiting("wallet");
+
+app.MapPost("/v1/robots/{robotId:guid}/equip", async (Guid robotId, EquipReq req, ClaimsPrincipal user) =>
+{
+    var me = UserId(user);
+    await using var c = await db.OpenAsync();
+
+    await using (var own = new NpgsqlCommand("SELECT user_id FROM robots WHERE id = $1;", c))
+    {
+        own.Parameters.AddWithValue(robotId);
+        var o = await own.ExecuteScalarAsync();
+        if (o is null) return Results.NotFound(new { error = "no such robot" });
+        if ((Guid)o != me) return Results.Forbid();
+    }
+
+    // You may only wear what you bought. Checked here AND reachable only for
+    // your own robot above — a cosmetic you do not own is not a display bug,
+    // it is a free item.
+    foreach (var (which, val) in new[] { ("plate", req.PlateId), ("title", req.TitleId) })
+    {
+        if (string.IsNullOrEmpty(val)) continue;
+        await using var q = new NpgsqlCommand(
+            "SELECT 1 FROM user_cosmetics WHERE user_id = $1 AND cosmetic_id = $2;", c);
+        q.Parameters.AddWithValue(me);
+        q.Parameters.AddWithValue(val!);
+        if (await q.ExecuteScalarAsync() is null)
+            return Bad($"you do not own the {which} '{val}'");
+    }
+
+    await using (var up = new NpgsqlCommand(@"
+        UPDATE robots SET plate_id = COALESCE($2, plate_id), title_id = COALESCE($3, title_id)
+         WHERE id = $1;", c))
+    {
+        up.Parameters.AddWithValue(robotId);
+        up.Parameters.AddWithValue((object?)req.PlateId ?? DBNull.Value);
+        up.Parameters.AddWithValue((object?)req.TitleId ?? DBNull.Value);
+        await up.ExecuteNonQueryAsync();
+    }
+    return Results.Ok(new { robotId, plateId = req.PlateId, titleId = req.TitleId });
+}).RequireAuthorization();
+
 app.Run();
 
 // ------------------------------------------------------------------ dtos
@@ -1471,6 +1603,7 @@ public record ClaimReq(string? WorkerId);
 public record ChallengeReq(Guid ChallengerSnapshotId, Guid DefenderSnapshotId);
 public record ReplayReq(string? Replay);
 public record DepositReq(int Amount, string? IdemKey);
+public record EquipReq(string? PlateId, string? TitleId);
 public record FightResult(Guid MatchId, string? WorkerId, string? Verdict,
                           string[]? ReplayUrls, string[]? Bouts);
 public record ValidateResult(
