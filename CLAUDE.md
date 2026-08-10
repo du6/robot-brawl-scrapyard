@@ -11,8 +11,10 @@ playable; **Multiplayer v3** (cloud ladder) is mid-build.
    names the one task that matters next (GcsBlobStore). It supersedes the
    status tables in (1) below; (1) is still the live guidance for the hard
    rules and the editor discipline.
-0. **`docs/HANDOVER_2026-08-09_late_night.md`** — the newest handover and the
-   one to start from. It supersedes `HANDOVER_2026-08-09_night.md` entirely
+0. **`docs/HANDOVER_2026-08-10.md`** — **START HERE.** The ladder is live and
+   autonomous; its §5 is the career-save incident and the rule that prevents
+   it, and should be read before running any bench.
+0. **`docs/HANDOVER_2026-08-09_late_night.md`** — the previous handover. It supersedes `HANDOVER_2026-08-09_night.md` entirely
    (that document's §6 traps are still true), and supersedes (1) on all
    status; (1) is still live on the hard rules and editor discipline (its §2
    and §3).
@@ -36,6 +38,7 @@ The records, most recent first:
 
 | doc | what |
 |---|---|
+| `docs/Mutual_Disarm_Root_Cause_2026-08-09.md` | the 43% disarm: the limb fails, not the weapon |
 | `docs/Cloud_Only_Defects_2026-08-09.md` | four faults that only exist in the cloud, and all four looked green |
 | `docs/Category_Assignment_Shipped_2026-08-09.md` | the ladder's weight categories; why the size box is gone |
 | `docs/M1_Worker_Contract_Gaps_2026-08-09.md` | the claim contract fix, and the two gaps that were left |
