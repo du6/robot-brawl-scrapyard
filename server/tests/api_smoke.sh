@@ -1182,6 +1182,30 @@ else
   note "ledger: $(dbq "SELECT count(*) FROM ledger;") rows, net $(dbq "SELECT COALESCE(SUM(delta),0) FROM ledger;") scrap across $(dbq "SELECT count(DISTINCT user_id) FROM ledger;") wallets"
 fi
 
+# --------------------------------------------------------------- section W
+# The claim's kind filter. A specialised worker must be able to ask only for
+# work it can run — otherwise it claims, refuses, and leaves the job CLAIMED
+# with an attempt already burned, and three of those FAIL a job that was never
+# broken. sql_bench proves the SQL; this proves the endpoint plumbs it through
+# and validates it.
+echo
+echo "--- W. the claim kind filter ---"
+c=$(req POST /v1/worker/jobs/claim '{"workerId":"kindtest","kind":"BANANA"}' "X-Worker-Key: $WKEY")
+expect "a nonsense kind is refused, not silently ignored" "$c" "400"
+c=$(req POST /v1/worker/jobs/claim '{"workerId":"kindtest","kind":"fight"}' "X-Worker-Key: $WKEY")
+if [ "$c" = "200" ]; then
+  same "a lowercase kind is accepted and returns that kind" "$(jget kind)" "FIGHT"
+elif [ "$c" = "204" ]; then
+  ok "a lowercase kind is accepted (no FIGHT work queued right now)"
+else
+  no "a lowercase kind is accepted -- HTTP $c"
+fi
+c=$(req POST /v1/worker/jobs/claim '{"workerId":"kindtest"}' "X-Worker-Key: $WKEY")
+case "$c" in
+  200|204) ok "omitting kind still claims any job (the old behaviour is intact)" ;;
+  *) no "omitting kind broke the claim -- HTTP $c" ;;
+esac
+
 # --------------------------------------------------------------- section M
 # §M4's monitoring surface.
 echo

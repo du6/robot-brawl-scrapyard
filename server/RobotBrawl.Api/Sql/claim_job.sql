@@ -33,10 +33,31 @@
 -- Columns 0-4 are unchanged and in the same order, so sql_bench.sh's
 -- `^[0-9]+\|` / cut -f1 parsing and api_smoke.sh's `jget id` keep working:
 -- this is additive.
+--
+-- 2026-08-09 — $2 FILTERS BY KIND, AND IT PREVENTS A REAL DATA-LOSS BUG.
+--
+-- Until now a claim took a worker id and nothing else, so every worker
+-- claimed indiscriminately. Both loops REFUSE a job of the wrong kind after
+-- claiming it (FightWorkerLoop: "claimed a VALIDATE job, which this loop does
+-- not run") and leave it CLAIMED for the reaper rather than failing it, which
+-- is the polite thing to do — but the attempt has already been burned, because
+-- attempts increments ON CLAIM.
+--
+-- So in any fleet running both kinds, a job repeatedly claimed by the wrong
+-- worker hits maxAttempts and is FAILED while nothing was ever wrong with it.
+-- Since 2026-08-09 a failed VALIDATE also REJECTS the player's snapshot, so
+-- the visible result is a legitimate robot refused with a reason that is not
+-- true. It has never fired because no worker has ever been deployed — this is
+-- being fixed on the way in, not after.
+--
+-- $2 NULL keeps the old behaviour exactly (any kind), so every existing caller
+-- and every existing bench is unaffected.
 -- $1 = worker id
+-- $2 = kind filter: NULL for any, else 'VALIDATE' or 'FIGHT'
 WITH claimed AS (
     SELECT id FROM match_jobs
      WHERE status = 'READY'
+       AND ($2::text IS NULL OR kind = $2::text)
      ORDER BY created_at
      FOR UPDATE SKIP LOCKED
      LIMIT 1

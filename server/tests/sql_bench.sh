@@ -98,9 +98,13 @@ mk_runner() {  # $1 = query file, $2 = out file, $3 = extra lines after EXECUTE
 }
 mk_runner "$API_SQL/claim_job.sql" /tmp/claim_run.sql \
   "BEGIN;
-EXECUTE st(:'worker');
+EXECUTE st(:'worker', NULL);
 SELECT pg_sleep(0.6);
 COMMIT;"
+# The same statement with a kind filter. NULL above is the old behaviour and
+# every check below it is unchanged, which is the point: the filter is additive.
+mk_runner "$API_SQL/claim_job.sql" /tmp/claim_kind.sql \
+  "EXECUTE st(:'worker', :'kind');"
 
 q "DELETE FROM match_jobs;" >/dev/null
 for i in 1 2 3 4; do
@@ -124,6 +128,42 @@ LEFT=$(q "SELECT count(*) FROM match_jobs WHERE status='READY';")
 ATT=$(q "SELECT DISTINCT attempts FROM match_jobs WHERE status='CLAIMED';")
 [ "$ATT" = "1" ] && ok "claiming burns exactly one attempt (read $ATT)" || no "attempts should be 1, read '$ATT'"
 
+# ---- the kind filter, and the bug it prevents ----------------------------
+# A worker that can only run one kind must be able to ASK for that kind.
+# Without this it claims whatever is at the head of the queue, refuses the
+# ones it cannot run, and leaves them CLAIMED for the reaper — but the attempt
+# is already burned, because attempts increments ON CLAIM. Three of those and
+# a perfectly good job is FAILED; since 2026-08-09 a failed VALIDATE also
+# REJECTS the player's snapshot, so the robot is refused for a reason that is
+# not true.
+q "DELETE FROM match_jobs;" >/dev/null
+q "INSERT INTO match_jobs (kind,snapshot_id) VALUES ('VALIDATE','$S1');" >/dev/null
+MX=$(q "INSERT INTO matches (challenger_snapshot_id,defender_snapshot_id,category,seeds) VALUES ('$S1','$S2','LIGHT','{7}') RETURNING id;")
+q "INSERT INTO match_jobs (kind,match_id) VALUES ('FIGHT','$MX');" >/dev/null
+# The VALIDATE was queued FIRST, so an unfiltered claim would take it. A FIGHT
+# worker asking for FIGHT must skip past it rather than claim and drop it.
+K=$("${PSQL[@]}" -v worker="fight-only" -v kind="FIGHT" -f /tmp/claim_kind.sql 2>&1 | grep -E '^[0-9]+\|' | cut -d'|' -f2)
+[ "$K" = "FIGHT" ] && ok "a FIGHT-only worker claims a FIGHT, skipping the older VALIDATE" || no "claimed kind '$K', wanted FIGHT"
+UNTOUCHED=$(q "SELECT attempts FROM match_jobs WHERE kind='VALIDATE';")
+[ "$UNTOUCHED" = "0" ] && ok "...and the VALIDATE it skipped burned NO attempt" || no "the skipped VALIDATE is at attempts=$UNTOUCHED; three of those and a good robot is rejected"
+K2=$("${PSQL[@]}" -v worker="val-only" -v kind="VALIDATE" -f /tmp/claim_kind.sql 2>&1 | grep -E '^[0-9]+\|' | cut -d'|' -f2)
+[ "$K2" = "VALIDATE" ] && ok "a VALIDATE-only worker claims the VALIDATE" || no "claimed kind '$K2', wanted VALIDATE"
+# And the filter must not invent work that is not there.
+q "DELETE FROM match_jobs;" >/dev/null
+q "INSERT INTO match_jobs (kind,snapshot_id) VALUES ('VALIDATE','$S1');" >/dev/null
+NONE=$("${PSQL[@]}" -v worker="fight-only" -v kind="FIGHT" -f /tmp/claim_kind.sql 2>&1 | grep -cE '^[0-9]+\|')
+[ "$NONE" = "0" ] && ok "a FIGHT worker facing only VALIDATE work claims nothing" || no "it claimed $NONE row(s) it cannot run"
+STILL=$(q "SELECT status FROM match_jobs WHERE kind='VALIDATE';")
+[ "$STILL" = "READY" ] && ok "...leaving that VALIDATE READY for a worker that can run it" || no "the VALIDATE is '$STILL', not READY"
+
+# Restore the state section E expects: four claimed FIGHT jobs, worker-1 first.
+q "DELETE FROM match_jobs;" >/dev/null
+for i in 1 2 3 4; do
+  MX=$(q "INSERT INTO matches (challenger_snapshot_id,defender_snapshot_id,category,seeds) VALUES ('$S1','$S2','LIGHT','{$i}') RETURNING id;")
+  q "INSERT INTO match_jobs (kind,match_id) VALUES ('FIGHT','$MX');" >/dev/null
+done
+for w in 1 2 3 4; do "${PSQL[@]}" -v worker="worker-$w" -v kind="FIGHT" -f /tmp/claim_kind.sql >/dev/null 2>&1; done
+
 # A fifth worker against an empty queue must come back empty, not block.
 "${PSQL[@]}" -v worker="worker-5" -f /tmp/claim_run.sql > /tmp/claim_empty.out 2>&1
 EMP=$(grep -cE '^[0-9]+\|' /tmp/claim_empty.out)
@@ -145,7 +185,7 @@ R=$("${PSQL[@]}" -v jid="$JID" -v worker="worker-1" -f /tmp/hb_run.sql 2>&1 | gr
 echo
 echo "== F. visibility timeout and retry exhaustion =="
 mk_runner "$API_SQL/reap_stale_jobs.sql" /tmp/reap_run.sql "EXECUTE st(:stale, :maxatt);"
-mk_runner "$API_SQL/claim_job.sql" /tmp/claim1.sql "EXECUTE st(:'worker');"
+mk_runner "$API_SQL/claim_job.sql" /tmp/claim1.sql "EXECUTE st(:'worker', NULL);"
 q "UPDATE match_jobs SET heartbeat_at = now() - interval '10 minutes' WHERE status='CLAIMED';" >/dev/null
 R=$("${PSQL[@]}" -v stale=300 -v maxatt=3 -f /tmp/reap_run.sql 2>&1)
 NBACK=$(grep -c '|READY|' <<<"$R")
@@ -304,7 +344,7 @@ LE=$(q "SELECT COALESCE(last_error,'') FROM match_jobs WHERE id=$FJ;")
              || no "the job failed with no last_error"
 
 # The whole point: a FAILED job must never be claimed again.
-mk_runner "$API_SQL/claim_job.sql" /tmp/claim_after_fail.sql "EXECUTE st(:'worker');"
+mk_runner "$API_SQL/claim_job.sql" /tmp/claim_after_fail.sql "EXECUTE st(:'worker', NULL);"
 R=$("${PSQL[@]}" -v worker="worker-2" -f /tmp/claim_after_fail.sql 2>&1 | grep -cE '^[0-9]+\|' )
 [ "$R" = "0" ] && ok "…and no worker can claim a FAILED job (the livelock is closed)" \
                || no "a FAILED job was handed back out ($R rows) — still livelocked"

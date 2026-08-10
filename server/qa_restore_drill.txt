@@ -1,5 +1,5 @@
 == taking the backup ==
-PASS  pg_dump wrote a custom-format backup ( 40K)
+PASS  pg_dump wrote a custom-format backup ( 44K)
 
 == restoring into a SEPARATE database ==
 PASS  created rb_restore_drill

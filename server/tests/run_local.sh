@@ -32,9 +32,22 @@ fi
 # The dev database was created today for exactly this and holds nothing worth
 # keeping. Resetting makes the bench repeatable: a job left READY by a failed
 # run would otherwise be the job the next run claims.
+#
+# ⚠ seasons AND ladder_config.current_season must be reset TOGETHER, and this
+# is why. TRUNCATE (via CASCADE) empties `seasons`, but `current_season` lives
+# in ladder_config and is not a truncation target, so it survives. Every
+# api_smoke run rolls the season over and increments it, and the two drift
+# apart until the rollover check fails with "season N already exists" against
+# an EMPTY seasons table — a state neither bench ever creates on purpose.
+#
+# It looks like a broken rollover and it is not: the endpoint refusing a
+# duplicate season is the idempotency guard doing its job. The bench was not
+# repeatable, which is the one thing this block exists to guarantee. Six
+# checks failed this way before anyone noticed the counter was the problem.
 echo "resetting the dev database…"
 PGPASSWORD=rb psql -h localhost -U rb -d rb -qtA \
-  -c "TRUNCATE ledger, match_jobs, matches, snapshots, robots, users, tickets, ratings RESTART IDENTITY CASCADE;" \
+  -c "TRUNCATE ledger, match_jobs, matches, snapshots, robots, users, tickets, ratings, seasons RESTART IDENTITY CASCADE;" \
+  -c "UPDATE ladder_config SET value = '1' WHERE key = 'current_season';" \
   >/dev/null 2>&1 || echo "  (nothing to reset — first run, or the schema is not up yet)"
 
 echo "starting the API (log: qa_api_server.log)…"

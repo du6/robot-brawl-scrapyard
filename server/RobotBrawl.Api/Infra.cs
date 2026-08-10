@@ -300,11 +300,17 @@ public sealed class JobQueue
             r.GetInt32(4), r.GetInt32(5), (int)r.GetInt64(6), r.GetInt32(7));
     }
 
-    public async Task<ClaimedJob?> ClaimAsync(string workerId, CancellationToken ct = default)
+    /// <summary>Claim one job. <paramref name="kind"/> null claims any kind,
+    /// which is the old behaviour; passing 'VALIDATE' or 'FIGHT' lets a
+    /// specialised worker avoid claiming — and thereby burning an attempt on —
+    /// work it cannot do. See claim_job.sql for why that matters.</summary>
+    public async Task<ClaimedJob?> ClaimAsync(string workerId, string? kind = null,
+                                              CancellationToken ct = default)
     {
         await using var c = await _db.OpenAsync(ct);
         await using var cmd = new NpgsqlCommand(_claim, c);
         cmd.Parameters.AddWithValue(workerId);
+        cmd.Parameters.AddWithValue((object?)kind ?? DBNull.Value);
         await using var r = await cmd.ExecuteReaderAsync(ct);
         if (!await r.ReadAsync(ct)) return null;
         return new ClaimedJob(

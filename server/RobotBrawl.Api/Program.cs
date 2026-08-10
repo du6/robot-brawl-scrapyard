@@ -543,7 +543,14 @@ app.MapPost("/v1/worker/jobs/claim", async (HttpContext ctx, JobQueue q, ClaimRe
 {
     if (!WorkerAuthed(ctx)) return Results.Unauthorized();
     if (string.IsNullOrWhiteSpace(req.WorkerId)) return Bad("workerId is required");
-    var job = await q.ClaimAsync(req.WorkerId!);
+    // Optional. A specialised worker passes the one kind it can run so it does
+    // not claim — and burn an attempt on — work it will only put back. Refused
+    // rather than ignored: a typo'd kind that silently claimed everything would
+    // reintroduce exactly the bug this prevents.
+    var kind = string.IsNullOrWhiteSpace(req.Kind) ? null : req.Kind!.Trim().ToUpperInvariant();
+    if (kind != null && kind != "VALIDATE" && kind != "FIGHT")
+        return Bad("kind must be VALIDATE, FIGHT, or omitted");
+    var job = await q.ClaimAsync(req.WorkerId!, kind);
     if (job is null) return Results.NoContent();
 
     // The stored URIs are s3://; a worker fetches over HTTP. Rewriting here
@@ -1811,7 +1818,7 @@ public record RegisterReq(string? Email, string? Password, string? DisplayName);
 public record LoginReq(string? Email, string? Password);
 public record RobotReq(string? Name);
 public record SnapshotReq(Guid RobotId, string? Envelope);
-public record ClaimReq(string? WorkerId);
+public record ClaimReq(string? WorkerId, string? Kind);
 public record ChallengeReq(Guid ChallengerSnapshotId, Guid DefenderSnapshotId);
 public record ReplayReq(string? Replay);
 public record DepositReq(int Amount, string? IdemKey);

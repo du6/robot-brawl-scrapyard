@@ -15,7 +15,7 @@ PASS  a wrong password and an unknown account are indistinguishable (both 401)
 
 == D. robots ==
 PASS  a robot is created
-      robot aa49faa2-01fa-4210-ba78-0e2eb439da76
+      robot 2f174f33-3a11-43db-b224-a9e6c3dd1bf1
 PASS  …but not without a token
 
 == E. snapshot upload stays opaque (§5.2) ==
@@ -30,7 +30,7 @@ PASS  …and a wrong key is refused too
 PASS  a keyed worker claims a job
 PASS  …and the job is the VALIDATE the upload enqueued
 PASS  …pointing at the snapshot just uploaded
-PASS  …and carries a payload location the worker can resolve (file:///tmp/rb-blobs/snapshots/aa49faa2-01fa-4210-ba78-0e2eb439da76/2f3477b99b654d27b63cc2d2caacbac8.json)
+PASS  …and carries a payload location the worker can resolve (file:///tmp/rb-blobs/snapshots/2f174f33-3a11-43db-b224-a9e6c3dd1bf1/451b01245f554067a5b6baf1c4c82d1a.json)
 PASS  …and the payload sha256 rides along, so the worker can verify storage
 PASS  another worker cannot heartbeat a job it does not hold
 PASS  …the holder can
@@ -210,6 +210,11 @@ PASS  a drawn match never paid a purse
 PASS  no wallet is overdrawn
       ledger: 25 rows, net 2940 scrap across 3 wallets
 
+--- W. the claim kind filter ---
+PASS  a nonsense kind is refused, not silently ignored
+PASS  a lowercase kind is accepted and returns that kind
+PASS  omitting kind still claims any job (the old behaviour is intact)
+
 --- M. metrics ---
 PASS  metrics are refused without the worker key
 PASS  metrics are served to a worker
@@ -222,7 +227,7 @@ PASS  metrics carry pendingSnapshots
 PASS  pendingSnapshots agrees with the database
 PASS  failed agrees with the database
 PASS  the rbmetrics log line keeps its shape
-      rbmetrics ready=1 claimed=0 failed=4 done=13 oldest_ready_s=0 oldest_heartbeat_s=0 pending_snapshots=3 oldest_pending_s=3
+      rbmetrics ready=0 claimed=0 failed=4 done=13 oldest_ready_s=0 oldest_heartbeat_s=0 pending_snapshots=3 oldest_pending_s=3
 PASS  …and reports real counts, not a row of zeros
 
 --- P. behind a proxy ---
@@ -230,4 +235,4 @@ PASS  one client can be rate-limited to exhaustion
 PASS  a different client keeps its own bucket
 SKIP  blob URLs are built with the forwarded scheme -- no object store configured (BLOB_S3_BUCKET unset); file:// rows are passed through verbatim
 
-===== passed 185  failed 0  skipped 1 =====
+===== passed 188  failed 0  skipped 1 =====

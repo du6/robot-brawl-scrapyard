@@ -1,5 +1,5 @@
 == resetting fixtures ==
-      users afc4a80d-cecc-424e-a15f-c93ea82d2016 / c76f051d-481c-4c7a-a4e4-bf6b6a93b670 ; robots 6236aeae-3fb0-4876-976e-50299107e4b7 / 287a5a6d-4bc4-4441-95ed-470a3bdc70c3
+      users 2dddb62b-b4c6-4301-a5c1-62f8e575c17c / 8a00f46e-5e26-47d3-8be1-056598ba4fdb ; robots a64606ec-8870-4d96-82ea-34ca569bb6a2 / 34761929-96e9-4e99-9fb4-31492c62b0c9
 
 == A. identity and snapshots ==
 PASS  case-insensitive email is unique (OWEN@example.com is Owen) (ERROR:  duplicate key value violates unique constraint "users_email_lowe)
@@ -31,6 +31,11 @@ PASS  4 concurrent workers each claimed a job
 PASS  no job was claimed twice (4 distinct of 4)
 PASS  queue drained to 0 READY
 PASS  claiming burns exactly one attempt (read 1)
+PASS  a FIGHT-only worker claims a FIGHT, skipping the older VALIDATE
+PASS  ...and the VALIDATE it skipped burned NO attempt
+PASS  a VALIDATE-only worker claims the VALIDATE
+PASS  a FIGHT worker facing only VALIDATE work claims nothing
+PASS  ...leaving that VALIDATE READY for a worker that can run it
 PASS  a worker finding an empty queue returns nothing and does not block
 
 == E. ownership: a worker only touches its own job ==
@@ -72,4 +77,4 @@ PASS  ladder_config carries defense_purse (40)
 PASS  ladder_config carries first_blood_bonus (50)
 PASS  a config key cannot be duplicated (ERROR:  duplicate key value violates unique constraint "ladder_config_pk)
 
-===== passed 48  failed 0 =====
+===== passed 53  failed 0 =====
