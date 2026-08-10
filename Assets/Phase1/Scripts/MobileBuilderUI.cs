@@ -1868,10 +1868,30 @@ public class MobileBuilderUI : MonoBehaviour
         if (vh <= 50f) return;                          // not laid out yet; leave it alone
         int rows = Mathf.Max(1, partGrid.constraintCount);
         float spacing = partGrid.spacing.y;
-        // Floored at 44: three lines of tile text at 8 pt want ~44.6, and the
-        // third line is the free-stock badge R4 added precisely because it was
-        // invisible on the parts you run out of.
-        float cellH = Mathf.Clamp((vh - (rows - 1) * spacing) / rows, 44f, R);
+        // ⚠ THE FLOOR IS R, NOT 44 — and the literal was a UNIT BUG that cost
+        // the touch floor for a day (fixed 2026-08-10).
+        //
+        // R is TouchRow(): a PHYSICAL 44 pt expressed in canvas units,
+        // (44/163)*dpi/sf. The literal 44 is 44 CANVAS UNITS, which on owen's
+        // phone measures 36.9 pt — comfortably under the 44 pt floor every
+        // other control in this dock is held to. Clamping between a
+        // canvas-unit lower bound and a physical upper bound is comparing two
+        // different quantities, and the low bound won.
+        //
+        // Measured: CareerSmoke "build controls clear the 44 pt touch floor
+        // (too small: part_0=36.9pt)". It went green the moment the palette
+        // stopped being allowed to shrink below a finger.
+        //
+        // So the cell never goes under a fingertip, and when the rows do not
+        // fit at that height the VERTICAL SCROLL below absorbs it. That is the
+        // honest trade: this method exists because the sensor rows were
+        // unreachable, and a row you can see but cannot hit accurately is the
+        // same failure wearing a different hat.
+        // R was ALREADY the upper bound, so flooring at R collapses this to a
+        // constant. Written as one, rather than left as a Clamp(x, R, R) that
+        // reads like it still negotiates: the cell is one touch row, always,
+        // and the scroll below is what gives when that does not fit.
+        float cellH = R;
         if (Mathf.Abs(partGrid.cellSize.y - cellH) > 0.5f)
             partGrid.cellSize = new Vector2(partGrid.cellSize.x, cellH);
 

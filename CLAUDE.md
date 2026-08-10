@@ -293,13 +293,17 @@ compose**) · `restore_drill.sh` 10/10 · WorkerBench **47/47** · FuzzBench
 **TestDebugBench 30/30** · **TouchSmoke 29/29** · **HazardBench 23/23** ·
 **EnlistLiveBench 21/21** · **EnlistUiBench 17/17**.
 
-⚠ **CareerSmoke is 127/1, NOT 128/128 — re-measured 2026-08-10 after the tab
-change, and the failure is OLDER than it.** `build controls clear the 44 pt
-touch floor (too small: part_0=36.9pt)`. Control leg: stash everything, fresh
-play session at HEAD, identical failure. It came in with `2dec48f`, the fix
-that made the sensor palette reachable by deriving cell HEIGHT from the
-viewport — nobody re-ran CareerSmoke after it. **The BUILD palette tiles are
-under the touch floor in shipped single player.** Open.
+✅ **The palette touch-floor regression is FIXED, 2026-08-10.** It was a UNIT
+BUG: `FitPaletteRows` floored the cell at `44f` — 44 CANVAS UNITS — while the
+dock's touch floor is a PHYSICAL 44 pt, which is what `TouchRow()` converts to
+(`(44/163)*dpi/sf`). Clamping between a canvas-unit low bound and a physical
+high bound measured 36.9 pt on owen's phone. The cell is now one touch row
+always, and the vertical scroll that method already had absorbs the overflow.
+Found by re-running CareerSmoke after the ARENA tab change; it arrived with
+`2dec48f` and nothing re-ran the bench that covered it.
+**Re-measured after the fix: CareerSmoke 128/128, TouchSmoke 29/29** — the
+latter including "no scroller clips its content across a FIXED axis", the
+invariant that caught the unreachable sensor rows in the first place.
 
 **The stale-green list is gone — every one of them was run.** Two notes:
 `CareerBench` is a BALANCE harness and reports **12 pass, 5 "TUNING NEEDED"**
