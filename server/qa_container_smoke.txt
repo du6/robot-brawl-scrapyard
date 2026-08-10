@@ -1,0 +1,206 @@
+== A. health ==
+PASS  healthz answers, which means the API reached Postgres
+
+== B. registration (§2.3) ==
+PASS  a new account registers
+PASS  …and comes back with a token
+PASS  the same email cannot register twice
+PASS  a 5-character password is refused
+PASS  a new account has exactly one ledger row
+PASS  …and it is the 500-scrap SIGNING_BONUS
+
+== C. login is not an account-enumeration oracle ==
+PASS  the right password logs in
+PASS  a wrong password and an unknown account are indistinguishable (both 401)
+
+== D. robots ==
+PASS  a robot is created
+      robot a52a2e40-7b39-42ec-ac50-bff1e305cfac
+PASS  …but not without a token
+
+== E. snapshot upload stays opaque (§5.2) ==
+PASS  a well-formed snapshot uploads
+PASS  …and lands PENDING, waiting on a worker
+PASS  a payload whose sha256 does not match is refused
+PASS  an unreadable envelope is refused
+
+== F. the worker path is key-gated (§5.5) ==
+PASS  claiming without the worker key is refused
+PASS  …and a wrong key is refused too
+PASS  a keyed worker claims a job
+PASS  …and the job is the VALIDATE the upload enqueued
+PASS  …pointing at the snapshot just uploaded
+PASS  …and carries a payload location the worker can resolve (file:///var/lib/robotbrawl/blobs/snapshots/a52a2e40-7b39-42ec-ac50-bff1e305cfac/66605344ee4042ac9410478043157b37.json)
+PASS  …and the payload sha256 rides along, so the worker can verify storage
+PASS  another worker cannot heartbeat a job it does not hold
+PASS  …the holder can
+
+== G. the worker decides legality, the API records it (§5.2) ==
+PASS  a validate result is accepted
+PASS  the snapshot reads back
+PASS  …now ACTIVE
+PASS  …carrying the worker's mass
+PASS  …and its category
+
+== H. the second upload supersedes the first (§1.2) ==
+PASS  a second snapshot uploads for the same robot
+PASS  validating it does NOT collide with the incumbent
+PASS  the new snapshot is ACTIVE and the old one SUPERSEDED
+
+== I. the privacy boundary (§1.3) ==
+PASS  an anonymous scout can read the scouting card
+PASS  the payload URL is NOT in the response, for anyone
+PASS  the payload itself is not there either
+PASS  …and it is not marked as the scout's own
+PASS  the owner is told why their own upload was rejected
+PASS  a scout cannot read the fail reasons
+PASS  a REJECTED upload left the incumbent ACTIVE
+
+== J. the category contract, pinned from the server side (§5.2) ==
+PASS  a valid category is accepted
+PASS  …and stored verbatim
+PASS  an illegal robot may report no category
+PASS  …and it is stored as SQL NULL, not the empty string
+PASS  the empty-string category is refused cleanly (HTTP 400)
+PASS  …and the job is marked FAILED, so the reaper cannot hand it out again
+PASS  …carrying a last_error a human can act on
+PASS  an unknown category name is refused cleanly (HTTP 400)
+PASS  a legal robot with no category is refused (HTTP 400)
+
+== K. the fight lifecycle, walked end to end (§5.3) ==
+PASS  a defender snapshot is ACTIVE and ready to be challenged
+PASS  a challenge is accepted
+PASS  …priced at the base stake for a same-category fight
+PASS  …and the match is QUEUED
+PASS  …and the stake left the wallet into escrow
+PASS  …recorded as a STAKE row against this match
+PASS  a worker claims the FIGHT job the challenge enqueued
+PASS  …carrying BOTH robots' payload locations, so the fight can be run
+PASS  the worker uploads a replay
+PASS  the worker posts the verdict
+PASS  …the match is COMPLETE
+PASS  …with the verdict recorded
+PASS  …and the replay attached
+PASS  …the winner's wallet is stake-refunded and paid the purse
+PASS  …and the FIGHT job is retired, not left to spin
+PASS  …the winner climbed above the 1200 placement and the loser fell below (1362 vs 1038)
+PASS  …and the winner's deviation tightened from the 350 placement to 290
+PASS  …with the deltas recorded on the match for the fight report
+PASS  the same result cannot be settled twice
+PASS  …and the wallet did not move on the second attempt
+PASS  a robot cannot challenge itself
+PASS  a FEATHER may punch up to a SUPER
+PASS  …at a gap of 4
+PASS  …staking 50 x (1 + gap)
+PASS  …and winning pays 100 x (1 + 0.5 x gap)^2 = 900
+PASS  a punch-up leaves the heavier defender UNRATED, so heavies cannot be farmed
+PASS  …while the challenger IS rated, in the class it reached up into
+PASS  …and the match records that the defender was deliberately not rated
+PASS  a SUPER cannot punch DOWN to a FEATHER
+PASS  a defender win settles
+PASS  …paying the defender the flat 40-scrap defense purse
+PASS  …and the challenger's stake is forfeit, not refunded
+
+== L. defender protection (§2.2) ==
+PASS  the ticket cap is configured
+PASS  a robot out of tickets cannot initiate another challenge
+PASS  …but defending is unlimited and free (they can still be challenged)
+      prior wins by this pair in the window: 4 (taper after 3)
+PASS  a 4th win vs the same opponent is flagged tapered
+PASS  …the stake is still refunded, so the wallet is exactly level
+PASS  …no PURSE row was written for it
+PASS  …and the winner's rating did not move
+PASS  the provisional threshold is configured
+PASS  the defender's daily floor is reported as reached
+PASS  …and the drop is exactly the remaining allowance (70 of 75 already spent today)
+PASS  …the API reports how much of the day's allowance was already gone
+PASS  …and records that this rank was floor-protected
+PASS  a PROVISIONAL defender is not floor-protected
+PASS  …and is reported as provisional, so nobody thinks the floor broke
+PASS  …so it takes its full natural loss, 241 points, past the 75/day floor
+
+== M. the read side: leaderboard, match view, inbox, wallet (§2.1/§5.3) ==
+PASS  the leaderboard is public — no token needed to scout standings
+PASS  …and lists at least one rated robot (2 in FEATHER)
+PASS  …ranked from 1
+PASS  …and ordered by rating, best first (1133.1 >= 1058.9)
+PASS  …flagging a placement-deviation robot as provisional
+PASS  an unknown category is refused rather than returning an empty board
+PASS  a match is publicly viewable, so a scout can watch a fight
+PASS  …showing the verdict
+PASS  …carrying the replay but NO payload url — the program stays private (§1.3)
+PASS  an anonymous scouting card carries no payload url
+PASS  the inbox loads for a signed-in player
+PASS  …and carries this account's matches (7)
+PASS  …stating the outcome from this account's side (WON)
+PASS  …and an inbox is private — no token, no inbox
+PASS  the wallet loads, so a client can show a balance before staking
+PASS  …and its balance equals the sum of the ledger, not a cached column
+PASS  scrap deposits from the wallet to the career save
+PASS  …debiting the wallet by exactly that much
+PASS  …as a NEGATIVE DEPOSIT_TO_CAREER row, which the schema also enforces
+PASS  …and replaying that exact deposit is refused
+PASS  …with the wallet unmoved by the replay
+PASS  …and exactly one row carrying that key, refused by the database
+PASS  a NEGATIVE deposit cannot be used to mint scrap into the wallet
+PASS  …and you cannot deposit scrap you do not have
+PASS  …and a deposit without an idempotency key is refused outright
+
+== O. league night: the ladder moves with nobody watching (§M3) ==
+PASS  a league night is generated for FEATHER
+PASS  …pairing every robot in the field exactly once (2 robots)
+PASS  …every match staked ZERO, because nobody challenged
+PASS  …and each one queued a FIGHT job
+PASS  …and spends no challenge tickets, since no robot initiated it
+PASS  a league-night match settles unattended
+PASS  …without creating a single scrap of currency from nothing
+PASS  …while still moving the ladder, which is the entire point
+
+== P. season rollover (§2.4) ==
+PASS  a season rolls over
+PASS  …into the next season
+PASS  …and the config now points at it
+PASS  …with a seasons row to point at
+PASS  …compressing 1574 halfway toward 1200 -> 1387
+PASS  …and resetting deviation HIGH, so the new season is genuinely open
+PASS  …leaving wallets intact apart from the season payouts
+PASS  …and closing the SAME season twice is refused
+PASS  …so nobody was paid for that season twice
+
+== Q. cosmetics: the economy finally has a sink (§M3) ==
+PASS  the catalogue is public — you can window-shop signed out
+PASS  …and v1 stocks six items
+PASS  …none of which carries a stat, because the table has no column for one
+PASS  a title can be bought
+PASS  …debiting exactly its price
+PASS  …as a NEGATIVE COSMETIC row, which the schema also enforces
+PASS  …and buying it twice is refused
+PASS  …with the wallet unmoved by the second attempt
+PASS  …and one you cannot afford is refused, whatever you happen to hold
+PASS  an owned title equips to your robot
+PASS  …but one you do not own does not
+PASS  …and the title shows on the leaderboard, which is what makes it worth buying
+
+== R. account deletion (§M4, and a store requirement) ==
+PASS  deletion without the confirmation phrase is refused
+PASS  …and with it, the account is deleted
+PASS  …the email is gone
+PASS  …so is the display name
+PASS  …their robots are retired, so nothing of theirs can be fought again
+PASS  …and off the ladder entirely
+PASS  …but the ledger survives, because it is an audit trail
+PASS  …and every match still exists, because each is also somebody else's
+
+== N. ledger conservation, over everything this run just did (§8/M3) ==
+PASS  every CREDIT is a faucet the design doc names
+PASS  every DEBIT is a stake or the one-way career valve
+PASS  no ledger row is worth zero scrap
+PASS  every ledger row that names a match points at a real one
+PASS  no match was staked more than once
+PASS  no refund ever exceeds the stake it returns
+PASS  a challenger who lost never got their stake back
+PASS  a drawn match never paid a purse
+PASS  no wallet is overdrawn
+      ledger: 23 rows, net 2640 scrap across 2 wallets
+
+===== passed 166  failed 0  skipped 0 =====

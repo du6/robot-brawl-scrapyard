@@ -210,7 +210,8 @@ TouchSmoke · HazardBench · SensorProbe · CareerBench.
 | Client ARENA tab (Unity) | 4 of 5 surfaces done; styling unlooked-at |
 | M3 server (league nights, seasons, sinks) | ✅ done 2026-08-09 |
 | M4 fuzz corpus · account deletion | ✅ done 2026-08-09 |
-| Docker image | **BLOCKED — no container runtime on this Mac** |
+| Docker image | ✅ built and benched 2026-08-09 — api_smoke 166/166 in-container |
+| docker compose | **needs `brew install docker-compose`; the db service is unproven** |
 | GCP deploy | **untouched — no Secret Manager entries** |
 | Replays are playable end to end | ✅ done 2026-08-09 — reopened by ReplayFile.Read |
 | Worker image / Docker / GCP | not started |
