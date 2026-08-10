@@ -18,6 +18,7 @@
 
 using System.Security.Claims;
 using System.Text.Json;
+using Microsoft.AspNetCore.HttpOverrides;
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.RateLimiting;
@@ -56,8 +57,26 @@ var tokens = new Tokens(jwtSecret, TimeSpan.FromHours(cfg.GetValue("Jwt:Hours", 
 builder.Services.AddSingleton(db);
 builder.Services.AddSingleton(tokens);
 builder.Services.AddSingleton(new JobQueue(db, sqlDir));
-builder.Services.AddSingleton<IBlobStore>(
-    new FileBlobStore(cfg["Storage:Root"] ?? Environment.GetEnvironmentVariable("BLOB_ROOT") ?? "/var/lib/robotbrawl/blobs"));
+// Object storage when it is configured, the local filesystem otherwise.
+// The fallback is not laziness: run_local.sh and every bench must work with
+// no network and no credentials, and a test suite that needs a cloud account
+// is a test suite that stops being run.
+//
+// ⚠ FileBlobStore ON CLOUD RUN LOSES DATA. That filesystem is ephemeral and
+// per-instance, so with min-instances=0 an uploaded payload vanishes when the
+// service scales down and its VALIDATE job can never be worked - while the
+// upload answers 200 the whole time. If BLOB_S3_BUCKET is unset in a
+// deployment, that deployment is broken in a way nothing will report.
+var s3Bucket = Environment.GetEnvironmentVariable("BLOB_S3_BUCKET");
+var s3Endpoint = Environment.GetEnvironmentVariable("BLOB_S3_ENDPOINT")
+                 ?? "https://storage.googleapis.com";
+var s3Key = Environment.GetEnvironmentVariable("BLOB_S3_KEY");
+var s3Secret = Environment.GetEnvironmentVariable("BLOB_S3_SECRET");
+if (!string.IsNullOrEmpty(s3Bucket) && !string.IsNullOrEmpty(s3Key) && !string.IsNullOrEmpty(s3Secret))
+    builder.Services.AddSingleton<IBlobStore>(new S3BlobStore(s3Endpoint, s3Bucket!, s3Key!, s3Secret!));
+else
+    builder.Services.AddSingleton<IBlobStore>(
+        new FileBlobStore(cfg["Storage:Root"] ?? Environment.GetEnvironmentVariable("BLOB_ROOT") ?? "/var/lib/robotbrawl/blobs"));
 builder.Services.AddHostedService<ReaperService>();
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
@@ -103,6 +122,43 @@ builder.Services.AddRateLimiter(o =>
 });
 
 var app = builder.Build();
+
+// Behind Cloud Run the app speaks plain HTTP to a proxy that terminated TLS,
+// and every request arrives from that proxy's address. Two things break, and
+// BOTH are invisible on a local run where the connection really is the client:
+//
+//   - Request.Scheme is "http", so Fetchable() hands workers an http:// blob
+//     URL. Cloud Run answers that with a 302, and a redirect drops the
+//     X-Worker-Key header. Measured against the live service: 302 on http,
+//     200 on the same URL forced to https.
+//   - RemoteIpAddress is the proxy for EVERY caller, so the 10/min anonymous
+//     auth limiter becomes one global bucket. Ten registrations a minute
+//     across all players, worldwide.
+//
+// ForwardLimit 1 with the known-proxy lists cleared takes the RIGHTMOST entry
+// of each header. That is deliberate and is the spoof-proof choice: Cloud Run
+// APPENDS the real client address to whatever X-Forwarded-For the caller sent,
+// so the rightmost value is the platform's, not the caller's. Reading the
+// leftmost would let anyone forge an IP and evade the limiter entirely.
+//
+// Gated, because trusting these headers with no proxy in front is exactly that
+// forgery hole. K_SERVICE is set by Cloud Run itself; TRUST_PROXY forces it on
+// for any other proxied deployment, and for the smoke test.
+var trustProxy = Environment.GetEnvironmentVariable("TRUST_PROXY") is { Length: > 0 } tp
+    ? tp is not ("0" or "false" or "False")
+    : Environment.GetEnvironmentVariable("K_SERVICE") is { Length: > 0 };
+if (trustProxy)
+{
+    var fwd = new ForwardedHeadersOptions {
+        ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto,
+        ForwardLimit = 1,
+    };
+    fwd.KnownNetworks.Clear();
+    fwd.KnownProxies.Clear();
+    app.UseForwardedHeaders(fwd);
+    app.Logger.LogInformation("Trusting X-Forwarded-For/Proto from the immediate proxy.");
+}
+
 app.UseAuthentication();
 app.UseAuthorization();
 app.UseRateLimiter();
@@ -194,6 +250,23 @@ async Task SaveRating(NpgsqlConnection c, NpgsqlTransaction tx,
     up.Parameters.AddWithValue(v.Rd);
     up.Parameters.AddWithValue(v.Sigma);
     await up.ExecuteNonQueryAsync();
+}
+
+
+// A stored blob URI is not a fetchable URL, and deliberately so: s3:// says
+// where the bytes live, and WHO may read them is decided per request. This
+// turns one into the other, pointing at this service's own /v1/blobs.
+//
+// file:// rows are returned unchanged - they predate object storage and are
+// only reachable on a single-machine deployment anyway, which is exactly
+// where they still work.
+string Fetchable(HttpContext ctx, string? storedUri)
+{
+    if (!BlobUri.IsObjectStore(storedUri)) return storedUri ?? "";
+    var key = BlobUri.KeyOf(storedUri);
+    if (key == null) return storedUri ?? "";
+    var baseUrl = $"{ctx.Request.Scheme}://{ctx.Request.Host}";
+    return $"{baseUrl}/v1/blobs/{key}";
 }
 
 // The five weight classes, mirroring 001_init.sql's CHECK on
@@ -459,7 +532,21 @@ app.MapPost("/v1/worker/jobs/claim", async (HttpContext ctx, JobQueue q, ClaimRe
     if (!WorkerAuthed(ctx)) return Results.Unauthorized();
     if (string.IsNullOrWhiteSpace(req.WorkerId)) return Bad("workerId is required");
     var job = await q.ClaimAsync(req.WorkerId!);
-    return job is null ? Results.NoContent() : Results.Ok(job);
+    if (job is null) return Results.NoContent();
+
+    // The stored URIs are s3://; a worker fetches over HTTP. Rewriting here
+    // rather than at write time means the link is minted for THIS request and
+    // nothing stale is ever persisted. Field names must match ClaimedJob's
+    // exactly — RobotWorker.ParseClaim reads them by name.
+    return Results.Ok(new
+    {
+        id = job.Id, kind = job.Kind, matchId = job.MatchId, snapshotId = job.SnapshotId,
+        attempts = job.Attempts,
+        payloadUrl = Fetchable(ctx, job.PayloadUrl), payloadSha256 = job.PayloadSha256,
+        challengerUrl = Fetchable(ctx, job.ChallengerUrl), challengerSha256 = job.ChallengerSha256,
+        defenderUrl = Fetchable(ctx, job.DefenderUrl), defenderSha256 = job.DefenderSha256,
+        arena = job.Arena, seeds = job.Seeds,
+    });
 }).AllowAnonymous();
 
 app.MapPost("/v1/worker/jobs/{id:long}/heartbeat", async (long id, HttpContext ctx, JobQueue q, ClaimReq req) =>
@@ -1062,7 +1149,7 @@ app.MapGet("/v1/leaderboard/{category?}", async (string? category, int? limit) =
 // A single match, public. M2's acceptance requires that "a third account can
 // scout both and watch the replay but cannot fetch either program payload" —
 // so the replay URL is here for everyone, and the payload URL is nowhere.
-app.MapGet("/v1/matches/{id:guid}", async (Guid id) =>
+app.MapGet("/v1/matches/{id:guid}", async (Guid id, HttpContext ctx) =>
 {
     await using var c = await db.OpenAsync();
     await using var cmd = new NpgsqlCommand(@"
@@ -1086,7 +1173,8 @@ app.MapGet("/v1/matches/{id:guid}", async (Guid id) =>
         category = r.GetString(3),
         gap = r.GetInt32(4),
         arena = r.GetString(5),
-        replayUrls = r.IsDBNull(6) ? Array.Empty<string>() : r.GetFieldValue<string[]>(6),
+        replayUrls = r.IsDBNull(6) ? Array.Empty<string>()
+                   : Array.ConvertAll(r.GetFieldValue<string[]>(6), u => Fetchable(ctx, u)),
         // The fight report §2.2 asks to be shown honestly: tapered, floor
         // reached, defender unrated on a punch-up.
         ratingDeltas = r.IsDBNull(7) ? null : r.GetFieldValue<string>(7),
@@ -1100,7 +1188,7 @@ app.MapGet("/v1/matches/{id:guid}", async (Guid id) =>
 // §5.3 step 4: "Both players' fight inboxes show the result; replay is live."
 // Authenticated, and scoped to matches this account was actually in — an
 // inbox that shows everyone's fights is a feed, not an inbox.
-app.MapGet("/v1/inbox", async (ClaimsPrincipal user, int? limit) =>
+app.MapGet("/v1/inbox", async (ClaimsPrincipal user, HttpContext ctx, int? limit) =>
 {
     var me = UserId(user);
     int take = Math.Clamp(limit ?? 25, 1, 100);
@@ -1141,7 +1229,8 @@ app.MapGet("/v1/inbox", async (ClaimsPrincipal user, int? limit) =>
             myRobot = iChallenged ? r.GetString(10) : r.GetString(11),
             category = r.GetString(3),
             gap = r.GetInt32(4),
-            replayUrls = r.IsDBNull(5) ? Array.Empty<string>() : r.GetFieldValue<string[]>(5),
+            replayUrls = r.IsDBNull(5) ? Array.Empty<string>()
+                       : Array.ConvertAll(r.GetFieldValue<string[]>(5), u => Fetchable(ctx, u)),
             ratingDeltas = r.IsDBNull(6) ? null : r.GetFieldValue<string>(6),
             createdAt = r.GetDateTime(7),
             completedAt = r.IsDBNull(8) ? (DateTime?)null : r.GetDateTime(8),
@@ -1661,6 +1750,47 @@ app.MapDelete("/v1/account", async (ClaimsPrincipal user,
         kept = "ledger rows and match history, now anonymous — the ledger is an audit trail (§2.3) and a match is also the other player's record",
     });
 }).RequireAuthorization().RequireRateLimiting("wallet");
+
+// ================================================================== blobs
+// The read side of object storage. Stored URIs are s3://, which nothing can
+// fetch; this is where the bytes actually come out.
+//
+// §1.3 DECIDES THE AUTHORISATION, and it splits by prefix:
+//
+//   replays/     PUBLIC. M2's acceptance is explicit that "a third account
+//                can scout both and WATCH THE REPLAY" — and it is tested
+//                anonymously, so this cannot require a token.
+//   everything   WORKER KEY. snapshots/ holds robot payloads. "It never
+//   else         leaks a program to anyone but its owner" is the rule the
+//                whole API is shaped around, and the only thing that ever
+//                legitimately reads a payload is a worker.
+//
+// Serving bytes through the API rather than handing out signed URLs is a
+// deliberate §7 rule-4 choice: signed URLs are storage-vendor specific, and
+// this keeps the critical path portable. At prototype traffic the bandwidth
+// is irrelevant; if that stops being true, signed URLs go HERE, behind the
+// same authorisation, and no caller changes.
+app.MapGet("/v1/blobs/{**key}", async (string key, HttpContext ctx, IBlobStore blobs) =>
+{
+    if (string.IsNullOrEmpty(key)) return Results.NotFound();
+    // A key is server-generated, but this one arrives in a URL. Refuse
+    // traversal before it reaches a store that might resolve it.
+    if (key.Contains("..", StringComparison.Ordinal)) return Results.NotFound();
+
+    bool isReplay = key.StartsWith("replays/", StringComparison.Ordinal);
+    if (!isReplay && !WorkerAuthed(ctx)) return Results.Unauthorized();
+
+    var bytes = await blobs.GetAsync(key);
+    if (bytes is null) return Results.NotFound();
+
+    // Replays are immutable once written, so they cache hard. Payloads are
+    // private and must not sit in an intermediary.
+    ctx.Response.Headers.CacheControl = isReplay
+        ? "public, max-age=31536000, immutable"
+        : "no-store";
+    return Results.File(bytes, key.EndsWith(".gz", StringComparison.Ordinal)
+        ? "application/gzip" : "application/octet-stream");
+}).AllowAnonymous();
 
 app.Run();
 

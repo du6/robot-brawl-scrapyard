@@ -1096,6 +1096,40 @@ else
 fi
 
 echo
+echo "== S. the blob read path (§1.3, §5.1) =="
+# Stored blob URIs are not fetchable; /v1/blobs is where bytes come out, and
+# §1.3 splits the authorisation by PREFIX: replays public, payloads not.
+#
+# These run against whichever store is configured. Locally that is
+# FileBlobStore, whose URIs stay file:// and are not served here at all — so
+# the prefix rules are asserted directly, which is what actually needs
+# proving and is true of either store.
+if [ -z "${WKEY:-}" ]; then
+  skip "the blob read path (5 checks)" "no worker key"
+else
+  # A payload must never be readable without the worker key. This is the one
+  # check that would let a scout read somebody's program.
+  S=$(req GET "/v1/blobs/snapshots/whatever/x.json")
+  expect "a payload blob is refused without the worker key" "$S" 401
+  S=$(req GET "/v1/blobs/snapshots/whatever/x.json" "" "X-Worker-Key: wrong-key")
+  expect "…and with a WRONG worker key" "$S" 401
+  # With the right key it gets as far as looking, and 404s because that key
+  # does not exist — which is the correct answer and proves authorisation
+  # passed rather than short-circuited.
+  S=$(req GET "/v1/blobs/snapshots/whatever/x.json" "" "X-Worker-Key: $WKEY")
+  expect "…and with the RIGHT key it looks, and honestly reports nothing there" "$S" 404
+  # Replays are public by §1.3 and M2's acceptance tests it anonymously.
+  S=$(req GET "/v1/blobs/replays/whatever/x.rbr.gz")
+  expect "a replay needs no token at all — a scout may watch any fight" "$S" 404
+  # Traversal, before it reaches a store that might resolve it.
+  S=$(req GET "/v1/blobs/replays/../../etc/passwd")
+  case "$S" in
+    404|400) ok "a traversal key is refused (HTTP $S)" ;;
+    *) no "a traversal key returned HTTP $S — it should never resolve" ;;
+  esac
+fi
+
+echo
 echo "== N. ledger conservation, over everything this run just did (§8/M3) =="
 # M3's acceptance: "every scrap created is accounted to a config'd faucet".
 # This runs LAST on purpose - by now the bench has registered accounts, fought
@@ -1146,6 +1180,71 @@ else
      "$(dbq "SELECT count(*) FROM (SELECT user_id, SUM(delta) b FROM ledger
               GROUP BY user_id) w WHERE b < 0;")" 0
   note "ledger: $(dbq "SELECT count(*) FROM ledger;") rows, net $(dbq "SELECT COALESCE(SUM(delta),0) FROM ledger;") scrap across $(dbq "SELECT count(DISTINCT user_id) FROM ledger;") wallets"
+fi
+
+# --------------------------------------------------------------- section P
+# The proxy headers. THIS SECTION IS LAST ON PURPOSE: it deliberately
+# exhausts an auth rate-limit bucket, and if the partitioning it is testing
+# is broken then the bucket it exhausts is the GLOBAL one. Anything placed
+# after this would fail with 429s that have nothing to do with it.
+#
+# Both defects here were measured against the live Cloud Run service, and
+# neither is reproducible on a local run without the forwarded headers,
+# because there the connection really is the client.
+echo
+echo "--- P. behind a proxy ---"
+if [ "${TRUST_PROXY:-}" = "" ]; then
+  skip "proxy header handling" "server not started with TRUST_PROXY=1"
+else
+  # The rate limiter must bucket by forwarded client, not by the proxy.
+  # Ten per minute is the policy, so eleven from one client must be refused
+  # — and a DIFFERENT client must still be served. That second half is the
+  # whole check: without it this passes even if the limiter is global.
+  A="X-Forwarded-For: 203.0.113.7"
+  B="X-Forwarded-For: 198.51.100.4"
+  PXY="X-Forwarded-Proto: https"
+  saw429=""
+  for i in $(seq 1 12); do
+    c=$(req POST /v1/auth/register \
+        "{\"email\":\"pxy-a-$$-$i@example.com\",\"password\":\"correct-horse-battery\",\"displayName\":\"PxyA$i\"}" \
+        "$A" "$PXY")
+    [ "$c" = "429" ] && { saw429="yes"; break; }
+  done
+  is "one client can be rate-limited to exhaustion" "${saw429:-no}" "yes"
+
+  cB=$(req POST /v1/auth/register \
+       "{\"email\":\"pxy-b-$$@example.com\",\"password\":\"correct-horse-battery\",\"displayName\":\"PxyB\"}" \
+       "$B" "$PXY")
+  if [ "$cB" = "429" ]; then
+    no "a different client keeps its own bucket -- HTTP 429; the limiter is bucketing every caller together, which behind a proxy is one global 10/min budget for the whole world"
+  else
+    expect "a different client keeps its own bucket" "$cB" "200"
+  fi
+
+  # And the scheme. Only observable when blobs are rewritten into absolute
+  # URLs, which needs an object store — file:// rows are returned unchanged.
+  if [ "${BLOB_S3_BUCKET:-}" = "" ]; then
+    skip "blob URLs are built with the forwarded scheme" "no object store configured (BLOB_S3_BUCKET unset); file:// rows are passed through verbatim"
+  else
+    cJ=$(req POST /v1/worker/jobs/claim '{"workerId":"proxy-probe"}' \
+         "X-Worker-Key: $WKEY" "$PXY")
+    if [ "$cJ" != "200" ]; then
+      skip "blob URLs are built with the forwarded scheme" "no job to claim (HTTP $cJ)"
+    else
+      # Whichever job comes back. A VALIDATE carries payloadUrl; a FIGHT
+      # carries the two robots instead, and by this point in the bench the
+      # VALIDATEs are all worked, so FIGHT is the usual case. Checking only
+      # payloadUrl made this skip itself on every run — a check that never
+      # runs is not cover.
+      PU=$(jget payloadUrl); [ -z "$PU" ] && PU=$(jget challengerUrl)
+      [ -z "$PU" ] && PU=$(jget defenderUrl)
+      case "$PU" in
+        https://*) ok "blob URLs are built with the forwarded scheme" ;;
+        http://*)  no "blob URLs are built with the forwarded scheme -- got '$PU'; an http:// URL on an HTTPS-only deployment answers 302, and the redirect drops X-Worker-Key" ;;
+        *)         skip "blob URLs are built with the forwarded scheme" "payloadUrl was not an absolute URL ('$PU')" ;;
+      esac
+    fi
+  fi
 fi
 
 rm -f "$BODY" "$VRC_SNAP_FILE" "$VRC_JOB_FILE"

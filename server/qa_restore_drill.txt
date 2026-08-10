@@ -7,8 +7,8 @@ PASS  pg_restore completed
 
 == is the restored copy the same database? ==
 PASS  every table restored with the same row count (12 tables)
-PASS  the ledger totals the same in both (2940 scrap)
-PASS  …across the same number of wallets (3)
+PASS  the ledger totals the same in both (8440 scrap)
+PASS  …across the same number of wallets (14)
 
 == did the RULES come back, or only the rows? ==
 PASS  ledger_delta_nonzero survived the restore

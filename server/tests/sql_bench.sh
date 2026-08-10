@@ -165,6 +165,35 @@ LIVE=$(q "SELECT count(*) FROM match_jobs WHERE status IN ('READY','CLAIMED');")
 check_ok "a FAILED job does not block re-queueing its match" \
   "INSERT INTO match_jobs (kind,match_id) SELECT 'FIGHT', match_id FROM match_jobs WHERE status='FAILED' LIMIT 1;"
 
+# A dead VALIDATE must not leave its snapshot PENDING forever. Found in
+# production: snapshots whose payload was written to per-instance disk could
+# never be fetched, so their jobs died — and the robots stayed "being
+# checked" with no error and no way to tell them from a busy queue.
+q "DELETE FROM match_jobs;" >/dev/null
+# Two subjects: one still PENDING (must be rejected) and one already ACTIVE
+# (must NOT be — it passed validation; a late-dying job cannot revoke it).
+PEND=$(q "INSERT INTO snapshots (robot_id,storage_url,sha256,client_version,status)
+          SELECT robot_id,'file:///gone/x.json',repeat('a',64),'0.9','PENDING'
+            FROM snapshots WHERE id='$S1' RETURNING id;")
+q "INSERT INTO match_jobs (kind,snapshot_id) VALUES ('VALIDATE','$PEND');" >/dev/null
+q "INSERT INTO match_jobs (kind,snapshot_id) VALUES ('VALIDATE','$S2');"   >/dev/null
+for round in 1 2 3; do
+  "${PSQL[@]}" -v worker="reap-w" -f /tmp/claim1.sql >/dev/null 2>&1
+  "${PSQL[@]}" -v worker="reap-w2" -f /tmp/claim1.sql >/dev/null 2>&1
+  q "UPDATE match_jobs SET heartbeat_at = now() - interval '10 minutes' WHERE status='CLAIMED';" >/dev/null
+  "${PSQL[@]}" -v stale=300 -v maxatt=3 -f /tmp/reap_run.sql >/dev/null 2>&1
+done
+ST=$(q "SELECT status FROM snapshots WHERE id='$PEND';")
+[ "$ST" = "REJECTED" ] && ok "a snapshot whose validation died is REJECTED, not left PENDING" \
+                       || no "snapshot is '$ST' -- a robot nobody can validate would sit PENDING forever"
+FR=$(q "SELECT COALESCE(array_length(fail_reasons,1),0) FROM snapshots WHERE id='$PEND';")
+[ "$FR" != "0" ] && ok "…and it carries a reason the player can be shown" \
+                 || no "fail_reasons is empty; the rejection is unexplained"
+note "reason: $(q "SELECT fail_reasons[1] FROM snapshots WHERE id='$PEND';")"
+ST2=$(q "SELECT status FROM snapshots WHERE id='$S2';")
+[ "$ST2" = "ACTIVE" ] && ok "…while an already-ACTIVE snapshot is left alone" \
+                      || no "an ACTIVE snapshot was moved to '$ST2' by a dying job"
+
 echo
 echo "== G. escrow is one transaction (§5.3 step 1) =="
 q "DELETE FROM match_jobs; " >/dev/null

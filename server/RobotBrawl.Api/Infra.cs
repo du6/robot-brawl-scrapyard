@@ -160,6 +160,89 @@ public sealed class FileBlobStore : IBlobStore
     }
 }
 
+/// <summary>Object storage over the S3 API — which is GCS, S3, R2 or a local
+/// Minio without a line changing. §7 rule 3 asks for exactly this ("the
+/// S3-compatible interoperability API so the exit door stays open"), and the
+/// interface above was written anticipating it.
+///
+/// WHY THIS EXISTS, 2026-08-09: FileBlobStore was the only implementation and
+/// the API had just gone live on Cloud Run, where the container filesystem is
+/// EPHEMERAL AND PER-INSTANCE. With min-instances=0 an uploaded payload
+/// disappeared the moment the service scaled down and its VALIDATE job could
+/// never be worked. The upload answered 200 throughout, which is exactly what
+/// made it dangerous.
+///
+/// Against GCS this needs an HMAC key, because the S3 interop API predates
+/// workload identity. That is a real trade — a long-lived secret instead of
+/// an ambient one — accepted because §7 rule 3 puts portability first and the
+/// key lives in Secret Manager with everything else.</summary>
+public sealed class S3BlobStore : IBlobStore
+{
+    readonly Amazon.S3.IAmazonS3 _s3;
+    readonly string _bucket;
+
+    public S3BlobStore(string endpoint, string bucket, string accessKey, string secretKey)
+    {
+        _bucket = bucket;
+        _s3 = new Amazon.S3.AmazonS3Client(accessKey, secretKey, new Amazon.S3.AmazonS3Config
+        {
+            ServiceURL = endpoint,
+            ForcePathStyle = true,   // GCS interop is path-style only; S3 tolerates it
+        });
+    }
+
+    /// <summary>Returns an s3:// URI, NOT a fetchable URL. What a caller may
+    /// fetch is decided at READ time by whoever is asking — see /v1/blobs.
+    /// Storing a fetchable URL is how expired links end up baked into
+    /// database rows.</summary>
+    public async Task<string> PutAsync(string key, byte[] bytes, CancellationToken ct = default)
+    {
+        using var ms = new MemoryStream(bytes);
+        await _s3.PutObjectAsync(new Amazon.S3.Model.PutObjectRequest
+        {
+            BucketName = _bucket,
+            Key = key,
+            InputStream = ms,
+            // Without this the SDK streams with a chunked signature GCS
+            // rejects, and the failure is a 501 that explains nothing.
+            UseChunkEncoding = false,
+        }, ct);
+        return $"s3://{_bucket}/{key}";
+    }
+
+    public async Task<byte[]?> GetAsync(string key, CancellationToken ct = default)
+    {
+        try
+        {
+            using var r = await _s3.GetObjectAsync(_bucket, key, ct);
+            using var ms = new MemoryStream();
+            await r.ResponseStream.CopyToAsync(ms, ct);
+            return ms.ToArray();
+        }
+        catch (Amazon.S3.AmazonS3Exception e) when (e.StatusCode == System.Net.HttpStatusCode.NotFound)
+        {
+            return null;   // a missing blob is an answer, not an exception
+        }
+    }
+}
+
+/// <summary>Turns a stored blob URI back into the key its store understands.
+/// Both forms exist in the wild: file:// rows written before object storage,
+/// s3:// after. A reader has to cope with both.</summary>
+public static class BlobUri
+{
+    public static bool IsObjectStore(string? uri) =>
+        uri != null && uri.StartsWith("s3://", StringComparison.Ordinal);
+
+    public static string? KeyOf(string? uri)
+    {
+        if (!IsObjectStore(uri)) return null;
+        var rest = uri!.Substring(5);
+        int slash = rest.IndexOf('/');
+        return slash < 0 ? null : rest.Substring(slash + 1);
+    }
+}
+
 // ------------------------------------------------------------------ queue
 /// <summary>What a worker is handed when it claims a job. The last eight
 /// fields were added 2026-08-09: without them a worker received a snapshot

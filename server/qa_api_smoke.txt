@@ -15,7 +15,7 @@ PASS  a wrong password and an unknown account are indistinguishable (both 401)
 
 == D. robots ==
 PASS  a robot is created
-      robot 96a63d3d-d0dd-466f-b8bd-735673783aee
+      robot c2800a95-8be7-4086-89bd-af4dbe335cbb
 PASS  …but not without a token
 
 == E. snapshot upload stays opaque (§5.2) ==
@@ -30,7 +30,7 @@ PASS  …and a wrong key is refused too
 PASS  a keyed worker claims a job
 PASS  …and the job is the VALIDATE the upload enqueued
 PASS  …pointing at the snapshot just uploaded
-PASS  …and carries a payload location the worker can resolve (file:///tmp/rb-blobs/snapshots/96a63d3d-d0dd-466f-b8bd-735673783aee/fa38145b89b341df8ffe48d598a294ca.json)
+PASS  …and carries a payload location the worker can resolve (file:///tmp/rb-blobs/snapshots/c2800a95-8be7-4086-89bd-af4dbe335cbb/58a1bb276a3b4d42806ce03be44f5457.json)
 PASS  …and the payload sha256 rides along, so the worker can verify storage
 PASS  another worker cannot heartbeat a job it does not hold
 PASS  …the holder can
@@ -191,6 +191,13 @@ PASS  …and off the ladder entirely
 PASS  …but the ledger survives, because it is an audit trail
 PASS  …and every match still exists, because each is also somebody else's
 
+== S. the blob read path (§1.3, §5.1) ==
+PASS  a payload blob is refused without the worker key
+PASS  …and with a WRONG worker key
+PASS  …and with the RIGHT key it looks, and honestly reports nothing there
+PASS  a replay needs no token at all — a scout may watch any fight
+PASS  a traversal key is refused (HTTP 404)
+
 == N. ledger conservation, over everything this run just did (§8/M3) ==
 PASS  every CREDIT is a faucet the design doc names
 PASS  every DEBIT is a stake or the one-way career valve
@@ -203,4 +210,9 @@ PASS  a drawn match never paid a purse
 PASS  no wallet is overdrawn
       ledger: 25 rows, net 2940 scrap across 3 wallets
 
-===== passed 166  failed 0  skipped 0 =====
+--- P. behind a proxy ---
+PASS  one client can be rate-limited to exhaustion
+PASS  a different client keeps its own bucket
+SKIP  blob URLs are built with the forwarded scheme -- no object store configured (BLOB_S3_BUCKET unset); file:// rows are passed through verbatim
+
+===== passed 173  failed 0  skipped 1 =====

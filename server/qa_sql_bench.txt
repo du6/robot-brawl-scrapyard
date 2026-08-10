@@ -1,5 +1,5 @@
 == resetting fixtures ==
-      users 1eccc572-397e-4de8-be32-8d110ac7e21f / 38c8181b-e816-428a-a6be-d72dc7ab5ff3 ; robots 488c8672-4a5a-4a4a-a538-61a5abb082b5 / d99e333c-2e30-4bad-bde8-98e328600810
+      users ee542ef0-b45c-4ba8-a4db-2dc2596b5acd / 74c0a014-65d9-4835-aafe-908df545a8a6 ; robots 85edde83-6de7-4dcc-adfe-b9eb232d3f3e / ff056ddb-3e36-4106-a1c2-19ae971db1ee
 
 == A. identity and snapshots ==
 PASS  case-insensitive email is unique (OWEN@example.com is Owen) (ERROR:  duplicate key value violates unique constraint "users_email_lowe)
@@ -44,6 +44,10 @@ PASS  after 3 attempts the jobs FAIL rather than retry forever
       last_error: heartbeat timeout after 3 attempt(s)
 PASS  nothing is left live after exhaustion
 PASS  a FAILED job does not block re-queueing its match
+PASS  a snapshot whose validation died is REJECTED, not left PENDING
+PASS  …and it carries a reason the player can be shown
+      reason: validation gave up after 3 attempt(s); the worker never reported a result
+PASS  …while an already-ACTIVE snapshot is left alone
 
 == G. escrow is one transaction (§5.3 step 1) ==
 PASS  an illegal match rolls the stake back with it (balance stayed 300)
@@ -68,4 +72,4 @@ PASS  ladder_config carries defense_purse (40)
 PASS  ladder_config carries first_blood_bonus (50)
 PASS  a config key cannot be duplicated (ERROR:  duplicate key value violates unique constraint "ladder_config_pk)
 
-===== passed 45  failed 0 =====
+===== passed 48  failed 0 =====

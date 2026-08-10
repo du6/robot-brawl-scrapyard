@@ -43,6 +43,7 @@ echo "starting the API (log: qa_api_server.log)…"
   JWT_SECRET="dev-only-change-me-0123456789abcdef" \
   WORKER_KEY="dev-only-worker-key" \
   BLOB_ROOT="/tmp/rb-blobs" \
+  TRUST_PROXY="1" \
   dotnet run ) > "$SRV" 2>&1 &
 API_PID=$!
 trap 'kill $API_PID 2>/dev/null' EXIT INT TERM
