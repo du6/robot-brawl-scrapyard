@@ -110,3 +110,47 @@ CareerSmoke 128/128 · TouchSmoke 29/29, each alone in a fresh play session.
 Career save 18614d0e, mtime 1786354063 UNCHANGED.
 
 STILL IMGUI:  3. inbox + replay launcher   4. enlist panel   5. sign-in
+
+---------------------------------------------------------------------------
+SURFACE 3: MY FIGHTS and the replay launcher — 2026-08-10
+
+docs/shots/14_arena_inbox.png — signed in as an account that has actually
+fought, because a fresh account's inbox is empty BY DEFINITION and a
+screenshot of the empty state proves only the empty state:
+  THE BOARD | MY FIGHTS      ← the list switch, MY FIGHTS lit
+  1 fight(s)
+  BenchBot-B-142943-2220 vs BenchBot-A-142943-2220
+  DRAW · FEATHER                                            [ WATCH ]
+docs/shots/13_arena_inbox_signed_out.png — "sign in to see your fights."
+
+The weight-class filters are HIDDEN here. They mean nothing against your own
+fights, and a filter row that does nothing is worse than one that is absent.
+
+IT DOES NOT PICK THE REPLAY URL. ArenaScreen.Watch takes replayUrls[0] and
+that index is a CONTRACT — FightWorkerLoop uploads the bout recordings first
+and appends the scorecard LAST, precisely so a client can take the first
+without inspecting anything. Re-deriving "the playable one" in the renderer
+would be a second reading of that rule, and the last time nobody had tried to
+PLAY a replay, every URL on every match pointed at a scorecard for a day.
+
+A match with no recording shows "no replay" rather than a dead button. While
+a replay plays the status line carries its progress and the list offers STOP
+REPLAY — Watch attaches the camera, so the player is looking at the arena and
+needs a way back.
+
+⚠ ONE STATUS STRING, FOUR SURFACES — FIXED. The first capture of this list
+opened reading "8 ranked": the BOARD's count, inherited. That is exactly the
+leak docs/ARENA_Judged_2026-08-10.md §2.4 records ("the board's status sits
+above ENLIST A ROBOT"), reproduced in the port within an hour of my having
+written it down. `status` now carries a SCOPE (BOARD/CARD/INBOX/ACCOUNT) set
+at every write site, and a surface shows the line only if it WROTE it —
+otherwise it says its own thing ("1 fight(s)"). Both renderers use it.
+
+MEASURED:
+  ChallengeGateBench  18/18  (pure)
+  CategoryBench       44/44  (pure)
+  CareerSmoke        128/128 alone, fresh play session
+  TouchSmoke          29/29  alone, fresh play session
+Career save 18614d0e, mtime 1786354063 UNCHANGED.
+
+STILL IMGUI:  4. enlist panel   5. sign-in

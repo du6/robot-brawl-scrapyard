@@ -124,6 +124,12 @@ public class MobileBuilderUI : MonoBehaviour
     GameObject arenaCardRoot;
     Transform arenaCardContent;
     string arenaCardStamp = "";
+    // Surface 3: MY FIGHTS and the replay launcher.
+    GameObject arenaInboxRoot, arenaCatRow;
+    Transform arenaInboxContent;
+    Button arenaSecBoard, arenaSecInbox;
+    LayoutElement arenaSecLE;
+    string arenaInboxStamp = "";
     // ---- P3a: the Program Bench canvas (career-only tab, index 5) ----
     GameObject programPanel; ProgramCanvas programCanvas;
     InputField nameInput;
@@ -1797,9 +1803,11 @@ public class MobileBuilderUI : MonoBehaviour
         // the same rule: one touch row, tracked against the scale factor.
         if (shopSecLE != null)
         { shopSecLE.flexibleHeight = 0f; shopSecLE.minHeight = R; shopSecLE.preferredHeight = R; }
-        // Same rule for the ARENA's weight-class filters.
+        // Same rule for the ARENA's weight-class filters and its list switch.
         if (arenaCatLE != null)
         { arenaCatLE.flexibleHeight = 0f; arenaCatLE.minHeight = R; arenaCatLE.preferredHeight = R; }
+        if (arenaSecLE != null)
+        { arenaSecLE.flexibleHeight = 0f; arenaSecLE.minHeight = R; arenaSecLE.preferredHeight = R; }
         if (partScrollRt != null)
         {
             partScrollRt.offsetMin = new Vector2(0f, R + 4f);
@@ -2347,9 +2355,23 @@ public class MobileBuilderUI : MonoBehaviour
         var hle = arenaStatus.gameObject.AddComponent<LayoutElement>();
         hle.minHeight = 20f; hle.preferredHeight = 20f; hle.flexibleHeight = 0f;
 
+        // BOARD or MY FIGHTS. Same shape as the SHOP's shelf switch, because
+        // it is the same idea: one tab, two lists, and the tab bar is full.
+        var secRow = MkPanel("arenasections", arenaPanel.transform, new Color(0f,0f,0f,0f));
+        arenaSecLE = secRow.AddComponent<LayoutElement>();
+        arenaSecLE.flexibleHeight = 0f;
+        arenaSecLE.minHeight = TouchRow(); arenaSecLE.preferredHeight = TouchRow();
+        var sh = secRow.AddComponent<HorizontalLayoutGroup>();
+        sh.spacing = 4f; sh.childForceExpandWidth = true; sh.childForceExpandHeight = true;
+        arenaSecBoard = MkButton("arenasec_board", secRow.transform, "THE BOARD", 14,
+            () => { if (arenaScreen != null) { arenaScreen.ShowInbox = false; arenaScreen.CloseCard(); arenaBoardStamp = -1; } });
+        arenaSecInbox = MkButton("arenasec_inbox", secRow.transform, "MY FIGHTS", 14,
+            () => { if (arenaScreen != null) { arenaScreen.ShowInbox = true; arenaScreen.CloseCard(); arenaInboxStamp = ""; } });
+
         // The weight classes. P4P first — it is the board the tab opens on,
         // and "everyone, pound for pound" is the only view that is never empty.
         var catRow = MkPanel("arenacats", arenaPanel.transform, new Color(0f,0f,0f,0f));
+        arenaCatRow = catRow;
         arenaCatLE = catRow.AddComponent<LayoutElement>();
         arenaCatLE.flexibleHeight = 0f;                 // see the SHOP switch: -1 eats the dock
         arenaCatLE.minHeight = TouchRow(); arenaCatLE.preferredHeight = TouchRow();
@@ -2410,6 +2432,130 @@ public class MobileBuilderUI : MonoBehaviour
         AddListOverflow(cScrollGO, cScroll, cVpRt);
         arenaCardContent = cContent.transform;
         arenaCardRoot.SetActive(false);
+
+        // ---- MY FIGHTS, surface 3 --------------------------------------
+        arenaInboxRoot = MkPanel("arenainboxroot", arenaPanel.transform, new Color(0f,0f,0f,0f));
+        var irle = arenaInboxRoot.AddComponent<LayoutElement>(); irle.flexibleHeight = 1f; irle.minHeight = 96f;
+        var irv = arenaInboxRoot.AddComponent<VerticalLayoutGroup>();
+        irv.childForceExpandWidth = true; irv.childForceExpandHeight = true;
+
+        var iScrollGO = MkPanel("arenainboxscroll", arenaInboxRoot.transform, new Color(0f,0f,0f,0f));
+        var iScroll = iScrollGO.AddComponent<ScrollRect>(); iScroll.horizontal = false; iScroll.vertical = true;
+        var iVp = MkPanel("arenainboxviewport", iScrollGO.transform, new Color(0f,0f,0f,0.15f));
+        var iVpRt = iVp.GetComponent<RectTransform>(); Stretch(iVpRt);
+        iVp.AddComponent<Mask>().showMaskGraphic = true;
+        var iContent = MkPanel("arenainboxcontent", iVp.transform, new Color(0f,0f,0f,0f));
+        var iCrt = iContent.GetComponent<RectTransform>();
+        iCrt.anchorMin = new Vector2(0f,1f); iCrt.anchorMax = new Vector2(1f,1f);
+        iCrt.pivot = new Vector2(0.5f,1f); iCrt.anchoredPosition = Vector2.zero;
+        iCrt.sizeDelta = new Vector2(0f, 0f);
+        var iClg = iContent.AddComponent<VerticalLayoutGroup>();
+        iClg.spacing = 3f; iClg.childForceExpandWidth = true; iClg.childForceExpandHeight = false;
+        iClg.padding = new RectOffset(4,4,4,4);
+        var iCsf = iContent.AddComponent<ContentSizeFitter>(); iCsf.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+        iScroll.viewport = iVpRt; iScroll.content = iCrt;
+        AddListOverflow(iScrollGO, iScroll, iVpRt);
+        arenaInboxContent = iContent.transform;
+        arenaInboxRoot.SetActive(false);
+    }
+
+    /// <summary>MY FIGHTS, and the launcher that plays one back.
+    ///
+    /// ⚠ IT DOES NOT PICK THE URL. ArenaScreen.Watch takes replayUrls[0], and
+    /// that index is a CONTRACT: FightWorkerLoop uploads the bout recordings
+    /// first and appends the scorecard LAST, precisely so a client can take
+    /// the first without inspecting anything. Re-deriving "the playable one"
+    /// here would be a second reading of that rule, and the last time nobody
+    /// had tried to PLAY a replay, every URL on every match pointed at a
+    /// scorecard for a day.</summary>
+    void RefreshArenaInbox()
+    {
+        if (arenaScreen == null || arenaInboxContent == null) return;
+
+        var inbox = arenaScreen.Inbox;
+        string stamp = inbox.Count + "|" + arenaScreen.Playing + "|" + LadderClient.SignedIn;
+        for (int i = 0; i < inbox.Count && i < 6; i++) stamp += "|" + inbox[i].matchId + inbox[i].outcome;
+        if (stamp == arenaInboxStamp) return;
+        arenaInboxStamp = stamp;
+
+        for (int i = arenaInboxContent.childCount - 1; i >= 0; i--)
+            Destroy(arenaInboxContent.GetChild(i).gameObject);
+
+        if (arenaScreen.Playing)
+        {
+            var stop = MkButton("arenastopreplay", arenaInboxContent, "STOP REPLAY", 14,
+                                () => { if (arenaScreen != null) { arenaScreen.StopReplay(); arenaInboxStamp = ""; } });
+            var sle2 = stop.gameObject.AddComponent<LayoutElement>();
+            sle2.flexibleHeight = 0f; sle2.minHeight = TouchRow(); sle2.preferredHeight = TouchRow();
+            stop.GetComponent<Image>().color = new Color(0.30f,0.18f,0.18f,1f);
+        }
+
+        if (!LadderClient.SignedIn)
+        {
+            var row = MkPanel("inbox_signedout", arenaInboxContent, new Color(0.13f,0.14f,0.18f,0.9f));
+            var le = row.AddComponent<LayoutElement>(); le.minHeight = 52f; le.preferredHeight = 52f;
+            var t = MkText("lbl", row.transform,
+                "sign in to see your fights.", 14, TextAnchor.MiddleLeft);
+            t.color = new Color(0.80f, 0.86f, 0.96f);
+            Stretch(t.rectTransform);
+            t.rectTransform.offsetMin = new Vector2(10f, 2f); t.rectTransform.offsetMax = new Vector2(-10f, -2f);
+            return;
+        }
+
+        if (inbox.Count == 0)
+        {
+            var row = MkPanel("inbox_empty", arenaInboxContent, new Color(0.13f,0.14f,0.18f,0.9f));
+            var le = row.AddComponent<LayoutElement>(); le.minHeight = 52f; le.preferredHeight = 52f;
+            var t = MkText("lbl", row.transform,
+                "no fights yet — SCOUT someone on the board and challenge them.",
+                14, TextAnchor.MiddleLeft);
+            t.color = new Color(0.78f, 0.82f, 0.90f);
+            Stretch(t.rectTransform);
+            t.rectTransform.offsetMin = new Vector2(10f, 2f); t.rectTransform.offsetMax = new Vector2(-10f, -2f);
+            return;
+        }
+
+        for (int i = 0; i < inbox.Count; i++)
+        {
+            var m = inbox[i];
+            bool win = m.outcome != null && m.outcome.ToUpper().Contains("WIN");
+            bool loss = m.outcome != null && m.outcome.ToUpper().Contains("LOS");
+            var row = MkPanel("inboxrow_" + i, arenaInboxContent,
+                win ? new Color(0.12f,0.18f,0.14f,1f)
+                    : loss ? new Color(0.18f,0.12f,0.12f,1f)
+                           : new Color(0.10f,0.11f,0.14f,1f));
+            var rle = row.AddComponent<LayoutElement>(); rle.minHeight = TouchRow(); rle.preferredHeight = TouchRow();
+            var rh = row.AddComponent<HorizontalLayoutGroup>();
+            rh.spacing = 4f; rh.childForceExpandHeight = true; rh.childForceExpandWidth = false;
+            rh.padding = new RectOffset(8,4,2,2);
+
+            var lbl = MkText("lbl", row.transform,
+                m.myRobot + "  vs  " + m.opponent + "\n"
+                + (string.IsNullOrEmpty(m.outcome) ? m.status : m.outcome)
+                + "  ·  " + m.category + (m.gap > 0 ? "  +" + m.gap : ""),
+                13, TextAnchor.MiddleLeft);
+            lbl.color = win ? new Color(0.76f, 0.94f, 0.80f)
+                      : loss ? new Color(0.96f, 0.80f, 0.78f)
+                             : new Color(0.86f, 0.90f, 0.96f);
+            lbl.gameObject.AddComponent<LayoutElement>().flexibleWidth = 1f;
+
+            if (m.replayUrls.Count > 0)
+            {
+                var mm = m;
+                var wb = MkButton("inboxwatch_" + i, row.transform, "WATCH", 13,
+                                  () => { if (arenaScreen != null) { arenaScreen.WatchNow(mm); arenaInboxStamp = ""; } });
+                wb.gameObject.AddComponent<LayoutElement>().minWidth = 86f;
+                wb.GetComponent<Image>().color = new Color(0.20f,0.45f,0.65f,1f);
+            }
+            else
+            {
+                // A match with no recording is not a broken button — it is a
+                // match whose replay never uploaded. Say which.
+                var no = MkText("norep", row.transform, "no replay", 12, TextAnchor.MiddleCenter);
+                no.color = new Color(0.55f, 0.58f, 0.64f);
+                no.gameObject.AddComponent<LayoutElement>().minWidth = 86f;
+            }
+        }
     }
 
     /// <summary>The scouting card, in UGUI. §1.3: everything on it is public
@@ -2539,25 +2685,66 @@ public class MobileBuilderUI : MonoBehaviour
         // The card REPLACES the board rather than floating over it. One
         // column, one thing at a time; a card that covers the list it came
         // from is how a player loses their place on a phone.
+        // Three views, one column: the CARD wins, then MY FIGHTS, then the
+        // BOARD. The card wins because it is the only one you arrive at by
+        // choosing something, and dropping a player back to a list they did
+        // not ask for is how a screen feels like it fought them.
         bool onCard = arenaScreen.Card != null;
+        bool onInbox = !onCard && arenaScreen.ShowInbox;
+        bool onBoard = !onCard && !onInbox;
+
         if (arenaCardRoot != null && arenaCardRoot.activeSelf != onCard)
-        {
-            arenaCardRoot.SetActive(onCard);
-            arenaCardStamp = "";                 // force a repaint on the way in
-        }
+        { arenaCardRoot.SetActive(onCard); arenaCardStamp = ""; }
+        if (arenaInboxRoot != null && arenaInboxRoot.activeSelf != onInbox)
+        { arenaInboxRoot.SetActive(onInbox); arenaInboxStamp = ""; }
         // Held as a reference, not walked to. content->viewport->scroll is two
         // hops today and would be a silent mis-toggle the moment a wrapper is
         // added; the first version of this line counted three.
-        if (arenaBoardRoot != null && arenaBoardRoot.activeSelf == onCard)
-            arenaBoardRoot.SetActive(!onCard);
+        if (arenaBoardRoot != null && arenaBoardRoot.activeSelf != onBoard)
+            arenaBoardRoot.SetActive(onBoard);
+        // The weight filters belong to the BOARD. They mean nothing against
+        // your own fights or a single card, and a filter row that does nothing
+        // is worse than one that is absent.
+        if (arenaCatRow != null && arenaCatRow.activeSelf != onBoard)
+            arenaCatRow.SetActive(onBoard);
+
+        TintSection(arenaSecBoard, !arenaScreen.ShowInbox);
+        TintSection(arenaSecInbox, arenaScreen.ShowInbox);
+
         if (onCard) { RefreshArenaCard(); return; }
+        if (onInbox)
+        {
+            RefreshArenaInbox();
+            if (arenaStatus != null)
+            {
+                // While a replay plays, the status line carries its progress —
+                // the player is looking at the arena, not this dock.
+                //
+                // ⚠ AND IT ONLY SHOWS A STATUS THIS SURFACE WROTE. The first
+                // version printed ArenaScreen.Status unconditionally and the
+                // fights list opened reading "8 ranked" — the BOARD's count,
+                // inherited. That is the exact leak §2.4 of the ARENA
+                // judgement recorded, reproduced in the port within an hour of
+                // my having written it down.
+                string rl = arenaScreen.ReplayLine;
+                bool ownStatus = arenaScreen.StatusScope == ArenaScreen.SC_INBOX
+                                 && !string.IsNullOrEmpty(arenaScreen.Status);
+                arenaStatus.text = !string.IsNullOrEmpty(rl) ? rl
+                                 : ownStatus ? arenaScreen.Status
+                                 : arenaScreen.Inbox.Count + " fight(s)";
+                arenaStatus.color = new Color(0.80f, 0.88f, 1f);
+            }
+            return;
+        }
 
         if (arenaStatus != null)
         {
-            string s = arenaScreen.Status;
-            arenaStatus.text = string.IsNullOrEmpty(s)
-                ? arenaScreen.CategoryLabel + " · " + arenaScreen.Board.Count + " ranked"
-                : s;
+            // Same rule as the inbox: the board shows only what the BOARD
+            // wrote, and otherwise says its own count.
+            bool ownStatus = arenaScreen.StatusScope == ArenaScreen.SC_BOARD
+                             && !string.IsNullOrEmpty(arenaScreen.Status);
+            arenaStatus.text = ownStatus ? arenaScreen.Status
+                : arenaScreen.CategoryLabel + " · " + arenaScreen.Board.Count + " ranked";
             arenaStatus.color = new Color(0.80f, 0.88f, 1f);
         }
         for (int i = 0; i < arenaCatBtns.Count; i++)

@@ -33,6 +33,12 @@ namespace RobotBrawl.Phase0
         public static bool finished;
         public static int shots;
         public static string LastError = "";
+
+        /// <summary>Sign in as an EXISTING account instead of registering a
+        /// fresh one. A new account has an empty inbox by definition, so the
+        /// populated MY FIGHTS surface — the one worth looking at — can only
+        /// be photographed as somebody who has actually fought.</summary>
+        public static string LoginEmail = "", LoginPassword = "";
         static readonly List<string> log = new List<string>();
 
         public static string Report()
@@ -146,6 +152,29 @@ namespace RobotBrawl.Phase0
                         arena.CloseCard();
                         yield return null;
                     }
+                }
+
+                // ---- MY FIGHTS, surface 3 ------------------------------
+                if (arena != null)
+                {
+                    arena.ShowInbox = true;
+                    yield return new WaitForSeconds(0.6f);
+                    yield return Shot(dir, "13_arena_inbox_signed_out");
+
+                    if (!string.IsNullOrEmpty(LoginEmail))
+                    {
+                        string lerr = null;
+                        yield return LadderClient.Login(LoginEmail, LoginPassword, (who, e) => { lerr = e; });
+                        if (!string.IsNullOrEmpty(lerr)) log.Add("  (login failed: " + lerr + ")");
+                        arena.RefreshNow();
+                        float t3 = 0f;
+                        while (arena.Busy && t3 < 8f) { t3 += Time.deltaTime; yield return null; }
+                        yield return new WaitForSeconds(1.0f);
+                        log.Add("  inbox rows=" + arena.Inbox.Count);
+                        yield return Shot(dir, "14_arena_inbox");
+                    }
+                    arena.ShowInbox = false;
+                    yield return null;
                 }
 
                 ui.TestShowTab(1);

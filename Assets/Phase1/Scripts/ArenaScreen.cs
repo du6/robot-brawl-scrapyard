@@ -34,6 +34,16 @@ namespace RobotBrawl.Phase0
         static readonly string[] Cats = { "", "FEATHER", "LIGHT", "MIDDLE", "HEAVY", "SUPER" };
         int catIndex = 1;
         string status = "";
+        // ⚠ ONE STATUS STRING, FOUR SURFACES — so it carries a SCOPE.
+        // docs/ARENA_Judged_2026-08-10.md §2.4 records the symptom: the
+        // board's "8 ranked" sat above ENLIST A ROBOT, and the fights list
+        // opened reading the board's count. Every surface inherited whatever
+        // the last one said. A renderer now shows the line only on the
+        // surface that WROTE it, and says its own thing otherwise.
+        public const int SC_BOARD = 0, SC_CARD = 1, SC_INBOX = 2, SC_ACCOUNT = 3;
+        int statusScope = SC_BOARD;
+        public int StatusScope { get { return statusScope; } }
+        void Say(string s, int scope) { status = s; statusScope = scope; }
         bool busy;
         List<LadderEntry> board = new List<LadderEntry>();
         List<InboxEntry> inbox = new List<InboxEntry>();
@@ -81,14 +91,14 @@ namespace RobotBrawl.Phase0
 
         IEnumerator DoAuth()
         {
-            busy = true; status = registering ? "creating your account…" : "signing in…";
+            busy = true; Say(registering ? "creating your account…" : "signing in…", SC_ACCOUNT);
             string pw = password;
             password = "";                 // out of the field before the request
             Action<string, string> done = (name, err) =>
             {
-                if (err != null) { status = err; return; }
+                if (err != null) { Say(err, SC_ACCOUNT); return; }
                 who = string.IsNullOrEmpty(name) ? email : name;
-                status = "signed in as " + who;
+                Say("signed in as " + who, SC_ACCOUNT);
             };
             if (registering) yield return LadderClient.Register(email, pw, displayName, done);
             else             yield return LadderClient.Login(email, pw, done);
@@ -98,11 +108,11 @@ namespace RobotBrawl.Phase0
 
         IEnumerator Refresh()
         {
-            busy = true; status = "loading the ladder…";
+            busy = true; Say("loading the ladder…", SC_BOARD);
             yield return LadderClient.Leaderboard(Cats[catIndex], (rows, err) =>
             {
-                if (err != null) { status = "leaderboard: " + err; }
-                else { board = rows; status = rows.Count + " ranked"; }
+                if (err != null) { Say("leaderboard: " + err, SC_BOARD); }
+                else { board = rows; Say(rows.Count + " ranked", SC_BOARD); }
             });
             if (!string.IsNullOrEmpty(LadderClient.Token))
             {
@@ -118,23 +128,23 @@ namespace RobotBrawl.Phase0
         /// last precisely so this can take the first without checking.</summary>
         IEnumerator Watch(InboxEntry m)
         {
-            if (m.replayUrls.Count == 0) { status = "that match has no replay"; yield break; }
-            busy = true; status = "downloading the replay…";
+            if (m.replayUrls.Count == 0) { Say("that match has no replay", SC_INBOX); yield break; }
+            busy = true; Say("downloading the replay…", SC_INBOX);
             string path = null;
             yield return LadderClient.FetchReplay(m.replayUrls[0], (p, err) =>
             {
-                if (err != null) status = "replay: " + err; else path = p;
+                if (err != null) Say("replay: " + err, SC_INBOX); else path = p;
             });
             if (path == null) { busy = false; yield break; }
 
             var bm = FindFirstObjectByType<BuilderManager>();
-            if (bm == null) { status = "no BuilderManager to play into"; busy = false; yield break; }
+            if (bm == null) { Say("no BuilderManager to play into", SC_INBOX); busy = false; yield break; }
             if (player != null) { player.Close(); player = null; }
-            status = "playing " + m.myRobot + " vs " + m.opponent;
+            Say("playing " + m.myRobot + " vs " + m.opponent, SC_INBOX);
             // attachCamera:true — watching a fight you cannot see is not
             // watching it.
             player = ReplayPlayer.Play(bm, path, 1f, true,
-                                       p => { status = "replay finished"; });
+                                       p => { Say("replay finished", SC_INBOX); });
             busy = false;
         }
 
@@ -213,11 +223,11 @@ namespace RobotBrawl.Phase0
         IEnumerator Scout(LadderEntry e)
         {
             if (string.IsNullOrEmpty(e.activeSnapshotId))
-            { status = e.robotName + " has no active snapshot to scout"; yield break; }
-            busy = true; status = "scouting " + e.robotName + "…"; card = null; pending = false;
+            { Say(e.robotName + " has no active snapshot to scout", SC_BOARD); yield break; }
+            busy = true; Say("scouting " + e.robotName + "…", SC_BOARD); card = null; pending = false;
             yield return LadderClient.ScoutCard(e.activeSnapshotId, (c, err) =>
             {
-                if (err != null) status = "scout: " + err; else { card = c; status = ""; }
+                if (err != null) Say("scout: " + err, SC_BOARD); else { card = c; Say("", SC_CARD); }
             });
             busy = false;
         }
@@ -235,14 +245,14 @@ namespace RobotBrawl.Phase0
 
         IEnumerator DoChallenge(MyRobot m, ScoutCard c)
         {
-            busy = true; status = "challenging " + c.robotName + "…";
+            busy = true; Say("challenging " + c.robotName + "…", SC_CARD);
             yield return LadderClient.Challenge(m.activeSnapshotId, c.snapshotId, (matchId, stake, err) =>
             {
                 // The API's own words. It distinguishes punching down, an
                 // empty wallet and a spent daily ticket, and a client that
                 // flattens those into "failed" throws that away.
-                status = err != null ? err
-                       : "challenge accepted — " + stake + " scrap staked, match queued";
+                Say(err != null ? err
+                    : "challenge accepted — " + stake + " scrap staked, match queued", SC_CARD);
                 if (err == null) { pending = false; card = null; }
             });
             yield return LadderClient.Wallet((b, e) => { if (e == null) balance = b; });
@@ -384,6 +394,27 @@ namespace RobotBrawl.Phase0
             var el = EligibleFor(c);
             if (el.Count == 0) return 0;
             return StakeFor(el[Mathf.Clamp(myPick, 0, el.Count - 1)], c);
+        }
+
+        // ---- surface 3: the inbox and the replay launcher -----------------
+        /// <summary>Which list the ARENA is showing. The weight-class filters
+        /// belong to the BOARD only — they mean nothing against your own
+        /// fights, and a filter row that does nothing is worse than absent.</summary>
+        public bool ShowInbox { get { return showInbox; } set { showInbox = value; } }
+
+        /// <summary>A replay is on screen. `Watch` attaches the camera, so
+        /// while this is true the player is looking at the arena, not the
+        /// dock — which is why the launcher must offer a way to stop.</summary>
+        public bool Playing { get { return player != null; } }
+        public void StopReplay() { if (player != null) { player.Close(); player = null; Say("", SC_INBOX); } }
+        public string ReplayLine
+        {
+            get
+            {
+                if (player == null) return "";
+                return string.Format("replay t={0:0.0}s  frames={1}  coverage={2:0.0}%",
+                                     player.time, player.framesApplied, player.Coverage * 100f);
+            }
         }
 
         public bool Pending { get { return pending; } }
