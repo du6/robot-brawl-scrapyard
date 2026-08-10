@@ -15,7 +15,7 @@ PASS  a wrong password and an unknown account are indistinguishable (both 401)
 
 == D. robots ==
 PASS  a robot is created
-      robot 79d95108-dc14-47ad-ae37-98bd9788c003
+      robot 855f4984-a5df-416f-a907-403b75cbb068
 PASS  …but not without a token
 
 == E. snapshot upload stays opaque (§5.2) ==
@@ -30,7 +30,7 @@ PASS  …and a wrong key is refused too
 PASS  a keyed worker claims a job
 PASS  …and the job is the VALIDATE the upload enqueued
 PASS  …pointing at the snapshot just uploaded
-PASS  …and carries a payload location the worker can resolve (file:///tmp/rb-blobs/snapshots/79d95108-dc14-47ad-ae37-98bd9788c003/603a1013689a4316a5466b1e775082fd.json)
+PASS  …and carries a payload location the worker can resolve (file:///tmp/rb-blobs/snapshots/855f4984-a5df-416f-a907-403b75cbb068/bbda68aed9764e629ae849f134fcba9b.json)
 PASS  …and the payload sha256 rides along, so the worker can verify storage
 PASS  another worker cannot heartbeat a job it does not hold
 PASS  …the holder can
@@ -114,4 +114,22 @@ PASS  the defender's daily floor is reported as reached
 PASS  …and the drop is exactly the remaining allowance (70 of 75 already spent today)
 PASS  …the API reports how much of the day's allowance was already gone
 
-===== passed 90  failed 0  skipped 0 =====
+== M. the read side: leaderboard, match view, inbox, wallet (§2.1/§5.3) ==
+PASS  the leaderboard is public — no token needed to scout standings
+PASS  …and lists at least one rated robot (2 in FEATHER)
+PASS  …ranked from 1
+PASS  …and ordered by rating, best first (1295 >= 1160.6)
+PASS  …flagging a placement-deviation robot as provisional
+PASS  an unknown category is refused rather than returning an empty board
+PASS  a match is publicly viewable, so a scout can watch a fight
+PASS  …showing the verdict
+PASS  …carrying the replay but NO payload url — the program stays private (§1.3)
+PASS  an anonymous scouting card carries no payload url
+PASS  the inbox loads for a signed-in player
+PASS  …and carries this account's matches (7)
+PASS  …stating the outcome from this account's side (WON)
+PASS  …and an inbox is private — no token, no inbox
+PASS  the wallet loads, so a client can show a balance before staking
+PASS  …and its balance equals the sum of the ledger, not a cached column
+
+===== passed 106  failed 0  skipped 0 =====

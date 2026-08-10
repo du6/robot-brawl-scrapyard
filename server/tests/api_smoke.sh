@@ -729,6 +729,86 @@ else
   fi
 fi
 
+echo
+echo "== M. the read side: leaderboard, match view, inbox, wallet (§2.1/§5.3) =="
+# 2026-08-09. Everything before this WRITES the ladder. Until now nothing let
+# anyone SEE it: ratings were computed, protected and stored, and no client
+# could ask for them.
+if [ -z "${CHSNAP:-}" ] || [ -z "${AUTH:-}" ]; then
+  skip "the read side (11 checks)" "section K did not leave a rated robot"
+else
+  # ---- leaderboard ----------------------------------------------------
+  S=$(req GET "/v1/leaderboard/$CHCAT")
+  expect "the leaderboard is public — no token needed to scout standings" "$S" 200
+  LBCOUNT=$(jget count)
+  [ -n "$LBCOUNT" ] && [ "$LBCOUNT" -ge 1 ] \
+    && ok "…and lists at least one rated robot ($LBCOUNT in $CHCAT)" \
+    || no "the $CHCAT leaderboard came back empty, but section K rated robots in it"
+  is "…ranked from 1" "$(jget entries.0.rank)" 1
+  # Ranked by rating DESC: entry 1 must not be below entry 2.
+  R1=$(jget entries.0.rating); R2=$(jget entries.1.rating)
+  if [ -z "$R2" ]; then
+    note "only one entry in $CHCAT; ordering not exercised"
+    ok "…with a rating attached ($R1)"
+  elif [ "$(echo "$R1 >= $R2" | bc -l 2>/dev/null || echo 1)" = "1" ]; then
+    ok "…and ordered by rating, best first ($R1 >= $R2)"
+  else
+    no "the leaderboard is out of order: rank 1 is $R1 but rank 2 is $R2"
+  fi
+  # A high-deviation robot is soft, not authoritative. The board must say so.
+  is "…flagging a placement-deviation robot as provisional" \
+     "$(req GET "/v1/leaderboard/$CHCAT" >/dev/null; jget entries.0.provisional)" \
+     "$(dbq "SELECT CASE WHEN deviation > 200 THEN 'True' ELSE 'False' END FROM ratings ra JOIN robots r ON r.id=ra.robot_id JOIN snapshots s ON s.robot_id=r.id WHERE s.id='$CHSNAP' AND ra.category='$CHCAT' LIMIT 1;")"
+  S=$(req GET "/v1/leaderboard/BANTAM")
+  expect "an unknown category is refused rather than returning an empty board" "$S" 400
+
+  # ---- the match view, and M2's authz acceptance ----------------------
+  # "a third account can scout both and watch the replay but cannot fetch
+  # either program payload". The strongest form of that test is ANONYMOUS.
+  if [ -n "${MATCH:-}" ]; then
+    S=$(req GET "/v1/matches/$MATCH")
+    expect "a match is publicly viewable, so a scout can watch a fight" "$S" 200
+    is "…showing the verdict" "$(jget verdict)" CHALLENGER
+    if grep -q 'replayUrls' "$BODY" && ! grep -qi 'payloadUrl\|storage_url\|storageUrl' "$BODY"; then
+      ok "…carrying the replay but NO payload url — the program stays private (§1.3)"
+    else
+      no "the public match view leaked a payload url, or carried no replay at all"
+    fi
+  else
+    skip "the public match view (3 checks)" "no settled match from section K"
+  fi
+  # The scouting card must not leak a payload either, to anyone, ever.
+  S=$(req GET "/v1/snapshots/$CHSNAP")
+  if [ "$S" = "200" ] && ! grep -qi 'payloadUrl\|storageUrl\|"payload"' "$BODY"; then
+    ok "an anonymous scouting card carries no payload url"
+  else
+    no "the anonymous scouting card leaked a payload (HTTP $S)"
+  fi
+
+  # ---- inbox ----------------------------------------------------------
+  S=$(req GET /v1/inbox "" "$AUTH")
+  expect "the inbox loads for a signed-in player" "$S" 200
+  INCOUNT=$(jget count)
+  [ -n "$INCOUNT" ] && [ "$INCOUNT" -ge 1 ] \
+    && ok "…and carries this account's matches ($INCOUNT)" \
+    || no "the inbox is empty for an account that has fought"
+  # The outcome must be stated from THIS account's point of view, not left
+  # for the client to re-derive from a verdict enum.
+  OUT0=$(jget matches.0.outcome)
+  case "$OUT0" in
+    WON|LOST|DRAW|PENDING) ok "…stating the outcome from this account's side ($OUT0)" ;;
+    *) no "the inbox gave an outcome of '$OUT0', which no client can render" ;;
+  esac
+  S=$(req GET /v1/inbox)
+  expect "…and an inbox is private — no token, no inbox" "$S" 401
+
+  # ---- wallet ---------------------------------------------------------
+  S=$(req GET /v1/wallet "" "$AUTH")
+  expect "the wallet loads, so a client can show a balance before staking" "$S" 200
+  is "…and its balance equals the sum of the ledger, not a cached column" \
+     "$(jget balance)" "$(dbq "SELECT COALESCE(SUM(delta),0) FROM ledger WHERE user_id='$USERID';")"
+fi
+
 rm -f "$BODY" "$VRC_SNAP_FILE" "$VRC_JOB_FILE"
 echo
 echo "===== passed $pass  failed $fail  skipped $skipped ====="

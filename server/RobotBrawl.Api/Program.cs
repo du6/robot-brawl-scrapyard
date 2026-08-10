@@ -892,6 +892,186 @@ app.MapPost("/v1/worker/jobs/{id:long}/fight-result",
     return Results.Ok(new { matchId = res.MatchId, status = "COMPLETE", verdict = res.Verdict });
 }).AllowAnonymous();
 
+// ============================================================ the ladder
+// M2's read side. Everything above WRITES the ladder; until now nothing let
+// anyone SEE it — ratings were computed, protected and stored, and no client
+// could ask for them.
+//
+// All three are anonymous by design. §1.3: "design public, code private" —
+// a scout may see standings, cards and replays without an account, and the
+// program payload is not reachable from any of them.
+
+// Leaderboard within a category (§2.1: "ranked within category"). Omit the
+// category for the global pound-for-pound board, which §2.1 marks display
+// only, no mechanics.
+app.MapGet("/v1/leaderboard/{category?}", async (string? category, int? limit) =>
+{
+    if (category != null && Array.IndexOf(Categories, category) < 0)
+        return Bad($"'{category}' is not one of {string.Join(", ", Categories)}");
+    int take = Math.Clamp(limit ?? 50, 1, 200);
+
+    await using var c = await db.OpenAsync();
+    // Rank by rating, but surface deviation too: a 1400 at RD 350 has not
+    // earned the same claim as a 1400 at RD 60, and a board that hides that
+    // is a board that lies about its own confidence.
+    await using var cmd = new NpgsqlCommand(@"
+        SELECT ra.category, ra.rating, ra.deviation, ra.volatility, ra.updated_at,
+               r.id, r.name, u.display_name,
+               (SELECT s.id FROM snapshots s
+                 WHERE s.robot_id = r.id AND s.status = 'ACTIVE' LIMIT 1)
+          FROM ratings ra
+          JOIN robots r ON r.id = ra.robot_id
+          JOIN users  u ON u.id = r.user_id
+         WHERE ($1::text IS NULL OR ra.category = $1)
+         ORDER BY ra.rating DESC, ra.deviation ASC
+         LIMIT $2;", c);
+    cmd.Parameters.AddWithValue((object?)category ?? DBNull.Value);
+    cmd.Parameters.AddWithValue(take);
+
+    var rows = new List<object>();
+    await using var r = await cmd.ExecuteReaderAsync();
+    int rank = 0;
+    while (await r.ReadAsync())
+        rows.Add(new
+        {
+            rank = ++rank,
+            category = r.GetString(0),
+            rating = Math.Round(r.GetDouble(1), 1),
+            deviation = Math.Round(r.GetDouble(2), 1),
+            // A robot that has not fought recently is soft, not wrong. Say so
+            // rather than letting a stale number look authoritative.
+            provisional = r.GetDouble(2) > 200,
+            robotId = r.GetGuid(5),
+            robotName = r.GetString(6),
+            owner = r.GetString(7),
+            activeSnapshotId = r.IsDBNull(8) ? (Guid?)null : r.GetGuid(8),
+            updatedAt = r.GetDateTime(4),
+        });
+    return Results.Ok(new { category = category ?? "ALL", count = rows.Count, entries = rows });
+}).AllowAnonymous();
+
+// A single match, public. M2's acceptance requires that "a third account can
+// scout both and watch the replay but cannot fetch either program payload" —
+// so the replay URL is here for everyone, and the payload URL is nowhere.
+app.MapGet("/v1/matches/{id:guid}", async (Guid id) =>
+{
+    await using var c = await db.OpenAsync();
+    await using var cmd = new NpgsqlCommand(@"
+        SELECT m.id, m.status, m.verdict, m.category, m.gap, m.arena, m.replay_urls,
+               m.rating_deltas, m.created_at, m.completed_at,
+               m.challenger_snapshot_id, m.defender_snapshot_id,
+               rc.name, rd.name, uc.display_name, ud.display_name
+          FROM matches m
+          JOIN snapshots sc ON sc.id = m.challenger_snapshot_id JOIN robots rc ON rc.id = sc.robot_id
+          JOIN snapshots sd ON sd.id = m.defender_snapshot_id   JOIN robots rd ON rd.id = sd.robot_id
+          JOIN users uc ON uc.id = rc.user_id JOIN users ud ON ud.id = rd.user_id
+         WHERE m.id = $1;", c);
+    cmd.Parameters.AddWithValue(id);
+    await using var r = await cmd.ExecuteReaderAsync();
+    if (!await r.ReadAsync()) return Results.NotFound();
+    return Results.Ok(new
+    {
+        id = r.GetGuid(0),
+        status = r.GetString(1),
+        verdict = r.IsDBNull(2) ? null : r.GetString(2),
+        category = r.GetString(3),
+        gap = r.GetInt32(4),
+        arena = r.GetString(5),
+        replayUrls = r.IsDBNull(6) ? Array.Empty<string>() : r.GetFieldValue<string[]>(6),
+        // The fight report §2.2 asks to be shown honestly: tapered, floor
+        // reached, defender unrated on a punch-up.
+        ratingDeltas = r.IsDBNull(7) ? null : r.GetFieldValue<string>(7),
+        challenger = new { snapshotId = r.GetGuid(10), robotName = r.GetString(12), owner = r.GetString(14) },
+        defender   = new { snapshotId = r.GetGuid(11), robotName = r.GetString(13), owner = r.GetString(15) },
+        createdAt = r.GetDateTime(8),
+        completedAt = r.IsDBNull(9) ? (DateTime?)null : r.GetDateTime(9),
+    });
+}).AllowAnonymous();
+
+// §5.3 step 4: "Both players' fight inboxes show the result; replay is live."
+// Authenticated, and scoped to matches this account was actually in — an
+// inbox that shows everyone's fights is a feed, not an inbox.
+app.MapGet("/v1/inbox", async (ClaimsPrincipal user, int? limit) =>
+{
+    var me = UserId(user);
+    int take = Math.Clamp(limit ?? 25, 1, 100);
+    await using var c = await db.OpenAsync();
+    await using var cmd = new NpgsqlCommand(@"
+        SELECT m.id, m.status, m.verdict, m.category, m.gap, m.replay_urls, m.rating_deltas,
+               m.created_at, m.completed_at,
+               rc.user_id = $1 AS i_challenged,
+               rc.name, rd.name
+          FROM matches m
+          JOIN snapshots sc ON sc.id = m.challenger_snapshot_id JOIN robots rc ON rc.id = sc.robot_id
+          JOIN snapshots sd ON sd.id = m.defender_snapshot_id   JOIN robots rd ON rd.id = sd.robot_id
+         WHERE rc.user_id = $1 OR rd.user_id = $1
+         ORDER BY COALESCE(m.completed_at, m.created_at) DESC
+         LIMIT $2;", c);
+    cmd.Parameters.AddWithValue(me);
+    cmd.Parameters.AddWithValue(take);
+
+    var rows = new List<object>();
+    await using var r = await cmd.ExecuteReaderAsync();
+    while (await r.ReadAsync())
+    {
+        bool iChallenged = r.GetBoolean(9);
+        string? verdict = r.IsDBNull(2) ? null : r.GetString(2);
+        // Say who won from THIS account's point of view. Making every client
+        // re-derive "was I the challenger" from a verdict enum is how two
+        // clients end up disagreeing about who won.
+        string outcome = verdict is null ? "PENDING"
+            : verdict == "DRAW" ? "DRAW"
+            : (verdict == "CHALLENGER") == iChallenged ? "WON" : "LOST";
+        rows.Add(new
+        {
+            matchId = r.GetGuid(0),
+            status = r.GetString(1),
+            outcome,
+            role = iChallenged ? "CHALLENGER" : "DEFENDER",
+            opponent = iChallenged ? r.GetString(11) : r.GetString(10),
+            myRobot = iChallenged ? r.GetString(10) : r.GetString(11),
+            category = r.GetString(3),
+            gap = r.GetInt32(4),
+            replayUrls = r.IsDBNull(5) ? Array.Empty<string>() : r.GetFieldValue<string[]>(5),
+            ratingDeltas = r.IsDBNull(6) ? null : r.GetFieldValue<string>(6),
+            createdAt = r.GetDateTime(7),
+            completedAt = r.IsDBNull(8) ? (DateTime?)null : r.GetDateTime(8),
+        });
+    }
+    return Results.Ok(new { count = rows.Count, matches = rows });
+}).RequireAuthorization();
+
+// The wallet, so a client can show a balance before a stake confirm (§2.3:
+// the balance IS the sum of the ledger; there is no cached column).
+app.MapGet("/v1/wallet", async (ClaimsPrincipal user) =>
+{
+    var me = UserId(user);
+    await using var c = await db.OpenAsync();
+    long balance;
+    await using (var bal = new NpgsqlCommand(
+        "SELECT COALESCE(SUM(delta),0) FROM ledger WHERE user_id = $1;", c))
+    {
+        bal.Parameters.AddWithValue(me);
+        balance = Convert.ToInt64(await bal.ExecuteScalarAsync());
+    }
+    var rows = new List<object>();
+    await using (var led = new NpgsqlCommand(
+        "SELECT delta, reason, match_id, created_at FROM ledger WHERE user_id=$1 ORDER BY id DESC LIMIT 50;", c))
+    {
+        led.Parameters.AddWithValue(me);
+        await using var r = await led.ExecuteReaderAsync();
+        while (await r.ReadAsync())
+            rows.Add(new
+            {
+                delta = r.GetInt32(0),
+                reason = r.GetString(1),
+                matchId = r.IsDBNull(2) ? (Guid?)null : r.GetGuid(2),
+                at = r.GetDateTime(3),
+            });
+    }
+    return Results.Ok(new { balance, recent = rows });
+}).RequireAuthorization();
+
 app.Run();
 
 // ------------------------------------------------------------------ dtos

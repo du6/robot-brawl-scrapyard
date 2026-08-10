@@ -206,7 +206,8 @@ TouchSmoke · HazardBench · SensorProbe · CareerBench.
 | FIGHT worker loop (client) | ✅ done 2026-08-09 — 26 pure + 19 play-mode |
 | Glicko-2 rating deltas | ✅ done 2026-08-09 — verified against Glickman's paper |
 | §2.2 tickets / defense floor / repeat taper | ✅ done 2026-08-09 |
-| Leaderboard endpoint | **absent — nothing serves the ratings** |
+| Leaderboard / match view / inbox / wallet | ✅ done 2026-08-09 |
+| Client ARENA tab (Unity) | **absent — the server side of M2 is complete** |
 | Worker image / Docker / GCP | not started |
 | Client login + ENLIST UI | not started — zero `UnityWebRequest` in the client |
 
