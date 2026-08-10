@@ -1,0 +1,26 @@
+== F. refusals, which cost no fight ==
+PASS  a fetch failure still POSTS, so the job is retired not stranded
+PASS  …as a DRAW, so the escrow returns to the challenger
+PASS  …and no replay was uploaded for a fight that never happened
+PASS  a challenger blob altered at its key is refused, and the job retired
+PASS  …naming the challenger as the bad side
+PASS  …without spending a fight on it
+PASS  a DEFENDER blob altered at its key is refused too
+== G. a job that is not ours ==
+PASS  a VALIDATE job is NOT posted to fight-result
+PASS  …and not fought
+      a validate job left alone is claimed-and-dropped; the reaper returns it (§5.3)
+== H. an empty queue ==
+PASS  an empty queue is not an error and posts nothing
+== I. one real fight, all the way through ==
+PASS  the loop completes a real match and posts exactly once
+PASS  …having uploaded the replay first
+PASS  …with a verdict the API's CHECK accepts (DRAW)
+PASS  …carrying the replay url the upload returned
+PASS  the replay doc is versioned
+PASS  …and carries the bouts
+== J. owner state ==
+PASS  the career object was never swapped
+PASS  …and autosave was left as it was found
+PASS  the bay is still owen's after every path
+ RESULT: 19 pass, 0 fail - ALL GREEN
