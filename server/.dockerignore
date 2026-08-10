@@ -1,0 +1,37 @@
+# ===========================================================================
+# Robot Brawl API — build context exclusions.
+#
+# ⚠ THIS IS NOT A SPEED OPTIMISATION. Without it the image build is likely to
+# FAIL, and the reason is not obvious from the Dockerfile.
+#
+# The Dockerfile restores inside the container first (for layer caching), then
+# does `COPY RobotBrawl.Api/ RobotBrawl.Api/`. With no exclusions that COPY
+# drags the HOST's obj/ over the container's freshly restored one — and the
+# host's obj/project.assets.json is full of absolute macOS paths:
+#
+#     /Users/leondu/.nuget/packages/
+#     /Users/leondu/Setup Guide In-Editor Tutorial/server/RobotBrawl.Api/...
+#
+# Six of them. Inside a Linux container none of those exist, so the publish
+# that follows either fails outright or builds against stale host artifacts.
+# Copying host bin/ over the container's output has the same shape of problem.
+#
+# Found by inspection rather than by building, because no container runtime is
+# installed on this machine — see docs. The image build itself remains
+# UNPROVEN; this removes one known reason it would not work.
+# ===========================================================================
+
+# Build output — regenerated inside the container, never copied in.
+**/bin/
+**/obj/
+
+# Test artifacts and their build output. The API image has no use for the
+# bench suite, and glicko_check is a second csproj that would confuse a
+# directory-wide restore.
+tests/
+qa_*.txt
+qa_*.log
+
+# Local state that must never enter an image.
+*.local
+.env
