@@ -1,0 +1,55 @@
+EnlistLiveBench — 2026-08-10
+RobotBrawl.Phase0.EnlistLiveBench.Run()   (play mode, local API on :5000)
+
+Covers the two things nothing else did: the ENLIST path, which did not exist
+in the game at all, and the worker's REAL HTTP transport, which had only ever
+been proven by hand with curl.
+
+      server: http://localhost:5000
+PASS  the API answers
+== A. enlist ==
+PASS  an account can be created from inside the game
+PASS  a robot can be ENLISTED from inside the game
+PASS  the enlisted robot comes back from GET /v1/robots
+PASS  …and it is NOT fightable yet — no worker has judged it
+PASS  re-enlisting the same name reuses the robot rather than starting a second rating
+== B. a real worker validates it over HTTP ==
+PASS  the worker posted a validate result over the real HTTP transport
+PASS  the enlisted robot is now ACTIVE and fightable
+PASS  …and the worker gave it a weight category (FEATHER)
+PASS  a STRANGER can see it on the board — the cold-start placement rating exists
+== C. challenge and fight ==
+PASS  a second account can be created
+PASS  the second player enlists
+PASS  the second robot is validated too
+PASS  a challenge can be issued from inside the game
+      match d16b1fe3-62ea-4ca7-80b1-5001fcbc2ff6 for 50 scrap
+PASS  the fight worker posted a verdict over the real HTTP transport
+PASS  the worker reached THIS bench's match
+PASS  a real best-of-3 ran to completion
+PASS  the verdict is one the API's CHECK constraint accepts (DRAW)
+PASS  the match appears in the challenger's inbox
+PASS  …with at least one replay URL, so WATCH has something to play
+== D. owner state ==
+PASS  the bay is byte-identical to before the bench
+===== passed 21  failed 0  skipped 0 =====
+
+Career save either side: 18614d0e6603869f28fb65992b7d1484, size 5438,
+mtime 1786354063 UNCHANGED — the file was never written.
+
+THREE REDS ON THE WAY HERE, all of them the bench and none of them the
+product. Recorded because each looked like a product fault first:
+
+ 1. "Needs at least 1 wheel."  The fixture was FightWorkerBench's lone core,
+    which is enough for MatchRunner to construct something and not enough to
+    be a legal robot. The validator was right.
+ 2. "hat 1 (IN RANGE): needs a Compass tracker — SHOP."  Validation checks the
+    PROGRAM against the BUILD. Brawler wants a compass this chassis does not
+    carry; FIRST STEPS is the sensor-free preset and is legal on any legal
+    chassis.
+ 3. "payload is not a readable snapshot."  The fight worker claimed a leftover
+    FIGHT job from an earlier api_smoke run — synthetic payloads by design —
+    refused it rather than fighting a robot it could not read, posted the DRAW
+    that retires it, and this bench's own match sat READY with attempts=0.
+    Every one of those steps is the worker doing its job. The bench now drains
+    to its own match instead of assuming the first claim is its.

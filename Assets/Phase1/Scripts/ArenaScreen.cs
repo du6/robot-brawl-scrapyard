@@ -57,6 +57,12 @@ namespace RobotBrawl.Phase0
         bool registering;
         string who = "";
 
+        // ENLIST — the step that puts a build on the ladder. Everything else
+        // on this screen consumes robots that some earlier step created, and
+        // until 2026-08-10 no such step existed anywhere in the game.
+        bool showEnlist;
+        string enlistName = "";
+
         // The shop (§2.3's scrap sinks) and the one-way deposit valve.
         bool showShop;
         List<Cosmetic> shop = new List<Cosmetic>();
@@ -196,6 +202,66 @@ namespace RobotBrawl.Phase0
             busy = false;
         }
 
+        /// <summary>The SAVED career robot is what gets enlisted, and that is
+        /// deliberate. RobotSnapshot.ExportRaw has said so in its own doc
+        /// comment since M0 — "the path the ARENA tab will use when enlisting
+        /// a career robot" — and it is the honest choice: the ladder fights
+        /// this build for days without the player present, so it must be the
+        /// one they committed to, not whatever half-finished thing is on the
+        /// bench when they happen to open this screen.
+        ///
+        /// The program travels WITH it. `program == ""` means AI-driven to the
+        /// worker, NOT "missing", so a robot enlisted without one is a legal
+        /// snapshot that stands still in the arena and nothing downstream can
+        /// tell that from a choice. It is read from the same saved record as
+        /// the build and never defaulted.</summary>
+        IEnumerator DoEnlist()
+        {
+            if (!Career.active || Career.Data == null)
+            { status = "enlisting sends your SAVED career robot — start a career first"; yield break; }
+            int ari = Career.Data.activeRobot;
+            var ar = (ari >= 0 && ari < Career.Data.stable.Count) ? Career.Data.stable[ari] : null;
+            if (ar == null || string.IsNullOrEmpty(ar.snapshot))
+            { status = "no saved robot — SAVE the build first, then enlist it"; yield break; }
+
+            string name = (enlistName ?? "").Trim();
+            if (name.Length == 0) name = (ar.name ?? "").Trim();
+            if (name.Length == 0) { status = "give your robot a name first"; yield break; }
+
+            busy = true; status = "enlisting " + name + "…";
+
+            SnapshotEnvelope env = null;
+            try { env = RobotSnapshot.ExportRaw(name, ar.snapshot, ar.program); }
+            catch (Exception e) { env = null; status = "export: " + e.Message; }
+            if (env == null) { busy = false; yield break; }
+
+            // Carried to the SUCCESS line rather than set here — a status
+            // written before the upload is overwritten by its result, which
+            // is precisely how a warning that matters goes unread.
+            string note = string.IsNullOrEmpty(ar.program)
+                ? "  ⚠ it has no program, so it will stand still — arm one in the PROGRAM tab and enlist again."
+                : "";
+
+            string snapId = null, err = null;
+            yield return LadderClient.Enlist(name, env, (id, e) => { snapId = id; err = e; });
+
+            if (err != null || string.IsNullOrEmpty(snapId))
+            {
+                status = "enlist: " + (err ?? "the server stored no snapshot");
+                busy = false; yield break;
+            }
+
+            // PENDING, not ranked. A worker decides whether the build is legal
+            // and which weight category it lands in, and that is a separate
+            // trip through the queue — up to one scheduler period in the
+            // cloud. Claiming "you are on the ladder" here would be a lie the
+            // player discovers by finding themselves nowhere on the board.
+            status = name + " uploaded — a match worker checks it is legal and "
+                   + "sets its weight class before it appears on the board." + note;
+            busy = false;
+            yield return Refresh();
+        }
+
         IEnumerator Scout(LadderEntry e)
         {
             if (string.IsNullOrEmpty(e.activeSnapshotId))
@@ -305,6 +371,8 @@ namespace RobotBrawl.Phase0
             GUILayout.BeginHorizontal();
             if (GUILayout.Button(showShop ? "close shop" : "shop") && !busy)
             { showShop = !showShop; if (showShop) StartCoroutine(LoadShop()); }
+            if (LadderClient.SignedIn && GUILayout.Button(showEnlist ? "close enlist" : "enlist"))
+                showEnlist = !showEnlist;
             if (LadderClient.SignedIn && GUILayout.Button("sign out"))
             { LadderClient.Logout(); who = ""; inbox.Clear(); mine.Clear(); balance = -1;
               status = "signed out"; }
@@ -313,6 +381,7 @@ namespace RobotBrawl.Phase0
 
             if (!LadderClient.SignedIn) { DrawSignIn(); GUILayout.EndArea(); GUI.matrix = prev; return; }
             if (showShop) { DrawShop(); GUILayout.EndArea(); GUI.matrix = prev; return; }
+            if (showEnlist) { DrawEnlist(); GUILayout.EndArea(); GUI.matrix = prev; return; }
 
             if (!showInbox) DrawBoard(); else DrawInbox();
             if (card != null) DrawCard();
@@ -376,6 +445,66 @@ namespace RobotBrawl.Phase0
 
         /// <summary>§2.3's sinks and the one-way valve, together — they are the
         /// only two things a player can do with scrap.</summary>
+        /// <summary>The enlist surface. It states what is being sent and what
+        /// happens next, because both were previously unknowable: there was no
+        /// way to enlist at all, and the challenge panel's refusal for a player
+        /// with no robot claimed they were trying to punch down.</summary>
+        void DrawEnlist()
+        {
+            GUILayout.Space(6);
+            GUILayout.Label("<b>ENLIST A ROBOT</b>",
+                            new GUIStyle(GUI.skin.label) { richText = true });
+
+            bool haveCareer = Career.active && Career.Data != null;
+            CareerRobot ar = null;
+            if (haveCareer)
+            {
+                int ari = Career.Data.activeRobot;
+                if (ari >= 0 && ari < Career.Data.stable.Count) ar = Career.Data.stable[ari];
+            }
+
+            if (ar == null || string.IsNullOrEmpty(ar.snapshot))
+            {
+                GUILayout.Label("enlisting sends your SAVED career robot to the ladder,\n"
+                              + "where it fights while you are away.\n\n"
+                              + "there is no saved robot yet — build one and SAVE it,\n"
+                              + "then come back here.");
+                if (GUILayout.Button("close")) showEnlist = false;
+                return;
+            }
+
+            if (string.IsNullOrEmpty(enlistName)) enlistName = ar.name ?? "";
+
+            GUILayout.Label("sending: <b>" + (ar.name ?? "(unnamed)") + "</b>"
+                          + (string.IsNullOrEmpty(ar.program)
+                             ? "  — <color=#c88>no program armed</color>"
+                             : "  — program armed"),
+                            new GUIStyle(GUI.skin.label) { richText = true });
+
+            GUILayout.BeginHorizontal();
+            GUILayout.Label("ladder name", GUILayout.Width(90));
+            enlistName = GUILayout.TextField(enlistName ?? "", 32);
+            GUILayout.EndHorizontal();
+            GUILayout.Label("re-enlisting under a name you already use replaces that\n"
+                          + "robot's build and keeps its rating. a new name starts at\n"
+                          + "placement.");
+
+            GUILayout.Space(4);
+            GUILayout.BeginHorizontal();
+            if (GUILayout.Button("enlist") && !busy) StartCoroutine(DoEnlist());
+            if (GUILayout.Button("close")) showEnlist = false;
+            GUILayout.EndHorizontal();
+
+            if (mine.Count > 0)
+            {
+                GUILayout.Space(6);
+                GUILayout.Label("already on the ladder:");
+                foreach (var m in mine)
+                    GUILayout.Label("  " + m.name
+                        + (m.CanFight ? "  " + m.category : "  waiting to be checked"));
+            }
+        }
+
         void DrawShop()
         {
             GUILayout.Space(4);
@@ -473,7 +602,14 @@ namespace RobotBrawl.Phase0
                         && System.Array.IndexOf(Order, m.category) <= System.Array.IndexOf(Order, card.category))
                         eligible.Add(m);
 
-                if (eligible.Count == 0)
+                if (mine.Count == 0)
+                    // NOT the same refusal, and saying the wrong one is how
+                    // the missing enlist flow stayed invisible: a player with
+                    // no robot at all was told they could not punch down,
+                    // which is the one thing that cannot be their problem.
+                    GUILayout.Label("you have no robot on the ladder yet — "
+                                    + "use ENLIST to send the build on your bench.");
+                else if (eligible.Count == 0)
                     // §1.2: you may punch up, never down. Say which it is
                     // rather than greying a button with no explanation.
                     GUILayout.Label("no robot of yours may fight a " + card.category

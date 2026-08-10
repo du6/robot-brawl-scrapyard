@@ -228,6 +228,117 @@ namespace RobotBrawl.Phase0
         }
 
         // ---------------------------------------------------------------
+        // ENLIST — 2026-08-10, and it is the other half of the line below.
+        //
+        // The comment under this one has said "login UI + ENLIST flow" since
+        // the day it was written, and only the login half was ever built.
+        // Nothing in Assets/ has ever called POST /v1/robots or
+        // POST /v1/snapshots: `RobotSnapshot.Export` was written, benched and
+        // never invoked by the product, and MyRobots therefore returned an
+        // empty list for every real player, forever.
+        //
+        // WHAT THAT MEANT, and it is worse than a missing button. ArenaScreen
+        // takes its challenger from MyRobots -> activeSnapshotId, so the
+        // challenge UI had nothing to select; the board could only ever show
+        // robots that arrived by curl. The ladder was live, autonomous,
+        // alerted, benched at 198/198 — and unreachable from inside the game.
+        // It is the cold-start deadlock of HANDOVER_2026-08-10 §3 one level
+        // further out, and it hid for the same reason: every endpoint worked,
+        // every bench was green, and the only thing missing was the caller.
+        //
+        // Uploading is TWO round trips because the server models it as two
+        // things: a robot is a durable identity that owns a rating and a name,
+        // a snapshot is one immutable build of it. Re-enlisting an existing
+        // robot must reuse its id — a second robot row would start a second
+        // rating at placement, which is how you launder a bad record into a
+        // fresh one.
+
+        /// <summary>done(robotId, err). The durable identity, created once.</summary>
+        public static IEnumerator CreateRobot(string name, Action<string, string> done)
+        {
+            using (var req = PostJson("/v1/robots", "{\"name\":" + RobotWorker.Str(name) + "}"))
+            {
+                yield return req.SendWebRequest();
+                string text = req.downloadHandler != null ? req.downloadHandler.text : "";
+                if (req.result != UnityWebRequest.Result.Success)
+                {
+                    string why = RobotWorker.Field(text, "error") ?? req.error;
+                    LastError = why; done(null, why); yield break;
+                }
+                done(RobotWorker.Field(text, "id"), null);
+            }
+        }
+
+        /// <summary>done(snapshotId, err). <paramref name="envelopeJson"/> is
+        /// the WHOLE envelope as text, and it travels as a JSON *string* —
+        /// the API stores it opaquely and reads exactly three fields out of it
+        /// (§5.2). Embedding it as an object instead is the mistake that looks
+        /// right: the server would still find sha256 and clientVersion, and
+        /// the worker would then be handed a payload that never matched its
+        /// own hash.</summary>
+        public static IEnumerator UploadSnapshot(string robotId, string envelopeJson,
+                                                 Action<string, string> done)
+        {
+            string body = "{\"robotId\":" + RobotWorker.Str(robotId)
+                        + ",\"envelope\":" + RobotWorker.Str(envelopeJson) + "}";
+            using (var req = PostJson("/v1/snapshots", body))
+            {
+                yield return req.SendWebRequest();
+                string text = req.downloadHandler != null ? req.downloadHandler.text : "";
+                if (req.result != UnityWebRequest.Result.Success)
+                {
+                    // The API explains a truncated upload, an oversized build
+                    // and a robot that is not yours in its own words.
+                    string why = RobotWorker.Field(text, "error") ?? req.error;
+                    LastError = why; done(null, why); yield break;
+                }
+                done(RobotWorker.Field(text, "id"), null);
+            }
+        }
+
+        /// <summary>Reuse-or-create the robot named <paramref name="robotName"/>
+        /// and upload <paramref name="env"/> against it. done(snapshotId, err).
+        ///
+        /// Takes a FINISHED envelope rather than a BuilderManager on purpose:
+        /// which build gets enlisted is a game decision (the saved career
+        /// robot, or whatever is on the bench) and this client has no business
+        /// knowing about Career. ArenaScreen picks; this uploads.
+        ///
+        /// The snapshot lands PENDING and a worker decides whether it is
+        /// legal — enlisting is not the same as being on the board, and the
+        /// caller must say so rather than implying the robot is ranked.</summary>
+        public static IEnumerator Enlist(string robotName, SnapshotEnvelope env,
+                                         Action<string, string> done)
+        {
+            string name = (robotName ?? "").Trim();
+            if (name.Length < 1 || name.Length > 32)
+            { done(null, "a robot name must be 1-32 characters"); yield break; }
+            if (env == null) { done(null, "this build could not be exported"); yield break; }
+
+            // Reuse before create. See the note above on laundering a rating.
+            string robotId = null; string err = null;
+            List<MyRobot> mine = null;
+            yield return MyRobots((rows, e) => { mine = rows; err = e; });
+            if (err != null) { done(null, err); yield break; }
+            if (mine != null)
+                foreach (var m in mine)
+                    if (string.Equals(m.name, name, StringComparison.OrdinalIgnoreCase))
+                    { robotId = m.id; break; }
+
+            if (string.IsNullOrEmpty(robotId))
+            {
+                yield return CreateRobot(name, (id, e) => { robotId = id; err = e; });
+                if (err != null || string.IsNullOrEmpty(robotId))
+                { done(null, err ?? "the server created no robot"); yield break; }
+            }
+
+            string snapId = null;
+            yield return UploadSnapshot(robotId, env.ToJson(), (id, e) => { snapId = id; err = e; });
+            if (err != null) { done(null, err); yield break; }
+            done(snapId, null);
+        }
+
+        // ---------------------------------------------------------------
         // §M1's "client: login UI + ENLIST flow". Until now Token was a field
         // somebody set by hand, so there was no way to make or use an account
         // from inside the game — the ladder was reachable only from a bench or
