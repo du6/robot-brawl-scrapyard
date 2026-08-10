@@ -1,3 +1,11 @@
+// ⚠ EDITOR AND DEVELOPMENT BUILDS ONLY — 2026-08-10.
+// This is a QA harness. It was compiling into the SHIPPED iOS player: 44 such
+// files, ~13k lines, and the string "dev-only-worker-key" was verified present
+// in build/ios global-metadata.dat. Dead weight in the binary, and a surface
+// that can register accounts and start fights inside a player's app.
+// Nothing in the product references any harness — checked against every
+// product script, every scene and every prefab before this guard was added.
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
 // ===========================================================================
 // EnlistLiveBench — the whole ladder, through the REAL transport. 2026-08-10.
 //
@@ -423,3 +431,4 @@ namespace RobotBrawl.Phase0
         }
     }
 }
+#endif
