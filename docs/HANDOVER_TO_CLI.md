@@ -207,7 +207,9 @@ TouchSmoke · HazardBench · SensorProbe · CareerBench.
 | Glicko-2 rating deltas | ✅ done 2026-08-09 — verified against Glickman's paper |
 | §2.2 tickets / defense floor / repeat taper | ✅ done 2026-08-09 |
 | Leaderboard / match view / inbox / wallet | ✅ done 2026-08-09 |
-| Client ARENA tab (Unity) | **absent — the server side of M2 is complete** |
+| Client ARENA tab (Unity) | 4 of 5 surfaces done; styling unlooked-at |
+| M3 server (league nights, seasons, sinks) | ✅ done 2026-08-09 |
+| M4 hardening · Docker · GCP | **untouched — the largest remaining risk** |
 | Replays are playable end to end | ✅ done 2026-08-09 — reopened by ReplayFile.Read |
 | Worker image / Docker / GCP | not started |
 | Client login + ENLIST UI | not started — zero `UnityWebRequest` in the client |
