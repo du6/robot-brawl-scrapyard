@@ -15,7 +15,7 @@ PASS  a wrong password and an unknown account are indistinguishable (both 401)
 
 == D. robots ==
 PASS  a robot is created
-      robot 9cd172aa-0c7b-424c-b00b-1abe06ac6926
+      robot 5200f8cd-f774-4262-8c52-48c0db0a919b
 PASS  …but not without a token
 
 == E. snapshot upload stays opaque (§5.2) ==
@@ -30,7 +30,7 @@ PASS  …and a wrong key is refused too
 PASS  a keyed worker claims a job
 PASS  …and the job is the VALIDATE the upload enqueued
 PASS  …pointing at the snapshot just uploaded
-PASS  …and carries a payload location the worker can resolve (file:///tmp/rb-blobs/snapshots/9cd172aa-0c7b-424c-b00b-1abe06ac6926/14f8830b601b4114bce20682ddd435b7.json)
+PASS  …and carries a payload location the worker can resolve (file:///tmp/rb-blobs/snapshots/5200f8cd-f774-4262-8c52-48c0db0a919b/553485094011427795c4c15b7bb41b85.json)
 PASS  …and the payload sha256 rides along, so the worker can verify storage
 PASS  another worker cannot heartbeat a job it does not hold
 PASS  …the holder can
@@ -87,7 +87,7 @@ PASS  …with the verdict recorded
 PASS  …and the replay attached
 PASS  …the winner's wallet is stake-refunded and paid the purse
 PASS  …and the FIGHT job is retired, not left to spin
-PASS  …the winner climbed above the 1200 placement and the loser fell below (17081200 vs 1142)
+PASS  …the winner climbed above the 1200 placement and the loser fell below (12001708 vs 1142)
 PASS  …and the winner's deviation tightened from the 350 placement to 315
 PASS  …with the deltas recorded on the match for the fight report
 PASS  the same result cannot be settled twice
@@ -232,12 +232,19 @@ PASS  metrics carry pendingSnapshots
 PASS  pendingSnapshots agrees with the database
 PASS  failed agrees with the database
 PASS  the rbmetrics log line keeps its shape
-      rbmetrics ready=0 claimed=1 failed=4 done=16 oldest_ready_s=0 oldest_heartbeat_s=0 pending_snapshots=3 oldest_pending_s=7
+      rbmetrics ready=0 claimed=0 failed=4 done=15 oldest_ready_s=0 oldest_heartbeat_s=0 pending_snapshots=3 oldest_pending_s=3
 PASS  …and reports real counts, not a row of zeros
+
+--- B. season badges ---
+PASS  the rollover awarded 5 badge(s)
+PASS  every badge has a matching SEASON payout
+PASS  …and no place is 0 or negative
+PASS  …and no robot holds two badges in one category in one season
+PASS  an anonymous scout sees the robot's season history (1 entry/entries)
 
 --- P. behind a proxy ---
 PASS  one client can be rate-limited to exhaustion
 PASS  a different client keeps its own bucket
 SKIP  blob URLs are built with the forwarded scheme -- no object store configured (BLOB_S3_BUCKET unset); file:// rows are passed through verbatim
 
-===== passed 193  failed 0  skipped 1 =====
+===== passed 198  failed 0  skipped 1 =====

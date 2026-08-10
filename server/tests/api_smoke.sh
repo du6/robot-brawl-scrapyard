@@ -1301,6 +1301,49 @@ else
     || no "every rbmetrics line was all zeros while the database held $(dbq "SELECT count(*) FROM match_jobs;") jobs -- a query matching nothing would look identical"
 fi
 
+# --------------------------------------------------------------- section B
+# §2.4's season badges and §M3's "season history on robot cards". The payouts
+# shipped with migration 007; the badges did not, so a season result was a
+# ledger row nobody ever looks at again and nothing a scouting card could show.
+echo
+echo "--- B. season badges ---"
+BADGES=$(dbq "SELECT count(*) FROM season_badges;")
+if [ "${BADGES:-0}" = "0" ]; then
+  skip "season badges (5 checks)" "no rollover has run in this session, so there is no podium to record"
+else
+  ok "the rollover awarded $BADGES badge(s)"
+  # A badge must pair with the payout that bought it: same robot, same season,
+  # same category. A podium paid but not recorded is a season result that
+  # vanishes; recorded but not paid is worse.
+  is "every badge has a matching SEASON payout" \
+     "$(dbq "SELECT count(*) FROM season_badges b
+              WHERE NOT EXISTS (SELECT 1 FROM ledger l
+                                 WHERE l.reason = 'SEASON'
+                                   AND l.idem_key = 'season:' || b.season_id || ':' || b.category || ':' || b.robot_id);")" 0
+  is "…and no place is 0 or negative" \
+     "$(dbq "SELECT count(*) FROM season_badges WHERE place < 1;")" 0
+  is "…and no robot holds two badges in one category in one season" \
+     "$(dbq "SELECT count(*) FROM (SELECT robot_id, season_id, category FROM season_badges
+              GROUP BY 1,2,3 HAVING count(*) > 1) d;")" 0
+  # The read path: a badge is only worth writing if a scouting card shows it.
+  BROBOT=$(dbq "SELECT robot_id FROM season_badges LIMIT 1;")
+  BSNAP=$(dbq "SELECT id FROM snapshots WHERE robot_id='$BROBOT' ORDER BY uploaded_at DESC LIMIT 1;")
+  if [ -z "$BSNAP" ]; then
+    skip "the scouting card shows season history" "the badged robot has no snapshot"
+  else
+    c=$(req GET "/v1/snapshots/$BSNAP" "")
+    if [ "$c" != "200" ]; then
+      no "the scouting card shows season history -- HTTP $c"
+    else
+      # Anonymous on purpose: a past placing is public, and this is the check
+      # that it is visible to a SCOUT rather than only to the owner.
+      N=$("$PY" -c "import json;d=json.load(open('$BODY'));print(len(d.get('seasonHistory') or []))" 2>/dev/null)
+      if [ "${N:-0}" -gt 0 ]; then ok "an anonymous scout sees the robot's season history ($N entry/entries)"
+      else no "seasonHistory is empty on a robot that holds a badge — the badge is unreadable"; fi
+    fi
+  fi
+fi
+
 # --------------------------------------------------------------- section P
 # The proxy headers. THIS SECTION IS LAST ON PURPOSE: it deliberately
 # exhausts an auth rate-limit bucket, and if the partitioning it is testing

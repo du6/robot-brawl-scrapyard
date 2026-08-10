@@ -493,32 +493,68 @@ app.MapGet("/v1/snapshots/{id:guid}", async (Guid id, ClaimsPrincipal user) =>
     var owner = r.GetGuid(11);
     var mine = user.Identity?.IsAuthenticated == true && UserId(user) == owner;
 
+    // ⚠ EVERY FIELD IS READ OUT OF THE READER BEFORE ANY OTHER QUERY RUNS.
+    // Npgsql allows one command per connection at a time, so issuing the badge
+    // query below while this reader is still open throws
+    // NpgsqlOperationInProgressException and the whole card 500s. That is
+    // exactly what the first version of this did — 17 checks went red, all of
+    // them downstream of a scouting card that had started failing.
+    var cardId       = r.GetGuid(0);
+    var cardStatus   = r.GetString(1);
+    var cardMass     = r.IsDBNull(2) ? (int?)null : r.GetInt32(2);
+    var cardAabb     = r.IsDBNull(3) ? null : new { x = r.GetFloat(3), y = r.GetFloat(4), z = r.GetFloat(5) };
+    var cardCategory = r.IsDBNull(6) ? null : r.GetString(6);
+    var cardParts    = r.IsDBNull(7) ? null : JsonSerializer.Deserialize<string[]>(r.GetFieldValue<string>(7));
+    var cardHash     = r.IsDBNull(8) ? null : r.GetString(8);
+    var cardFails    = mine && !r.IsDBNull(9) ? r.GetFieldValue<string[]>(9) : null;
+    var cardUploaded = r.GetDateTime(10);
+    var cardName     = r.GetString(12);
+    await r.CloseAsync();
+
+    // §M3's "season history on robot cards". A badge is public: it is a past
+    // PLACING, the most public fact about a ladder there is, and it is what
+    // makes a scouting card mean something two seasons on — "1st in FEATHER,
+    // at 1574" says more about an opponent than a current provisional rating.
+    var badges = new List<object>();
+    await using (var b = new NpgsqlCommand(@"
+        SELECT b.season_id, b.category, b.place, b.final_rating
+          FROM season_badges b
+          JOIN snapshots s ON s.robot_id = b.robot_id
+         WHERE s.id = $1
+         ORDER BY b.season_id DESC, b.place ASC;", c))
+    {
+        b.Parameters.AddWithValue(id);
+        await using var br = await b.ExecuteReaderAsync();
+        while (await br.ReadAsync())
+            badges.Add(new { season = br.GetInt32(0), category = br.GetString(1),
+                             place = br.GetInt32(2), rating = Math.Round(br.GetDouble(3), 1) });
+    }
+
     // §1.3: this is the scouting card. Everything here is public by design —
     // mass, size box, category, part manifest, record. The program is not
     // here, and neither is the payload URL, for the owner OR anyone else:
     // the only thing that ever reads a payload is a worker.
     return Results.Ok(new
     {
-        id = r.GetGuid(0),
-        status = r.GetString(1),
-        robotName = r.GetString(12),
-        massKg = r.IsDBNull(2) ? (int?)null : r.GetInt32(2),
-        aabb = r.IsDBNull(3) ? null : new { x = r.GetFloat(3), y = r.GetFloat(4), z = r.GetFloat(5) },
-        category = r.IsDBNull(6) ? null : r.GetString(6),
+        id = cardId,
+        status = cardStatus,
+        robotName = cardName,
+        massKg = cardMass,
+        aabb = cardAabb,
+        category = cardCategory,
         // A REAL JSON array, not a quoted string. parts_manifest is jsonb, and
         // handing it back as GetFieldValue<string> emitted
         // "partsManifest": "[\"beam\",\"wheel\"]" — legal JSON that every
         // client has to unescape and parse a second time. The scouting card
         // read it as zero parts, which is how this was found.
-        partsManifest = r.IsDBNull(7)
-            ? null
-            : JsonSerializer.Deserialize<string[]>(r.GetFieldValue<string>(7)),
-        programHash = r.IsDBNull(8) ? null : r.GetString(8),
-        hasProgram = !r.IsDBNull(8) && r.GetString(8).Length > 0,
+        partsManifest = cardParts,
+        programHash = cardHash,
+        hasProgram = cardHash != null && cardHash.Length > 0,
         // Only the owner is told WHY their own upload was rejected. Handing a
         // scout the validator's reasons is handing them the build.
-        failReasons = mine && !r.IsDBNull(9) ? r.GetFieldValue<string[]>(9) : null,
-        uploadedAt = r.GetDateTime(10),
+        failReasons = cardFails,
+        uploadedAt = cardUploaded,
+        seasonHistory = badges,
         mine,
     });
 }).AllowAnonymous();
@@ -1519,6 +1555,27 @@ app.MapPost("/v1/admin/season/rollover", async (HttpContext ctx) =>
             return Results.Conflict(new { error = $"season {to} already exists — this rollover has already run" });
     }
 
+    // The season being CLOSED must exist as a row before anything can be
+    // recorded against it. `seasons` only ever got rows for NEW seasons, so
+    // season 1 — the one ladder_config starts on — never had one, and the
+    // first badge insert failed its foreign key and took the whole rollover
+    // down with it. A season that is being closed is by definition a season
+    // that happened; this makes the table say so.
+    //
+    // starts_at is unknown for a season nobody recorded, so it is derived from
+    // the length that was configured rather than invented: it ran for
+    // season_weeks up to now. ON CONFLICT DO NOTHING because every season
+    // after this one is inserted properly below.
+    await using (var back = new NpgsqlCommand(@"
+        INSERT INTO seasons (id, starts_at, ends_at)
+        VALUES ($1, now() - make_interval(weeks => $2), now())
+        ON CONFLICT (id) DO NOTHING;", c, tx))
+    {
+        back.Parameters.AddWithValue(from);
+        back.Parameters.AddWithValue(weeks);
+        await back.ExecuteNonQueryAsync();
+    }
+
     // ---- payouts, before the ratings are compressed ---------------------
     // The standings being paid are the FINAL ones, so this has to read them
     // before the compression rewrites them.
@@ -1561,6 +1618,27 @@ app.MapPost("/v1/admin/season/rollover", async (HttpContext ctx) =>
                 // ledger's unique index doing exactly its job.
                 l.Parameters.AddWithValue($"season:{from}:{row.Cat}:{row.Robot}");
                 await l.ExecuteNonQueryAsync();
+            }
+            // The badge is the PERMANENT half of a season result — the ledger
+            // row pays the scrap and is never looked at again, the badge is
+            // what a scouting card shows two seasons later. Written inside the
+            // same transaction as the payout so a podium can never be paid
+            // without being recorded, or recorded without being paid.
+            //
+            // ON CONFLICT DO NOTHING for the same reason the payout has an
+            // idempotency key: (robot, season, category) is the primary key,
+            // and a rollover that somehow ran twice must not raise here and
+            // roll back a payout that was already correct.
+            await using (var badge = new NpgsqlCommand(@"
+                INSERT INTO season_badges (robot_id, season_id, category, place, final_rating)
+                VALUES ($1,$2,$3,$4,$5) ON CONFLICT DO NOTHING;", c, tx))
+            {
+                badge.Parameters.AddWithValue(row.Robot);
+                badge.Parameters.AddWithValue(from);
+                badge.Parameters.AddWithValue(row.Cat);
+                badge.Parameters.AddWithValue((int)row.Place);
+                badge.Parameters.AddWithValue(row.Rating);
+                await badge.ExecuteNonQueryAsync();
             }
             awards.Add(new { category = row.Cat, place = row.Place, robotId = row.Robot, scrap = amount });
         }

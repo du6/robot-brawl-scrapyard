@@ -80,7 +80,25 @@ namespace RobotBrawl.Editor
                 PlayerSettings.SetScriptingDefineSymbols(
                     named, string.IsNullOrEmpty(defines) ? "RB_WORKER" : defines + ";RB_WORKER");
 
-            Debug.Log("[BuildWorker] building " + exe + " (Linux64 dedicated server)");
+            // ⚠ DEDICATED SERVER OPTIMIZATIONS MUST BE OFF, and this cost a
+            // deploy to discover. It strips shaders out of the build entirely
+            // ("Trying to access a shader but no shaders were included"), and
+            // this game's REAL code path builds render materials while it
+            // constructs a robot: MatDB.MakeRenderMat -> new Material(shader)
+            // -> ArgumentNullException -> BuilderManager.LoadSnapshot fails ->
+            // every claimed job is left for retry. The container looked
+            // healthy, claimed work, and could not validate anything.
+            //
+            // The fix belongs HERE and not in the game code. §5.2 puts the
+            // real game code in the worker so there is one implementation and
+            // zero drift; teaching the renderer to tolerate a null shader
+            // would be exactly the second code path that rule exists to
+            // prevent. Shipping shaders in a server build costs image size and
+            // nothing else.
+            PlayerSettings.dedicatedServerOptimizations = false;
+
+            Debug.Log("[BuildWorker] building " + exe
+                      + " (Linux64 dedicated server, shaders INCLUDED)");
             BuildReport report = BuildPipeline.BuildPlayer(opts);
             var sum = report.summary;
 
