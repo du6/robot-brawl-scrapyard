@@ -148,6 +148,28 @@ public static class DamageResolver
     /// rapid ticks on the same part into one growing number (round-1 fix 6).</summary>
     public static System.Action<Vector3, float, bool, object> OnHit = delegate { };
 
+    /// <summary>Diagnostic hook, fired ONLY when a part is actually destroyed:
+    /// (victim, attacker, victimPart, attackerHardness, src).
+    ///
+    /// Why a second hook rather than more arguments on OnHit. OnHit fires on
+    /// every applied tick and feeds the HUD; this fires a handful of times per
+    /// bout and feeds benches, so it can afford to carry the whole context —
+    /// crucially the ATTACKER'S hardness, which OnHit does not have and which
+    /// is the difference between "a weapon was traded with another weapon" and
+    /// "a weapon was knocked off by a chassis".
+    ///
+    /// That distinction is the open question. `WEAPON_VS_WEAPON` only applies
+    /// when BOTH sides are edges (see the multiply below), and shipping it at
+    /// 0.25 moved the ladder's mutual-disarm rate by ZERO bouts — 13/30 before
+    /// and after. If the ladder's weapons are mostly being lost to non-edge
+    /// contact, that null result is explained and the lever was never the one
+    /// that mattered. Nothing could answer it from the outside: the fight
+    /// outcome does not record what struck what.
+    ///
+    /// Defaults to a no-op and is invoked only on destruction, so it changes
+    /// no behaviour and costs nothing in a normal fight.</summary>
+    public static System.Action<object, object, object, float, int> OnPartDestroyed = delegate { };
+
     /// ================= ROUND-3-CRITIC MAJOR =================================
     /// "The Phase 4 edge parts are the most fragile things in the game - a blade
     ///  of any material is one-shot by a mid-range hit."
@@ -276,6 +298,9 @@ public static class DamageResolver
             + " dmg (hp " + Mathf.Max(0f, p.hp).ToString("F1") + "/" + p.maxHp.ToString("F1")
             + (destroyed ? ") — DESTROYED" : ")"));
         OnHit(worldPos, dmg, destroyed, p);
+
+        // Fired BEFORE DestroyPart so a listener can still read the part.
+        if (destroyed) OnPartDestroyed(victim, attacker, p, hardness, src);
 
         if (destroyed) victim.DestroyPart(victimIdx);
     }

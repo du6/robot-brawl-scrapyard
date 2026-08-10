@@ -1026,9 +1026,15 @@ public class CompoundRobot : MonoBehaviour
     {
         if (!detachLogOn || idx < 0 || idx >= parts.Count) return;
         var p = parts[idx];
-        detachLog.Add(string.Format("{0}|{1}|{2}|hp {3:F0}/{4:F0} ({5:F0}%)|t {6:F1}",
+        // The EDGE flag is here so a reader can tell a weapon leaving from a
+        // beam leaving without a part catalogue to hand. It is the same
+        // IsEdge test the damage rule uses, so there is no second notion of
+        // weapon-ness to drift. Costs nothing: this whole method is behind
+        // detachLogOn, which is off in a shipped build.
+        detachLog.Add(string.Format("{0}|{1}|{2}|hp {3:F0}/{4:F0} ({5:F0}%)|t {6:F1}|{7}",
             name, p.spec.id, cause, Mathf.Max(0f, p.hp), p.maxHp,
-            p.maxHp > 0.0001f ? 100f * Mathf.Clamp01(p.hp / p.maxHp) : 0f, Time.time));
+            p.maxHp > 0.0001f ? 100f * Mathf.Clamp01(p.hp / p.maxHp) : 0f, Time.time,
+            DamageResolver.IsEdge(p.spec.edgeHardness) ? "EDGE" : "struct"));
     }
 
     /// <summary>How many PIECES (attached parts + the wheels bolted to them)
