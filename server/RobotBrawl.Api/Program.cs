@@ -578,6 +578,29 @@ app.MapPost("/v1/challenges", async (ChallengeReq req, ClaimsPrincipal user) =>
                         Random.Shared.Next(1, int.MaxValue) };
 
     await using var tx = await c.BeginTransactionAsync();
+
+    // §2.2: "each robot may INITIATE 10 challenges per day (tickets,
+    // refreshed daily). Defenses are unlimited and free." Inside the
+    // transaction, and the spend is the same statement as the check — a
+    // separate read-then-write would let two concurrent challenges both see
+    // the ninth ticket. The WHERE on the DO UPDATE is what makes the
+    // exhausted case return no row rather than a negative balance.
+    int ticketCap = (int)(cfg.TryGetValue("challenge_tickets_per_day", out var tc) ? tc : 10);
+    bool gotTicket;
+    await using (var tk = new NpgsqlCommand(@"
+        INSERT INTO tickets (robot_id, day, used) VALUES ($1, CURRENT_DATE, 1)
+        ON CONFLICT (robot_id, day) DO UPDATE SET used = tickets.used + 1
+              WHERE tickets.used < $2
+        RETURNING used;", c, tx))
+    {
+        tk.Parameters.AddWithValue(ch.RobotId);
+        tk.Parameters.AddWithValue(ticketCap);
+        gotTicket = await tk.ExecuteScalarAsync() is not null;
+    }
+    if (!gotTicket)
+        return Results.Json(new { error = $"out of challenge tickets — {ticketCap} per robot per day, and defending is always free" },
+                            statusCode: StatusCodes.Status429TooManyRequests);
+
     Guid matchId;
     await using (var ins = new NpgsqlCommand(@"
         INSERT INTO matches (challenger_snapshot_id, defender_snapshot_id, category, gap, arena, seeds, status)
@@ -678,6 +701,37 @@ app.MapPost("/v1/worker/jobs/{id:long}/fight-result",
     var cfg = await LadderConfig(c, tx);
     int stake = (int)cfg["stake_base"] * (1 + gap);
 
+    // §2.2 repeat-opponent taper: "rating and scrap gains vs the same opponent
+    // taper to zero after 3 wins in a rolling 24 h (kills win-trading and
+    // griefing in one rule)."
+    //
+    // READ AS: the first N wins in the window pay in full; the N+1th and
+    // beyond pay nothing. The alternative reading is a graded taper
+    // (full, 2/3, 1/3, 0) — "taper" invites it — but §2.2 says "to zero AFTER
+    // 3 wins", which is a cliff, and a cliff is the version a player can
+    // actually reason about. Recorded here because it is a judgement call.
+    //
+    // GAINS only: a loss still costs full price. Zeroing losses too would
+    // make the 4th rematch a free roll.
+    //
+    // Counted from `matches`, not a counter column: a derived rule with its
+    // own tally is a rule that can disagree with the history it derives from.
+    int taperAfter = (int)(cfg.TryGetValue("repeat_win_taper_after", out var ta) ? ta : 3);
+    int priorWins = 0;
+    await using (var pw = new NpgsqlCommand(@"
+        SELECT count(*) FROM matches m
+          JOIN snapshots sc ON sc.id = m.challenger_snapshot_id
+          JOIN snapshots sd ON sd.id = m.defender_snapshot_id
+         WHERE m.status = 'COMPLETE' AND m.verdict = 'CHALLENGER'
+           AND m.completed_at > now() - interval '24 hours'
+           AND sc.robot_id = $1 AND sd.robot_id = $2;", c, tx))
+    {
+        pw.Parameters.AddWithValue(chRobot);
+        pw.Parameters.AddWithValue(dfRobot);
+        priorWins = Convert.ToInt32(await pw.ExecuteScalarAsync());
+    }
+    bool tapered = res.Verdict == "CHALLENGER" && priorWins >= taperAfter;
+
     await using (var up = new NpgsqlCommand(@"
         UPDATE matches SET status = 'COMPLETE', verdict = $2, replay_urls = $3, completed_at = now()
          WHERE id = $1;", c, tx))
@@ -701,10 +755,16 @@ app.MapPost("/v1/worker/jobs/{id:long}/fight-result",
     }
     if (res.Verdict == "CHALLENGER")
     {
-        // (1 + 0.5*gap)^2 — punching up two categories pays 4x base.
-        double mult = Math.Pow(1 + 0.5 * gap, 2);
+        // The stake always comes back — it is escrow, not a fee, and §2.2
+        // tapers GAINS. Confiscating the stake on a tapered win would be a
+        // penalty the spec never asks for.
         await Credit(chUser, stake, "STAKE_REFUND");
-        await Credit(chUser, (int)Math.Round(cfg["win_purse_base"] * mult), "PURSE");
+        if (!tapered)
+        {
+            // (1 + 0.5*gap)^2 — punching up two categories pays 4x base.
+            double mult = Math.Pow(1 + 0.5 * gap, 2);
+            await Credit(chUser, (int)Math.Round(cfg["win_purse_base"] * mult), "PURSE");
+        }
     }
     else if (res.Verdict == "DEFENDER")
     {
@@ -742,6 +802,9 @@ app.MapPost("/v1/worker/jobs/{id:long}/fight-result",
         var oppForChallenger = dfR with { R = dfR.R + offset * gap };
         var chNew = Glicko2.UpdateOne(chR, oppForChallenger, chScore, tau);
 
+        // §2.2 taper zeroes the challenger's GAIN, not its loss.
+        if (tapered) chNew = chR;
+
         // §2.1: "The defender's rating is untouched by cross-category
         // fights." Heavies must not farm rating by squashing lightweights,
         // nor lose their rank to a swarm of speculative punch-ups. Only a
@@ -749,6 +812,47 @@ app.MapPost("/v1/worker/jobs/{id:long}/fight-result",
         Rating? dfNew = gap == 0
             ? Glicko2.UpdateOne(dfR, chR, 1.0 - chScore, tau)
             : null;
+
+        // §2.2 defense loss floor: "a defender's rating cannot drop more than
+        // 75 points per day from defenses. Excess challenges still pay out
+        // scrap to winners but apply zero rating delta to the defender."
+        //
+        // Summed from what actually happened — each completed match this robot
+        // DEFENDED today carries its own before/after in rating_deltas. A
+        // separate daily counter would be a second source of truth for a
+        // number the match history already holds.
+        bool floorHit = false;
+        double droppedToday = 0;
+        if (dfNew is Rating cand && cand.R < dfR.R)
+        {
+            double floor = cfg.TryGetValue("defense_daily_floor", out var fl) ? fl : 75;
+            await using (var dd = new NpgsqlCommand(@"
+                SELECT COALESCE(SUM(GREATEST(
+                         (m.rating_deltas->'defender'->>'before')::float8
+                       - (m.rating_deltas->'defender'->>'after')::float8, 0)), 0)
+                  FROM matches m
+                  JOIN snapshots sd ON sd.id = m.defender_snapshot_id
+                 WHERE m.status = 'COMPLETE' AND sd.robot_id = $1
+                   AND m.rating_deltas->'defender' IS NOT NULL
+                   AND m.completed_at >= date_trunc('day', now());", c, tx))
+            {
+                dd.Parameters.AddWithValue(dfRobot);
+                droppedToday = Convert.ToDouble(await dd.ExecuteScalarAsync());
+            }
+            double allowed = Math.Max(0, floor - droppedToday);
+            double wanted = dfR.R - cand.R;
+            if (wanted > allowed)
+            {
+                // Clamp rather than skip: "cannot drop more than 75 points per
+                // day" is a bound on the total, and once the bound is spent
+                // `allowed` is 0, which is the spec's "zero rating delta".
+                // Deviation and volatility still move — the defender did play
+                // a game, and freezing RD would make an actively-defended
+                // robot look idle.
+                dfNew = cand with { R = dfR.R - allowed };
+                floorHit = true;
+            }
+        }
 
         await SaveRating(c, tx, chRobot, category, season, chNew);
         if (dfNew is Rating dn) await SaveRating(c, tx, dfRobot, category, season, dn);
@@ -761,6 +865,12 @@ app.MapPost("/v1/worker/jobs/{id:long}/fight-result",
                 : null,
             gap,
             defenderUnrated = gap > 0,
+            // Shown honestly in the fight report, per §2.2 — a player whose
+            // win paid nothing is owed the reason.
+            tapered,
+            priorWins,
+            defenderFloorReached = floorHit,
+            defenderDroppedToday = droppedToday,
         });
         await using var rd = new NpgsqlCommand(
             "UPDATE matches SET rating_deltas = $2::jsonb WHERE id = $1;", c, tx);

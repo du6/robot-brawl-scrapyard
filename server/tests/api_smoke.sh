@@ -614,6 +614,121 @@ else
   fi
 fi
 
+echo
+echo "== L. defender protection (§2.2) =="
+# 2026-08-09. Glicko-2 made ratings worth attacking; these are the three rules
+# that price the attacks. Each is seeded through the DATABASE rather than by
+# driving the API ten times: the rule is what is under test, not the
+# accumulation, and ten real challenges would exhaust the 20/min upload
+# limiter and turn a rule failure into a 429 nobody can read.
+if [ -z "${CHSNAP:-}" ] || [ -z "${DSNAP:-}" ] || ! command -v psql >/dev/null 2>&1; then
+  skip "defender protection (8 checks)" "section K did not leave two ACTIVE snapshots"
+else
+  LCHROBOT=$(dbq "SELECT robot_id FROM snapshots WHERE id='$CHSNAP';")
+  LDFROBOT=$(dbq "SELECT robot_id FROM snapshots WHERE id='$DSNAP';")
+
+  # ---- challenge tickets ---------------------------------------------
+  CAP=$(dbq "SELECT value::int FROM ladder_config WHERE key='challenge_tickets_per_day';")
+  is "the ticket cap is configured" "$CAP" 10
+  dbq "INSERT INTO tickets (robot_id, day, used) VALUES ('$LCHROBOT', CURRENT_DATE, $CAP)
+       ON CONFLICT (robot_id, day) DO UPDATE SET used = $CAP;" >/dev/null
+  S=$(req POST /v1/challenges "{\"challengerSnapshotId\":\"$CHSNAP\",\"defenderSnapshotId\":\"$DSNAP\"}" "$AUTH")
+  expect "a robot out of tickets cannot initiate another challenge" "$S" 429
+  # Defending must stay free: the cap is on INITIATING. Prove the same robot
+  # can still be challenged BY someone else while its own tickets are spent.
+  dbq "INSERT INTO tickets (robot_id, day, used) VALUES ('$LDFROBOT', CURRENT_DATE, 0)
+       ON CONFLICT (robot_id, day) DO UPDATE SET used = 0;" >/dev/null
+  S=$(req POST /v1/challenges "{\"challengerSnapshotId\":\"$DSNAP\",\"defenderSnapshotId\":\"$CHSNAP\"}" "$DAUTH")
+  expect "…but defending is unlimited and free (they can still be challenged)" "$S" 200
+  FREEMATCH=$(jget matchId)
+  # Retire that job so it does not sit READY and confuse a later claim.
+  if [ -n "$FREEMATCH" ]; then
+    req POST /v1/worker/jobs/claim '{"workerId":"smoke-prot"}' "X-Worker-Key: $WKEY" >/dev/null
+    FJ=$(jget id)
+    req POST "/v1/worker/jobs/$FJ/fight-result" \
+      "{\"matchId\":\"$FREEMATCH\",\"workerId\":\"smoke-prot\",\"verdict\":\"DRAW\",\"replayUrls\":[],\"bouts\":[]}" \
+      "X-Worker-Key: $WKEY" >/dev/null
+  fi
+  dbq "UPDATE tickets SET used = 0 WHERE robot_id='$LCHROBOT' AND day=CURRENT_DATE;" >/dev/null
+
+  # ---- repeat-opponent taper -----------------------------------------
+  # Seed three prior wins by this exact pair inside the 24h window. The taper
+  # counts COMPLETE matches, so these are indistinguishable from real ones.
+  TAP=$(dbq "SELECT value::int FROM ladder_config WHERE key='repeat_win_taper_after';")
+  for i in 1 2 3; do
+    dbq "INSERT INTO matches (challenger_snapshot_id, defender_snapshot_id, category, gap, arena, seeds, status, verdict, completed_at)
+         VALUES ('$CHSNAP','$DSNAP','$CHCAT',0,'synthetic','{1,2,3}','COMPLETE','CHALLENGER', now());" >/dev/null
+  done
+  PRIOR=$(dbq "SELECT count(*) FROM matches m JOIN snapshots sc ON sc.id=m.challenger_snapshot_id JOIN snapshots sd ON sd.id=m.defender_snapshot_id WHERE m.verdict='CHALLENGER' AND m.status='COMPLETE' AND sc.robot_id='$LCHROBOT' AND sd.robot_id='$LDFROBOT' AND m.completed_at > now() - interval '24 hours';")
+  note "prior wins by this pair in the window: $PRIOR (taper after $TAP)"
+
+  WBEFORE=$(dbq "SELECT COALESCE(SUM(delta),0) FROM ledger WHERE user_id='$USERID';")
+  RBEFORE=$(dbq "SELECT round(rating) FROM ratings WHERE robot_id='$LCHROBOT' AND category='$CHCAT';")
+  S=$(req POST /v1/challenges "{\"challengerSnapshotId\":\"$CHSNAP\",\"defenderSnapshotId\":\"$DSNAP\"}" "$AUTH")
+  TMATCH=$(jget matchId)
+  if [ "$S" != "200" ] || [ -z "$TMATCH" ]; then
+    skip "the repeat-opponent taper (4 checks)" "the tapered challenge did not open (HTTP $S)"
+  else
+    req POST /v1/worker/jobs/claim '{"workerId":"smoke-prot"}' "X-Worker-Key: $WKEY" >/dev/null
+    TJOB=$(jget id)
+    req POST "/v1/worker/jobs/$TJOB/fight-result" \
+      "{\"matchId\":\"$TMATCH\",\"workerId\":\"smoke-prot\",\"verdict\":\"CHALLENGER\",\"replayUrls\":[],\"bouts\":[]}" \
+      "X-Worker-Key: $WKEY" >/dev/null
+    is "a 4th win vs the same opponent is flagged tapered" \
+       "$(dbq "SELECT rating_deltas->>'tapered' FROM matches WHERE id='$TMATCH';")" true
+    # The stake still comes back — the taper zeroes GAINS, not the escrow.
+    is "…the stake is still refunded, so the wallet is exactly level" \
+       "$(dbq "SELECT COALESCE(SUM(delta),0) FROM ledger WHERE user_id='$USERID';")" "$WBEFORE"
+    is "…no PURSE row was written for it" \
+       "$(dbq "SELECT count(*) FROM ledger WHERE match_id='$TMATCH' AND reason='PURSE';")" 0
+    is "…and the winner's rating did not move" \
+       "$(dbq "SELECT round(rating) FROM ratings WHERE robot_id='$LCHROBOT' AND category='$CHCAT';")" "$RBEFORE"
+  fi
+
+  # ---- defense loss floor --------------------------------------------
+  # Seed a day's worth of defending that already cost 70 of the 75 allowance,
+  # then take one more loss and prove the drop is clamped to the remaining 5.
+  # Remove the taper fixtures, and strip the defender key from every REAL
+  # match this robot already defended today. Without that reset the allowance
+  # is already spent by section K's fights, the clamp lands on 0, and the
+  # check below passes without proving anything - which is exactly what the
+  # first version of it did.
+  dbq "DELETE FROM matches WHERE arena='synthetic';" >/dev/null
+  dbq "UPDATE matches SET rating_deltas = rating_deltas - 'defender'
+        WHERE defender_snapshot_id='$DSNAP' AND rating_deltas ? 'defender';" >/dev/null
+  FLOOR=$(dbq "SELECT value::int FROM ladder_config WHERE key='defense_daily_floor';")
+  SPENT=70
+  dbq "INSERT INTO matches (challenger_snapshot_id, defender_snapshot_id, category, gap, arena, seeds, status, verdict, completed_at, rating_deltas)
+       VALUES ('$CHSNAP','$DSNAP','$CHCAT',0,'synthetic','{1,2,3}','COMPLETE','CHALLENGER', now(),
+               '{\"defender\":{\"before\":1300,\"after\":1230}}'::jsonb);" >/dev/null
+  ALLOWED=$(( FLOOR - SPENT ))
+  dbq "UPDATE ratings SET rating = 1300 WHERE robot_id='$LDFROBOT' AND category='$CHCAT';" >/dev/null
+  DBEFORE=$(dbq "SELECT round(rating) FROM ratings WHERE robot_id='$LDFROBOT' AND category='$CHCAT';")
+  S=$(req POST /v1/challenges "{\"challengerSnapshotId\":\"$CHSNAP\",\"defenderSnapshotId\":\"$DSNAP\"}" "$AUTH")
+  FMATCH=$(jget matchId)
+  if [ "$S" != "200" ] || [ -z "$FMATCH" ]; then
+    skip "the defense loss floor (2 checks)" "the floor challenge did not open (HTTP $S)"
+  else
+    req POST /v1/worker/jobs/claim '{"workerId":"smoke-prot"}' "X-Worker-Key: $WKEY" >/dev/null
+    FJOB2=$(jget id)
+    req POST "/v1/worker/jobs/$FJOB2/fight-result" \
+      "{\"matchId\":\"$FMATCH\",\"workerId\":\"smoke-prot\",\"verdict\":\"CHALLENGER\",\"replayUrls\":[],\"bouts\":[]}" \
+      "X-Worker-Key: $WKEY" >/dev/null
+    is "the defender's daily floor is reported as reached" \
+       "$(dbq "SELECT rating_deltas->>'defenderFloorReached' FROM matches WHERE id='$FMATCH';")" true
+    DAFTER=$(dbq "SELECT round(rating) FROM ratings WHERE robot_id='$LDFROBOT' AND category='$CHCAT';")
+    DROP=$(( DBEFORE - DAFTER ))
+    # EXACTLY the remaining allowance, not "at most". A range that includes 0
+    # passes when the rating never moved at all, which cannot distinguish a
+    # working floor from a broken one. The raw Glicko drop here is ~75+, so a
+    # correct clamp lands on precisely $ALLOWED.
+    is "…and the drop is exactly the remaining allowance ($SPENT of $FLOOR already spent today)" \
+       "$DROP" "$ALLOWED"
+    is "…the API reports how much of the day's allowance was already gone" \
+       "$(dbq "SELECT round((rating_deltas->>'defenderDroppedToday')::numeric) FROM matches WHERE id='$FMATCH';")" "$SPENT" 
+  fi
+fi
+
 rm -f "$BODY" "$VRC_SNAP_FILE" "$VRC_JOB_FILE"
 echo
 echo "===== passed $pass  failed $fail  skipped $skipped ====="

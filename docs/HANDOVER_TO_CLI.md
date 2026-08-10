@@ -205,7 +205,8 @@ TouchSmoke · HazardBench · SensorProbe · CareerBench.
 | FIGHT endpoints, replay upload | ✅ done 2026-08-09 (`88e0d46`) |
 | FIGHT worker loop (client) | ✅ done 2026-08-09 — 26 pure + 19 play-mode |
 | Glicko-2 rating deltas | ✅ done 2026-08-09 — verified against Glickman's paper |
-| §2.2 tickets / defense floor / repeat taper | **absent — challenge frequency unbounded** |
+| §2.2 tickets / defense floor / repeat taper | ✅ done 2026-08-09 |
+| Leaderboard endpoint | **absent — nothing serves the ratings** |
 | Worker image / Docker / GCP | not started |
 | Client login + ENLIST UI | not started — zero `UnityWebRequest` in the client |
 

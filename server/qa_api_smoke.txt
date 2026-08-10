@@ -15,7 +15,7 @@ PASS  a wrong password and an unknown account are indistinguishable (both 401)
 
 == D. robots ==
 PASS  a robot is created
-      robot 8b193a5d-2528-4cac-b307-85db9d8ceaca
+      robot 79d95108-dc14-47ad-ae37-98bd9788c003
 PASS  …but not without a token
 
 == E. snapshot upload stays opaque (§5.2) ==
@@ -30,7 +30,7 @@ PASS  …and a wrong key is refused too
 PASS  a keyed worker claims a job
 PASS  …and the job is the VALIDATE the upload enqueued
 PASS  …pointing at the snapshot just uploaded
-PASS  …and carries a payload location the worker can resolve (file:///tmp/rb-blobs/snapshots/8b193a5d-2528-4cac-b307-85db9d8ceaca/3d748e932e1a4126b19c1979cd58eba5.json)
+PASS  …and carries a payload location the worker can resolve (file:///tmp/rb-blobs/snapshots/79d95108-dc14-47ad-ae37-98bd9788c003/603a1013689a4316a5466b1e775082fd.json)
 PASS  …and the payload sha256 rides along, so the worker can verify storage
 PASS  another worker cannot heartbeat a job it does not hold
 PASS  …the holder can
@@ -83,7 +83,7 @@ PASS  …with the verdict recorded
 PASS  …and the replay attached
 PASS  …the winner's wallet is stake-refunded and paid the purse
 PASS  …and the FIGHT job is retired, not left to spin
-PASS  …the winner climbed above the 1200 placement and the loser fell below (1362 vs 1038)
+PASS  …the winner climbed above the 1200 placement and the loser fell below (1362 vs 1125)
 PASS  …and the winner's deviation tightened from the 350 placement to 290
 PASS  …with the deltas recorded on the match for the fight report
 PASS  the same result cannot be settled twice
@@ -101,4 +101,17 @@ PASS  a defender win settles
 PASS  …paying the defender the flat 40-scrap defense purse
 PASS  …and the challenger's stake is forfeit, not refunded
 
-===== passed 80  failed 0  skipped 0 =====
+== L. defender protection (§2.2) ==
+PASS  the ticket cap is configured
+PASS  a robot out of tickets cannot initiate another challenge
+PASS  …but defending is unlimited and free (they can still be challenged)
+      prior wins by this pair in the window: 4 (taper after 3)
+PASS  a 4th win vs the same opponent is flagged tapered
+PASS  …the stake is still refunded, so the wallet is exactly level
+PASS  …no PURSE row was written for it
+PASS  …and the winner's rating did not move
+PASS  the defender's daily floor is reported as reached
+PASS  …and the drop is exactly the remaining allowance (70 of 75 already spent today)
+PASS  …the API reports how much of the day's allowance was already gone
+
+===== passed 90  failed 0  skipped 0 =====
