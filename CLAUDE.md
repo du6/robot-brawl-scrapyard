@@ -6,7 +6,12 @@ playable; **Multiplayer v3** (cloud ladder) is mid-build.
 
 ## Read this first
 
-1. **`docs/HANDOVER_TO_CLI.md`** — **START HERE.** As of 2026-08-09 this
+0. **`docs/HANDOVER_2026-08-09_night.md`** — **START HERE.** End of
+   2026-08-09: the API is LIVE on Cloud Run, 42 commits that day, and it
+   names the one task that matters next (GcsBlobStore). It supersedes the
+   status tables in (1) below; (1) is still the live guidance for the hard
+   rules and the editor discipline.
+1. **`docs/HANDOVER_TO_CLI.md`** — the takeover brief. As of 2026-08-09 this
    project is driven by a Claude Code session on owen's Mac. That document
    is the takeover brief: what to verify before trusting anything, the
    editor discipline, the hard rules, full M1 state, and the work queue in
