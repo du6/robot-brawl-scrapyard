@@ -154,3 +154,54 @@ MEASURED:
 Career save 18614d0e, mtime 1786354063 UNCHANGED.
 
 STILL IMGUI:  4. enlist panel   5. sign-in
+
+---------------------------------------------------------------------------
+SURFACES 4 AND 5: ENLIST and the account — 2026-08-10.  THE PORT IS DONE.
+
+All five ARENA surfaces are UGUI in the dock. The IMGUI remains only for the
+standalone ArenaScreen.Open() path, and cannot drift from the dock because
+both render the same model and drive the same flows.
+
+docs/shots/15_arena_enlist.png   signed in, with a saved career robot:
+  THE BOARD | MY FIGHTS | ENLIST        ← three-way switch, ENLIST lit
+  signed in
+  ENLIST A ROBOT · sending: Spinner · program armed
+  ladder name [Spinner]
+  re-enlisting under a name you already use replaces that robot's build and
+  keeps its rating. a new name starts at placement.
+  [ ENLIST ]   already on the ladder: …
+
+docs/shots/16_arena_sign_in.png   signed out:
+  the board is public — signing in lets you play
+  SIGN IN · email · password (masked)
+  [ SIGN IN ] [ CREATE ONE ]
+  the board is public. signing in is what lets you enlist a robot, …
+
+⚠ THE PASSWORD IS PUSHED, NEVER PULLED. The UGUI field writes into
+ArenaScreen.SetPassword and NOTHING reads it back — there is no public getter,
+the panel's rebuild key is not derived from it, and ArenaScreen still clears it
+the moment it has been sent. A screen that can hand its password back is one
+screenshot, one log line or one careless bench away from leaking it, and this
+dock is photographed on purpose. The capture types nothing into the field for
+the same reason: a shot of a filled password box is a shot of a password.
+
+Signed out, the ACCOUNT surface wins outright over board/inbox/card. Every
+other view is something you can only DO with an account, and a board you
+cannot act on is a worse first screen than one asking you to sign in.
+
+MEASURED:
+  ChallengeGateBench  18/18  (pure)
+  CategoryBench       44/44  (pure)
+  EnlistUiBench       17/17  alone
+  CareerSmoke        128/128 alone, fresh play session
+  TouchSmoke          29/29  alone, fresh play session
+Career save 18614d0e, size 5438, mtime 1786354063 UNCHANGED throughout.
+
+WHAT THE PORT BOUGHT, beyond looking like the game: the ARENA is now inside
+the dock, so it inherits the safe-area insets, the 44 pt touch floor, and the
+benches that measure both. TouchSmoke's fixed-axis invariant covers all four
+ARENA scrollers now; it could not see any of them as IMGUI.
+
+STILL OPEN, and owen's: the deposit amount field on the SHOP's COSMETICS shelf
+is a dark box on a dark row and is nearly invisible until focused. It is
+styling, and it is the same in every field this dock draws.

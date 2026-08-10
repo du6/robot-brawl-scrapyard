@@ -175,6 +175,31 @@ namespace RobotBrawl.Phase0
                     }
                     arena.ShowInbox = false;
                     yield return null;
+
+                    // ---- ENLIST, surface 4 ----------------------------
+                    // Signed IN, with a saved career robot, which is the state
+                    // the panel exists for.
+                    Career.active = true;
+                    Career.Data = new CareerData();
+                    Career.Data.stable.Add(new CareerRobot
+                    {
+                        name = "Spinner",
+                        snapshot = BuilderManager.SNAP_STAMP + "\ncore|0.000,0.700,0.000|0|0.00,0.00,0.00|Aluminum\n",
+                        program = RobotProgram.FirstSteps().ToJson(),
+                    });
+                    Career.Data.activeRobot = 0;
+                    arena.ShowEnlistPanel = true;
+                    yield return new WaitForSeconds(0.8f);
+                    yield return Shot(dir, "15_arena_enlist");
+
+                    // ---- SIGN IN, surface 5 ---------------------------
+                    // Signed OUT. Nothing is typed into the password field —
+                    // this screen is photographed on purpose and a shot of a
+                    // filled password box is a shot of a password.
+                    LadderClient.Logout();
+                    arena.ShowEnlistPanel = false;
+                    yield return new WaitForSeconds(0.8f);
+                    yield return Shot(dir, "16_arena_sign_in");
                 }
 
                 ui.TestShowTab(1);

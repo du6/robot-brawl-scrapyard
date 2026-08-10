@@ -417,6 +417,43 @@ namespace RobotBrawl.Phase0
             }
         }
 
+        // ---- surfaces 4 and 5: enlist, and the account -------------------
+        public bool ShowEnlistPanel { get { return showEnlist; } set { showEnlist = value; } }
+        public string EnlistName { get { return enlistName; } set { enlistName = value; } }
+        public void EnlistNow() { if (!busy) StartCoroutine(DoEnlist()); }
+
+        public bool Registering { get { return registering; } }
+        public void ToggleRegistering() { registering = !registering; Say("", SC_ACCOUNT); }
+        public string Email { get { return email; } set { email = value; } }
+        public string DisplayName { get { return displayName; } set { displayName = value; } }
+        public string Who { get { return who; } }
+
+        /// <summary>WRITE-ONLY, and that is the point. The password lives in
+        /// one field, is cleared the moment it has been sent, and is never
+        /// readable from outside — a screen that hands its password back is
+        /// one screenshot, one log line or one careless bench away from
+        /// leaking it. The UGUI field pushes into this and never reads back.</summary>
+        public void SetPassword(string p) { password = p; }
+        public bool HasPassword { get { return !string.IsNullOrEmpty(password); } }
+
+        /// <summary>Everything the sign-in button needs to know, without
+        /// exposing what was typed: enough to enable itself, and no more.</summary>
+        public bool CanSubmitAuth
+        {
+            get
+            {
+                return !busy && !string.IsNullOrEmpty(email) && HasPassword
+                       && (!registering || !string.IsNullOrEmpty(displayName));
+            }
+        }
+        public void SubmitAuth() { if (CanSubmitAuth) StartCoroutine(DoAuth()); }
+        public void SignOut()
+        {
+            LadderClient.Logout(); who = ""; inbox.Clear(); mine.Clear(); balance = -1;
+            card = null; pending = false; showInbox = false;
+            Say("signed out", SC_ACCOUNT);
+        }
+
         public bool Pending { get { return pending; } }
         public long Balance { get { return balance; } }
         public int Pick { get { return myPick; } }

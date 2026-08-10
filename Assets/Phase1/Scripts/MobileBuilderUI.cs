@@ -130,6 +130,13 @@ public class MobileBuilderUI : MonoBehaviour
     Button arenaSecBoard, arenaSecInbox;
     LayoutElement arenaSecLE;
     string arenaInboxStamp = "";
+    // Surfaces 4 and 5: ENLIST, and the account. One root, because they are
+    // the same errand seen from either side of being signed in — you cannot
+    // enlist without an account, and an account exists in order to enlist.
+    GameObject arenaAccountRoot;
+    Transform arenaAccountContent;
+    string arenaAccountStamp = "";
+    Button arenaSecAccount;
     // ---- P3a: the Program Bench canvas (career-only tab, index 5) ----
     GameObject programPanel; ProgramCanvas programCanvas;
     InputField nameInput;
@@ -2366,7 +2373,9 @@ public class MobileBuilderUI : MonoBehaviour
         arenaSecBoard = MkButton("arenasec_board", secRow.transform, "THE BOARD", 14,
             () => { if (arenaScreen != null) { arenaScreen.ShowInbox = false; arenaScreen.CloseCard(); arenaBoardStamp = -1; } });
         arenaSecInbox = MkButton("arenasec_inbox", secRow.transform, "MY FIGHTS", 14,
-            () => { if (arenaScreen != null) { arenaScreen.ShowInbox = true; arenaScreen.CloseCard(); arenaInboxStamp = ""; } });
+            () => { if (arenaScreen != null) { arenaScreen.ShowInbox = true; arenaScreen.ShowEnlistPanel = false; arenaScreen.CloseCard(); arenaInboxStamp = ""; } });
+        arenaSecAccount = MkButton("arenasec_account", secRow.transform, "ENLIST", 14,
+            () => { if (arenaScreen != null) { arenaScreen.ShowEnlistPanel = true; arenaScreen.ShowInbox = false; arenaScreen.CloseCard(); arenaAccountStamp = ""; } });
 
         // The weight classes. P4P first — it is the board the tab opens on,
         // and "everyone, pound for pound" is the only view that is never empty.
@@ -2457,6 +2466,196 @@ public class MobileBuilderUI : MonoBehaviour
         AddListOverflow(iScrollGO, iScroll, iVpRt);
         arenaInboxContent = iContent.transform;
         arenaInboxRoot.SetActive(false);
+
+        // ---- ENLIST / the account, surfaces 4 and 5 --------------------
+        arenaAccountRoot = MkPanel("arenaaccountroot", arenaPanel.transform, new Color(0f,0f,0f,0f));
+        var arle = arenaAccountRoot.AddComponent<LayoutElement>(); arle.flexibleHeight = 1f; arle.minHeight = 96f;
+        var arv = arenaAccountRoot.AddComponent<VerticalLayoutGroup>();
+        arv.childForceExpandWidth = true; arv.childForceExpandHeight = true;
+
+        var aScrollGO = MkPanel("arenaaccountscroll", arenaAccountRoot.transform, new Color(0f,0f,0f,0f));
+        var aScroll = aScrollGO.AddComponent<ScrollRect>(); aScroll.horizontal = false; aScroll.vertical = true;
+        var aVp = MkPanel("arenaaccountviewport", aScrollGO.transform, new Color(0f,0f,0f,0.15f));
+        var aVpRt = aVp.GetComponent<RectTransform>(); Stretch(aVpRt);
+        aVp.AddComponent<Mask>().showMaskGraphic = true;
+        var aContent = MkPanel("arenaaccountcontent", aVp.transform, new Color(0f,0f,0f,0f));
+        var aCrt = aContent.GetComponent<RectTransform>();
+        aCrt.anchorMin = new Vector2(0f,1f); aCrt.anchorMax = new Vector2(1f,1f);
+        aCrt.pivot = new Vector2(0.5f,1f); aCrt.anchoredPosition = Vector2.zero;
+        aCrt.sizeDelta = new Vector2(0f, 0f);
+        var aClg = aContent.AddComponent<VerticalLayoutGroup>();
+        aClg.spacing = 4f; aClg.childForceExpandWidth = true; aClg.childForceExpandHeight = false;
+        aClg.padding = new RectOffset(4,4,4,4);
+        var aCsf = aContent.AddComponent<ContentSizeFitter>(); aCsf.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+        aScroll.viewport = aVpRt; aScroll.content = aCrt;
+        AddListOverflow(aScrollGO, aScroll, aVpRt);
+        arenaAccountContent = aContent.transform;
+        arenaAccountRoot.SetActive(false);
+    }
+
+    /// <summary>A labelled text field, the dock's way. `secret` switches the
+    /// InputField to Password content type, which masks it — and the value is
+    /// pushed OUT to the caller and never read back, so nothing here ever
+    /// holds what was typed.</summary>
+    InputField ArenaField(Transform parent, string label, string initial,
+                          bool secret, System.Action<string> onChanged)
+    {
+        var row = MkPanel("field_" + label, parent, new Color(0f,0f,0f,0f));
+        var rle = row.AddComponent<LayoutElement>();
+        rle.flexibleHeight = 0f; rle.minHeight = TouchRow(); rle.preferredHeight = TouchRow();
+        var rh = row.AddComponent<HorizontalLayoutGroup>();
+        rh.spacing = 6f; rh.childForceExpandHeight = true; rh.childForceExpandWidth = false;
+        rh.padding = new RectOffset(6,6,2,2);
+
+        var lbl = MkText("lbl", row.transform, label, 13, TextAnchor.MiddleLeft);
+        lbl.color = new Color(0.74f, 0.80f, 0.90f);
+        lbl.gameObject.AddComponent<LayoutElement>().minWidth = 92f;
+
+        var boxGO = MkPanel("box", row.transform, new Color(0.06f,0.07f,0.09f,1f));
+        boxGO.AddComponent<LayoutElement>().flexibleWidth = 1f;
+        var txt = MkText("lbl", boxGO.transform, "", 14, TextAnchor.MiddleLeft);
+        Stretch(txt.rectTransform);
+        txt.rectTransform.offsetMin = new Vector2(8f, 0f); txt.rectTransform.offsetMax = new Vector2(-8f, 0f);
+        var fin = boxGO.AddComponent<InputField>();
+        fin.textComponent = txt;
+        fin.text = initial ?? "";
+        if (secret) fin.contentType = InputField.ContentType.Password;
+        fin.onValueChanged.AddListener(s => { if (onChanged != null) onChanged(s); });
+        return fin;
+    }
+
+    /// <summary>ENLIST when signed in; the account when not. Two faces of one
+    /// errand — you cannot enlist without an account, and an account exists in
+    /// order to enlist, which is what the sign-in copy has always promised.
+    ///
+    /// ⚠ THE PASSWORD IS PUSHED, NEVER PULLED. The field writes into
+    /// ArenaScreen.SetPassword and nothing reads it back; ArenaScreen clears
+    /// it the moment it has been sent. A screen that can hand its password
+    /// back is one screenshot, one log line or one careless bench away from
+    /// leaking it, and this dock gets photographed on purpose.</summary>
+    void RefreshArenaAccount()
+    {
+        if (arenaScreen == null || arenaAccountContent == null) return;
+
+        // Deliberately NOT keyed on anything derived from the password.
+        string stamp = LadderClient.SignedIn + "|" + arenaScreen.Registering
+                     + "|" + arenaScreen.MyRobots.Count + "|" + arenaScreen.Who
+                     + "|" + (Career.active && Career.Data != null ? Career.Data.activeRobot : -1);
+        if (stamp == arenaAccountStamp) return;
+        arenaAccountStamp = stamp;
+
+        for (int i = arenaAccountContent.childCount - 1; i >= 0; i--)
+            Destroy(arenaAccountContent.GetChild(i).gameObject);
+
+        if (!LadderClient.SignedIn)
+        {
+            var head = MkText("acchead", arenaAccountContent,
+                arenaScreen.Registering ? "CREATE AN ACCOUNT" : "SIGN IN", 16, TextAnchor.MiddleLeft);
+            head.color = new Color(0.90f, 0.94f, 1f);
+            head.gameObject.AddComponent<LayoutElement>().minHeight = 26f;
+
+            ArenaField(arenaAccountContent, "email", arenaScreen.Email, false,
+                       s => { if (arenaScreen != null) arenaScreen.Email = s; });
+            ArenaField(arenaAccountContent, "password", "", true,
+                       s => { if (arenaScreen != null) arenaScreen.SetPassword(s); });
+            if (arenaScreen.Registering)
+                ArenaField(arenaAccountContent, "display name", arenaScreen.DisplayName, false,
+                           s => { if (arenaScreen != null) arenaScreen.DisplayName = s; });
+
+            var row = MkPanel("accbtns", arenaAccountContent, new Color(0f,0f,0f,0f));
+            var rle = row.AddComponent<LayoutElement>();
+            rle.flexibleHeight = 0f; rle.minHeight = TouchRow(); rle.preferredHeight = TouchRow();
+            var rh = row.AddComponent<HorizontalLayoutGroup>();
+            rh.spacing = 4f; rh.childForceExpandWidth = true; rh.childForceExpandHeight = true;
+
+            var go = MkButton("accsubmit", row.transform,
+                arenaScreen.Registering ? "CREATE ACCOUNT" : "SIGN IN", 14,
+                () => { if (arenaScreen != null) { arenaScreen.SubmitAuth(); arenaAccountStamp = ""; } });
+            go.GetComponent<Image>().color = new Color(0.20f,0.45f,0.65f,1f);
+            var alt = MkButton("accalt", row.transform,
+                arenaScreen.Registering ? "I HAVE AN ACCOUNT" : "CREATE ONE", 14,
+                () => { if (arenaScreen != null) { arenaScreen.ToggleRegistering(); arenaAccountStamp = ""; } });
+            alt.GetComponent<Image>().color = new Color(0.16f,0.17f,0.21f,1f);
+
+            var note = MkText("accnote", arenaAccountContent,
+                "the board is public. signing in is what lets you enlist a robot,\n"
+                + "challenge, and spend what you win.", 13, TextAnchor.UpperLeft);
+            note.color = new Color(0.70f, 0.76f, 0.86f);
+            note.gameObject.AddComponent<LayoutElement>().minHeight = 38f;
+            return;
+        }
+
+        // ---- signed in: ENLIST -----------------------------------------
+        var h2 = MkText("enlisthead", arenaAccountContent, "ENLIST A ROBOT", 16, TextAnchor.MiddleLeft);
+        h2.color = new Color(0.90f, 0.94f, 1f);
+        h2.gameObject.AddComponent<LayoutElement>().minHeight = 26f;
+
+        CareerRobot ar = null;
+        if (Career.active && Career.Data != null)
+        {
+            int ari = Career.Data.activeRobot;
+            if (ari >= 0 && ari < Career.Data.stable.Count) ar = Career.Data.stable[ari];
+        }
+
+        if (ar == null || string.IsNullOrEmpty(ar.snapshot))
+        {
+            var t = MkText("enlistnone", arenaAccountContent,
+                "enlisting sends your SAVED career robot to the ladder, where it\n"
+                + "fights while you are away.\n\n"
+                + "there is no saved robot yet — build one and SAVE it, then come back.",
+                14, TextAnchor.UpperLeft);
+            t.color = new Color(0.80f, 0.86f, 0.96f);
+            t.gameObject.AddComponent<LayoutElement>().minHeight = 76f;
+        }
+        else
+        {
+            if (string.IsNullOrEmpty(arenaScreen.EnlistName)) arenaScreen.EnlistName = ar.name ?? "";
+            var sending = MkText("enlistsending", arenaAccountContent,
+                "sending: " + (ar.name ?? "(unnamed)")
+                + (string.IsNullOrEmpty(ar.program) ? "   ·   no program armed" : "   ·   program armed"),
+                14, TextAnchor.MiddleLeft);
+            sending.color = string.IsNullOrEmpty(ar.program)
+                ? new Color(0.90f, 0.78f, 0.60f) : new Color(0.76f, 0.90f, 0.80f);
+            sending.gameObject.AddComponent<LayoutElement>().minHeight = 22f;
+
+            ArenaField(arenaAccountContent, "ladder name", arenaScreen.EnlistName, false,
+                       s => { if (arenaScreen != null) arenaScreen.EnlistName = s; });
+
+            var rule = MkText("enlistrule", arenaAccountContent,
+                "re-enlisting under a name you already use replaces that robot's\n"
+                + "build and keeps its rating. a new name starts at placement.",
+                12, TextAnchor.UpperLeft);
+            rule.color = new Color(0.66f, 0.72f, 0.82f);
+            rule.gameObject.AddComponent<LayoutElement>().minHeight = 34f;
+
+            var eb = MkButton("enlistgo", arenaAccountContent, "ENLIST", 14,
+                () => { if (arenaScreen != null) { arenaScreen.EnlistNow(); arenaAccountStamp = ""; } });
+            var ele2 = eb.gameObject.AddComponent<LayoutElement>();
+            ele2.flexibleHeight = 0f; ele2.minHeight = TouchRow(); ele2.preferredHeight = TouchRow();
+            eb.GetComponent<Image>().color = new Color(0.20f,0.45f,0.65f,1f);
+        }
+
+        if (arenaScreen.MyRobots.Count > 0)
+        {
+            var t = MkText("enlistmine", arenaAccountContent, "already on the ladder:", 13, TextAnchor.MiddleLeft);
+            t.color = new Color(0.70f, 0.76f, 0.86f);
+            t.gameObject.AddComponent<LayoutElement>().minHeight = 20f;
+            foreach (var m in arenaScreen.MyRobots)
+            {
+                var r = MkText("mine_" + m.id, arenaAccountContent,
+                    "   " + m.name + (m.CanFight ? "   ·   " + m.category : "   ·   waiting to be checked"),
+                    13, TextAnchor.MiddleLeft);
+                r.color = m.CanFight ? new Color(0.82f, 0.88f, 0.96f) : new Color(0.72f, 0.74f, 0.66f);
+                r.gameObject.AddComponent<LayoutElement>().minHeight = 20f;
+            }
+        }
+
+        var so = MkButton("accsignout", arenaAccountContent,
+            "SIGN OUT" + (string.IsNullOrEmpty(arenaScreen.Who) ? "" : " (" + arenaScreen.Who + ")"), 13,
+            () => { if (arenaScreen != null) { arenaScreen.SignOut(); arenaAccountStamp = ""; } });
+        var sole = so.gameObject.AddComponent<LayoutElement>();
+        sole.flexibleHeight = 0f; sole.minHeight = TouchRow(); sole.preferredHeight = TouchRow();
+        so.GetComponent<Image>().color = new Color(0.16f,0.17f,0.21f,1f);
     }
 
     /// <summary>MY FIGHTS, and the launcher that plays one back.
@@ -2689,12 +2888,18 @@ public class MobileBuilderUI : MonoBehaviour
         // BOARD. The card wins because it is the only one you arrive at by
         // choosing something, and dropping a player back to a list they did
         // not ask for is how a screen feels like it fought them.
+        // Signed out, the ACCOUNT surface wins outright: every other view is
+        // something you can only do with an account, and a board you cannot
+        // act on is a worse first screen than the one asking you to sign in.
         bool onCard = arenaScreen.Card != null;
-        bool onInbox = !onCard && arenaScreen.ShowInbox;
-        bool onBoard = !onCard && !onInbox;
+        bool onAccount = !onCard && (arenaScreen.ShowEnlistPanel || !LadderClient.SignedIn);
+        bool onInbox = !onCard && !onAccount && arenaScreen.ShowInbox;
+        bool onBoard = !onCard && !onAccount && !onInbox;
 
         if (arenaCardRoot != null && arenaCardRoot.activeSelf != onCard)
         { arenaCardRoot.SetActive(onCard); arenaCardStamp = ""; }
+        if (arenaAccountRoot != null && arenaAccountRoot.activeSelf != onAccount)
+        { arenaAccountRoot.SetActive(onAccount); arenaAccountStamp = ""; }
         if (arenaInboxRoot != null && arenaInboxRoot.activeSelf != onInbox)
         { arenaInboxRoot.SetActive(onInbox); arenaInboxStamp = ""; }
         // Held as a reference, not walked to. content->viewport->scroll is two
@@ -2708,10 +2913,24 @@ public class MobileBuilderUI : MonoBehaviour
         if (arenaCatRow != null && arenaCatRow.activeSelf != onBoard)
             arenaCatRow.SetActive(onBoard);
 
-        TintSection(arenaSecBoard, !arenaScreen.ShowInbox);
-        TintSection(arenaSecInbox, arenaScreen.ShowInbox);
+        TintSection(arenaSecBoard, onBoard);
+        TintSection(arenaSecInbox, onInbox);
+        TintSection(arenaSecAccount, onAccount);
 
         if (onCard) { RefreshArenaCard(); return; }
+        if (onAccount)
+        {
+            RefreshArenaAccount();
+            if (arenaStatus != null)
+            {
+                bool own = arenaScreen.StatusScope == ArenaScreen.SC_ACCOUNT
+                           && !string.IsNullOrEmpty(arenaScreen.Status);
+                arenaStatus.text = own ? arenaScreen.Status
+                    : LadderClient.SignedIn ? "signed in" : "the board is public — signing in lets you play";
+                arenaStatus.color = new Color(0.80f, 0.88f, 1f);
+            }
+            return;
+        }
         if (onInbox)
         {
             RefreshArenaInbox();
@@ -3613,10 +3832,12 @@ public class MobileBuilderUI : MonoBehaviour
         if (arenaScreen != null)
         {
             arenaScreen.enabled = wantArena;
-            // The BOARD is ported, so the IMGUI must not also draw it — two
-            // renderers of one list is a doubled screen, not a fallback. The
-            // un-ported surfaces (card, inbox, sign-in, enlist) still need it,
-            // so this flips back the moment one of them is asked for.
+            // ALL FIVE SURFACES ARE PORTED, so inside the dock the IMGUI never
+            // draws: two renderers of one screen is a doubled screen, not a
+            // fallback. ArenaScreen keeps its OnGUI for the standalone
+            // ArenaScreen.Open() path, which is how this screen is looked at
+            // without the mobile dock — the model and the flows are shared, so
+            // that path cannot drift from this one.
             arenaScreen.SuppressImgui = wantArena;
         }
         if (arenaPanel != null) arenaPanel.SetActive(wantArena);
