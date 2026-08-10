@@ -1,0 +1,14 @@
+      server: http://localhost:5000
+PASS  the leaderboard answers without an error
+PASS  the board parses to at least one entry
+      4 ranked
+PASS  an entry carries a robot name
+PASS  an entry carries a category
+PASS  an entry carries a rating
+PASS  an entry carries a rank
+PASS  the five categories partition the board exactly (4 = 4)
+PASS  the scouting card loads
+PASS  the card names the robot
+PASS  the card carries a mass
+PASS  the card lists part ids — the design is public (1 parts)
+RESULT: 11 pass, 0 fail, 0 skip - ALL GREEN
