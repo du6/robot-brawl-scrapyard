@@ -38,6 +38,7 @@ The records, most recent first:
 
 | doc | what |
 |---|---|
+| `docs/ARENA_Judged_2026-08-10.md` | the ARENA photographed — and it has no entry point |
 | `docs/Mutual_Disarm_Root_Cause_2026-08-09.md` | the 43% disarm: the limb fails, not the weapon |
 | `docs/Cloud_Only_Defects_2026-08-09.md` | four faults that only exist in the cloud, and all four looked green |
 | `docs/Category_Assignment_Shipped_2026-08-09.md` | the ladder's weight categories; why the size box is gone |
@@ -187,6 +188,13 @@ hits that matter.**
   `ratings.category` is NOT NULL. `SnapshotMeta.category` is `""` for
   none, but `snapshots.category` accepts NULL and **not** the empty
   string — a worker must map one to the other.
+- **A UI PATH ONLY A HUMAN CAN DRIVE IS A UI PATH NOTHING CHECKS.** ENLIST
+  shipped with its network half 21/21 and the button itself never once
+  pressed; the first run of `EnlistUiBench` found the confirmation message
+  being destroyed by the `Refresh()` that followed it. Use the `Test*` seam
+  precedent (`ProgramCanvas`, `ArenaScreen`) — the bridge refuses reflection.
+  ⚠ And a draw seam must be serviced from a real `OnGUI`: `GUILayout` called
+  anywhere else throws, which reads as a broken panel and is a broken harness.
 - **A GREEN ENDPOINT IS NOT A REACHABLE FEATURE.** `POST /v1/robots` and
   `POST /v1/snapshots` were benched, deployed, alerted and worked in
   production for two days with **no caller anywhere in `Assets/`** — the
@@ -273,7 +281,7 @@ compose**) · `restore_drill.sh` 10/10 · WorkerBench **47/47** · FuzzBench
 · LadderLiveBench 11/11 · DisarmBench 32/32 · **CareerSmoke 128/128** ·
 **VerbBench 32/32** · **AutonomyBench 24/24** · **CanvasDragBench 31/31** ·
 **TestDebugBench 30/30** · **TouchSmoke 29/29** · **HazardBench 23/23** ·
-**EnlistLiveBench 21/21**.
+**EnlistLiveBench 21/21** · **EnlistUiBench 17/17**.
 
 **The stale-green list is gone — every one of them was run.** Two notes:
 `CareerBench` is a BALANCE harness and reports **12 pass, 5 "TUNING NEEDED"**
@@ -314,11 +322,18 @@ Things explicitly NOT done:
 1. **Point-in-time recovery is off** on `rb-db`. Daily backups (09:00 UTC,
    7 retained) are on and the restore drill passes, but a restore loses up
    to 24h. It costs WAL storage against a $25/mo budget — **owen's call.**
-2. **ARENA styling.** The board, scouting card, challenge flow, inbox, replay
-   launcher, sign-in and shop all exist and work; the layout is OnGUI
-   placeholder and largely unjudged. Screenshot with
-   `RobotBrawl.Phase0.UiShot.Take(path)` in play mode — the MCP capture
-   tools render from a camera and never see IMGUI.
+2. ⚠ **THE ARENA HAS NO ENTRY POINT — the whole screen is unreachable.**
+   `ArenaScreen`'s GUID is in **no scene and no prefab**, and no product code
+   constructs it. Board, scouting card, challenge flow, inbox, replay
+   launcher, sign-in, shop and enlist are all live code nobody can open; only
+   benches have ever instantiated it. **This is why the missing enlist flow
+   survived two days.** The tab bar is BUILD/LEAGUE/ROBOTS/SHOP/TROPHIES/
+   PROGRAM — six tabs, none of them the ladder — and `SHOP` is already a tab
+   while `ArenaScreen` draws a second shop of its own. **Where it lives is
+   owen's call.**
+   Now JUDGED, with pictures: `docs/ARENA_Judged_2026-08-10.md` and
+   `docs/shots/`. Re-shoot with `RobotBrawl.Phase0.ArenaShots.Run(dir)` in
+   play mode — the MCP capture tools render from a camera and never see IMGUI.
 3. ~~**The worker fight path has no BENCH.**~~ **CLOSED 2026-08-10** —
    `EnlistLiveBench` 21/21 drives the real `HttpWorkerTransport` against a
    live API for both halves: validate, then a real best-of-3 fought and posted
