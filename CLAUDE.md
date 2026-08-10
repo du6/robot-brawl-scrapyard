@@ -187,11 +187,31 @@ hits that matter.**
   `ratings.category` is NOT NULL. `SnapshotMeta.category` is `""` for
   none, but `snapshots.category` accepts NULL and **not** the empty
   string — a worker must map one to the other.
+- **A GREEN ENDPOINT IS NOT A REACHABLE FEATURE.** `POST /v1/robots` and
+  `POST /v1/snapshots` were benched, deployed, alerted and worked in
+  production for two days with **no caller anywhere in `Assets/`** — the
+  ladder was unreachable from inside the game and every bench was green,
+  because `api_smoke` calls the endpoints with curl. Twice now the fault has
+  been a missing CALLER, not broken code (the other is
+  `HANDOVER_2026-08-10` §3). When something "works", ask which line of
+  *product* code invokes it, and grep `Assets/` for the route.
 - **Read `docs/…` before touching `ProgramRunner` or `SensorBus`.** Both
   have a long history of fixes that regressed each other.
 
 ## Bench notes
 
+- **`EnlistLiveBench` needs a live API and WRITES TO IT** — accounts, robots,
+  snapshots, matches. Point it at a dev database, never production. Play mode,
+  21/21, skips rather than fails with no server. It is the only cover for the
+  worker's real HTTP transport and for the enlist path.
+  ⚠ **It drains the queue to reach its own match**, and it must: a single
+  claim takes whatever is at the head, which on a dev DB is usually a leftover
+  `api_smoke` job with a synthetic payload. A bench that assumes the first
+  claim is its own reports a red against a worker that did exactly right.
+  ⚠ **Its fixture has to be a REAL robot.** Validation checks the build (a
+  lone core fails "needs at least 1 wheel") AND the program against the build
+  (`Brawler` fails "needs a Compass tracker" on a chassis without one). Use
+  `FirstSteps`, the sensor-free preset.
 - **`CategoryBench` is pure data** — no scene, no play mode, no career
   state. `RobotBrawl.Phase0.CategoryBench.RunPure()`, under a second,
   44/44. The cheapest green in the project; run it after any edit near
@@ -227,12 +247,21 @@ csproj"*). The hand-written `RobotBrawl.Api.csproj` is tracked and no
 `bin/` or `obj/` entries remain. **Handovers written before that still
 list it as outstanding — they are stale on this point.**
 
-⚠ **What was never done is the acceptance test**: nobody has confirmed a
-fresh clone actually builds the API, because no session had both `git`
-and `dotnet`. `docs/CLI_SESSION_BRIEF_2026-08-09.md` §3 has the command.
-Also still open: `server/qa_api_server.log` is tracked despite now being
-in `.gitignore` (ignore rules do not untrack), and
-`server/qa_sql_bench.txt` is untracked while its two siblings are.
+✅ **The acceptance test is DONE, 2026-08-10, and it passed.** A fresh clone
+builds the API (0 warnings), ships all six `Sql/*.sql` and all nine
+migrations to the build output, boots, and runs `sql_bench` 53/53 +
+`api_smoke` 198/198 + `restore_drill`. The two tracked/untracked complaints
+that used to sit here are also resolved: `qa_api_server.log` is untracked and
+`qa_sql_bench.txt` is tracked.
+
+⚠ **It found a check that had never once run.** `run_local.sh` set
+`TRUST_PROXY` on the API PROCESS's environment while `api_smoke.sh` reads the
+same name out of ITS OWN shell — so section P skipped on every one-command run
+and passed only when a human had exported it by hand. It covers
+`X-Forwarded-For` spoof resistance. **`skipped` counts CALLS, not checks**
+(section L's one skip stands for fourteen), so "skipped 1" beside "failed 0"
+read as a pass. Skips are now replayed at the end under **NOT COVERED BY THIS
+RUN**. Read a skip line as missing cover, never as a pass.
 
 ## Current state, briefly
 
@@ -243,7 +272,8 @@ compose**) · `restore_drill.sh` 10/10 · WorkerBench **47/47** · FuzzBench
 25/25 · FightWorkerBench 21/21 play + 26/26 pure · LadderClientBench **28/28**
 · LadderLiveBench 11/11 · DisarmBench 32/32 · **CareerSmoke 128/128** ·
 **VerbBench 32/32** · **AutonomyBench 24/24** · **CanvasDragBench 31/31** ·
-**TestDebugBench 30/30** · **TouchSmoke 29/29** · **HazardBench 23/23**.
+**TestDebugBench 30/30** · **TouchSmoke 29/29** · **HazardBench 23/23** ·
+**EnlistLiveBench 21/21**.
 
 **The stale-green list is gone — every one of them was run.** Two notes:
 `CareerBench` is a BALANCE harness and reports **12 pass, 5 "TUNING NEEDED"**
@@ -289,8 +319,10 @@ Things explicitly NOT done:
    placeholder and largely unjudged. Screenshot with
    `RobotBrawl.Phase0.UiShot.Take(path)` in play mode — the MCP capture
    tools render from a camera and never see IMGUI.
-3. **The worker fight path has no BENCH.** `LadderLiveBench` covers the client
-   against a live server; the worker half is proven by hand, not by a bench.
+3. ~~**The worker fight path has no BENCH.**~~ **CLOSED 2026-08-10** —
+   `EnlistLiveBench` 21/21 drives the real `HttpWorkerTransport` against a
+   live API for both halves: validate, then a real best-of-3 fought and posted
+   by `FightWorkerLoop`, with the replay URL read back from the inbox.
 4. **The worker latency/cost trade is a dial.** 5 minutes was chosen because
    an always-on worker service costs ~$35/mo against a $25 budget. If owen
    wants instant fights, that is a scheduler change and a bill.
