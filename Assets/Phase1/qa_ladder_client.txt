@@ -1,0 +1,24 @@
+== A. an array of objects, which Field() cannot do ==
+PASS  two entries split out of one array
+PASS  …in order, not jumbled
+PASS  …and each is independently readable
+PASS  an unknown key yields nothing rather than throwing
+PASS  an empty body yields nothing
+PASS  a genuinely empty board yields nothing
+== B. braces that are not structure ==
+PASS  a '}' inside a robot name does not end the object
+PASS  …and the name survives intact
+PASS  …as does a ']'
+== C. nested objects inside an entry ==
+PASS  one match, despite two nested objects inside it
+PASS  …and its own fields still read
+== D. string arrays — the replay urls ==
+PASS  both replay urls parse
+PASS  …the playable recording is FIRST, so [0] is safe to hand to ReplayPlayer
+PASS  an empty url array is empty
+PASS  a missing url array is empty, not a crash
+== E. the fields the screen actually renders ==
+PASS  provisional reads false when earned
+PASS  …and true when not
+PASS  a JSON null comes back as null, not "null"
+ RESULT: 18 pass, 0 fail - ALL GREEN

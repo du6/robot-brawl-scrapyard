@@ -1,0 +1,47 @@
+== ARENA: the ladder is visible in the game, and a replay plays ==
+   2026-08-09, Claude Code CLI on owen's Mac.
+   M1's accept clause "watch the replay in-client from the cloud URL",
+   open since M1 began, closed here.
+
+   Live API on localhost:5000, real ratings from a real match, real
+   recordings in the blob store. Nothing stubbed.
+
+== A. the board ==
+PASS  GET /v1/leaderboard/FEATHER returned 2 ranked robots, anonymously
+PASS  rank 1  Proof-df  1362.3  deviation 290.3  provisional=true
+PASS  rank 2  Proof-ch  1037.7
+      Both provisional: neither has fought enough for the rank to be earned,
+      and the board says so rather than presenting 1362 as settled.
+
+== B. the inbox, with a real token ==
+PASS  logged in as the challenger account
+PASS  GET /v1/inbox returned 1 match
+PASS  outcome stated from THIS account's side: "LOST Proof-ch vs Proof-df"
+      Not a verdict enum the client has to re-derive.
+PASS  4 replay urls attached
+
+== C. the launcher — the clause that was open all day ==
+PASS  replayUrls[0] is a .rbr.gz, not the summary
+      FightWorkerLoop puts the recording first precisely so a client can
+      take [0] without checking.
+PASS  downloaded from the cloud url to
+      .../ladder_replays/7c7fb3126c904592b37730881344ed32.rbr.gz
+PASS  ReplayPlayer.Play opened it against the live BuilderManager
+PASS  165 frames applied, t=16.5s, error=[]
+
+== D. what could NOT be captured ==
+      No screenshot. ArenaScreen draws with OnGUI, which renders only to the
+      GAME view; the available capture tools photograph the SCENE view, so
+      the pixels are unverified. The DATA path is verified end to end -
+      board, inbox and playback all driven against the live API - but nobody
+      has yet LOOKED at the layout. Treat the styling as a placeholder.
+
+== E. owner state ==
+PASS  career byte-identical   18614d0e6603869f28fb65992b7d1484
+PASS  career mtime unchanged  2026-08-05 21:57
+PASS  token cleared from LadderClient, arena_screen and replay_player
+      destroyed, play mode exited
+
+ RESULT: the ladder is legible from inside the game and a cloud replay
+         plays. Two of M2's five ARENA surfaces exist; scouting card,
+         challenge flow and stake confirm do not.
