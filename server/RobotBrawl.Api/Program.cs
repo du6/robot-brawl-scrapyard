@@ -319,13 +319,27 @@ app.MapPost("/v1/robots", async (RobotReq req, ClaimsPrincipal user) =>
 app.MapGet("/v1/robots", async (ClaimsPrincipal user) =>
 {
     await using var c = await db.OpenAsync();
-    await using var cmd = new NpgsqlCommand(
-        "SELECT id, name, created_at, retired FROM robots WHERE user_id = $1 ORDER BY created_at;", c);
+    // The ACTIVE snapshot comes with it. Without this a client cannot name
+    // its own challenger: POST /v1/challenges wants a snapshot id, and there
+    // was no endpoint that turned "my robot" into one. Adding it here rather
+    // than a second round trip because the ladder browser needs the category
+    // anyway, to know which fights are legal before offering them.
+    await using var cmd = new NpgsqlCommand(@"
+        SELECT r.id, r.name, r.created_at, r.retired, s.id, s.category
+          FROM robots r
+          LEFT JOIN snapshots s ON s.robot_id = r.id AND s.status = 'ACTIVE'
+         WHERE r.user_id = $1 ORDER BY r.created_at;", c);
     cmd.Parameters.AddWithValue(UserId(user));
     var list = new List<object>();
     await using var r = await cmd.ExecuteReaderAsync();
     while (await r.ReadAsync())
-        list.Add(new { id = r.GetGuid(0), name = r.GetString(1), createdAt = r.GetDateTime(2), retired = r.GetBoolean(3) });
+        list.Add(new
+        {
+            id = r.GetGuid(0), name = r.GetString(1),
+            createdAt = r.GetDateTime(2), retired = r.GetBoolean(3),
+            activeSnapshotId = r.IsDBNull(4) ? (Guid?)null : r.GetGuid(4),
+            category = r.IsDBNull(5) ? null : r.GetString(5),
+        });
     return Results.Ok(list);
 }).RequireAuthorization();
 
@@ -418,7 +432,14 @@ app.MapGet("/v1/snapshots/{id:guid}", async (Guid id, ClaimsPrincipal user) =>
         massKg = r.IsDBNull(2) ? (int?)null : r.GetInt32(2),
         aabb = r.IsDBNull(3) ? null : new { x = r.GetFloat(3), y = r.GetFloat(4), z = r.GetFloat(5) },
         category = r.IsDBNull(6) ? null : r.GetString(6),
-        partsManifest = r.IsDBNull(7) ? null : r.GetFieldValue<string>(7),
+        // A REAL JSON array, not a quoted string. parts_manifest is jsonb, and
+        // handing it back as GetFieldValue<string> emitted
+        // "partsManifest": "[\"beam\",\"wheel\"]" — legal JSON that every
+        // client has to unescape and parse a second time. The scouting card
+        // read it as zero parts, which is how this was found.
+        partsManifest = r.IsDBNull(7)
+            ? null
+            : JsonSerializer.Deserialize<string[]>(r.GetFieldValue<string>(7)),
         programHash = r.IsDBNull(8) ? null : r.GetString(8),
         hasProgram = !r.IsDBNull(8) && r.GetString(8).Length > 0,
         // Only the owner is told WHY their own upload was rejected. Handing a

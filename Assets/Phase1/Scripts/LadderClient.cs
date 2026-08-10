@@ -46,6 +46,22 @@ namespace RobotBrawl.Phase0
         public List<string> replayUrls = new List<string>();
     }
 
+    public class ScoutCard
+    {
+        public string snapshotId = "", status = "", robotName = "", category = "", programHash = "";
+        public int massKg;
+        public bool hasProgram, mine;
+        /// <summary>Part IDS only — §1.3 makes the design public and the code
+        /// private, so this is the closest a scout gets to the build.</summary>
+        public List<string> parts = new List<string>();
+    }
+
+    public class MyRobot
+    {
+        public string id = "", name = "", activeSnapshotId = "", category = "";
+        public bool CanFight { get { return !string.IsNullOrEmpty(activeSnapshotId); } }
+    }
+
     public static class LadderClient
     {
         public static string BaseUrl = "http://localhost:5000";
@@ -120,6 +136,88 @@ namespace RobotBrawl.Phase0
             }
         }
 
+        /// <summary>§1.3's scouting card: design public, code private. Mass,
+        /// size, category and the part manifest are here; the program and the
+        /// payload url are not, for anyone.</summary>
+        public static IEnumerator ScoutCard(string snapshotId, Action<ScoutCard, string> done)
+        {
+            using (var req = Get("/v1/snapshots/" + snapshotId))
+            {
+                yield return req.SendWebRequest();
+                if (req.result != UnityWebRequest.Result.Success)
+                { LastError = req.error; done(null, req.error); yield break; }
+                string j = req.downloadHandler.text;
+                var card = new ScoutCard
+                {
+                    snapshotId = RobotWorker.Field(j, "id") ?? "",
+                    status = RobotWorker.Field(j, "status") ?? "",
+                    robotName = RobotWorker.Field(j, "robotName") ?? "",
+                    category = RobotWorker.Field(j, "category") ?? "",
+                    programHash = RobotWorker.Field(j, "programHash") ?? "",
+                };
+                int.TryParse(RobotWorker.Field(j, "massKg"), out card.massKg);
+                card.hasProgram = string.Equals(RobotWorker.Field(j, "hasProgram"), "true",
+                                                StringComparison.OrdinalIgnoreCase);
+                card.mine = string.Equals(RobotWorker.Field(j, "mine"), "true",
+                                          StringComparison.OrdinalIgnoreCase);
+                card.parts.AddRange(StringArray(j, "partsManifest"));
+                done(card, null);
+            }
+        }
+
+        public static IEnumerator MyRobots(Action<List<MyRobot>, string> done)
+        {
+            using (var req = Get("/v1/robots"))
+            {
+                yield return req.SendWebRequest();
+                if (req.result != UnityWebRequest.Result.Success)
+                { LastError = req.error; done(null, req.error); yield break; }
+                var rows = new List<MyRobot>();
+                // A BARE top-level array, unlike every other endpoint here.
+                foreach (string obj in Objects(req.downloadHandler.text, null))
+                {
+                    var m = new MyRobot
+                    {
+                        id = RobotWorker.Field(obj, "id") ?? "",
+                        name = RobotWorker.Field(obj, "name") ?? "",
+                        activeSnapshotId = RobotWorker.Field(obj, "activeSnapshotId") ?? "",
+                        category = RobotWorker.Field(obj, "category") ?? "",
+                    };
+                    rows.Add(m);
+                }
+                done(rows, null);
+            }
+        }
+
+        /// <summary>done(matchId, stake, err). A 429 here is the daily ticket
+        /// cap (§2.2), not a network problem, and the body says which.</summary>
+        public static IEnumerator Challenge(string challengerSnapshotId, string defenderSnapshotId,
+                                            Action<string, int, string> done)
+        {
+            string body = "{\"challengerSnapshotId\":" + RobotWorker.Str(challengerSnapshotId)
+                        + ",\"defenderSnapshotId\":" + RobotWorker.Str(defenderSnapshotId) + "}";
+            var req = new UnityWebRequest(BaseUrl.TrimEnd('/') + "/v1/challenges", "POST");
+            req.uploadHandler = new UploadHandlerRaw(System.Text.Encoding.UTF8.GetBytes(body));
+            req.downloadHandler = new DownloadHandlerBuffer();
+            req.SetRequestHeader("Content-Type", "application/json");
+            if (!string.IsNullOrEmpty(Token)) req.SetRequestHeader("Authorization", "Bearer " + Token);
+            using (req)
+            {
+                yield return req.SendWebRequest();
+                string text = req.downloadHandler != null ? req.downloadHandler.text : "";
+                if (req.result != UnityWebRequest.Result.Success)
+                {
+                    // The API's own words, not "HTTP 400" — it explains
+                    // punching down, an empty wallet and a spent ticket, and
+                    // the player deserves to read that.
+                    string why = RobotWorker.Field(text, "error") ?? req.error;
+                    LastError = why; done(null, 0, why); yield break;
+                }
+                int stake; int.TryParse(RobotWorker.Field(text, "stake"), out stake);
+                done(RobotWorker.Field(text, "matchId"), stake, null);
+            }
+        }
+
         public static IEnumerator Wallet(Action<long, string> done)
         {
             using (var req = Get("/v1/wallet"))
@@ -171,12 +269,18 @@ namespace RobotBrawl.Phase0
         /// Brace-counting rather than a regex, because a nested object inside
         /// an entry (rating deltas, an aabb) makes any regex wrong. Strings
         /// are skipped so a brace inside a robot NAME cannot end an object.</summary>
+        /// <summary>key == null means the body IS the array — GET /v1/robots
+        /// returns a bare one while everything else wraps it.</summary>
         public static List<string> Objects(string json, string key)
         {
             var outv = new List<string>();
             if (string.IsNullOrEmpty(json)) return outv;
-            int k = json.IndexOf("\"" + key + "\"", StringComparison.Ordinal);
-            if (k < 0) return outv;
+            int k = 0;
+            if (key != null)
+            {
+                k = json.IndexOf("\"" + key + "\"", StringComparison.Ordinal);
+                if (k < 0) return outv;
+            }
             int open = json.IndexOf('[', k);
             if (open < 0) return outv;
 

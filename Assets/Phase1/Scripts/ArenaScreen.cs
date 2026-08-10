@@ -40,6 +40,15 @@ namespace RobotBrawl.Phase0
         ReplayPlayer player;
         bool showInbox;
 
+        // Scouting + challenge state. `card` is the selected opponent, `mine`
+        // the robots that could answer, `pending` the confirm step.
+        ScoutCard card;
+        List<MyRobot> mine = new List<MyRobot>();
+        int myPick;
+        bool pending;
+        long balance = -1;
+        static readonly string[] Order = { "FEATHER", "LIGHT", "MIDDLE", "HEAVY", "SUPER" };
+
         void Start() { StartCoroutine(Refresh()); }
 
         IEnumerator Refresh()
@@ -52,10 +61,9 @@ namespace RobotBrawl.Phase0
             });
             if (!string.IsNullOrEmpty(LadderClient.Token))
             {
-                yield return LadderClient.Inbox((rows, err) =>
-                {
-                    if (err == null) inbox = rows;
-                });
+                yield return LadderClient.Inbox((rows, err) => { if (err == null) inbox = rows; });
+                yield return LadderClient.MyRobots((rows, err) => { if (err == null) mine = rows; });
+                yield return LadderClient.Wallet((b, err) => { if (err == null) balance = b; });
             }
             busy = false;
         }
@@ -85,6 +93,45 @@ namespace RobotBrawl.Phase0
             busy = false;
         }
 
+        IEnumerator Scout(LadderEntry e)
+        {
+            if (string.IsNullOrEmpty(e.activeSnapshotId))
+            { status = e.robotName + " has no active snapshot to scout"; yield break; }
+            busy = true; status = "scouting " + e.robotName + "…"; card = null; pending = false;
+            yield return LadderClient.ScoutCard(e.activeSnapshotId, (c, err) =>
+            {
+                if (err != null) status = "scout: " + err; else { card = c; status = ""; }
+            });
+            busy = false;
+        }
+
+        /// <summary>The stake the server WILL charge, computed the same way it
+        /// does: 50 x (1 + gap). Shown before the button is pressed, because a
+        /// confirm that does not say the price is not a confirm.</summary>
+        int StakeFor(MyRobot m, ScoutCard c)
+        {
+            int a = System.Array.IndexOf(Order, m.category);
+            int b = System.Array.IndexOf(Order, c.category);
+            if (a < 0 || b < 0) return 0;
+            return 50 * (1 + Mathf.Max(0, b - a));
+        }
+
+        IEnumerator DoChallenge(MyRobot m, ScoutCard c)
+        {
+            busy = true; status = "challenging " + c.robotName + "…";
+            yield return LadderClient.Challenge(m.activeSnapshotId, c.snapshotId, (matchId, stake, err) =>
+            {
+                // The API's own words. It distinguishes punching down, an
+                // empty wallet and a spent daily ticket, and a client that
+                // flattens those into "failed" throws that away.
+                status = err != null ? err
+                       : "challenge accepted — " + stake + " scrap staked, match queued";
+                if (err == null) { pending = false; card = null; }
+            });
+            yield return LadderClient.Wallet((b, e) => { if (e == null) balance = b; });
+            busy = false;
+        }
+
         // The first screenshot of this screen was taken at 2532x1170 and the
         // panel was unreadable: OnGUI's default font is a fixed pixel size, so
         // on a retina game view everything renders at about a third the size
@@ -107,7 +154,8 @@ namespace RobotBrawl.Phase0
             const int TOP = 64;
             GUILayout.BeginArea(new Rect(10, TOP, W, vh - TOP - 90), GUI.skin.box);
 
-            GUILayout.Label("<b>ARENA</b>   " + LadderClient.BaseUrl,
+            GUILayout.Label("<b>ARENA</b>   " + LadderClient.BaseUrl
+                            + (balance >= 0 ? "   ·   " + balance + " scrap" : ""),
                             new GUIStyle(GUI.skin.label) { richText = true });
 
             // Two rows of three: six categories on one row clipped "SUPER" to
@@ -133,6 +181,7 @@ namespace RobotBrawl.Phase0
             GUILayout.Label(status);
 
             if (!showInbox) DrawBoard(); else DrawInbox();
+            if (card != null) DrawCard();
 
             if (player != null)
             {
@@ -159,9 +208,71 @@ namespace RobotBrawl.Phase0
                 GUILayout.Label(Mathf.RoundToInt(e.rating).ToString(), GUILayout.Width(48));
                 GUILayout.Label(e.provisional ? "provisional" : "±" + Mathf.RoundToInt(e.deviation),
                                 GUILayout.Width(80));
+                if (!string.IsNullOrEmpty(e.activeSnapshotId)
+                    && GUILayout.Button("scout", GUILayout.Width(52)) && !busy)
+                    StartCoroutine(Scout(e));
                 GUILayout.EndHorizontal();
             }
             GUILayout.EndScrollView();
+        }
+
+        /// <summary>§1.3's scouting card. Everything here is public by design;
+        /// the program is not here and neither is the payload url, which is
+        /// the whole point of the rule.</summary>
+        void DrawCard()
+        {
+            GUILayout.Space(6);
+            GUILayout.BeginVertical(GUI.skin.box);
+            GUILayout.Label("<b>" + card.robotName + "</b>   " + card.category + "   "
+                            + card.massKg + " kg",
+                            new GUIStyle(GUI.skin.label) { richText = true });
+            GUILayout.Label(card.parts.Count + " parts: " + string.Join(", ", card.parts.ToArray()));
+            // Whether they have a program, never WHAT it is.
+            GUILayout.Label(card.hasProgram ? "has a program (contents private)" : "no program");
+
+            if (card.mine) GUILayout.Label("this is yours.");
+            else if (string.IsNullOrEmpty(LadderClient.Token)) GUILayout.Label("sign in to challenge.");
+            else
+            {
+                var eligible = new List<MyRobot>();
+                foreach (var m in mine)
+                    if (m.CanFight && System.Array.IndexOf(Order, m.category) >= 0
+                        && System.Array.IndexOf(Order, m.category) <= System.Array.IndexOf(Order, card.category))
+                        eligible.Add(m);
+
+                if (eligible.Count == 0)
+                    // §1.2: you may punch up, never down. Say which it is
+                    // rather than greying a button with no explanation.
+                    GUILayout.Label("no robot of yours may fight a " + card.category
+                                    + " — you can punch up, never down.");
+                else
+                {
+                    myPick = Mathf.Clamp(myPick, 0, eligible.Count - 1);
+                    GUILayout.BeginHorizontal();
+                    for (int i = 0; i < eligible.Count && i < 4; i++)
+                        if (GUILayout.Toggle(myPick == i, eligible[i].name, GUI.skin.button)) myPick = i;
+                    GUILayout.EndHorizontal();
+
+                    var me = eligible[myPick];
+                    int stake = StakeFor(me, card);
+                    if (!pending)
+                    {
+                        if (GUILayout.Button("challenge for " + stake + " scrap") && !busy) pending = true;
+                    }
+                    else
+                    {
+                        GUILayout.Label("stake " + stake + " scrap"
+                                        + (balance >= 0 ? " of your " + balance : "")
+                                        + " — returned if you win or draw, lost if you do not.");
+                        GUILayout.BeginHorizontal();
+                        if (GUILayout.Button("confirm") && !busy) StartCoroutine(DoChallenge(me, card));
+                        if (GUILayout.Button("cancel")) pending = false;
+                        GUILayout.EndHorizontal();
+                    }
+                }
+            }
+            if (GUILayout.Button("close card")) { card = null; pending = false; }
+            GUILayout.EndVertical();
         }
 
         void DrawInbox()
