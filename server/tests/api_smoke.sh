@@ -85,7 +85,16 @@ body_upload() { "$PY" -c "import json,sys;print(json.dumps({'robotId':sys.argv[1
 # Ask the database directly. Some contracts are invisible from the HTTP side:
 # a torn write still answers 200, and SQL NULL and the empty string are the
 # same three characters in a JSON response. Same credentials run_local.sh uses.
-dbq() { PGPASSWORD=rb psql -h localhost -U rb -d rb -qtA -c "$1" 2>/dev/null | tr -d '[:space:]'; }
+# PGPORT is a parameter because the compose stack publishes Postgres on 5433,
+# NOT 5432 — a Mac running its own Postgres holds 127.0.0.1:5432 and shadows
+# Docker's forward. Hardcoding 5432 here meant the db checks silently read the
+# HOST's database while the API wrote to the container's: every comparison
+# against live data was against the wrong rows. docker-compose.yml documents
+# the same trap on the port mapping.
+#
+#   against compose:  PGPORT=5433 bash tests/api_smoke.sh http://localhost:8080
+RB_PGPORT="${PGPORT:-5432}"
+dbq() { PGPASSWORD=rb psql -h localhost -p "$RB_PGPORT" -U rb -d rb -qtA -c "$1" 2>/dev/null | tr -d '[:space:]'; }
 
 # Post a validate-result carrying a RAW JSON category value, on its own fresh
 # snapshot and job, and echo the HTTP status. The category argument is spliced

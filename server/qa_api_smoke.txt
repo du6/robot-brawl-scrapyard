@@ -15,7 +15,7 @@ PASS  a wrong password and an unknown account are indistinguishable (both 401)
 
 == D. robots ==
 PASS  a robot is created
-      robot 5200f8cd-f774-4262-8c52-48c0db0a919b
+      robot 397352f7-11e1-4b94-8155-2d5d3cd72960
 PASS  …but not without a token
 
 == E. snapshot upload stays opaque (§5.2) ==
@@ -30,7 +30,7 @@ PASS  …and a wrong key is refused too
 PASS  a keyed worker claims a job
 PASS  …and the job is the VALIDATE the upload enqueued
 PASS  …pointing at the snapshot just uploaded
-PASS  …and carries a payload location the worker can resolve (file:///tmp/rb-blobs/snapshots/5200f8cd-f774-4262-8c52-48c0db0a919b/553485094011427795c4c15b7bb41b85.json)
+PASS  …and carries a payload location the worker can resolve (file:///tmp/rb-blobs/snapshots/397352f7-11e1-4b94-8155-2d5d3cd72960/c2a2d921194c43dcb94bd9df880a8af6.json)
 PASS  …and the payload sha256 rides along, so the worker can verify storage
 PASS  another worker cannot heartbeat a job it does not hold
 PASS  …the holder can
@@ -87,7 +87,7 @@ PASS  …with the verdict recorded
 PASS  …and the replay attached
 PASS  …the winner's wallet is stake-refunded and paid the purse
 PASS  …and the FIGHT job is retired, not left to spin
-PASS  …the winner climbed above the 1200 placement and the loser fell below (12001708 vs 1142)
+PASS  …the winner climbed above the 1200 placement and the loser fell below (17081200 vs 1142)
 PASS  …and the winner's deviation tightened from the 350 placement to 315
 PASS  …with the deltas recorded on the match for the fight report
 PASS  the same result cannot be settled twice
