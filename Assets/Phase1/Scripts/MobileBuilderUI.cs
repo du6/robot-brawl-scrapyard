@@ -1777,9 +1777,61 @@ public class MobileBuilderUI : MonoBehaviour
                                                     / (float)partGrid.constraintCount));
             float cellW = vw > 50f ? (vw - 8f - (cols - 1) * 6f) / cols : 112f;
             partGrid.cellSize = new Vector2(Mathf.Max(84f, cellW), R);
+
         }
         if (handleRt != null) handleRt.sizeDelta = new Vector2(300f, R);
         ApplyDockH();
+        FitPaletteRows(R);
+    }
+
+    /// <summary>Size the palette's cell HEIGHT to the viewport it actually
+    /// got, and scroll vertically if even that is not enough.
+    ///
+    /// ⚠ THIS MUST RUN AFTER ApplyDockH(), and that ordering is the whole
+    /// reason it is a separate method. The width pass above reads
+    /// partScrollRt.rect while the dock still has its PREVIOUS height, which
+    /// is harmless for width and useless for height — the first version of
+    /// this fix sat in that block, measured a stale viewport, and changed
+    /// nothing at all: the bench reported the identical 80.6 units clipped.
+    /// The canvas is force-rebuilt first because rect does not settle until
+    /// the layout pass runs.
+    ///
+    /// The bug being fixed: width has been derived from the viewport since R6
+    /// ("whatever ten columns is, make it fit") but height stayed pinned to a
+    /// touch row, which held only while the rows happened to fit. They stopped
+    /// fitting — the sensor palette took the catalogue to 25 parts and the
+    /// grid to FOUR rows, DockH(0) asked for six touch rows, and the
+    /// 0.68-of-screen cap (which by design has the last word) handed back
+    /// less. The grid laid out four rows anyway, so the bottom row hung 80.6
+    /// units BELOW a viewport that only scrolls horizontally: four parts a
+    /// player could see the tops of and never touch.
+    ///
+    /// That is R1's failure one axis over ("EVERY wheel and EVERY weapon lived
+    /// off-screen"), and it was invisible to every bench that checks data
+    /// rather than geometry. TouchSmoke's fixed-axis invariant caught it.</summary>
+    void FitPaletteRows(float R)
+    {
+        if (partGrid == null || partScrollRt == null) return;
+
+        float vh = partScrollRt.rect.height - 10f;      // the scrollbar's lane
+        if (vh <= 50f) return;                          // not laid out yet; leave it alone
+        int rows = Mathf.Max(1, partGrid.constraintCount);
+        float spacing = partGrid.spacing.y;
+        // Floored at 44: three lines of tile text at 8 pt want ~44.6, and the
+        // third line is the free-stock badge R4 added precisely because it was
+        // invisible on the parts you run out of.
+        float cellH = Mathf.Clamp((vh - (rows - 1) * spacing) / rows, 44f, R);
+        if (Mathf.Abs(partGrid.cellSize.y - cellH) > 0.5f)
+            partGrid.cellSize = new Vector2(partGrid.cellSize.x, cellH);
+
+        // Last resort, and it has to exist. If even the floored height cannot
+        // fit the rows — a shorter screen, or a catalogue that grows again —
+        // let the palette scroll VERTICALLY too. A cramped two-axis scroll is
+        // worse than a clean one-axis one, and both are enormously better than
+        // a part that cannot be reached at all.
+        var srr = partScrollRt.GetComponent<UnityEngine.UI.ScrollRect>();
+        if (srr != null)
+            srr.vertical = (rows * cellH + (rows - 1) * spacing) > vh + 1f;
     }
 
     /// <summary>Test hook: how tall a named control actually is, in points.
@@ -2814,6 +2866,19 @@ public class MobileBuilderUI : MonoBehaviour
                 lastScaleFactor = canvas.scaleFactor;
                 ApplyTouchSizes();
             }
+            // …and refit the palette EVERY frame, not just on a signature
+            // change. ApplyTouchSizes runs once when the UI is built, and at
+            // that moment the dock's new height has not propagated down to the
+            // palette's rect yet — so a one-shot fit measures a viewport that
+            // does not exist and leaves the cells at their unfitted height.
+            // That is exactly what the first two attempts at this fix did:
+            // correct arithmetic, run at a moment when the inputs were not
+            // there, and the bench reported the identical 80.6 units clipped
+            // both times.
+            //
+            // Cheap enough to do unconditionally: a handful of float ops, and
+            // it assigns only when the value actually moved.
+            FitPaletteRows(TouchRow());
         }
         bool fighting = FightManager.current != null
                      || bm.mode == BuilderManager.Mode.Test   // fix: dock stayed up over TEST DRIVE
