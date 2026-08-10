@@ -194,8 +194,10 @@ TouchSmoke · HazardBench · SensorProbe · CareerBench.
 | Claim resolves to a payload | fixed |
 | Category assignment — **mass only** | done, proven |
 | VALIDATE worker loop | done, benched against a stub |
-| **Worker ↔ live API, end to end** | **never done** |
-| FIGHT endpoints, replay upload | **do not exist** |
+| **Worker ↔ live API, end to end** | ✅ done 2026-08-09 — VALIDATE and FIGHT both |
+| FIGHT endpoints, replay upload | ✅ done 2026-08-09 (`88e0d46`) |
+| FIGHT worker loop (client) | ✅ done 2026-08-09 — 26 pure + 19 play-mode |
+| **Glicko-2 rating deltas** | **absent — fights settle money and move nobody** |
 | Worker image / Docker / GCP | not started |
 | Client login + ENLIST UI | not started — zero `UnityWebRequest` in the client |
 

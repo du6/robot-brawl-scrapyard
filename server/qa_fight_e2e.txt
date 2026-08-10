@@ -1,0 +1,62 @@
+== The FIGHT loop against the LIVE API — first end-to-end match ==
+   2026-08-09, Claude Code CLI on owen's Mac.
+   HANDOVER_TO_CLI.md §5.2 + §5.3 joined. Never done before this run.
+
+   Setup: dev DB truncated; API started by hand (dotnet run); two accounts,
+   two robots, snapshots uploaded through the real /v1/snapshots and
+   validated by the REAL ValidateWorkerLoop; challenge issued through
+   /v1/challenges; the fight run by the REAL FightWorkerLoop in play mode.
+   Nothing in this run was posted by a bench pretending to be a worker.
+
+== A. two genuinely different fighters ==
+      A draw proves the plumbing and nothing about the verdict mapping, so
+      this run needed a fight one side could actually win.
+      First attempt FAILED and is recorded because it is the useful part:
+      deleting the spindle+spike to make an "unarmed" robot was REJECTED -
+      "Structure has floating parts - Beam at (0.00, 1.25, 0.00) isn't flush
+      with anything." The spindle was STRUCTURAL, not just a weapon.
+      The fix keeps every part and its geometry and softens the weapon only:
+      spike Steel -> ABS, a one-token diff.
+
+PASS  Spinner-Armed  ACTIVE  FEATHER  mass 799  16 parts  (spike = Steel)
+PASS  Spinner-Soft   ACTIVE  FEATHER  mass 750  16 parts  (spike = ABS)
+      Same category, so gap 0 and the stake is the 50 base.
+
+== B. the challenge (§5.3 step 1) ==
+PASS  challenge accepted            matchId 6d1427ee, QUEUED, stake 50, gap 0
+PASS  escrow debited                challenger wallet 500 -> 450
+PASS  a FIGHT job was enqueued      job 4, READY
+
+== C. the worker (§5.3 step 2) ==
+PASS  FightWorkerLoop claimed the FIGHT job over HTTP
+PASS  fetched BOTH payloads and verified BOTH hashes
+PASS  ran best-of-3 through MatchRunner
+PASS  uploaded the replay before posting
+PASS  posted exactly once           handled 1, postsOK 1, postsFail 0, refusals 0
+
+== D. the settlement (§5.3 step 3) ==
+PASS  match COMPLETE
+PASS  verdict CHALLENGER            the armed robot won, as predicted
+PASS  replay attached               1 url, 3 seeds issued
+PASS  ledger settled                STAKE -50, STAKE_REFUND +50, PURSE +100
+PASS  challenger wallet 600         predicted 600 before the run
+PASS  every job DONE                4 DONE, 0 READY, 0 CLAIMED, 0 FAILED
+PASS  server log clean              0 error lines across the whole run
+
+== E. the replay is real, not just a url ==
+PASS  551 bytes on disk at the file:// url the API returned
+PASS  replayVersion 1, decidedBy "bouts"
+PASS  bout 0  seed 976552167   winner A  PlayerWin  49.0s
+PASS  bout 1  seed 1684946207  winner A  PlayerWin  32.7s
+      2-0, so the third bout was never run - stopWhenDecided working.
+      The runner says "A"; the wire says CHALLENGER. That mapping had never
+      been exercised by a robot actually winning until this run.
+
+== F. owner state ==
+PASS  career byte-identical   18614d0e6603869f28fb65992b7d1484
+PASS  career mtime unchanged  2026-08-05 21:57  (never written)
+PASS  owen's bay untouched    ExportRaw only; the builder was never driven
+PASS  editor restored         not playing, scene Main clean, no stray objects
+
+ RESULT: M1's VALIDATE and FIGHT halves both proven end to end, locally.
+         NOT a bench - hand-run. See the record for what stays open.
