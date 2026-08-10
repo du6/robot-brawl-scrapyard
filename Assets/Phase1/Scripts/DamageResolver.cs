@@ -142,6 +142,24 @@ public static class DamageResolver
     /// argued.</summary>
     public static float WEAPON_VS_WEAPON = 0.25f;
 
+    /// <summary>Multiplier on an EDGE's damage to NON-EDGE structure.
+    /// **1.0 = no change, and that is the shipped value.**
+    ///
+    /// It exists so the third lever named in
+    /// `docs/Mutual_Disarm_Root_Cause_2026-08-09.md` can be MEASURED. That
+    /// document's finding is that 69% of weapons leave a body with a mean 78%
+    /// of their HP intact — shed when the structure carrying them fails — so
+    /// `WEAPON_VS_WEAPON` cannot reach them at any value, and two fixes aimed
+    /// there moved the number by zero bouts. Ninety non-weapon parts died to
+    /// edges over thirty bouts, and NO weapon rule touches that path.
+    ///
+    /// ⚠ ADDED AS A NO-OP ON PURPOSE, the same way `OnPartDestroyed` was: a
+    /// lever nobody can sweep is a lever nobody can argue about, but changing
+    /// the shipped number while adding the dial would smuggle a balance change
+    /// in under a measurement. Balance is owen's call and gets made from the
+    /// table. `DisarmLeverBench` sweeps this; nothing else writes it.</summary>
+    public static float WEAPON_VS_STRUCT = 1f;
+
     /// <summary>Floating-damage-number hook for Phase 2B:
     /// (worldPos, amount, destroyedFlag, victimPartKey). Fired once per
     /// applied hit; the key (the victim's Part object) lets the HUD aggregate
@@ -274,7 +292,12 @@ public static class DamageResolver
 
         float dmg = effImpulse * hardness * DMG_K;
         // Weapon on weapon is a glancing exchange, not a mutual kill (2026-08-08).
-        if (IsEdge(hardness) && IsEdge(p.spec.edgeHardness)) dmg *= WEAPON_VS_WEAPON;
+        // Weapon on STRUCTURE is the other half, and it was untouched by any
+        // weapon rule until 2026-08-10 — which is the whole finding of
+        // Mutual_Disarm_Root_Cause. WEAPON_VS_STRUCT ships at 1.0, so this
+        // branch changes nothing until somebody sweeps it.
+        if (IsEdge(hardness))
+            dmg *= IsEdge(p.spec.edgeHardness) ? WEAPON_VS_WEAPON : WEAPON_VS_STRUCT;
         // Round-2-critic CRITICAL 3: the underside is not armour.
         if (victim.Flipped) dmg *= EXPOSED_MULT;
         if (dmg <= 0f) return;

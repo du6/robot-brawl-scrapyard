@@ -38,6 +38,7 @@ The records, most recent first:
 
 | doc | what |
 |---|---|
+| `docs/Disarm_Lever_Sweep_2026-08-10.md` | which lever moves the 43% — and the one that sounds right does nothing |
 | `docs/ARENA_Judged_2026-08-10.md` | the ARENA photographed — and it has no entry point |
 | `docs/Mutual_Disarm_Root_Cause_2026-08-09.md` | the 43% disarm: the limb fails, not the weapon |
 | `docs/Cloud_Only_Defects_2026-08-09.md` | four faults that only exist in the cloud, and all four looked green |
@@ -365,14 +366,18 @@ Things explicitly NOT done:
 4. **The worker latency/cost trade is a dial.** 5 minutes was chosen because
    an always-on worker service costs ~$35/mo against a $25 budget. If owen
    wants instant fights, that is a scheduler change and a bill.
-5. **The ladder's 43% mutual disarm — ROOT CAUSE FOUND 2026-08-09**, see
-   `docs/Mutual_Disarm_Root_Cause_2026-08-09.md`. **The weapon is not the
-   fragile thing; the limb carrying it is.** 69% of weapons leave with a
-   mean 78% of their HP intact, shed when their structure fails, so
-   `WEAPON_VS_WEAPON` cannot reach them at ANY value — which is why two
-   fixes moved it by zero bouts. `DisarmBench` measures it. **The lever has
-   to act on structure, and "make weapons tougher" is the reading this
-   rules out.** What to change is owen's call, unmade.
+5. **The ladder's 43% mutual disarm — root cause found 08-09, LEVERS NOW
+   SWEPT 08-10.** `docs/Disarm_Lever_Sweep_2026-08-10.md` is the table, 105
+   real fights, nothing changed. In short: **`WEAPON_VS_STRUCT` does nothing**
+   (candidate 3 is dead, measured); **`BREAK_K` ×1.5 takes 40% → 27% and ×2.0
+   buys nothing more**; and **a SHORTER WEAPON ARM fixes the mechanism but
+   makes the outcome worse** — weapons stop being shed (67% → 38% leave with
+   HP intact) and start being destroyed instead, so mutual disarm rises to
+   53%. Together, short limb + `BREAK_K` ×1.5 is the best row at 20%.
+   ⚠ 15 bouts/arm: trust the MECHANISM columns, not 1–2 bout differences in
+   the rate. **Which lever to pull, if any, is still owen's** — and the sweep
+   raises a question nobody has asked: is 43% actually wrong?
+
 6. **Mirror lock is unsolved** — two identical robots still meet
    nose-to-nose and mutually disarm. A behaviour problem, not a damage
    constant; 0.10 was tested and rejected.
