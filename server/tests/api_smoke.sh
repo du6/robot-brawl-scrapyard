@@ -1182,6 +1182,55 @@ else
   note "ledger: $(dbq "SELECT count(*) FROM ledger;") rows, net $(dbq "SELECT COALESCE(SUM(delta),0) FROM ledger;") scrap across $(dbq "SELECT count(DISTINCT user_id) FROM ledger;") wallets"
 fi
 
+# --------------------------------------------------------------- section M
+# §M4's monitoring surface.
+echo
+echo "--- M. metrics ---"
+c=$(req GET /v1/admin/metrics "")
+expect "metrics are refused without the worker key" "$c" "401"
+c=$(req GET /v1/admin/metrics "" "X-Worker-Key: $WKEY")
+if [ "$c" != "200" ]; then
+  no "metrics are served to a worker -- HTTP $c"
+  skip "the metric fields (5 checks)" "endpoint did not answer"
+else
+  ok "metrics are served to a worker"
+  # Each field is asserted by NAME. A renamed or dropped field would
+  # otherwise show up only as a Cloud Monitoring chart that quietly went
+  # flat, which is the failure mode alerting exists to prevent.
+  for f in ready claimed failed oldestReadyAgeS oldestHeartbeatAgeS pendingSnapshots; do
+    v=$(jget "$f")
+    [ -n "$v" ] && ok "metrics carry $f" || no "metrics are missing '$f'; a log-based metric built on it goes flat, not red"
+  done
+  # And the numbers must be real, not zeros from a query that silently
+  # matched nothing. Compared against the database directly.
+  same "pendingSnapshots agrees with the database" "$(jget pendingSnapshots)" \
+       "$(dbq "SELECT count(*) FROM snapshots WHERE status='PENDING';")"
+  same "failed agrees with the database" "$(jget failed)" \
+       "$(dbq "SELECT count(*) FROM match_jobs WHERE status='FAILED';")"
+fi
+# The log line the Cloud Monitoring metrics parse. Its shape is load-bearing:
+# the extractor is a regex, so a reworded message breaks every metric built on
+# it and nothing goes red. Checked here because nothing else would notice.
+SRVLOG="${SRVLOG:-$PWD/qa_api_server.log}"
+if [ ! -f "$SRVLOG" ]; then
+  skip "the rbmetrics log line keeps its shape" "no server log at $SRVLOG"
+else
+  # [0-9]+ and not [0-9]* — the first cut used * , which matches the EMPTY
+  # string, so "ready= claimed=" would have passed as well-formed.
+  RE='rbmetrics ready=[0-9]+ claimed=[0-9]+ failed=[0-9]+ done=[0-9]+ oldest_ready_s=[0-9]+ oldest_heartbeat_s=[0-9]+ pending_snapshots=[0-9]+ oldest_pending_s=[0-9]+'
+  L=$(grep -Eo "$RE" "$SRVLOG" | tail -1)
+  [ -n "$L" ] && ok "the rbmetrics log line keeps its shape" \
+              || no "no well-formed rbmetrics line in $SRVLOG -- the log-based metrics parse this with a regex and would silently flatline"
+  [ -n "$L" ] && note "$L"
+  # …and that it reports the world rather than a row of zeros. The first
+  # version of this check passed on "ready=0 … pending_snapshots=0", which a
+  # query matching nothing at all would also produce. run_local.sh sets
+  # Queue__ReapEverySeconds=5 so several passes land inside a 13-second run.
+  NZ=$(grep -Eo "$RE" "$SRVLOG" | grep -Ec '(ready|claimed|failed|done|pending_snapshots)=[1-9]')
+  [ "${NZ:-0}" -gt 0 ] && ok "…and reports real counts, not a row of zeros" \
+    || no "every rbmetrics line was all zeros while the database held $(dbq "SELECT count(*) FROM match_jobs;") jobs -- a query matching nothing would look identical"
+fi
+
 # --------------------------------------------------------------- section P
 # The proxy headers. THIS SECTION IS LAST ON PURPOSE: it deliberately
 # exhausts an auth rate-limit bucket, and if the partitioning it is testing

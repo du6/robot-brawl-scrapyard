@@ -259,6 +259,14 @@ public sealed record ClaimedJob(
     string? DefenderUrl, string? DefenderSha256,
     string? Arena, int[]? Seeds);
 
+/// <summary>Queue health, read on a timer by the reaper and served by
+/// GET /v1/admin/metrics. The two *AgeS fields are the ones worth alerting
+/// on; the counts are context for whoever the alert wakes.</summary>
+public sealed record QueueStats(
+    int Ready, int Claimed, int Failed, int Done,
+    int OldestReadyAgeS, int OldestHeartbeatAgeS,
+    int PendingSnapshots, int OldestPendingSnapshotAgeS);
+
 /// <summary>The Postgres-as-queue half of §5.1. Every statement is loaded
 /// from Sql/*.sql rather than inlined, because those files are what
 /// tests/sql_bench.sh proves — inlining the text here would create a second
@@ -266,7 +274,7 @@ public sealed record ClaimedJob(
 public sealed class JobQueue
 {
     readonly Db _db;
-    readonly string _claim, _heartbeat, _complete, _fail, _reap;
+    readonly string _claim, _heartbeat, _complete, _fail, _reap, _stats;
 
     public JobQueue(Db db, string sqlDir)
     {
@@ -276,6 +284,20 @@ public sealed class JobQueue
         _complete  = File.ReadAllText(Path.Combine(sqlDir, "complete_job.sql"));
         _fail      = File.ReadAllText(Path.Combine(sqlDir, "fail_job.sql"));
         _reap      = File.ReadAllText(Path.Combine(sqlDir, "reap_stale_jobs.sql"));
+        _stats     = File.ReadAllText(Path.Combine(sqlDir, "queue_stats.sql"));
+    }
+
+    /// <summary>The numbers §M4 alerts on. See queue_stats.sql for why these
+    /// four and not the obvious counts.</summary>
+    public async Task<QueueStats> StatsAsync(CancellationToken ct = default)
+    {
+        await using var c = await _db.OpenAsync(ct);
+        await using var cmd = new NpgsqlCommand(_stats, c);
+        await using var r = await cmd.ExecuteReaderAsync(ct);
+        if (!await r.ReadAsync(ct)) return new QueueStats(0, 0, 0, 0, 0, 0, 0, 0);
+        return new QueueStats(
+            (int)r.GetInt64(0), (int)r.GetInt64(1), (int)r.GetInt64(2), (int)r.GetInt64(3),
+            r.GetInt32(4), r.GetInt32(5), (int)r.GetInt64(6), r.GetInt32(7));
     }
 
     public async Task<ClaimedJob?> ClaimAsync(string workerId, CancellationToken ct = default)
@@ -368,6 +390,28 @@ public sealed class ReaperService : BackgroundService
             {
                 int n = await _q.ReapAsync(stale, maxAtt, ct);
                 if (n > 0) _log.LogWarning("reaped {Count} stale job(s)", n);
+
+                // §M4's queue depth / failure rate / heartbeat age, emitted on
+                // the pass we are already making rather than on a second
+                // timer. The prefix is fixed and the shape is key=value
+                // because Cloud Logging extracts these with a regex; changing
+                // either breaks the log-based metrics silently, so it is
+                // covered by api_smoke rather than left to trust.
+                //
+                // HONEST LIMITATION: this only runs while an instance is
+                // alive, and min-instances=0 means that is "while there is
+                // traffic". A queue that backs up with nothing polling emits
+                // nothing at all — absence of the metric is itself the
+                // signal, which is why the alert policies below fire on
+                // missing data as well as on high values.
+                var s = await _q.StatsAsync(ct);
+                _log.LogInformation(
+                    "rbmetrics ready={Ready} claimed={Claimed} failed={Failed} done={Done} " +
+                    "oldest_ready_s={OldestReady} oldest_heartbeat_s={OldestHeartbeat} " +
+                    "pending_snapshots={Pending} oldest_pending_s={OldestPending}",
+                    s.Ready, s.Claimed, s.Failed, s.Done,
+                    s.OldestReadyAgeS, s.OldestHeartbeatAgeS,
+                    s.PendingSnapshots, s.OldestPendingSnapshotAgeS);
             }
             catch (Exception ex) when (!ct.IsCancellationRequested)
             {

@@ -523,6 +523,18 @@ app.MapGet("/v1/snapshots/{id:guid}", async (Guid id, ClaimsPrincipal user) =>
     });
 }).AllowAnonymous();
 
+// §M4's monitoring surface. Behind the worker key, not anonymous: queue depth
+// and failure counts tell an attacker when the ladder is struggling, which is
+// exactly when a flood is cheapest. It is also what an uptime check can hit
+// to prove the DB is reachable, which /healthz deliberately does not do —
+// /healthz answers from the process alone, so it stays green through a total
+// database outage. Two different questions, two different endpoints.
+app.MapGet("/v1/admin/metrics", async (HttpContext ctx, JobQueue q) =>
+{
+    if (!WorkerAuthed(ctx)) return Results.Unauthorized();
+    return Results.Ok(await q.StatsAsync());
+}).AllowAnonymous();
+
 // ----------------------------------------------------------- worker path
 // §5.5: worker→API calls are authenticated with a worker key. Ownership of a
 // job is checked in SQL (claimed_by), so a stolen key still cannot steal

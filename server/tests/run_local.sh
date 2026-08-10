@@ -44,6 +44,7 @@ echo "starting the API (log: qa_api_server.log)…"
   WORKER_KEY="dev-only-worker-key" \
   BLOB_ROOT="/tmp/rb-blobs" \
   TRUST_PROXY="1" \
+  Queue__ReapEverySeconds="5" \
   dotnet run ) > "$SRV" 2>&1 &
 API_PID=$!
 trap 'kill $API_PID 2>/dev/null' EXIT INT TERM
