@@ -33,9 +33,20 @@ WKEY="${WORKER_KEY:-dev-only-worker-key}"
 PY=$(command -v python3 || command -v python) || { echo "python3 is required"; exit 2; }
 
 pass=0; fail=0; skipped=0
+SKIP_LOG=/tmp/rb_skips.$$; : > "$SKIP_LOG"
 ok()   { pass=$((pass+1));       printf 'PASS  %s\n' "$1"; }
 no()   { fail=$((fail+1));       printf 'FAIL  %s\n' "$1"; }
-skip() { skipped=$((skipped+1)); printf 'SKIP  %s -- %s\n' "$1" "$2"; }
+# ⚠ A SKIP COUNT UNDERSTATES WHAT IS MISSING, and the summary must not hide
+# it — 2026-08-10. `skipped` counts CALLS, not checks: section L's single skip
+# stands in for FOURTEEN checks, so "skipped 1" beside "failed 0" can mean a
+# seventh of this bench never executed and the run still reads as a pass.
+#
+# Measured, and this is why the banner exists: the proxy section skipped on
+# every one-command run for a day because run_local.sh set TRUST_PROXY on the
+# SERVER's environment and not on this script's. Nothing said so. The reasons
+# are replayed at the end so what did not run is stated, not merely counted.
+skip() { skipped=$((skipped+1)); printf 'SKIP  %s -- %s\n' "$1" "$2"
+         printf '  %s -- %s\n' "$1" "$2" >> "$SKIP_LOG"; }
 note() { printf '      %s\n' "$1"; }
 
 BODY=/tmp/rb_body.$$
@@ -1420,5 +1431,12 @@ fi
 
 rm -f "$BODY" "$VRC_SNAP_FILE" "$VRC_JOB_FILE"
 echo
+if [ "$skipped" -gt 0 ]; then
+  echo "----- NOT COVERED BY THIS RUN ($skipped) -----"
+  cat "$SKIP_LOG"
+  echo "----- a skip is not a pass; each line above is cover this run did not provide -----"
+  echo
+fi
+rm -f "$SKIP_LOG"
 echo "===== passed $pass  failed $fail  skipped $skipped ====="
 [ "$fail" -eq 0 ] || exit 1

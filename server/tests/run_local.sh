@@ -24,6 +24,26 @@ SRV="$PWD/qa_api_server.log"
 SQL="$PWD/qa_sql_bench.txt"
 OUT="$PWD/qa_api_smoke.txt"
 
+# ⚠ ONE VARIABLE, TWO CONSUMERS, AND THEY MUST NOT DRIFT — 2026-08-10.
+#
+# The API reads TRUST_PROXY to decide whether to honour X-Forwarded-For, and
+# api_smoke.sh reads THE SAME NAME OUT OF ITS OWN SHELL to decide whether the
+# proxy-header section can run at all. This script used to set it only on the
+# server's environment, so the section skipped on every one-command run and
+# passed only when a human happened to export it by hand first.
+#
+# That is the failure mode the skip was designed to avoid and fell into
+# anyway: `skip` prints one line in a 198-line file and the summary still says
+# "failed 0", so a check covering X-Forwarded-For SPOOF RESISTANCE — a
+# cloud-only defect class, see docs/Cloud_Only_Defects_2026-08-09.md — looked
+# green while never executing. Found by running the bench from a fresh clone
+# in a shell that had never exported it: 196 passed, 1 skipped, against the
+# working copy's 198.
+#
+# Exporting it here means the process that STARTS the server and the bench
+# that TESTS it can only ever be told the same thing.
+export TRUST_PROXY="1"
+
 if lsof -nP -iTCP:5000 -sTCP:LISTEN >/dev/null 2>&1; then
   echo "Port 5000 is already in use — stop the API running in your other tab (Ctrl-C) and re-run."
   exit 2
@@ -56,7 +76,7 @@ echo "starting the API (log: qa_api_server.log)…"
   JWT_SECRET="dev-only-change-me-0123456789abcdef" \
   WORKER_KEY="dev-only-worker-key" \
   BLOB_ROOT="/tmp/rb-blobs" \
-  TRUST_PROXY="1" \
+  TRUST_PROXY="$TRUST_PROXY" \
   Queue__ReapEverySeconds="5" \
   dotnet run ) > "$SRV" 2>&1 &
 API_PID=$!
