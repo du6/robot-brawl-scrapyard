@@ -15,7 +15,7 @@ PASS  a wrong password and an unknown account are indistinguishable (both 401)
 
 == D. robots ==
 PASS  a robot is created
-      robot 82e907f5-6016-4dfa-9505-72b11d581c3f
+      robot 008f01c3-8a2e-4e93-aa05-2d8d9161161f
 PASS  …but not without a token
 
 == E. snapshot upload stays opaque (§5.2) ==
@@ -30,7 +30,7 @@ PASS  …and a wrong key is refused too
 PASS  a keyed worker claims a job
 PASS  …and the job is the VALIDATE the upload enqueued
 PASS  …pointing at the snapshot just uploaded
-PASS  …and carries a payload location the worker can resolve (file:///tmp/rb-blobs/snapshots/82e907f5-6016-4dfa-9505-72b11d581c3f/2f0117803a454a8b918aa30c2dd24272.json)
+PASS  …and carries a payload location the worker can resolve (file:///tmp/rb-blobs/snapshots/008f01c3-8a2e-4e93-aa05-2d8d9161161f/c4dde43637a14cba9b44d6e7433034d1.json)
 PASS  …and the payload sha256 rides along, so the worker can verify storage
 PASS  another worker cannot heartbeat a job it does not hold
 PASS  …the holder can
@@ -83,7 +83,7 @@ PASS  …with the verdict recorded
 PASS  …and the replay attached
 PASS  …the winner's wallet is stake-refunded and paid the purse
 PASS  …and the FIGHT job is retired, not left to spin
-PASS  …the winner climbed above the 1200 placement and the loser fell below (1362 vs 1125)
+PASS  …the winner climbed above the 1200 placement and the loser fell below (1362 vs 1038)
 PASS  …and the winner's deviation tightened from the 350 placement to 290
 PASS  …with the deltas recorded on the match for the fight report
 PASS  the same result cannot be settled twice
@@ -110,15 +110,20 @@ PASS  a 4th win vs the same opponent is flagged tapered
 PASS  …the stake is still refunded, so the wallet is exactly level
 PASS  …no PURSE row was written for it
 PASS  …and the winner's rating did not move
+PASS  the provisional threshold is configured
 PASS  the defender's daily floor is reported as reached
 PASS  …and the drop is exactly the remaining allowance (70 of 75 already spent today)
 PASS  …the API reports how much of the day's allowance was already gone
+PASS  …and records that this rank was floor-protected
+PASS  a PROVISIONAL defender is not floor-protected
+PASS  …and is reported as provisional, so nobody thinks the floor broke
+PASS  …so it takes its full natural loss, 241 points, past the 75/day floor
 
 == M. the read side: leaderboard, match view, inbox, wallet (§2.1/§5.3) ==
 PASS  the leaderboard is public — no token needed to scout standings
 PASS  …and lists at least one rated robot (2 in FEATHER)
 PASS  …ranked from 1
-PASS  …and ordered by rating, best first (1295 >= 1160.6)
+PASS  …and ordered by rating, best first (1133.1 >= 1058.9)
 PASS  …flagging a placement-deviation robot as provisional
 PASS  an unknown category is refused rather than returning an empty board
 PASS  a match is publicly viewable, so a scout can watch a fight
@@ -151,6 +156,6 @@ PASS  no refund ever exceeds the stake it returns
 PASS  a challenger who lost never got their stake back
 PASS  a drawn match never paid a purse
 PASS  no wallet is overdrawn
-      ledger: 19 rows, net 2250 scrap across 3 wallets
+      ledger: 21 rows, net 2250 scrap across 3 wallets
 
-===== passed 124  failed 0  skipped 0 =====
+===== passed 129  failed 0  skipped 0 =====

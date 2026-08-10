@@ -702,7 +702,12 @@ else
        VALUES ('$CHSNAP','$DSNAP','$CHCAT',0,'synthetic','{1,2,3}','COMPLETE','CHALLENGER', now(),
                '{\"defender\":{\"before\":1300,\"after\":1230}}'::jsonb);" >/dev/null
   ALLOWED=$(( FLOOR - SPENT ))
-  dbq "UPDATE ratings SET rating = 1300 WHERE robot_id='$LDFROBOT' AND category='$CHCAT';" >/dev/null
+  # An ESTABLISHED rank: deviation below the provisional threshold. This is
+  # what the floor exists to protect. The provisional case is checked below,
+  # and it must behave the OPPOSITE way.
+  PROVAT=$(dbq "SELECT value::int FROM ladder_config WHERE key='floor_applies_below_deviation';")
+  is "the provisional threshold is configured" "$PROVAT" 200
+  dbq "UPDATE ratings SET rating = 1300, deviation = 120 WHERE robot_id='$LDFROBOT' AND category='$CHCAT';" >/dev/null
   DBEFORE=$(dbq "SELECT round(rating) FROM ratings WHERE robot_id='$LDFROBOT' AND category='$CHCAT';")
   S=$(req POST /v1/challenges "{\"challengerSnapshotId\":\"$CHSNAP\",\"defenderSnapshotId\":\"$DSNAP\"}" "$AUTH")
   FMATCH=$(jget matchId)
@@ -725,7 +730,47 @@ else
     is "…and the drop is exactly the remaining allowance ($SPENT of $FLOOR already spent today)" \
        "$DROP" "$ALLOWED"
     is "…the API reports how much of the day's allowance was already gone" \
-       "$(dbq "SELECT round((rating_deltas->>'defenderDroppedToday')::numeric) FROM matches WHERE id='$FMATCH';")" "$SPENT" 
+       "$(dbq "SELECT round((rating_deltas->>'defenderDroppedToday')::numeric) FROM matches WHERE id='$FMATCH';")" "$SPENT"
+    is "…and records that this rank was floor-protected" \
+       "$(dbq "SELECT rating_deltas->>'defenderFloorProtected' FROM matches WHERE id='$FMATCH';")" true
+  fi
+
+  # ---- ...and who it does NOT protect (migration 005) ------------------
+  # The floor guards an EARNED rank. A placement rating is a guess with a
+  # high deviation attached, and the whole point of that deviation is to move
+  # fast. Measured: at RD 350 one loss is worth 162 points, more than double
+  # the entire daily allowance - so a protected provisional robot would sit
+  # above its true rating for days and mislead everyone who challenges it.
+  #
+  # This check is the guard on the exemption itself: if it ever passes while
+  # the ESTABLISHED case above also passes, the floor is working on exactly
+  # the ranks it should and none of the ones it should not.
+  dbq "DELETE FROM matches WHERE arena='synthetic';" >/dev/null
+  dbq "UPDATE matches SET rating_deltas = rating_deltas - 'defender'
+        WHERE defender_snapshot_id='$DSNAP' AND rating_deltas ? 'defender';" >/dev/null
+  dbq "UPDATE ratings SET rating = 1300, deviation = 350 WHERE robot_id='$LDFROBOT' AND category='$CHCAT';" >/dev/null
+  PBEFORE=$(dbq "SELECT round(rating) FROM ratings WHERE robot_id='$LDFROBOT' AND category='$CHCAT';")
+  S=$(req POST /v1/challenges "{\"challengerSnapshotId\":\"$CHSNAP\",\"defenderSnapshotId\":\"$DSNAP\"}" "$AUTH")
+  PMATCH=$(jget matchId)
+  if [ "$S" != "200" ] || [ -z "$PMATCH" ]; then
+    skip "the provisional exemption (3 checks)" "the provisional challenge did not open (HTTP $S)"
+  else
+    req POST /v1/worker/jobs/claim '{"workerId":"smoke-prot"}' "X-Worker-Key: $WKEY" >/dev/null
+    PJOB=$(jget id)
+    req POST "/v1/worker/jobs/$PJOB/fight-result" \
+      "{\"matchId\":\"$PMATCH\",\"workerId\":\"smoke-prot\",\"verdict\":\"CHALLENGER\",\"replayUrls\":[],\"bouts\":[]}" \
+      "X-Worker-Key: $WKEY" >/dev/null
+    is "a PROVISIONAL defender is not floor-protected" \
+       "$(dbq "SELECT rating_deltas->>'defenderFloorProtected' FROM matches WHERE id='$PMATCH';")" false
+    is "…and is reported as provisional, so nobody thinks the floor broke" \
+       "$(dbq "SELECT rating_deltas->>'defenderProvisional' FROM matches WHERE id='$PMATCH';")" true
+    PAFTER=$(dbq "SELECT round(rating) FROM ratings WHERE robot_id='$LDFROBOT' AND category='$CHCAT';")
+    PDROP=$(( PBEFORE - PAFTER ))
+    if [ "$PDROP" -gt "$FLOOR" ]; then
+      ok "…so it takes its full natural loss, $PDROP points, past the ${FLOOR}/day floor"
+    else
+      no "a provisional defender only fell $PDROP points — the floor is still clamping a rank that has not been earned"
+    fi
   fi
 fi
 

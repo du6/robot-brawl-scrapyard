@@ -829,9 +829,19 @@ app.MapPost("/v1/worker/jobs/{id:long}/fight-result",
         // DEFENDED today carries its own before/after in rating_deltas. A
         // separate daily counter would be a second source of truth for a
         // number the match history already holds.
-        bool floorHit = false;
+        //
+        // ⚠ The floor protects an EARNED rank, not a placement guess. See
+        // migration 005: at placement deviation one loss is worth 162 points
+        // against a 75/day allowance, so applying the floor there leaves a
+        // new robot stranded above its true rating and misleads everyone who
+        // challenges it. Deviation at or above the threshold means the rating
+        // is provisional — the same threshold the leaderboard shows — and a
+        // provisional rating takes its full natural movement.
+        bool floorHit = false, floorProtected = false;
         double droppedToday = 0;
-        if (dfNew is Rating cand && cand.R < dfR.R)
+        double floorBelowRd = cfg.TryGetValue("floor_applies_below_deviation", out var fr) ? fr : 200;
+        floorProtected = dfR.Rd < floorBelowRd;
+        if (floorProtected && dfNew is Rating cand && cand.R < dfR.R)
         {
             double floor = cfg.TryGetValue("defense_daily_floor", out var fl) ? fl : 75;
             await using (var dd = new NpgsqlCommand(@"
@@ -879,6 +889,11 @@ app.MapPost("/v1/worker/jobs/{id:long}/fight-result",
             priorWins,
             defenderFloorReached = floorHit,
             defenderDroppedToday = droppedToday,
+            // A provisional defender is deliberately unprotected. Say so, or
+            // a player watching their new robot fall 160 points will assume
+            // the floor is broken.
+            defenderFloorProtected = floorProtected,
+            defenderProvisional = !floorProtected,
         });
         await using var rd = new NpgsqlCommand(
             "UPDATE matches SET rating_deltas = $2::jsonb WHERE id = $1;", c, tx);
