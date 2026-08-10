@@ -204,7 +204,8 @@ TouchSmoke · HazardBench · SensorProbe · CareerBench.
 | **Worker ↔ live API, end to end** | ✅ done 2026-08-09 — VALIDATE and FIGHT both |
 | FIGHT endpoints, replay upload | ✅ done 2026-08-09 (`88e0d46`) |
 | FIGHT worker loop (client) | ✅ done 2026-08-09 — 26 pure + 19 play-mode |
-| **Glicko-2 rating deltas** | **absent — fights settle money and move nobody** |
+| Glicko-2 rating deltas | ✅ done 2026-08-09 — verified against Glickman's paper |
+| §2.2 tickets / defense floor / repeat taper | **absent — challenge frequency unbounded** |
 | Worker image / Docker / GCP | not started |
 | Client login + ENLIST UI | not started — zero `UnityWebRequest` in the client |
 

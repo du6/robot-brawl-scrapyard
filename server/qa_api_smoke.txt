@@ -15,7 +15,7 @@ PASS  a wrong password and an unknown account are indistinguishable (both 401)
 
 == D. robots ==
 PASS  a robot is created
-      robot 32c4b81b-2c8d-48e7-9a2e-92ee98248c96
+      robot 8b193a5d-2528-4cac-b307-85db9d8ceaca
 PASS  …but not without a token
 
 == E. snapshot upload stays opaque (§5.2) ==
@@ -30,7 +30,7 @@ PASS  …and a wrong key is refused too
 PASS  a keyed worker claims a job
 PASS  …and the job is the VALIDATE the upload enqueued
 PASS  …pointing at the snapshot just uploaded
-PASS  …and carries a payload location the worker can resolve (file:///tmp/rb-blobs/snapshots/32c4b81b-2c8d-48e7-9a2e-92ee98248c96/c4608022300844589fa7854ad0fef8f7.json)
+PASS  …and carries a payload location the worker can resolve (file:///tmp/rb-blobs/snapshots/8b193a5d-2528-4cac-b307-85db9d8ceaca/3d748e932e1a4126b19c1979cd58eba5.json)
 PASS  …and the payload sha256 rides along, so the worker can verify storage
 PASS  another worker cannot heartbeat a job it does not hold
 PASS  …the holder can
@@ -83,6 +83,9 @@ PASS  …with the verdict recorded
 PASS  …and the replay attached
 PASS  …the winner's wallet is stake-refunded and paid the purse
 PASS  …and the FIGHT job is retired, not left to spin
+PASS  …the winner climbed above the 1200 placement and the loser fell below (1362 vs 1038)
+PASS  …and the winner's deviation tightened from the 350 placement to 290
+PASS  …with the deltas recorded on the match for the fight report
 PASS  the same result cannot be settled twice
 PASS  …and the wallet did not move on the second attempt
 PASS  a robot cannot challenge itself
@@ -90,9 +93,12 @@ PASS  a FEATHER may punch up to a SUPER
 PASS  …at a gap of 4
 PASS  …staking 50 x (1 + gap)
 PASS  …and winning pays 100 x (1 + 0.5 x gap)^2 = 900
+PASS  a punch-up leaves the heavier defender UNRATED, so heavies cannot be farmed
+PASS  …while the challenger IS rated, in the class it reached up into
+PASS  …and the match records that the defender was deliberately not rated
 PASS  a SUPER cannot punch DOWN to a FEATHER
 PASS  a defender win settles
 PASS  …paying the defender the flat 40-scrap defense purse
 PASS  …and the challenger's stake is forfeit, not refunded
 
-===== passed 74  failed 0  skipped 0 =====
+===== passed 80  failed 0  skipped 0 =====

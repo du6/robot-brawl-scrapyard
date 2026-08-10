@@ -496,6 +496,31 @@ else
         is "…and the FIGHT job is retired, not left to spin" \
            "$(dbq "SELECT status FROM match_jobs WHERE id=$FJOB;")" DONE
 
+        # §2.1: the ladder must actually MOVE. Before 2026-08-09 a fight
+        # settled scrap and nobody's rank changed - matches.rating_deltas was
+        # NULL and `ratings` had never held a row.
+        CHROBOT=$(dbq "SELECT r.id FROM robots r JOIN snapshots s ON s.robot_id=r.id WHERE s.id='$CHSNAP';")
+        DFROBOT=$(dbq "SELECT r.id FROM robots r JOIN snapshots s ON s.robot_id=r.id WHERE s.id='$DSNAP';")
+        CHRATE=$(dbq "SELECT round(rating) FROM ratings WHERE robot_id='$CHROBOT';")
+        DFRATE=$(dbq "SELECT round(rating) FROM ratings WHERE robot_id='$DFROBOT';")
+        if [ -z "$CHRATE" ] || [ -z "$DFRATE" ]; then
+          no "a settled match left no rating rows -- the ladder did not move (challenger '$CHRATE', defender '$DFRATE')"
+        elif [ "$CHRATE" -gt 1200 ] && [ "$DFRATE" -lt 1200 ]; then
+          ok "…the winner climbed above the 1200 placement and the loser fell below ($CHRATE vs $DFRATE)"
+        else
+          no "same-category ratings moved the wrong way: winner $CHRATE, loser $DFRATE (placement is 1200)"
+        fi
+        # Deviation must SHRINK once a robot has actually fought: that is the
+        # whole reason §2.1 chose Glicko-2 over Elo.
+        CHRD=$(dbq "SELECT round(deviation) FROM ratings WHERE robot_id='$CHROBOT';")
+        if [ -n "$CHRD" ] && [ "$CHRD" -lt 350 ]; then
+          ok "…and the winner's deviation tightened from the 350 placement to $CHRD"
+        else
+          no "deviation did not tighten after a fight (got '$CHRD', placement 350)"
+        fi
+        is "…with the deltas recorded on the match for the fight report" \
+           "$(dbq "SELECT CASE WHEN rating_deltas IS NOT NULL THEN 'yes' ELSE 'no' END FROM matches WHERE id='$MATCH';")" yes
+
         # Settling twice mints scrap from nothing. The job is no longer
         # CLAIMED, so ownership refuses it before the money moves.
         S=$(req POST "/v1/worker/jobs/$FJOB/fight-result" \
@@ -547,6 +572,19 @@ else
       # Won it: stake back plus a purse that grows with the SQUARE of the gap.
       is "…and winning pays 100 x (1 + 0.5 x gap)^2 = $WANT_PURSE" \
          "$(dbq "SELECT COALESCE(SUM(delta),0) FROM ledger WHERE user_id='$USERID';")" "$((BAL2 + WANT_PURSE))"
+      # §2.1's anti-farming rule, and the one most likely to be got wrong:
+      # "The defender's rating is untouched by cross-category fights."
+      # A heavy must not be able to farm rating by squashing lightweights, nor
+      # lose its rank to a swarm of speculative punch-ups. The challenger IS
+      # rated (it just beat someone $GAP classes up); the defender is not.
+      HROBOT=$(dbq "SELECT r.id FROM robots r JOIN snapshots s ON s.robot_id=r.id WHERE s.id='$HSNAP';")
+      HRATE=$(dbq "SELECT count(*) FROM ratings WHERE robot_id='$HROBOT';")
+      is "a punch-up leaves the heavier defender UNRATED, so heavies cannot be farmed" "$HRATE" 0
+      CHSUPER=$(dbq "SELECT count(*) FROM ratings WHERE robot_id='$CHROBOT' AND category='SUPER';")
+      is "…while the challenger IS rated, in the class it reached up into" "$CHSUPER" 1
+      is "…and the match records that the defender was deliberately not rated" \
+         "$(dbq "SELECT rating_deltas->>'defenderUnrated' FROM matches WHERE id='$BIGMATCH';")" true
+
       # §1.2, the rule that actually protects the ladder.
       S=$(req POST /v1/challenges "{\"challengerSnapshotId\":\"$HSNAP\",\"defenderSnapshotId\":\"$CHSNAP\"}" "$DAUTH")
       expect "a SUPER cannot punch DOWN to a $CHCAT" "$S" 400

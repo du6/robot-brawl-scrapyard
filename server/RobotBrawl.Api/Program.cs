@@ -109,13 +109,77 @@ bool WorkerAuthed(HttpContext ctx) =>
 // a client update." Read per request rather than cached at boot — the whole
 // point is that owen can change a dial without a deploy, and a cache would
 // quietly reinstate the deploy requirement. It is one small indexed table.
-async Task<Dictionary<string,int>> LadderConfig(NpgsqlConnection c, NpgsqlTransaction? tx = null)
+// value is NUMERIC as of migration 003: glicko_tau is 0.5, and storing it as
+// an integer number of thousandths would be a unit trap for whoever tunes it.
+// Callers that want whole scrap use (int) on the way out.
+async Task<Dictionary<string,double>> LadderConfig(NpgsqlConnection c, NpgsqlTransaction? tx = null)
 {
-    var d = new Dictionary<string,int>();
+    var d = new Dictionary<string,double>();
     await using var cmd = new NpgsqlCommand("SELECT key, value FROM ladder_config;", c, tx);
     await using var r = await cmd.ExecuteReaderAsync();
-    while (await r.ReadAsync()) d[r.GetString(0)] = r.GetInt32(1);
+    while (await r.ReadAsync()) d[r.GetString(0)] = (double)r.GetDecimal(1);
     return d;
+}
+
+// §2.1: "New snapshot in a category → placement rating 1200, high deviation."
+// The placement values are the COLUMN DEFAULTS on `ratings`, not constants
+// here — one source of truth, and an INSERT that names no values gets them.
+// create:false is for a robot we are about to deliberately NOT rate — the
+// defender of a punch-up. Materialising its placement row would put it on the
+// leaderboard of a class it never fought in, purely because somebody reached
+// up at it, which is the farming surface §2.1 exists to close. "Untouched"
+// has to mean no row appears, not just no number changes.
+async Task<Rating> LoadRating(NpgsqlConnection c, NpgsqlTransaction tx,
+                              Guid robot, string category, int season,
+                              bool create = true)
+{
+    await using (var get = new NpgsqlCommand(
+        "SELECT rating, deviation, volatility FROM ratings WHERE robot_id=$1 AND category=$2 AND season_id=$3;", c, tx))
+    {
+        get.Parameters.AddWithValue(robot);
+        get.Parameters.AddWithValue(category);
+        get.Parameters.AddWithValue(season);
+        await using var r = await get.ExecuteReaderAsync();
+        if (await r.ReadAsync())
+            return new Rating(r.GetDouble(0), r.GetDouble(1), r.GetDouble(2));
+    }
+    // Not rating this robot, so do not put it on the board. The placement
+    // values are still returned so the punch-up offset has something to
+    // compute against — in memory only.
+    if (!create) return new Rating(1200, 350, 0.06);
+
+    // First fight in this category: create the placement row from the
+    // defaults so the ladder has something to move.
+    await using (var ins = new NpgsqlCommand(
+        "INSERT INTO ratings (robot_id, category, season_id) VALUES ($1,$2,$3) "
+      + "ON CONFLICT DO NOTHING RETURNING rating, deviation, volatility;", c, tx))
+    {
+        ins.Parameters.AddWithValue(robot);
+        ins.Parameters.AddWithValue(category);
+        ins.Parameters.AddWithValue(season);
+        await using var r = await ins.ExecuteReaderAsync();
+        if (await r.ReadAsync())
+            return new Rating(r.GetDouble(0), r.GetDouble(1), r.GetDouble(2));
+    }
+    return new Rating(1200, 350, 0.06);   // unreachable unless the row raced in
+}
+
+async Task SaveRating(NpgsqlConnection c, NpgsqlTransaction tx,
+                      Guid robot, string category, int season, Rating v)
+{
+    await using var up = new NpgsqlCommand(@"
+        INSERT INTO ratings (robot_id, category, season_id, rating, deviation, volatility, updated_at)
+        VALUES ($1,$2,$3,$4,$5,$6, now())
+        ON CONFLICT (robot_id, category, season_id) DO UPDATE
+           SET rating = EXCLUDED.rating, deviation = EXCLUDED.deviation,
+               volatility = EXCLUDED.volatility, updated_at = now();", c, tx);
+    up.Parameters.AddWithValue(robot);
+    up.Parameters.AddWithValue(category);
+    up.Parameters.AddWithValue(season);
+    up.Parameters.AddWithValue(v.R);
+    up.Parameters.AddWithValue(v.Rd);
+    up.Parameters.AddWithValue(v.Sigma);
+    await up.ExecuteNonQueryAsync();
 }
 
 // The five weight classes, mirroring 001_init.sql's CHECK on
@@ -493,7 +557,7 @@ app.MapPost("/v1/challenges", async (ChallengeReq req, ClaimsPrincipal user) =>
     if (gap < 0) return Bad($"a {ch.Category} cannot punch down to a {df.Category}");
 
     var cfg = await LadderConfig(c);
-    int stake = cfg["stake_base"] * (1 + gap);
+    int stake = (int)cfg["stake_base"] * (1 + gap);
 
     // §2.3: the balance IS the sum of the ledger. There is no cached column
     // to disagree with it.
@@ -590,10 +654,12 @@ app.MapPost("/v1/worker/jobs/{id:long}/fight-result",
     if (jobMatch != res.MatchId)
         return Bad("this result is for a different match than the job holds");
 
-    // Everything settlement needs, read under the same transaction.
-    Guid chUser, dfUser; int gap; string status;
+    // Everything settlement needs, read under the same transaction. The ROBOT
+    // ids come along too: scrap belongs to a user, but a rating belongs to a
+    // robot (§2.1 is per-robot, not per-account).
+    Guid chUser, dfUser, chRobot, dfRobot; int gap; string status, category;
     await using (var m = new NpgsqlCommand(@"
-        SELECT m.status, m.gap, rc.user_id, rd.user_id
+        SELECT m.status, m.gap, m.category, rc.user_id, rd.user_id, rc.id, rd.id
           FROM matches m
           JOIN snapshots sc ON sc.id = m.challenger_snapshot_id JOIN robots rc ON rc.id = sc.robot_id
           JOIN snapshots sd ON sd.id = m.defender_snapshot_id   JOIN robots rd ON rd.id = sd.robot_id
@@ -602,13 +668,15 @@ app.MapPost("/v1/worker/jobs/{id:long}/fight-result",
         m.Parameters.AddWithValue(res.MatchId);
         await using var r = await m.ExecuteReaderAsync();
         if (!await r.ReadAsync()) return Results.NotFound(new { error = "no such match" });
-        status = r.GetString(0); gap = r.GetInt32(1); chUser = r.GetGuid(2); dfUser = r.GetGuid(3);
+        status = r.GetString(0); gap = r.GetInt32(1); category = r.GetString(2);
+        chUser = r.GetGuid(3); dfUser = r.GetGuid(4);
+        chRobot = r.GetGuid(5); dfRobot = r.GetGuid(6);
     }
     // Settling twice would mint scrap from nothing.
     if (status == "COMPLETE") return Results.Conflict(new { error = "this match is already settled" });
 
     var cfg = await LadderConfig(c, tx);
-    int stake = cfg["stake_base"] * (1 + gap);
+    int stake = (int)cfg["stake_base"] * (1 + gap);
 
     await using (var up = new NpgsqlCommand(@"
         UPDATE matches SET status = 'COMPLETE', verdict = $2, replay_urls = $3, completed_at = now()
@@ -640,11 +708,65 @@ app.MapPost("/v1/worker/jobs/{id:long}/fight-result",
     }
     else if (res.Verdict == "DEFENDER")
     {
-        await Credit(dfUser, cfg["defense_purse"], "DEFENSE");   // challenger's stake is forfeit
+        await Credit(dfUser, (int)cfg["defense_purse"], "DEFENSE");   // challenger's stake is forfeit
     }
     else
     {
         await Credit(chUser, stake, "STAKE_REFUND");
+    }
+
+    // ---- §2.1: the ladder actually moves -------------------------------
+    // In the same transaction as the money: a rating that survived a rollback
+    // of its own match is a rank nobody can explain.
+    //
+    // §2.1 says "win = 1, loss = 0; no draws — judges decide", so a DRAW
+    // applies no rating change at all. That also covers the worker's refusal
+    // path, which posts DRAW when no fight happened — nobody should climb for
+    // a match that never ran.
+    if (res.Verdict != "DRAW")
+    {
+        double tau = cfg.TryGetValue("glicko_tau", out var t) ? t : 0.5;
+        int offset = cfg.TryGetValue("cross_category_offset", out var o) ? (int)o : 150;
+        int season = cfg.TryGetValue("current_season", out var s) ? (int)s : 1;
+
+        var chR = await LoadRating(c, tx, chRobot, category, season);
+        // The defender only gets a row when it is actually being rated, i.e.
+        // a same-category fight. See LoadRating's note.
+        var dfR = await LoadRating(c, tx, dfRobot, category, season, create: gap == 0);
+        double chScore = res.Verdict == "CHALLENGER" ? 1.0 : 0.0;
+
+        // The challenger is rated against a defender who is treated as
+        // heavier the further up the challenger reached. Beating a heavy is
+        // worth more and losing to one costs almost nothing — the
+        // expected-score curve does that on its own once the offset is in.
+        var oppForChallenger = dfR with { R = dfR.R + offset * gap };
+        var chNew = Glicko2.UpdateOne(chR, oppForChallenger, chScore, tau);
+
+        // §2.1: "The defender's rating is untouched by cross-category
+        // fights." Heavies must not farm rating by squashing lightweights,
+        // nor lose their rank to a swarm of speculative punch-ups. Only a
+        // same-category fight moves the defender.
+        Rating? dfNew = gap == 0
+            ? Glicko2.UpdateOne(dfR, chR, 1.0 - chScore, tau)
+            : null;
+
+        await SaveRating(c, tx, chRobot, category, season, chNew);
+        if (dfNew is Rating dn) await SaveRating(c, tx, dfRobot, category, season, dn);
+
+        var deltas = JsonSerializer.Serialize(new
+        {
+            challenger = new { before = chR.R, after = chNew.R, rd = chNew.Rd, sigma = chNew.Sigma },
+            defender = dfNew is Rating d2
+                ? new { before = dfR.R, after = d2.R, rd = d2.Rd, sigma = d2.Sigma }
+                : null,
+            gap,
+            defenderUnrated = gap > 0,
+        });
+        await using var rd = new NpgsqlCommand(
+            "UPDATE matches SET rating_deltas = $2::jsonb WHERE id = $1;", c, tx);
+        rd.Parameters.AddWithValue(res.MatchId);
+        rd.Parameters.AddWithValue(deltas);
+        await rd.ExecuteNonQueryAsync();
     }
 
     // Retire the job in the SAME transaction as the settlement.
