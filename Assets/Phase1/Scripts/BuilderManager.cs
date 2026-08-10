@@ -5410,6 +5410,14 @@ public class BuilderManager : MonoBehaviour
         byCollider.Clear();
         foulDirty = true;
         var badMats = new List<string>();
+        var badLines = new List<string>();
+        // Float, but NOT AllowThousands or currency — a build file is machine
+        // written, and being liberal about its number format only widens what
+        // a hostile payload can express.
+        const System.Globalization.NumberStyles NumStyle =
+            System.Globalization.NumberStyles.AllowLeadingSign
+          | System.Globalization.NumberStyles.AllowDecimalPoint
+          | System.Globalization.NumberStyles.AllowExponent;
         foreach (var raw in text.Split('\n'))
         {
             string line = raw.Trim();
@@ -5422,11 +5430,43 @@ public class BuilderManager : MonoBehaviour
             P1PartDef def = null;
             foreach (var d in palette) if (d.id == f[0]) { def = d; break; }
             if (def == null) continue;
+            // FUZZ FIX 2026-08-09. These were float.Parse/int.Parse, which
+            // THROW on anything that is not a number, and indexed c[0..2]
+            // without checking the split produced three parts. A snapshot
+            // containing "core|abc,def,ghi|..." therefore killed whatever was
+            // loading it - and since the validate worker loads every uploaded
+            // payload to measure it, that was a worker any stranger could
+            // crash with one upload. §M4 names this exactly: "malformed
+            // payloads must land in REJECTED, never crash a worker - the
+            // worker's crash IS the fuzz oracle." FuzzBench found it.
+            //
+            // An unparseable line is now SKIPPED and NAMED, which is how this
+            // loader already treats an unknown part id and an unknown
+            // material. A snapshot that loses parts is a snapshot that fails
+            // its legality check for a reason the owner can read; a snapshot
+            // that throws is an outage.
             var c = f[1].Split(',');
-            var pos = new Vector3(float.Parse(c[0], inv), float.Parse(c[1], inv), float.Parse(c[2], inv));
-            int yaw = int.Parse(f[2], inv);
             var ax = f[3].Split(',');
-            var axis = new Vector3(float.Parse(ax[0], inv), float.Parse(ax[1], inv), float.Parse(ax[2], inv));
+            if (c.Length < 3 || ax.Length < 3) { badLines.Add(line); continue; }
+            float px, py, pz, axx, axy, axz; int yaw;
+            if (!float.TryParse(c[0], NumStyle, inv, out px) ||
+                !float.TryParse(c[1], NumStyle, inv, out py) ||
+                !float.TryParse(c[2], NumStyle, inv, out pz) ||
+                !int.TryParse(f[2], System.Globalization.NumberStyles.Integer, inv, out yaw) ||
+                !float.TryParse(ax[0], NumStyle, inv, out axx) ||
+                !float.TryParse(ax[1], NumStyle, inv, out axy) ||
+                !float.TryParse(ax[2], NumStyle, inv, out axz))
+            { badLines.Add(line); continue; }
+            // NaN and infinity parse happily as floats and then poison every
+            // measurement downstream - a bounding box of NaN compares false to
+            // everything. Refuse them here rather than debugging them later.
+            if (float.IsNaN(px) || float.IsNaN(py) || float.IsNaN(pz) ||
+                float.IsInfinity(px) || float.IsInfinity(py) || float.IsInfinity(pz) ||
+                float.IsNaN(axx) || float.IsNaN(axy) || float.IsNaN(axz) ||
+                float.IsInfinity(axx) || float.IsInfinity(axy) || float.IsInfinity(axz))
+            { badLines.Add(line); continue; }
+            var pos = new Vector3(px, py, pz);
+            var axis = new Vector3(axx, axy, axz);
             // v2 adds a 5th field: the part's material. v1 lines (4 fields)
             // load exactly as before, on the def's default material.
             string mat = f.Length >= 5 ? f[4].Trim() : null;
@@ -5480,6 +5520,15 @@ public class BuilderManager : MonoBehaviour
               + "Repaired {0} of them: {1}. Your saved file is untouched until you save.",
                 migrated, string.Join("; ", discNotes.ToArray()));
             CompoundRobot.Log("LoadSnapshot: " + message);
+        }
+        if (badLines.Count > 0)
+        {
+            message += (message.Length > 0 ? "  " : "")
+                    + "\u26a0 " + badLines.Count + " unreadable build line(s) were skipped"
+                    + " - the snapshot is not what its author wrote.";
+            CompoundRobot.Log("LoadSnapshot: skipped " + badLines.Count
+                            + " unreadable line(s); first: "
+                            + badLines[0].Substring(0, Mathf.Min(80, badLines[0].Length)));
         }
         if (badMats.Count > 0)
         {

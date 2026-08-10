@@ -1,0 +1,30 @@
+== the corpus: 20 malformed snapshots ==
+      §M4 asks for 10+; a worker that survives 20 is the claim being made.
+PASS  empty payload — refused, with a reason
+PASS  not json — refused, with a reason
+PASS  truncated json — refused, with a reason
+PASS  json array, not an object — refused, with a reason
+PASS  json null — refused, with a reason
+PASS  no build field — refused, with a reason
+PASS  empty build — refused, with a reason
+PASS  build with no stamp — refused, with a reason
+PASS  unknown part id — refused, with a reason
+PASS  unknown material — refused, with a reason
+PASS  garbage coordinates — refused, with a reason
+PASS  NaN coordinates — refused, with a reason
+PASS  absurd coordinates — refused, with a reason
+PASS  future payloadVersion — refused, with a reason
+PASS  truncated build line — refused, with a reason
+PASS  control characters in name — refused, with a reason
+PASS  4000 parts — refused, with a reason
+PASS  envelope is not json — refused, with a reason
+PASS  envelope missing payload — refused, with a reason
+PASS  sha does not match payload — refused, with a reason
+== the oracle ==
+PASS  not one payload crashed the worker (20 cases)
+PASS  not one malformed payload was judged legal
+PASS  every refusal carries a reason
+== owner state ==
+PASS  the career object was never swapped
+PASS  the bay is owen's again after 20 hostile payloads, once restored the way the worker restores it
+ RESULT: 25 pass, 0 fail - ALL GREEN
