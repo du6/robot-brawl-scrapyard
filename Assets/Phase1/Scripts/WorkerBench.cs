@@ -105,6 +105,30 @@ namespace RobotBrawl.Phase0
             bool savedAuto = Career.autosave, savedActive = Career.active;
             Career.autosave = false;
 
+            // ==================================== 0. the worker key's blast radius
+            // The payload url comes from a SERVER RESPONSE, and the fetch has
+            // to send the worker key because /v1/blobs is authenticated. Those
+            // two facts together mean a bad or compromised payload url could
+            // walk the shared secret to any host it names, so the transport
+            // sends it same-origin only. This is cheap to get wrong with
+            // StartsWith and expensive to notice.
+            log.Add("== 0. the worker key goes to our API and nowhere else ==");
+            var probe = new HttpWorkerTransport("https://rb-api.example.com", "secret", "VALIDATE");
+            Check(probe.IsOwnApi("https://rb-api.example.com/v1/blobs/snapshots/a.json"),
+                  "the key is sent to our own API");
+            Check(probe.IsOwnApi("https://RB-API.EXAMPLE.COM/v1/blobs/x"),
+                  "...host comparison is case-insensitive, as DNS is");
+            Check(!probe.IsOwnApi("https://rb-api.example.com.evil.test/v1/blobs/x"),
+                  "a look-alike host that merely STARTS WITH ours is refused");
+            Check(!probe.IsOwnApi("https://evil.test/v1/blobs/x"),
+                  "an unrelated host is refused");
+            Check(!probe.IsOwnApi("http://rb-api.example.com/v1/blobs/x"),
+                  "the same host over plain http is refused — that is a downgrade");
+            Check(!probe.IsOwnApi("https://rb-api.example.com:8443/v1/blobs/x"),
+                  "a different port on the same host is refused");
+            Check(!probe.IsOwnApi("not a url"), "an unparseable url is refused rather than assumed ours");
+            Check(!probe.IsOwnApi(""), "an empty url is refused");
+
             // ============================================ A. the result JSON
             log.Add("== A. the wire format — where JsonUtility would have lied ==");
 

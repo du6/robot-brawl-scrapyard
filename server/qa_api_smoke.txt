@@ -15,7 +15,7 @@ PASS  a wrong password and an unknown account are indistinguishable (both 401)
 
 == D. robots ==
 PASS  a robot is created
-      robot 2f174f33-3a11-43db-b224-a9e6c3dd1bf1
+      robot 9cd172aa-0c7b-424c-b00b-1abe06ac6926
 PASS  …but not without a token
 
 == E. snapshot upload stays opaque (§5.2) ==
@@ -30,7 +30,7 @@ PASS  …and a wrong key is refused too
 PASS  a keyed worker claims a job
 PASS  …and the job is the VALIDATE the upload enqueued
 PASS  …pointing at the snapshot just uploaded
-PASS  …and carries a payload location the worker can resolve (file:///tmp/rb-blobs/snapshots/2f174f33-3a11-43db-b224-a9e6c3dd1bf1/451b01245f554067a5b6baf1c4c82d1a.json)
+PASS  …and carries a payload location the worker can resolve (file:///tmp/rb-blobs/snapshots/9cd172aa-0c7b-424c-b00b-1abe06ac6926/14f8830b601b4114bce20682ddd435b7.json)
 PASS  …and the payload sha256 rides along, so the worker can verify storage
 PASS  another worker cannot heartbeat a job it does not hold
 PASS  …the holder can
@@ -59,6 +59,10 @@ PASS  a REJECTED upload left the incumbent ACTIVE
 == J. the category contract, pinned from the server side (§5.2) ==
 PASS  a valid category is accepted
 PASS  …and stored verbatim
+PASS  a validated robot gets a placement rating, so the ladder can start
+PASS  …and it is provisional: RD 350, the placement default
+PASS  …so it is now visible on the board to OTHER players
+PASS  revalidating does NOT reset an earned rating
 PASS  an illegal robot may report no category
 PASS  …and it is stored as SQL NULL, not the empty string
 PASS  the empty-string category is refused cleanly (HTTP 400)
@@ -83,8 +87,8 @@ PASS  …with the verdict recorded
 PASS  …and the replay attached
 PASS  …the winner's wallet is stake-refunded and paid the purse
 PASS  …and the FIGHT job is retired, not left to spin
-PASS  …the winner climbed above the 1200 placement and the loser fell below (1362 vs 1038)
-PASS  …and the winner's deviation tightened from the 350 placement to 290
+PASS  …the winner climbed above the 1200 placement and the loser fell below (17081200 vs 1142)
+PASS  …and the winner's deviation tightened from the 350 placement to 315
 PASS  …with the deltas recorded on the match for the fight report
 PASS  the same result cannot be settled twice
 PASS  …and the wallet did not move on the second attempt
@@ -93,7 +97,8 @@ PASS  a FEATHER may punch up to a SUPER
 PASS  …at a gap of 4
 PASS  …staking 50 x (1 + gap)
 PASS  …and winning pays 100 x (1 + 0.5 x gap)^2 = 900
-PASS  a punch-up leaves the heavier defender UNRATED, so heavies cannot be farmed
+PASS  a punch-up creates NO rating for the defender in the challenger's class
+PASS  …and the defender's own-class rating is untouched by the punch-up
 PASS  …while the challenger IS rated, in the class it reached up into
 PASS  …and the match records that the defender was deliberately not rated
 PASS  a SUPER cannot punch DOWN to a FEATHER
@@ -117,13 +122,13 @@ PASS  …the API reports how much of the day's allowance was already gone
 PASS  …and records that this rank was floor-protected
 PASS  a PROVISIONAL defender is not floor-protected
 PASS  …and is reported as provisional, so nobody thinks the floor broke
-PASS  …so it takes its full natural loss, 241 points, past the 75/day floor
+PASS  …so it takes its full natural loss, 140 points, past the 75/day floor
 
 == M. the read side: leaderboard, match view, inbox, wallet (§2.1/§5.3) ==
 PASS  the leaderboard is public — no token needed to scout standings
 PASS  …and lists at least one rated robot (2 in FEATHER)
 PASS  …ranked from 1
-PASS  …and ordered by rating, best first (1133.1 >= 1058.9)
+PASS  …and ordered by rating, best first (1383.5 >= 1160.4)
 PASS  …flagging a placement-deviation robot as provisional
 PASS  an unknown category is refused rather than returning an empty board
 PASS  a match is publicly viewable, so a scout can watch a fight
@@ -208,7 +213,7 @@ PASS  no refund ever exceeds the stake it returns
 PASS  a challenger who lost never got their stake back
 PASS  a drawn match never paid a purse
 PASS  no wallet is overdrawn
-      ledger: 25 rows, net 2940 scrap across 3 wallets
+      ledger: 27 rows, net 3390 scrap across 3 wallets
 
 --- W. the claim kind filter ---
 PASS  a nonsense kind is refused, not silently ignored
@@ -227,7 +232,7 @@ PASS  metrics carry pendingSnapshots
 PASS  pendingSnapshots agrees with the database
 PASS  failed agrees with the database
 PASS  the rbmetrics log line keeps its shape
-      rbmetrics ready=0 claimed=0 failed=4 done=13 oldest_ready_s=0 oldest_heartbeat_s=0 pending_snapshots=3 oldest_pending_s=3
+      rbmetrics ready=0 claimed=1 failed=4 done=16 oldest_ready_s=0 oldest_heartbeat_s=0 pending_snapshots=3 oldest_pending_s=7
 PASS  …and reports real counts, not a row of zeros
 
 --- P. behind a proxy ---
@@ -235,4 +240,4 @@ PASS  one client can be rate-limited to exhaustion
 PASS  a different client keeps its own bucket
 SKIP  blob URLs are built with the forwarded scheme -- no object store configured (BLOB_S3_BUCKET unset); file:// rows are passed through verbatim
 
-===== passed 188  failed 0  skipped 1 =====
+===== passed 193  failed 0  skipped 1 =====

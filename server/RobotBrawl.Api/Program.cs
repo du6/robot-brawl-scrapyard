@@ -642,6 +642,39 @@ app.MapPost("/v1/worker/jobs/{id:long}/validate-result",
         up.Parameters.AddWithValue(res.FailReasons ?? Array.Empty<string>());
         await up.ExecuteNonQueryAsync();
     }
+
+    // A robot that passes validation JOINS THE LADDER, and it has to happen
+    // here or the ladder cannot start at all.
+    //
+    // Ratings rows used to be created only by the first FIGHT ("first fight in
+    // this category: create the placement row"). But the leaderboard reads
+    // `ratings`, and the leaderboard is how one player discovers another. So a
+    // freshly validated robot was ACTIVE, correctly categorised, visible to its
+    // OWNER via /v1/robots — and invisible to everybody else. Two players could
+    // both enlist and neither could see the other, so neither could issue the
+    // first challenge, so no rating row was ever created. League nights could
+    // not break the tie either: they draw from the top 8 of `ratings`, which
+    // was empty. The ladder had no way to begin.
+    //
+    // Found by working the first real job in the cloud and looking at the
+    // board afterwards: ACTIVE robot, FEATHER, count 0.
+    //
+    // ON CONFLICT DO NOTHING is load-bearing, not defensive: re-uploading a
+    // robot revalidates it, and this must never reset a rating that has been
+    // earned. A build that changes weight class gets a placement row in the new
+    // category and keeps its old one, which is what per-category rating means.
+    if (res.Legal && !string.IsNullOrEmpty(res.Category))
+    {
+        await using var place = new NpgsqlCommand(@"
+            INSERT INTO ratings (robot_id, category, season_id)
+            SELECT s.robot_id, $2, (SELECT value::int FROM ladder_config WHERE key = 'current_season')
+              FROM snapshots s WHERE s.id = $1
+            ON CONFLICT DO NOTHING;", c, tx);
+        place.Parameters.AddWithValue(res.SnapshotId);
+        place.Parameters.AddWithValue(res.Category!);
+        await place.ExecuteNonQueryAsync();
+    }
+
     await tx.CommitAsync();
 
     return await q.CompleteAsync(id, res.WorkerId ?? "") ? Results.Ok() : Results.Conflict(

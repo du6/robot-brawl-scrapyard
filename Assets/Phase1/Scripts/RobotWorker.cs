@@ -495,11 +495,19 @@ namespace RobotBrawl.Phase0
     /// <summary>The real one. First UnityWebRequest in this client.</summary>
     public class HttpWorkerTransport : IFightTransport
     {
-        readonly string _baseUrl, _workerKey;
-        public HttpWorkerTransport(string baseUrl, string workerKey)
+        readonly string _baseUrl, _workerKey, _kind;
+        /// <summary><paramref name="kind"/> null claims any job, which is the
+        /// original behaviour. Passing "VALIDATE" or "FIGHT" makes this
+        /// transport claim only that kind — which matters, because both loops
+        /// REFUSE a job of the wrong kind AFTER claiming it, and the attempt is
+        /// spent by then. Three wrong claims FAIL a job that was never broken,
+        /// and a failed VALIDATE now rejects the player's robot. A specialised
+        /// worker must never claim work it cannot run.</summary>
+        public HttpWorkerTransport(string baseUrl, string workerKey, string kind = null)
         {
             _baseUrl = (baseUrl ?? "").TrimEnd('/');
             _workerKey = workerKey ?? "";
+            _kind = string.IsNullOrEmpty(kind) ? null : kind;
         }
 
         UnityWebRequest Post(string path, string json)
@@ -514,8 +522,9 @@ namespace RobotBrawl.Phase0
 
         public IEnumerator Claim(string workerId, Action<WorkerJob, string> done)
         {
-            using (var req = Post("/v1/worker/jobs/claim",
-                                  "{\"workerId\":" + RobotWorker.Str(workerId) + "}"))
+            string body = "{\"workerId\":" + RobotWorker.Str(workerId)
+                        + (_kind == null ? "" : ",\"kind\":" + RobotWorker.Str(_kind)) + "}";
+            using (var req = Post("/v1/worker/jobs/claim", body))
             {
                 yield return req.SendWebRequest();
                 if (req.result != UnityWebRequest.Result.Success)
@@ -528,15 +537,49 @@ namespace RobotBrawl.Phase0
             }
         }
 
+        /// <summary>Fetch a payload. The worker key rides along ONLY when the
+        /// url is on our own API.
+        ///
+        /// It has to be sent at all because payload blobs are no longer public:
+        /// since object storage landed, the claim hands back a
+        /// /v1/blobs/&lt;key&gt; url on this service and §1.3's prefix rule
+        /// requires the worker key for everything except replays/. Without the
+        /// header this is a 401, the worker correctly declines to judge what it
+        /// could not read (TRAP 2), and every upload sits PENDING until the
+        /// reaper rejects a robot that was never bad. That is exactly what
+        /// happened on the first live run: claim OK, fetch 401, nothing moved.
+        ///
+        /// It must NOT be sent anywhere else, and that is not paranoia — the
+        /// url comes from a server response. Attaching a shared secret to
+        /// whatever host that response names would hand the worker key to
+        /// anyone who could influence a payload url. Same-origin only; anything
+        /// else is fetched bare, which is right for a public replay or a signed
+        /// storage url.</summary>
         public IEnumerator Fetch(string url, Action<string, string> done)
         {
             using (var req = UnityWebRequest.Get(url))
             {
+                if (IsOwnApi(url)) req.SetRequestHeader(RobotWorker.HEADER_WORKER_KEY, _workerKey);
                 yield return req.SendWebRequest();
                 if (req.result != UnityWebRequest.Result.Success)
                 { done(null, req.error ?? "fetch failed"); yield break; }
                 done(req.downloadHandler.text, null);
             }
+        }
+
+        /// <summary>Is this url served by the API this transport is configured
+        /// for? Compared on scheme+host+port after parsing, never by
+        /// StartsWith: "https://rb-api.example.com.evil.test/" starts with the
+        /// base url's host as a STRING and is a different origin.</summary>
+        internal bool IsOwnApi(string url)
+        {
+            if (string.IsNullOrEmpty(url) || string.IsNullOrEmpty(_baseUrl)) return false;
+            Uri a, b;
+            if (!Uri.TryCreate(url, UriKind.Absolute, out a)) return false;
+            if (!Uri.TryCreate(_baseUrl, UriKind.Absolute, out b)) return false;
+            return string.Equals(a.Host, b.Host, StringComparison.OrdinalIgnoreCase)
+                && a.Port == b.Port
+                && string.Equals(a.Scheme, b.Scheme, StringComparison.OrdinalIgnoreCase);
         }
 
         public IEnumerator PostValidate(long jobId, string resultJson, Action<bool, string> done)

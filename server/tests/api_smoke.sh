@@ -347,6 +347,39 @@ else
     is "…and stored verbatim" "$(dbq "SELECT category FROM snapshots WHERE id='$VRC_SNAP';")" FEATHER
   else skip "…and stored verbatim" "no snapshot from the FEATHER case"; fi
 
+  # A validated robot must JOIN THE LADDER. Ratings rows used to be created
+  # only by the first fight, but the leaderboard reads `ratings` and the
+  # leaderboard is how one player discovers another — so every enlisted robot
+  # was invisible to everyone but its owner, nobody could issue the first
+  # challenge, and the ladder could never start. League nights could not break
+  # the tie either; they draw from the top 8 of `ratings`.
+  if [ -n "$VRC_SNAP" ]; then
+    is "a validated robot gets a placement rating, so the ladder can start" \
+       "$(dbq "SELECT count(*) FROM ratings ra JOIN snapshots s ON s.robot_id = ra.robot_id
+                WHERE s.id='$VRC_SNAP' AND ra.category='FEATHER';")" 1
+    is "…and it is provisional: RD 350, the placement default" \
+       "$(dbq "SELECT round(ra.deviation)::int FROM ratings ra JOIN snapshots s ON s.robot_id = ra.robot_id
+                WHERE s.id='$VRC_SNAP' AND ra.category='FEATHER';")" 350
+    # The point of the placement row is DISCOVERABILITY, so assert the
+    # leaderboard's own join rather than counting rows a second time.
+    is "…so it is now visible on the board to OTHER players" \
+       "$(dbq "SELECT count(*) FROM ratings ra
+                 JOIN robots r ON r.id = ra.robot_id
+                 JOIN snapshots s ON s.robot_id = r.id AND s.status = 'ACTIVE'
+                WHERE s.id='$VRC_SNAP' AND ra.category = 'FEATHER';")" 1
+    # The property that matters more than creation: revalidating must not
+    # reset a rating that has been earned. A player re-uploading a tweaked
+    # build would otherwise be handed back to 1200 every time.
+    dbq "UPDATE ratings SET rating = 1650 WHERE robot_id =
+           (SELECT robot_id FROM snapshots WHERE id='$VRC_SNAP') AND category='FEATHER';" >/dev/null
+    S2=$(vr_category '"FEATHER"'); VRC_SNAP2=$(cat "$VRC_SNAP_FILE" 2>/dev/null)
+    is "revalidating does NOT reset an earned rating" \
+       "$(dbq "SELECT round(rating)::int FROM ratings WHERE robot_id =
+                 (SELECT robot_id FROM snapshots WHERE id='$VRC_SNAP') AND category='FEATHER';")" 1650
+  else
+    skip "the placement rating (4 checks)" "no snapshot from the FEATHER case"
+  fi
+
   S=$(vr_category 'null' false); VRC_SNAP=$(cat "$VRC_SNAP_FILE" 2>/dev/null)
   expect "an illegal robot may report no category" "$S" 200
   if [ -n "$VRC_SNAP" ]; then
@@ -512,7 +545,11 @@ else
         fi
         # Deviation must SHRINK once a robot has actually fought: that is the
         # whole reason §2.1 chose Glicko-2 over Elo.
-        CHRD=$(dbq "SELECT round(deviation) FROM ratings WHERE robot_id='$CHROBOT';")
+        # Filter by category: ratings are per (robot, category, season), so an
+        # unfiltered read returns one row per class the robot is placed in and
+        # -qtA concatenates them. This read "315350" the moment robots started
+        # getting a placement row at validation.
+        CHRD=$(dbq "SELECT round(deviation) FROM ratings WHERE robot_id='$CHROBOT' AND category='$CHCAT';")
         if [ -n "$CHRD" ] && [ "$CHRD" -lt 350 ]; then
           ok "…and the winner's deviation tightened from the 350 placement to $CHRD"
         else
@@ -578,8 +615,17 @@ else
       # lose its rank to a swarm of speculative punch-ups. The challenger IS
       # rated (it just beat someone $GAP classes up); the defender is not.
       HROBOT=$(dbq "SELECT r.id FROM robots r JOIN snapshots s ON s.robot_id=r.id WHERE s.id='$HSNAP';")
-      HRATE=$(dbq "SELECT count(*) FROM ratings WHERE robot_id='$HROBOT';")
-      is "a punch-up leaves the heavier defender UNRATED, so heavies cannot be farmed" "$HRATE" 0
+      # Two distinct claims, because "count the defender's rating rows" stopped
+      # being a valid proxy once every validated robot got a placement row —
+      # and that proxy would ALSO have passed if ratings were never created at
+      # all, which is the vacuous-pass this project keeps re-learning.
+      HRATE=$(dbq "SELECT count(*) FROM ratings WHERE robot_id='$HROBOT' AND category='$CHCAT';")
+      is "a punch-up creates NO rating for the defender in the challenger's class" "$HRATE" 0
+      # And its own-class rating is untouched: still sitting at the placement
+      # values, because a cross-category fight must not move it.
+      HOWN=$(dbq "SELECT round(rating)::int || '/' || round(deviation)::int FROM ratings
+                   WHERE robot_id='$HROBOT' AND category='SUPER';")
+      is "…and the defender's own-class rating is untouched by the punch-up" "$HOWN" "1200/350"
       CHSUPER=$(dbq "SELECT count(*) FROM ratings WHERE robot_id='$CHROBOT' AND category='SUPER';")
       is "…while the challenger IS rated, in the class it reached up into" "$CHSUPER" 1
       is "…and the match records that the defender was deliberately not rated" \
