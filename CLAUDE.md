@@ -11,6 +11,10 @@ playable; **Multiplayer v3** (cloud ladder) is mid-build.
    names the one task that matters next (GcsBlobStore). It supersedes the
    status tables in (1) below; (1) is still the live guidance for the hard
    rules and the editor discipline.
+0. **`docs/HANDOVER_2026-08-09_night.md`** — the newest handover, and the one
+   to start from. It supersedes (1) on all status; (1) is still live on the
+   hard rules and editor discipline (its §2 and §3). ⚠ Its §3 ("write
+   GcsBlobStore") is **DONE** — see `docs/Cloud_Only_Defects_2026-08-09.md`.
 1. **`docs/HANDOVER_TO_CLI.md`** — the takeover brief. As of 2026-08-09 this
    project is driven by a Claude Code session on owen's Mac. That document
    is the takeover brief: what to verify before trusting anything, the
@@ -31,6 +35,7 @@ The records, most recent first:
 
 | doc | what |
 |---|---|
+| `docs/Cloud_Only_Defects_2026-08-09.md` | four faults that only exist in the cloud, and all four looked green |
 | `docs/Category_Assignment_Shipped_2026-08-09.md` | the ladder's weight categories; why the size box is gone |
 | `docs/M1_Worker_Contract_Gaps_2026-08-09.md` | the claim contract fix, and the two gaps that were left |
 | `docs/Opening_Ram_Fix_2026-08-09.md` | the opening disarm: 42% → 0% |
@@ -227,30 +232,50 @@ in `.gitignore` (ignore rules do not untrack), and
 
 ## Current state, briefly
 
-**Green at last measurement (2026-08-09):** CategoryBench 44/44 ·
+**Green at last measurement (2026-08-09, late):** CategoryBench 44/44 ·
 ReplayBench 60/60 · ProgramBench 40/40 · MatrixBench 10/10 FLOOR + 3/3
-SWEEP · `sql_bench.sh` 34/34 · `api_smoke.sh` 37/37.
+SWEEP · `sql_bench.sh` **48/48** · `api_smoke.sh` **185/185** ·
+`restore_drill.sh` 10/10 · WorkerBench 39/39 · FuzzBench 25/25 ·
+FightWorkerBench 21/21 play + 26/26 pure · LadderClientBench 18/18.
 
 **Stale-green, verify before trusting:** VerbBench (32) · AutonomyBench
 (24) · CareerSmoke (128) · CanvasDragBench (31) · TestDebugBench (30) ·
 TouchSmoke · HazardBench · SensorProbe · CareerBench.
 
-**`RobotCategory.cs` and `CategoryBench.cs` are untracked** — new on
-2026-08-09, proven 44/44, and existing in exactly one copy. Run
-`git status` before assuming anything else about what is committed.
+**The ladder API is LIVE**: `https://rb-api-902243335343.us-central1.run.app`
+on Cloud Run, against Cloud SQL over a unix socket, with blobs in GCS.
+`server/scripts/deploy_api.zsh` now runs end to end — it was written from the
+docs and had never executed until 08-09. Alerting is
+`server/scripts/gcp_monitoring.zsh`; both are idempotent.
 
-Things explicitly NOT done — the handover has the detail:
+⚠ **Anything that assumes "this process is the whole world" breaks in the
+cloud, and breaks GREEN.** Four such defects landed on 08-09 —
+`docs/Cloud_Only_Defects_2026-08-09.md`. Read it before touching blob
+storage, `Request.Scheme`, or anything that partitions on a client address.
 
-1. **The VALIDATE worker loop.** Every piece it needs now exists; it is
-   the unblocked next step on the multiplayer side.
-2. **The FIGHT half of the server contract does not exist** — no
-   match-create, no match-result, no replay upload.
-3. **The Docker image has never been built** — owen has no Docker, so
-   `server/` runs via `dotnet run` against a brew-installed Postgres.
-   `docker-compose.yml` and the Dockerfile are unproven.
-4. **The ladder's 43% mutual disarm** — the biggest open single-player
+Things explicitly NOT done:
+
+1. **The Docker image builds and deploys now** (colima + Cloud Build), but
+   `docker-compose.yml` and its `db` service are still unproven —
+   `docker compose` needs `brew install docker-compose`.
+2. **Point-in-time recovery is off** on `rb-db`. Daily backups (09:00 UTC,
+   7 retained) are on and the restore drill passes, but a restore loses up
+   to 24h. It costs WAL storage against a $25/mo budget — **owen's call.**
+3. **ARENA styling.** Four of five surfaces exist and work; the layout is
+   OnGUI placeholder and largely unjudged. Screenshot with
+   `RobotBrawl.Phase0.UiShot.Take(path)` in play mode — the MCP capture
+   tools render from a camera and never see IMGUI.
+4. **The end-to-end worker↔API runs are hand-run, not benches.** That path
+   has no regression cover.
+5. **The ladder's 43% mutual disarm** — the biggest open single-player
    problem, with three cheap explanations already ruled out. It needs its
    own bench; `OpeningBench` is the template.
-5. **Mirror lock is unsolved** — two identical robots still meet
+6. **Mirror lock is unsolved** — two identical robots still meet
    nose-to-nose and mutually disarm. A behaviour problem, not a damage
    constant; 0.10 was tested and rejected.
+
+**Superseded — do not act on these, they appear in older handovers:** the
+VALIDATE worker loop and the FIGHT half of the server contract were both
+listed as not-done. Both exist and are benched (`FightWorkerLoop.cs`,
+match-create/result/settlement, replay upload). `RobotCategory.cs` and
+`CategoryBench.cs` were listed as untracked; both are committed.
