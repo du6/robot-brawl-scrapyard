@@ -85,22 +85,45 @@ namespace RobotBrawl.Phase0
             busy = false;
         }
 
+        // The first screenshot of this screen was taken at 2532x1170 and the
+        // panel was unreadable: OnGUI's default font is a fixed pixel size, so
+        // on a retina game view everything renders at about a third the size
+        // it does at 720p. Work in a virtual 720-high space and scale the
+        // whole GUI up to fit — one matrix, and every rect below is legible on
+        // any display.
+        const float VirtualH = 720f;
+
         void OnGUI()
         {
-            const int W = 560;
-            GUILayout.BeginArea(new Rect(12, 12, W, Screen.height - 24), GUI.skin.box);
+            float scale = Screen.height / VirtualH;
+            var prev = GUI.matrix;
+            GUI.matrix = Matrix4x4.TRS(Vector3.zero, Quaternion.identity,
+                                       new Vector3(scale, scale, 1f));
+            float vw = Screen.width / scale, vh = VirtualH;
+
+            const int W = 460;
+            // Down the LEFT, below the game's own top HUD — the first version
+            // sat at y=12 and covered the build bar's status line.
+            const int TOP = 64;
+            GUILayout.BeginArea(new Rect(10, TOP, W, vh - TOP - 90), GUI.skin.box);
 
             GUILayout.Label("<b>ARENA</b>   " + LadderClient.BaseUrl,
                             new GUIStyle(GUI.skin.label) { richText = true });
 
-            GUILayout.BeginHorizontal();
-            for (int i = 0; i < Cats.Length; i++)
+            // Two rows of three: six categories on one row clipped "SUPER" to
+            // "SUPE" at this width, which is exactly the kind of thing only a
+            // screenshot tells you.
+            for (int row = 0; row < 2; row++)
             {
-                string label = Cats[i] == "" ? "P4P" : Cats[i].Substring(0, 4);
-                bool on = GUILayout.Toggle(catIndex == i, label, GUI.skin.button);
-                if (on && catIndex != i && !busy) { catIndex = i; StartCoroutine(Refresh()); }
+                GUILayout.BeginHorizontal();
+                for (int i = row * 3; i < Mathf.Min(row * 3 + 3, Cats.Length); i++)
+                {
+                    string label = Cats[i] == "" ? "P4P" : Cats[i];
+                    bool on = GUILayout.Toggle(catIndex == i, label, GUI.skin.button);
+                    if (on && catIndex != i && !busy) { catIndex = i; StartCoroutine(Refresh()); }
+                }
+                GUILayout.EndHorizontal();
             }
-            GUILayout.EndHorizontal();
 
             GUILayout.BeginHorizontal();
             if (GUILayout.Button(showInbox ? "show ladder" : "show my fights")) showInbox = !showInbox;
@@ -117,6 +140,7 @@ namespace RobotBrawl.Phase0
                                 player.time, player.framesApplied, player.Coverage * 100f));
             }
             GUILayout.EndArea();
+            GUI.matrix = prev;
         }
 
         void DrawBoard()
@@ -127,9 +151,9 @@ namespace RobotBrawl.Phase0
             {
                 GUILayout.BeginHorizontal();
                 GUILayout.Label(e.rank + ".", GUILayout.Width(28));
-                GUILayout.Label(e.robotName, GUILayout.Width(150));
-                GUILayout.Label(e.owner, GUILayout.Width(90));
-                GUILayout.Label(e.category, GUILayout.Width(64));
+                GUILayout.Label(e.robotName, GUILayout.Width(120));
+                GUILayout.Label(e.owner, GUILayout.Width(60));
+                GUILayout.Label(e.category, GUILayout.Width(62));
                 // The rating and the confidence in it, together. A 1400 at
                 // RD 350 has not earned what a 1400 at RD 60 has.
                 GUILayout.Label(Mathf.RoundToInt(e.rating).ToString(), GUILayout.Width(48));
@@ -151,7 +175,7 @@ namespace RobotBrawl.Phase0
             {
                 GUILayout.BeginHorizontal();
                 GUILayout.Label(m.outcome, GUILayout.Width(64));
-                GUILayout.Label(m.myRobot + " vs " + m.opponent, GUILayout.Width(240));
+                GUILayout.Label(m.myRobot + " vs " + m.opponent, GUILayout.Width(190));
                 GUILayout.Label(m.category + (m.gap > 0 ? " +" + m.gap : ""), GUILayout.Width(70));
                 if (m.replayUrls.Count > 0)
                 {
