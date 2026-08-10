@@ -139,6 +139,18 @@ namespace RobotBrawl.Phase0
         {
             Note("server: " + LadderClient.BaseUrl);
 
+            // ⚠ NEVER AGAINST PRODUCTION. This bench REGISTERS ACCOUNTS,
+            // uploads robots, issues challenges and settles matches. Pointed
+            // at the live ladder it would write junk users and junk rows into
+            // real players' board — and every check would pass while doing it.
+            // The editor default is localhost, but a default is a convention;
+            // this is the rule.
+            if (LadderClient.IsProduction)
+            {
+                Fail("REFUSED: BaseUrl is PRODUCTION. This bench writes accounts and matches.");
+                Done(); yield break;
+            }
+
             var bm = FindFirstObjectByType<BuilderManager>();
             if (bm == null) { Fail("a BuilderManager is in the scene"); Done(); yield break; }
             string ownerBay = bm.SnapshotString();

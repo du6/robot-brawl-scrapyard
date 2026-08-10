@@ -327,6 +327,21 @@ save**. It is recoverable (`career_backups/`, baseline md5 `18614d0e`) and the
 mechanism is now closed — `Career.SuspendAutosave()` is a COUNTED hold, so
 autosave returns only when the last holder releases — but the rule stands.
 
+⚠ **THE APP DID NOT KNOW THE SERVER EXISTED until 2026-08-10.**
+`LadderClient.BaseUrl` was `http://localhost:5000` and **nothing in the game
+ever set it** — the production URL was in the deploy scripts and five docs and
+in zero lines of game code, so a shipped iOS build would have reached for
+localhost ON THE PHONE and rendered an empty ladder. Every bench pointed at
+localhost too, which is exactly why none of them caught it.
+Now: **the EDITOR defaults to `LOCAL_DEV` and a BUILD defaults to
+`PRODUCTION`**, and that asymmetry is load-bearing — `EnlistLiveBench`,
+`EnlistUiBench` and `ArenaShots` REGISTER ACCOUNTS, and they now **refuse to
+run when `LadderClient.IsProduction`** (proven: pointed at production on
+purpose, it stopped before any request). Override with
+`LadderClient.BaseUrl = LadderClient.PRODUCTION`.
+⚠ The BUILD side of that default is **verified by inspection only** — no iOS
+build has ever been made from this code. Confirm it on the first one.
+
 **The ladder API is LIVE**: `https://rb-api-902243335343.us-central1.run.app`
 on Cloud Run, against Cloud SQL over a unix socket, with blobs in GCS.
 `server/scripts/deploy_api.zsh` now runs end to end — it was written from the

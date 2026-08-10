@@ -73,7 +73,65 @@ namespace RobotBrawl.Phase0
 
     public static class LadderClient
     {
-        public static string BaseUrl = "http://localhost:5000";
+        // ===================================================================
+        // WHICH SERVER, and this was a LAUNCH BLOCKER until 2026-08-10.
+        //
+        // This field was `= "http://localhost:5000"` and NOTHING in the game
+        // ever assigned it. The production URL lived in the deploy scripts and
+        // five documents and in ZERO lines of game code, so a shipped iOS
+        // build would have reached for localhost ON THE PHONE, found nothing,
+        // and rendered an empty ladder — which looks exactly like a ladder
+        // nobody has joined. It is also http://, which iOS App Transport
+        // Security blocks outright.
+        //
+        // Every bench points at localhost, which is precisely why no bench
+        // caught it: the whole suite agreed with the bug.
+        //
+        // ⚠ THE EDITOR DEFAULTS TO LOCAL AND A BUILD DEFAULTS TO PRODUCTION,
+        // and that asymmetry is deliberate and load-bearing. EnlistLiveBench
+        // REGISTERS ACCOUNTS, uploads robots and starts matches; ArenaShots
+        // registers accounts to photograph a populated shelf. If the editor
+        // defaulted to production, running the bench suite would write junk
+        // accounts and junk ladder rows into the live database — and it would
+        // do it silently, because everything would pass. A default that is
+        // safe in the editor and correct in a build is worth the asymmetry.
+        //
+        // To aim the editor at production deliberately:
+        //     LadderClient.BaseUrl = LadderClient.PRODUCTION;
+        // The setter is the override; it is not a secret and not a toggle a
+        // player can reach.
+        public const string PRODUCTION = "https://rb-api-902243335343.us-central1.run.app";
+        public const string LOCAL_DEV  = "http://localhost:5000";
+
+        static string _baseUrl;
+        public static string BaseUrl
+        {
+            get { return string.IsNullOrEmpty(_baseUrl) ? DefaultBaseUrl : _baseUrl; }
+            set { _baseUrl = value; }
+        }
+
+        /// <summary>Where an un-configured client points. See the note above
+        /// for why these two differ.</summary>
+        public static string DefaultBaseUrl
+        {
+            get
+            {
+#if UNITY_EDITOR
+                return LOCAL_DEV;
+#else
+                return PRODUCTION;
+#endif
+            }
+        }
+
+        /// <summary>True when this client is talking to the live ladder.
+        /// Surfaced so a bench can REFUSE to write to production rather than
+        /// trust that somebody remembered.</summary>
+        public static bool IsProduction
+        {
+            get { return BaseUrl.TrimEnd('/') == PRODUCTION.TrimEnd('/'); }
+        }
+
         public static string Token = "";          // empty = anonymous
 
         public static string LastError = "";

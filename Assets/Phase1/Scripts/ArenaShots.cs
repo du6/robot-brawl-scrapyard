@@ -56,6 +56,18 @@ namespace RobotBrawl.Phase0
             go.AddComponent<ArenaShots>().StartCoroutine(All(dir));
         }
 
+        /// <summary>⚠ These captures REGISTER ACCOUNTS to photograph a
+        /// populated shelf and a real inbox. Against the live ladder that
+        /// writes junk users into real players' board, so it is refused.</summary>
+        static bool RefuseProduction()
+        {
+            if (!LadderClient.IsProduction) return false;
+            LastError = "REFUSED: BaseUrl is PRODUCTION; these captures register accounts.";
+            log.Add("  " + LastError);
+            finished = true;
+            return true;
+        }
+
         static IEnumerator Shot(string dir, string name)
         {
             string path = dir + "/" + name + ".png";
@@ -91,6 +103,7 @@ namespace RobotBrawl.Phase0
 
         static IEnumerator MobileTab(string dir)
         {
+            if (RefuseProduction()) yield break;
             try { System.IO.Directory.CreateDirectory(dir); }
             catch (Exception e) { LastError = e.Message; finished = true; yield break; }
 
@@ -254,6 +267,7 @@ namespace RobotBrawl.Phase0
 
         static IEnumerator All(string dir)
         {
+            if (RefuseProduction()) yield break;
             try { System.IO.Directory.CreateDirectory(dir); }
             catch (Exception e) { LastError = e.Message; finished = true; yield break; }
 

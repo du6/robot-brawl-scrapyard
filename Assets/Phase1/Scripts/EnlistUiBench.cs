@@ -135,6 +135,14 @@ namespace RobotBrawl.Phase0
         {
             Note("server: " + LadderClient.BaseUrl);
 
+            // ⚠ NEVER AGAINST PRODUCTION — it registers accounts and uploads
+            // robots. See EnlistLiveBench for the argument.
+            if (LadderClient.IsProduction)
+            {
+                Fail("REFUSED: BaseUrl is PRODUCTION. This bench writes accounts.");
+                Done(); yield break;
+            }
+
             // ---- is anyone home? -------------------------------------------
             List<LadderEntry> board = null; string err = null;
             yield return LadderClient.Leaderboard("", (r, e) => { board = r; err = e; });
