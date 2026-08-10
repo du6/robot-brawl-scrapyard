@@ -38,6 +38,7 @@ The records, most recent first:
 
 | doc | what |
 |---|---|
+| `docs/LAUNCH_CHECKLIST_2026-08-10.md` | **START HERE before shipping** — what is ready, what needs a phone, what needs owen |
 | `docs/CareerBench_Sample_Size_2026-08-10.md` | three of eleven balance verdicts were coin flips |
 | `docs/Disarm_Lever_Sweep_2026-08-10.md` | which lever moves the 43% — and the one that sounds right does nothing |
 | `docs/ARENA_Judged_2026-08-10.md` | the ARENA photographed — and it has no entry point |
