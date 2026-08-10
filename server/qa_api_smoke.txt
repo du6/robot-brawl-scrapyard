@@ -15,7 +15,7 @@ PASS  a wrong password and an unknown account are indistinguishable (both 401)
 
 == D. robots ==
 PASS  a robot is created
-      robot 855f4984-a5df-416f-a907-403b75cbb068
+      robot 6e93f606-5d0d-490c-9b79-08774e373856
 PASS  …but not without a token
 
 == E. snapshot upload stays opaque (§5.2) ==
@@ -30,7 +30,7 @@ PASS  …and a wrong key is refused too
 PASS  a keyed worker claims a job
 PASS  …and the job is the VALIDATE the upload enqueued
 PASS  …pointing at the snapshot just uploaded
-PASS  …and carries a payload location the worker can resolve (file:///tmp/rb-blobs/snapshots/855f4984-a5df-416f-a907-403b75cbb068/bbda68aed9764e629ae849f134fcba9b.json)
+PASS  …and carries a payload location the worker can resolve (file:///tmp/rb-blobs/snapshots/6e93f606-5d0d-490c-9b79-08774e373856/52f0a972231c4254bbcf096ed05230e3.json)
 PASS  …and the payload sha256 rides along, so the worker can verify storage
 PASS  another worker cannot heartbeat a job it does not hold
 PASS  …the holder can
@@ -131,5 +131,14 @@ PASS  …stating the outcome from this account's side (WON)
 PASS  …and an inbox is private — no token, no inbox
 PASS  the wallet loads, so a client can show a balance before staking
 PASS  …and its balance equals the sum of the ledger, not a cached column
+PASS  scrap deposits from the wallet to the career save
+PASS  …debiting the wallet by exactly that much
+PASS  …as a NEGATIVE DEPOSIT_TO_CAREER row, which the schema also enforces
+PASS  …and replaying that exact deposit is refused
+PASS  …with the wallet unmoved by the replay
+PASS  …and exactly one row carrying that key, refused by the database
+PASS  a NEGATIVE deposit cannot be used to mint scrap into the wallet
+PASS  …and you cannot deposit scrap you do not have
+PASS  …and a deposit without an idempotency key is refused outright
 
-===== passed 106  failed 0  skipped 0 =====
+===== passed 115  failed 0  skipped 0 =====

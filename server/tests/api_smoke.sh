@@ -807,6 +807,35 @@ else
   expect "the wallet loads, so a client can show a balance before staking" "$S" 200
   is "…and its balance equals the sum of the ledger, not a cached column" \
      "$(jget balance)" "$(dbq "SELECT COALESCE(SUM(delta),0) FROM ledger WHERE user_id='$USERID';")"
+
+  # ---- DEPOSIT TO CAREER, the one-way valve (§2.3) --------------------
+  # Wallet scrap may move into the local career save and can NEVER come back.
+  # That direction is the whole reason a hacked save is worthless online.
+  BAL0=$(dbq "SELECT COALESCE(SUM(delta),0) FROM ledger WHERE user_id='$USERID';")
+  IDEM="dep-$STAMP-1"
+  S=$(req POST /v1/wallet/deposit "{\"amount\":40,\"idemKey\":\"$IDEM\"}" "$AUTH")
+  expect "scrap deposits from the wallet to the career save" "$S" 200
+  is "…debiting the wallet by exactly that much" \
+     "$(dbq "SELECT COALESCE(SUM(delta),0) FROM ledger WHERE user_id='$USERID';")" "$((BAL0 - 40))"
+  is "…as a NEGATIVE DEPOSIT_TO_CAREER row, which the schema also enforces" \
+     "$(dbq "SELECT delta FROM ledger WHERE idem_key='$IDEM';")" -40
+  # §8/M3 acceptance: "a deposited balance replayed from a tampered client is
+  # rejected (idempotency key per deposit)". Replay the EXACT same request.
+  S=$(req POST /v1/wallet/deposit "{\"amount\":40,\"idemKey\":\"$IDEM\"}" "$AUTH")
+  expect "…and replaying that exact deposit is refused" "$S" 409
+  is "…with the wallet unmoved by the replay" \
+     "$(dbq "SELECT COALESCE(SUM(delta),0) FROM ledger WHERE user_id='$USERID';")" "$((BAL0 - 40))"
+  is "…and exactly one row carrying that key, refused by the database" \
+     "$(dbq "SELECT count(*) FROM ledger WHERE idem_key='$IDEM';")" 1
+  # The valve only opens one way: there is no endpoint that credits a wallet
+  # from a client-reported career balance, and the CHECK makes one
+  # unrepresentable even if somebody wrote it.
+  S=$(req POST /v1/wallet/deposit "{\"amount\":-100,\"idemKey\":\"dep-$STAMP-neg\"}" "$AUTH")
+  expect "a NEGATIVE deposit cannot be used to mint scrap into the wallet" "$S" 400
+  S=$(req POST /v1/wallet/deposit "{\"amount\":999999,\"idemKey\":\"dep-$STAMP-big\"}" "$AUTH")
+  expect "…and you cannot deposit scrap you do not have" "$S" 400
+  S=$(req POST /v1/wallet/deposit "{\"amount\":10}" "$AUTH")
+  expect "…and a deposit without an idempotency key is refused outright" "$S" 400
 fi
 
 rm -f "$BODY" "$VRC_SNAP_FILE" "$VRC_JOB_FILE"

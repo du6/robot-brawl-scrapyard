@@ -86,6 +86,14 @@ builder.Services.AddRateLimiter(o =>
     o.AddPolicy("auth", ctx => RateLimitPartition.GetFixedWindowLimiter(
         ctx.Connection.RemoteIpAddress?.ToString() ?? "anon",
         _ => new FixedWindowRateLimiterOptions { PermitLimit = 10, Window = TimeSpan.FromMinutes(1) }));
+    // The wallet gets its own bucket rather than sharing "upload". They are
+    // different actions with different abuse profiles, and sharing one bucket
+    // means a player who has been challenging hard is throttled out of
+    // looking at their own winnings. Note this does NOT raise the upload
+    // limit — it stops three unrelated operations competing for one budget.
+    o.AddPolicy("wallet", ctx => RateLimitPartition.GetFixedWindowLimiter(
+        ctx.User.FindFirstValue("sub") ?? ctx.Connection.RemoteIpAddress?.ToString() ?? "anon",
+        _ => new FixedWindowRateLimiterOptions { PermitLimit = 20, Window = TimeSpan.FromMinutes(1) }));
 });
 
 var app = builder.Build();
@@ -1072,6 +1080,71 @@ app.MapGet("/v1/wallet", async (ClaimsPrincipal user) =>
     return Results.Ok(new { balance, recent = rows });
 }).RequireAuthorization();
 
+// §2.3's one-way valve: wallet scrap may move INTO the local career save and
+// can never come back. That direction is what makes a hacked save worthless
+// online — local scrap can never enter the ladder.
+//
+// Two rules are enforced by the DATABASE, not here, and deliberately so:
+//   * ledger_deposit_is_withdrawal — a DEPOSIT_TO_CAREER row can only be
+//     negative, so no code path can turn this into a faucet.
+//   * ledger_idem_key (unique, partial) — the replay is refused by Postgres
+//     rather than by an application check somebody can skip.
+// This endpoint's job is to not undermine either.
+app.MapPost("/v1/wallet/deposit", async (DepositReq req, ClaimsPrincipal user) =>
+{
+    var me = UserId(user);
+    if (req.Amount <= 0) return Bad("a deposit must be a positive amount of scrap");
+    if (string.IsNullOrWhiteSpace(req.IdemKey))
+        return Bad("an idempotency key is required — without one a dropped response cannot be retried safely");
+
+    await using var c = await db.OpenAsync();
+    await using var tx = await c.BeginTransactionAsync();
+
+    // The balance IS the ledger (§2.3). Read it inside the transaction so a
+    // concurrent stake cannot be spent twice over.
+    long balance;
+    await using (var bal = new NpgsqlCommand(
+        "SELECT COALESCE(SUM(delta),0) FROM ledger WHERE user_id = $1;", c, tx))
+    {
+        bal.Parameters.AddWithValue(me);
+        balance = Convert.ToInt64(await bal.ExecuteScalarAsync());
+    }
+    if (balance < req.Amount)
+        return Bad($"your wallet holds {balance} scrap and this deposit is {req.Amount}");
+
+    try
+    {
+        await using var ins = new NpgsqlCommand(
+            "INSERT INTO ledger (user_id, delta, reason, idem_key) VALUES ($1,$2,'DEPOSIT_TO_CAREER',$3);", c, tx);
+        ins.Parameters.AddWithValue(me);
+        ins.Parameters.AddWithValue(-req.Amount);
+        ins.Parameters.AddWithValue(req.IdemKey!);
+        await ins.ExecuteNonQueryAsync();
+        await tx.CommitAsync();
+    }
+    catch (PostgresException ex) when (ex.SqlState == "23505")
+    {
+        // §8/M3: "a deposited balance replayed from a tampered client is
+        // rejected". Rejected, not silently re-accepted — but the original
+        // row comes back with it, so an HONEST client that merely lost its
+        // response can reconcile instead of guessing.
+        await tx.RollbackAsync();
+        await using var prev = new NpgsqlCommand(
+            "SELECT -delta, created_at FROM ledger WHERE idem_key = $1;", c);
+        prev.Parameters.AddWithValue(req.IdemKey!);
+        await using var pr = await prev.ExecuteReaderAsync();
+        object? already = await pr.ReadAsync()
+            ? new { amount = pr.GetInt32(0), at = pr.GetDateTime(1) } : null;
+        return Results.Conflict(new
+        {
+            error = "this deposit was already applied — the idempotency key has been used",
+            alreadyDeposited = already,
+        });
+    }
+
+    return Results.Ok(new { deposited = req.Amount, balance = balance - req.Amount });
+}).RequireAuthorization().RequireRateLimiting("wallet");
+
 app.Run();
 
 // ------------------------------------------------------------------ dtos
@@ -1082,6 +1155,7 @@ public record SnapshotReq(Guid RobotId, string? Envelope);
 public record ClaimReq(string? WorkerId);
 public record ChallengeReq(Guid ChallengerSnapshotId, Guid DefenderSnapshotId);
 public record ReplayReq(string? Replay);
+public record DepositReq(int Amount, string? IdemKey);
 public record FightResult(Guid MatchId, string? WorkerId, string? Verdict,
                           string[]? ReplayUrls, string[]? Bouts);
 public record ValidateResult(
