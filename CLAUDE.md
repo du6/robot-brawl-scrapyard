@@ -11,10 +11,11 @@ playable; **Multiplayer v3** (cloud ladder) is mid-build.
    names the one task that matters next (GcsBlobStore). It supersedes the
    status tables in (1) below; (1) is still the live guidance for the hard
    rules and the editor discipline.
-0. **`docs/HANDOVER_2026-08-09_night.md`** — the newest handover, and the one
-   to start from. It supersedes (1) on all status; (1) is still live on the
-   hard rules and editor discipline (its §2 and §3). ⚠ Its §3 ("write
-   GcsBlobStore") is **DONE** — see `docs/Cloud_Only_Defects_2026-08-09.md`.
+0. **`docs/HANDOVER_2026-08-09_late_night.md`** — the newest handover and the
+   one to start from. It supersedes `HANDOVER_2026-08-09_night.md` entirely
+   (that document's §6 traps are still true), and supersedes (1) on all
+   status; (1) is still live on the hard rules and editor discipline (its §2
+   and §3).
 1. **`docs/HANDOVER_TO_CLI.md`** — the takeover brief. As of 2026-08-09 this
    project is driven by a Claude Code session on owen's Mac. That document
    is the takeover brief: what to verify before trusting anything, the
