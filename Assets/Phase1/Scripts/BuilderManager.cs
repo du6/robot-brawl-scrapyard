@@ -6098,7 +6098,9 @@ public class BuilderManager : MonoBehaviour
                 }
             }
             // ---- MEDALS (2026-08-02, owen): the trophy case ------------------
-            // The desktop twin of MobileBuilderUI's TROPHIES tab. Same content,
+            // The desktop twin of the mobile trophy case — which lived on its
+            // own TROPHIES tab until ARENA took index 4 (owen, 2026-08-10) and
+            // now rides on the LEAGUE board. Same content,
             // same rule that every league is listed whether or not it has been
             // won, because the gaps are the motivation. Desktop is NOT optional
             // here: mobile uGUI and IMGUI are two separate code paths and this

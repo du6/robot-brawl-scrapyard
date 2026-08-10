@@ -13,8 +13,9 @@ namespace RobotBrawl.Phase0
 /// Proves the league-champion medal end to end through the REAL settle path:
 /// seeds a throwaway career one contest short of sweeping League 1, runs that
 /// last contest as a real career fight, ends it with FightManager.End() (what
-/// a real KO calls), and photographs the RESULTS ribbon, the mobile TROPHIES
-/// tab, the mobile ROBOTS card and the desktop IMGUI trophy block.
+/// a real KO calls), and photographs the RESULTS ribbon, the mobile LEAGUE
+/// board (which carries the trophy case since 2026-08-10), the mobile ROBOTS
+/// card and the desktop IMGUI trophy block.
 ///
 /// SAFETY: the player's real save files are read into memory as BYTES before
 /// anything is touched, Career.autosave is forced off for the whole run, and
@@ -163,7 +164,17 @@ public class MedalDev : MonoBehaviour
         var ui = MobileBuilderUI.inst;
         if (ui != null)
         {
-            ui.TestShowTab(5);
+            // ⚠ THIS SAID 5 AND HAD BEEN WRONG SINCE 2026-08-05. Removing the
+            // PARTS tab renumbered everything above index 4, and this call was
+            // one of three sites the pass missed (TabHint's cases 4 and 5 were
+            // the others) — so every "trophies.png" produced for five days was
+            // a photograph of the PROGRAM tab, filed under the wrong name.
+            // Nothing failed: a screenshot of the wrong screen is still a
+            // screenshot.
+            //
+            // It is 1 now, LEAGUE, because that is where the trophy case went
+            // when ARENA took index 4 (owen, 2026-08-10).
+            ui.TestShowTab(1);
             yield return null; yield return null;
             log.Add("# mobile: tab=" + ui.TestTab + " dockH=" + ui.TestDockHeight);
             yield return Shot(dir, "trophies");

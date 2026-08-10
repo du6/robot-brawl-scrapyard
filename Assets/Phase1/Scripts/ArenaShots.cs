@@ -69,6 +69,76 @@ namespace RobotBrawl.Phase0
             }
         }
 
+        /// <summary>Reach the ARENA the way a PLAYER does — through the mobile
+        /// dock's tab — and photograph it. `Run` builds ArenaScreen itself,
+        /// which proves the screen and says nothing about whether anything can
+        /// open it. That distinction is the whole reason this file exists.
+        ///
+        /// Career state is held and restored: forcing career mode to see a
+        /// career-only tab is still touching owner state.</summary>
+        public static void RunMobileTab(string dir)
+        {
+            finished = false; shots = 0; LastError = ""; log.Clear();
+            var go = new GameObject("arena_tab_shots");
+            go.AddComponent<ArenaShots>().StartCoroutine(MobileTab(dir));
+        }
+
+        static IEnumerator MobileTab(string dir)
+        {
+            try { System.IO.Directory.CreateDirectory(dir); }
+            catch (Exception e) { LastError = e.Message; finished = true; yield break; }
+
+            var savedData = Career.Data;
+            bool savedActive = Career.active;
+            bool savedForce = MobileBuilderUI.forceMobileUI;
+            var hold = Career.SuspendAutosave();
+            try
+            {
+                Career.active = true;
+                if (Career.Data == null) Career.Data = new CareerData();
+                MobileBuilderUI.forceMobileUI = true;
+
+                float t = 0f;
+                while (!MobileBuilderUI.Active && t < 8f) { t += Time.deltaTime; yield return null; }
+                var ui = MobileBuilderUI.inst;
+                if (ui == null) { LastError = "the mobile dock never came up"; yield break; }
+
+                // ⚠ OPEN THE DOCK FIRST. Every panel is gated on `dockOpen`,
+                // ARENA included, so TestShowTab against a collapsed dock
+                // switches the tab and shows nothing — the first run of this
+                // photographed a correct ARENA tab strip over an empty screen
+                // and would have been filed as proof. Tapping the tab for real
+                // opens the dock (the button handler does it); a direct
+                // TestShowTab does not.
+                ui.SetDockOpen(true);
+                yield return null;
+
+                // Index 4. If ARENA is not there, this photographs whatever is,
+                // which is why the log records the tab it actually landed on.
+                ui.TestShowTab(4);
+                yield return null; yield return null;
+                log.Add("  dock tab=" + ui.TestTab + " (4 = ARENA) dockOpen=" + ui.DockOpen);
+                yield return new WaitForSeconds(1.2f);
+                yield return Shot(dir, "07_arena_tab");
+
+                ui.TestShowTab(1);
+                yield return null; yield return null;
+                yield return new WaitForSeconds(0.6f);
+                yield return Shot(dir, "08_league_with_trophy_case");
+                ui.TestShowTab(0);
+                yield return null;
+            }
+            finally
+            {
+                MobileBuilderUI.forceMobileUI = savedForce;
+                Career.Data = savedData;
+                Career.active = savedActive;
+                hold.Dispose();
+            }
+            finished = true;
+            Debug.Log("[ArenaShots] " + Report());
+        }
+
         static IEnumerator All(string dir)
         {
             try { System.IO.Directory.CreateDirectory(dir); }

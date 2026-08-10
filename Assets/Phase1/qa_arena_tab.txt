@@ -1,0 +1,69 @@
+ARENA tab replaces TROPHIES — 2026-08-10
+
+owen: "let's remove TROPHIES tab and add a new arena tab."
+
+Tab bar, career mode: BUILD | LEAGUE | ROBOTS | SHOP | ARENA | PROGRAM.
+Six tabs before, six after. ARENA takes index 4.
+
+PROVEN, not assumed (docs/shots/07_arena_tab.png):
+  dock tab=4 (4 = ARENA) dockOpen=True — and the ARENA screen RENDERS:
+  sign-in panel, category filters, "8 ranked". The ladder is reachable from
+  inside the game for the first time.
+
+⚠ The first capture attempt photographed a correct ARENA tab strip over an
+EMPTY screen and would have been filed as proof. Every dock panel is gated on
+`dockOpen`, ARENA included; TestShowTab against a COLLAPSED dock switches the
+tab and shows nothing. Tapping the tab for real opens the dock — the button
+handler does it — but a direct TestShowTab does not. ArenaShots.RunMobileTab
+now opens the dock first.
+
+THE MEDALS MOVED TO LEAGUE (docs/shots/08_league_with_trophy_case.png), not
+into the bin. Removing a tab that owns live content is how you create the
+unreachable-but-green defect this project has now hit three times, so the
+trophy case went where the medals are earned:
+  ★ TROPHY CASE · 3 of 5 league campaigns won
+  ★ Scrapyard Open · The Yard · cap 1500 kg · pillars
+      CHAMPION · spinner1 2-1 · 2 contests swept · 2026-08-03
+  ★ Garage League · The Loading Dock · cap 2000 kg · twin wall screws
+      CHAMPION · spinner1 5-1 · 3 contests swept · 2026-08-03
+The medal rides on its own league's header, directly above the contests still
+owed. Nothing the old trophy panel said was lost.
+
+TWO OFF-BY-ONE BUGS FOUND, both left by the PARTS removal of 2026-08-05, which
+renumbered the names array, LayoutTabs and ShowTab and missed everything that
+never mentioned a tab BY NAME:
+
+  * TabHint() case 4 answered with the DELETED PARTS tab's hint and case 5
+    with the trophy case's. Every tab from index 4 down described its
+    predecessor, for five days. Nothing failed — a wrong sentence is not an
+    exception.
+  * MedalDev did TestShowTab(5) and filed the result as "trophies.png", so
+    every trophy screenshot since 08-05 was a photograph of the PROGRAM tab.
+
+When you renumber, grep for the INDEX, not the name.
+
+CareerSmoke, run ALONE in a fresh play session:  127 pass, 1 fail
+  PASS  workshop tabs: LEAGUE / ROBOTS / SHOP / ARENA in career,
+        and no PARTS or TROPHIES
+  FAIL  build controls clear the 44 pt touch floor (too small: part_0=36.9pt)
+
+⚠ THAT FAILURE IS NOT THIS CHANGE. Control leg: the same commit stashed, a
+fresh play session at HEAD, CareerSmoke run once — 127 pass, 1 fail, the
+IDENTICAL part_0=36.9pt. It is a pre-existing regression from 2dec48f ("The
+whole sensor palette was unreachable in the builder"), which derived cell
+HEIGHT from the viewport; CareerSmoke was never re-run after it, so
+CLAUDE.md's "CareerSmoke 128/128" is stale. Open, and it is a shipped
+single-player defect: the BUILD palette tiles are under the touch floor.
+
+⚠ A SECOND CareerSmoke RUN IN THE SAME PLAY SESSION REPORTS 114/14 and is
+meaningless — CLAUDE.md says so and I did it anyway. Fresh session, once.
+
+Career save either side: 18614d0e6603869f28fb65992b7d1484, size 5438,
+mtime 1786354063 UNCHANGED — including the capture run, which forced career
+mode under a counted autosave hold and photographed owen's real career.
+
+KNOWN, NOT FIXED: the ARENA's IMGUI panel is drawn at a fixed top-left rect
+and the OPEN dock pushes the tab strip up underneath it, so BUILD and LEAGUE
+are obscured while ARENA is showing (07_arena_tab.png). It is the same
+collision docs/ARENA_Judged_2026-08-10.md §2.2 records, now on the tab bar
+instead of the tutorial banner. Styling is owen's call.

@@ -62,8 +62,25 @@ public class MobileBuilderUI : MonoBehaviour
     // Removing PARTS (owen, 2026-08-05) is the renumbering that note was
     // avoiding, so it was done in ONE pass across every index-keyed site:
     // the `names` array, LayoutTabs' count, and all three arms of ShowTab.
-    // TROPHIES is index 4 now; there is no index 5.
-    GameObject trophyPanel; Transform trophyContent; Text trophyHeader;
+    //
+    // ⚠ THAT PASS MISSED TabHint(), and nobody noticed for five days: its
+    // case 4 still answered with the deleted PARTS tab's hint and case 5 with
+    // the trophy case's, so both tabs described the wrong screen. Fixed
+    // 2026-08-10. When you renumber, grep for the INDEX, not the name — the
+    // sites that break are the ones that never mentioned "TROPHIES" at all.
+    //
+    // ---- ARENA takes index 4 (owen, 2026-08-10) ----
+    // The trophy case is gone from the dock and its content moved INTO the
+    // LEAGUE board, where the medals are actually earned: a league that has
+    // been swept now says so on its own header. Nothing became unreachable,
+    // which was the whole risk of removing a tab that owned live content.
+    //
+    // ARENA has no UGUI panel because ArenaScreen is IMGUI — it draws itself
+    // in OnGUI, over everything. The tab therefore toggles the COMPONENT
+    // rather than a panel GameObject. Built lazily: the ladder screen hits
+    // the network in Start(), and constructing it for a player who never
+    // opens the tab would be a request nobody asked for.
+    ArenaScreen arenaScreen;
     // ---- P3a: the Program Bench canvas (career-only tab, index 5) ----
     GameObject programPanel; ProgramCanvas programCanvas;
     InputField nameInput;
@@ -343,7 +360,7 @@ public class MobileBuilderUI : MonoBehaviour
 
         // tab buttons across the top of the dock. SHOP (C2) exists only in
         // career mode; LayoutTabs re-anchors whenever the career switch flips.
-        string[] names = { "BUILD", "FIGHT", "GARAGE", "SHOP", "TROPHIES", "PROGRAM" };   // P3a: index 5, career-only
+        string[] names = { "BUILD", "FIGHT", "GARAGE", "SHOP", "ARENA", "PROGRAM" };   // P3a: index 5, career-only
         tabBtns.Clear();
         for (int i = 0; i < names.Length; i++)
         {
@@ -368,9 +385,9 @@ public class MobileBuilderUI : MonoBehaviour
         garagePanel = MkPanel("garage", dock.transform, new Color(0f, 0f, 0f, 0f));
         shopPanel = MkPanel("shop", dock.transform, new Color(0f, 0f, 0f, 0f));
         robotsPanel = MkPanel("robots", dock.transform, new Color(0f, 0f, 0f, 0f));
-        trophyPanel = MkPanel("trophies", dock.transform, new Color(0f, 0f, 0f, 0f));
+        // no trophies panel: ARENA is index 4 and draws in OnGUI, not UGUI.
         programPanel = MkPanel("program", dock.transform, new Color(0f, 0f, 0f, 0f));   // P3a
-        foreach (var p in new[] { buildPanel, fightPanel, garagePanel, shopPanel, robotsPanel, trophyPanel, programPanel })
+        foreach (var p in new[] { buildPanel, fightPanel, garagePanel, shopPanel, robotsPanel, programPanel })
         {
             var rt = p.GetComponent<RectTransform>();
             rt.anchorMin = new Vector2(0f, 0f); rt.anchorMax = new Vector2(1f, 1f);
@@ -386,7 +403,8 @@ public class MobileBuilderUI : MonoBehaviour
         if (!Career.active) BuildGarageTab();
         BuildShopTab();
         BuildRobotsTab();
-        BuildTrophiesTab();
+        // BuildTrophiesTab() is gone: ARENA owns index 4 and builds itself in
+        // ShowTab, and the medals moved into the LEAGUE board.
         // P3a: career-only, the C6.5 rule (never build career UI the sandbox
         // can mis-hit; the garage is the same rule in reverse).
         if (Career.active) BuildProgramTab();
@@ -1348,17 +1366,49 @@ public class MobileBuilderUI : MonoBehaviour
         fightGates.Clear();   // the rows below are about to be destroyed
         for (int i = careerBoardContent.childCount - 1; i >= 0; i--)
             Destroy(careerBoardContent.GetChild(i).gameObject);
+
+        // ---- THE TROPHY CASE LIVES HERE NOW (owen, 2026-08-10) -------------
+        // It had its own tab until ARENA took index 4. Moving it here rather
+        // than deleting it, because a medal is the LEAGUE's reward \u2014 "win
+        // every contest in a league and its champion medal lands here" \u2014 and
+        // a trophy case on its own tab is a room you visit to be told nothing
+        // has changed. On the board it is read on the way past, next to the
+        // contests that are still owed.
+        int medalsWon = Career.Data.medals.Count;
+        var tcase = MkText("trophycase", careerBoardContent,
+            medalsWon > 0
+                ? "\u2605 TROPHY CASE  \u00b7  " + medalsWon + " of " + CareerDB.Leagues.Length
+                  + " league campaigns won"
+                : "TROPHY CASE  \u00b7  no medals yet \u2014 sweep every contest in a league "
+                  + "to win its champion medal",
+            14, TextAnchor.MiddleLeft);
+        tcase.color = medalsWon > 0 ? new Color(1f, 0.87f, 0.46f) : new Color(0.72f, 0.78f, 0.88f);
+        tcase.gameObject.AddComponent<LayoutElement>().minHeight = 22f;
+
         for (int li = 0; li < CareerDB.Leagues.Length; li++)
         {
             var lg = CareerDB.Leagues[li];
             bool open = Career.LeagueUnlocked(li);
+            // The medal rides on its own league's header. Everything the old
+            // trophy row said that is not already on this line \u2014 who won it,
+            // their record, when \u2014 goes in the second line, and only when
+            // there is a medal to describe.
+            var medal = Career.MedalFor(li);
             var hdr = MkText("lg_" + li, careerBoardContent,
-                string.Format("{0}{1} \u00b7 {2} \u00b7 cap {3} kg \u00b7 {4}",
-                    open ? "" : "[locked] ", lg.name, lg.arenaName, Mathf.RoundToInt(lg.weightCap),
-                    ArenaHazards.Summary(lg.arenaId)),
+                string.Format("{0}{1}{2} \u00b7 {3} \u00b7 cap {4} kg \u00b7 {5}{6}",
+                    open ? "" : "[locked] ", medal != null ? "\u2605 " : "",
+                    lg.name, lg.arenaName, Mathf.RoundToInt(lg.weightCap),
+                    ArenaHazards.Summary(lg.arenaId),
+                    medal != null
+                        ? "\n    CHAMPION \u00b7 " + medal.robot + " " + medal.wins + "-" + medal.losses
+                          + " \u00b7 " + medal.contests + " contest" + (medal.contests == 1 ? "" : "s")
+                          + " swept \u00b7 " + medal.when
+                        : ""),
                 14, TextAnchor.MiddleLeft);
-            hdr.color = open ? new Color(0.80f,0.88f,1f) : new Color(0.55f,0.55f,0.60f);
-            hdr.gameObject.AddComponent<LayoutElement>().minHeight = 20f;
+            hdr.color = medal != null ? new Color(1f, 0.87f, 0.46f)
+                      : open         ? new Color(0.80f,0.88f,1f)
+                                     : new Color(0.55f,0.55f,0.60f);
+            hdr.gameObject.AddComponent<LayoutElement>().minHeight = medal != null ? 38f : 20f;
             if (!open) continue;
             for (int ci = 0; ci < lg.contests.Length; ci++)
             {
@@ -1606,7 +1656,8 @@ public class MobileBuilderUI : MonoBehaviour
     /// R9 (owen 2026-08-04). Measured on his landscape iPhone: the screen is
     /// 2532x1170 but the SAFE area is x=141 w=2250 y=63 - 141 px bitten out of
     /// each side and 63 px off the bottom. The UI ignored all of it and drew
-    /// edge to edge, so the outer tabs (BUILD and TROPHIES) ran under the notch
+    /// edge to edge, so the outer tabs (BUILD and the last one, TROPHIES at the
+    /// time and ARENA since 2026-08-10) ran under the notch
     /// and the rounded corners, and the whole action row - ROTATE through SAVE -
     /// sat in the home-indicator strip, which on iOS also swallows the swipe
     /// that would have hit them.
@@ -1685,7 +1736,7 @@ public class MobileBuilderUI : MonoBehaviour
             if (rt != null) rt.sizeDelta = new Vector2(-4f, R);
         }
         foreach (var pn in new[] { buildPanel, fightPanel, garagePanel, shopPanel,
-                                   robotsPanel, trophyPanel })
+                                   robotsPanel })
         {
             if (pn == null) continue;
             var rt = pn.GetComponent<RectTransform>();
@@ -2022,8 +2073,10 @@ public class MobileBuilderUI : MonoBehaviour
 
     void LayoutTabs()
     {
-        // TROPHIES is career-only, like SHOP - 5 tabs in career mode, still 3
-        // in the sandbox. PARTS was the sixth and is gone (owen, 2026-08-05):
+        // ARENA is career-only, like SHOP - 6 tabs in career mode, still 3
+        // in the sandbox. It replaced TROPHIES at index 4 (owen, 2026-08-10);
+        // the medals moved onto the LEAGUE board, where they are earned.
+        // PARTS was the sixth and is gone (owen, 2026-08-05):
         // ownership is already on the BUILD tiles ("N free") and on every SHOP
         // row ("own N"), so the tab restated two numbers the player had
         // anyway. What it uniquely showed - which robot was holding what - it
@@ -2038,7 +2091,8 @@ public class MobileBuilderUI : MonoBehaviour
             // R9: spread the tabs across the SAFE width, not the screen width.
             // Measured on owen's landscape iPhone, 141 px is bitten out of each
             // side by the notch and the rounded corners - so the first and last
-            // tabs, BUILD and TROPHIES, were the two sitting underneath it.
+            // tabs — BUILD and whatever is last (TROPHIES then, ARENA now) — were
+            // the two sitting underneath it.
             // Dividing 0..1 evenly is only correct on a rectangle.
             rt.anchorMin = new Vector2(Mathf.Lerp(safeFracL, safeFracR, i / (float)n), 1f);
             rt.anchorMax = new Vector2(Mathf.Lerp(safeFracL, safeFracR, (i + 1) / (float)n), 1f);
@@ -2664,28 +2718,6 @@ public class MobileBuilderUI : MonoBehaviour
         RefreshNameGates();
     }
 
-    void BuildTrophiesTab()
-    {
-        var v = trophyPanel.AddComponent<VerticalLayoutGroup>(); v.spacing = 4f; v.childForceExpandWidth = true; v.childForceExpandHeight = false; v.padding = new RectOffset(4,4,4,4);
-        trophyHeader = MkText("trophyheader", trophyPanel.transform, "", 15, TextAnchor.MiddleLeft);
-        var hle = trophyHeader.gameObject.AddComponent<LayoutElement>(); hle.minHeight = 22f; hle.preferredHeight = 22f;
-        var scrollGO = MkPanel("trscroll", trophyPanel.transform, new Color(0f,0f,0f,0f));
-        var sle = scrollGO.AddComponent<LayoutElement>(); sle.flexibleHeight = 1f; sle.minHeight = 100f;
-        var scroll = scrollGO.AddComponent<ScrollRect>(); scroll.horizontal = false; scroll.vertical = true;
-        var viewport = MkPanel("trviewport", scrollGO.transform, new Color(0f,0f,0f,0.15f));
-        var vp = viewport.GetComponent<RectTransform>(); Stretch(vp);
-        viewport.AddComponent<Mask>().showMaskGraphic = true;
-        var content = MkPanel("trcontent", viewport.transform, new Color(0f,0f,0f,0f));
-        var crt = content.GetComponent<RectTransform>();
-        crt.anchorMin = new Vector2(0f,1f); crt.anchorMax = new Vector2(1f,1f); crt.pivot = new Vector2(0.5f,1f); crt.anchoredPosition = Vector2.zero;
-        crt.sizeDelta = new Vector2(0f, 0f);
-        var clg = content.AddComponent<VerticalLayoutGroup>(); clg.spacing = 4f; clg.childForceExpandWidth = true; clg.childForceExpandHeight = false; clg.padding = new RectOffset(4,4,4,4);
-        var csf = content.AddComponent<ContentSizeFitter>(); csf.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
-        scroll.viewport = vp; scroll.content = crt;
-        AddListOverflow(scrollGO, scroll, vp);   // R2 finding 8: TROPHIES
-        trophyContent = content.transform;
-    }
-
     // BuildPartsTab() and RefreshParts() lived here and are gone with the tab
     // (owen, 2026-08-05: "the PARTS tab looks redundant because we know how
     // many of each part are owned in the SHOP tab and BUILD tab").
@@ -2697,66 +2729,6 @@ public class MobileBuilderUI : MonoBehaviour
     // N-M spare" beside a BUILD tile already reading "N free" and a SHOP row
     // already reading "own N". Three surfaces, one fact.
 
-    void RefreshTrophies()
-    {
-        if (trophyContent == null) return;
-        for (int i = trophyContent.childCount - 1; i >= 0; i--) Destroy(trophyContent.GetChild(i).gameObject);
-        int won = Career.Data.medals.Count;
-        int total = CareerDB.Leagues.Length;
-        if (trophyHeader != null)
-        {
-            trophyHeader.text = "TROPHY CASE  \u00b7  " + won + " of " + total + " league campaigns won";
-            trophyHeader.color = won > 0 ? new Color(1f, 0.87f, 0.46f) : new Color(0.72f, 0.78f, 0.88f);
-        }
-        if (won == 0)
-        {
-            // Empty state must read as "not yet", never as "failed to load".
-            var erow = MkPanel("tremptyhead", trophyContent, new Color(0.13f,0.12f,0.09f,0.9f));
-            var ele = erow.AddComponent<LayoutElement>(); ele.minHeight = 46f; ele.preferredHeight = 46f;
-            var et = MkText("lbl", erow.transform,
-                "No medals yet \u2014 win EVERY contest in a league and its champion medal lands here.",
-                14, TextAnchor.MiddleLeft);
-            et.color = new Color(0.88f, 0.82f, 0.66f);
-            Stretch(et.rectTransform);
-            et.rectTransform.offsetMin = new Vector2(10f, 2f); et.rectTransform.offsetMax = new Vector2(-10f, -2f);
-        }
-        for (int li = 0; li < total; li++)
-        {
-            var lg = CareerDB.Leagues[li];
-            var m = Career.MedalFor(li);
-            bool open = Career.LeagueUnlocked(li);
-            int done = 0;
-            foreach (var cc in lg.contests) if (Career.Data.doneContests.Contains(cc.id)) done++;
-            var row = MkPanel("medal_" + li, trophyContent,
-                m != null ? new Color(0.22f,0.17f,0.05f,0.96f) : new Color(0.10f,0.11f,0.14f,0.9f));
-            var rle = row.AddComponent<LayoutElement>(); rle.minHeight = 52f; rle.preferredHeight = 52f;
-            string head, sub;
-            if (m != null)
-            {
-                head = "\u2605  " + m.leagueName.ToUpper() + " CHAMPION";
-                sub  = m.arenaName + "  \u00b7  " + m.robot + "  " + m.wins + "-" + m.losses
-                     + "  \u00b7  " + m.contests + " contest" + (m.contests == 1 ? "" : "s")
-                     + " swept  \u00b7  " + m.when;
-            }
-            else if (!open)
-            {
-                head = "\u25cb  " + lg.name.ToUpper() + "  \u2014  LOCKED";
-                sub  = lg.arenaName + "  \u00b7  win the " + CareerDB.Leagues[li - 1].name + " first";
-            }
-            else
-            {
-                head = "\u25cb  " + lg.name.ToUpper() + "  \u2014  NOT YET WON";
-                sub  = lg.arenaName + "  \u00b7  " + done + " of " + lg.contests.Length
-                     + " contests beaten  \u00b7  sweep them all for the medal";
-            }
-            var lbl = MkText("lbl", row.transform, head + "\n" + sub, 13, TextAnchor.MiddleLeft);
-            lbl.color = m != null ? new Color(1f, 0.87f, 0.46f)
-                      : open     ? new Color(0.70f, 0.76f, 0.86f)
-                                 : new Color(0.48f, 0.52f, 0.60f);
-            Stretch(lbl.rectTransform);
-            lbl.rectTransform.offsetMin = new Vector2(10f, 2f); lbl.rectTransform.offsetMax = new Vector2(-10f, -2f);
-        }
-    }
 
     /// <summary>Test/QA hook: drive the dock exactly as a tap would. The
     /// visual critic loop needs to walk every tab and photograph it; without
@@ -2796,11 +2768,23 @@ public class MobileBuilderUI : MonoBehaviour
         if (garagePanel != null) garagePanel.SetActive(open && i == 2 && !Career.active);
         if (robotsPanel != null) robotsPanel.SetActive(open && robots);
         if (shopPanel != null) shopPanel.SetActive(open && i == 3);
-        if (trophyPanel != null) trophyPanel.SetActive(open && i == 4 && Career.active);
         if (programPanel != null) programPanel.SetActive(open && i == 5 && Career.active);   // P3a
+
+        // ---- ARENA, index 4 ------------------------------------------------
+        // ArenaScreen is IMGUI, so there is no panel to SetActive; the
+        // component itself is the switch, and disabling it stops its OnGUI.
+        // Built on first open, never before — Start() hits the ladder API.
+        bool wantArena = open && i == 4 && Career.active;
+        if (wantArena && arenaScreen == null)
+        {
+            var ago = new GameObject("arena_screen");
+            ago.transform.SetParent(transform, false);
+            arenaScreen = ago.AddComponent<ArenaScreen>();
+        }
+        if (arenaScreen != null) arenaScreen.enabled = wantArena;
+
         if (i == 3) { shopNote = ""; shopNoteBad = false; RefreshShop(); }
         if (robots) RefreshRobots();
-        if (i == 4) RefreshTrophies();
         if (i == 5 && programCanvas != null) programCanvas.Refresh();   // P3a
         // R1 fix 2 + 6: geometry and selection are both per-tab now.
         ApplyDockH();
@@ -3058,8 +3042,14 @@ public class MobileBuilderUI : MonoBehaviour
             case 1:  return "pick a contest \u00b7 SCOUT first, then FIGHT";
             case 2:  return "your stable \u00b7 EDIT loads a robot into the builder";
             case 3:  return "tap a part to see every material and price \u00b7 then BUY";
-            case 4:  return "your parts, and who is using them";
-            case 5:  return "your trophy case \u00b7 one medal per league campaign won";
+            // \u26a0 4 and 5 were BOTH WRONG until 2026-08-10. The PARTS removal on
+            // 08-05 renumbered the names array, LayoutTabs and ShowTab and
+            // missed this switch, so case 4 answered with the deleted PARTS
+            // tab's hint and case 5 with the trophy case's \u2014 every tab from
+            // here down described its predecessor. Nothing failed, because a
+            // wrong sentence is not an exception.
+            case 4:  return "the ladder \u00b7 ENLIST your saved robot, then scout and challenge";
+            case 5:  return "your program bench \u00b7 the robot drives itself with this";
             default: return "pick a part below, then tap the robot";
         }
     }

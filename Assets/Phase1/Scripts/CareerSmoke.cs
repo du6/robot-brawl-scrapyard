@@ -337,9 +337,13 @@ public class CareerSmoke : MonoBehaviour
         foreach (var it in bm.CareerShortfallItems()) Career.AddItem(it.partId, it.mat, it.count);
         bm.LoadSnapshot(bm.SnapshotString());
         yield return null; yield return null;
+        // ARENA replaced TROPHIES at index 4 (owen, 2026-08-10). TROPHIES is
+        // asserted ABSENT rather than simply dropped from the list: a tab that
+        // comes back by accident is exactly the kind of thing this check is
+        // for, and the medals now live on the LEAGUE board instead.
         Check(Btn("LEAGUE") != null && Btn("ROBOTS") != null && Btn("SHOP") != null
-              && Btn("TROPHIES") != null && Btn("PARTS") == null,
-              "workshop tabs: LEAGUE / ROBOTS / SHOP / TROPHIES in career, and no PARTS");
+              && Btn("ARENA") != null && Btn("PARTS") == null && Btn("TROPHIES") == null,
+              "workshop tabs: LEAGUE / ROBOTS / SHOP / ARENA in career, and no PARTS or TROPHIES");
         Check(Career.Data.tutorialStep == 0, "fresh career starts at onboarding step 0");
 
         Tap("ROBOTS"); yield return null;
