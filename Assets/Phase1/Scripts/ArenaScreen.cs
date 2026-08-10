@@ -140,6 +140,19 @@ namespace RobotBrawl.Phase0
         // any display.
         const float VirtualH = 720f;
 
+        // The board row's columns. These are the ONLY widths written down —
+        // the panel derives from them (see W in OnGUI), so a new column widens
+        // the panel instead of quietly clipping the button on the right.
+        const int ROW_RANK = 28, ROW_NAME = 120, ROW_OWNER = 60, ROW_CAT = 62,
+                  ROW_RATING = 48, ROW_DEV = 80, ROW_SCOUT = 52;
+        const int BoardRowW = ROW_RANK + ROW_NAME + ROW_OWNER + ROW_CAT
+                            + ROW_RATING + ROW_DEV + ROW_SCOUT;
+        // What the row needs BEYOND its columns: 6 inter-control gaps at the
+        // skin's 4px margin, the scroll view's vertical scrollbar, the box's
+        // own padding, and a little slack so a font that measures wider than
+        // expected does not clip.
+        const int ROW_CHROME = 6 * 4 + 16 + 12 + 18;
+
         void OnGUI()
         {
             float scale = Screen.height / VirtualH;
@@ -148,7 +161,14 @@ namespace RobotBrawl.Phase0
                                        new Vector3(scale, scale, 1f));
             float vw = Screen.width / scale, vh = VirtualH;
 
-            const int W = 460;
+            // The panel is DERIVED from the widest row it has to hold, not
+            // picked. It was 460 against a board row of 450 + spacing, which
+            // overflowed by ~40: the "scout" button rendered as "sc" and the
+            // scroll view grew a horizontal scrollbar that sat across the
+            // BUILD tab. Two numbers that have to agree, kept in two places,
+            // drifted the moment a column was added — so now only one of them
+            // is written down. See ROW_* and BoardRowW.
+            const int W = BoardRowW + ROW_CHROME;
             // Down the LEFT, below the game's own top HUD — the first version
             // sat at y=12 and covered the build bar's status line.
             const int TOP = 64;
@@ -199,17 +219,17 @@ namespace RobotBrawl.Phase0
             foreach (var e in board)
             {
                 GUILayout.BeginHorizontal();
-                GUILayout.Label(e.rank + ".", GUILayout.Width(28));
-                GUILayout.Label(e.robotName, GUILayout.Width(120));
-                GUILayout.Label(e.owner, GUILayout.Width(60));
-                GUILayout.Label(e.category, GUILayout.Width(62));
+                GUILayout.Label(e.rank + ".", GUILayout.Width(ROW_RANK));
+                GUILayout.Label(e.robotName, GUILayout.Width(ROW_NAME));
+                GUILayout.Label(e.owner, GUILayout.Width(ROW_OWNER));
+                GUILayout.Label(e.category, GUILayout.Width(ROW_CAT));
                 // The rating and the confidence in it, together. A 1400 at
                 // RD 350 has not earned what a 1400 at RD 60 has.
-                GUILayout.Label(Mathf.RoundToInt(e.rating).ToString(), GUILayout.Width(48));
+                GUILayout.Label(Mathf.RoundToInt(e.rating).ToString(), GUILayout.Width(ROW_RATING));
                 GUILayout.Label(e.provisional ? "provisional" : "±" + Mathf.RoundToInt(e.deviation),
-                                GUILayout.Width(80));
+                                GUILayout.Width(ROW_DEV));
                 if (!string.IsNullOrEmpty(e.activeSnapshotId)
-                    && GUILayout.Button("scout", GUILayout.Width(52)) && !busy)
+                    && GUILayout.Button("scout", GUILayout.Width(ROW_SCOUT)) && !busy)
                     StartCoroutine(Scout(e));
                 GUILayout.EndHorizontal();
             }
