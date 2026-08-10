@@ -1592,6 +1592,76 @@ app.MapPost("/v1/robots/{robotId:guid}/equip", async (Guid robotId, EquipReq req
     return Results.Ok(new { robotId, plateId = req.PlateId, titleId = req.TitleId });
 }).RequireAuthorization();
 
+// ====================================================== account deletion
+// §M4 lists "privacy policy + account deletion endpoint (store requirement
+// even pre-revenue)". Apple and Google both require an in-app path to delete
+// an account, and "email us" does not satisfy it.
+//
+// THE HARD PART IS NOT DELETING, IT IS WHAT MUST SURVIVE. §2.3 makes the
+// ledger the audit trail a real-money phase will need, and matches are other
+// players' history — a fight you lost does not disappear because your
+// opponent left. So this is a REDACTION, not a DELETE:
+//
+//   gone      email, password hash, display name — everything that identifies
+//             a person. The row remains so foreign keys hold.
+//   kept      ledger rows and matches, now attached to an anonymous id.
+//
+// That is the standard shape for "delete my account" against an append-only
+// financial record, and it is worth being explicit that it is a choice: a
+// hard DELETE would cascade through robots and snapshots and take other
+// players' match history with it.
+// [FromBody] is required: MapDelete refuses to INFER a body, and the
+// confirmation must not move to the query string where it would be
+// logged by every proxy between here and the client.
+app.MapDelete("/v1/account", async (ClaimsPrincipal user,
+                                    [Microsoft.AspNetCore.Mvc.FromBody] DeleteReq req) =>
+{
+    var me = UserId(user);
+    // Deleting an account is irreversible and one fat-fingered client should
+    // not do it, so it takes an explicit confirmation string rather than an
+    // empty DELETE.
+    if (req?.Confirm != "DELETE MY ACCOUNT")
+        return Bad("send {\"confirm\":\"DELETE MY ACCOUNT\"} to confirm — this cannot be undone");
+
+    await using var c = await db.OpenAsync();
+    await using var tx = await c.BeginTransactionAsync();
+
+    // Retire the robots so nothing of theirs can be challenged or fought
+    // after the person has gone, and stand their snapshots down off the
+    // ladder. Their PAST matches stay, because they are also somebody else's.
+    await using (var r = new NpgsqlCommand(
+        "UPDATE robots SET retired = true, name = 'deleted robot' WHERE user_id = $1;", c, tx))
+    { r.Parameters.AddWithValue(me); await r.ExecuteNonQueryAsync(); }
+
+    await using (var s = new NpgsqlCommand(@"
+        UPDATE snapshots SET status = 'SUPERSEDED'
+         WHERE status = 'ACTIVE'
+           AND robot_id IN (SELECT id FROM robots WHERE user_id = $1);", c, tx))
+    { s.Parameters.AddWithValue(me); await s.ExecuteNonQueryAsync(); }
+
+    // Ratings are per robot and would keep a retired robot on the board.
+    await using (var ra = new NpgsqlCommand(
+        "DELETE FROM ratings WHERE robot_id IN (SELECT id FROM robots WHERE user_id = $1);", c, tx))
+    { ra.Parameters.AddWithValue(me); await ra.ExecuteNonQueryAsync(); }
+
+    // The redaction itself. email_lower is generated from email, so writing a
+    // unique placeholder keeps the unique index satisfied without keeping
+    // anything that identifies anyone.
+    await using (var u = new NpgsqlCommand(@"
+        UPDATE users SET email = 'deleted+' || id::text || '@deleted.invalid',
+                         pw_hash = 'deleted',
+                         display_name = 'deleted player'
+         WHERE id = $1;", c, tx))
+    { u.Parameters.AddWithValue(me); await u.ExecuteNonQueryAsync(); }
+
+    await tx.CommitAsync();
+    return Results.Ok(new
+    {
+        deleted = true,
+        kept = "ledger rows and match history, now anonymous — the ledger is an audit trail (§2.3) and a match is also the other player's record",
+    });
+}).RequireAuthorization().RequireRateLimiting("wallet");
+
 app.Run();
 
 // ------------------------------------------------------------------ dtos
@@ -1604,6 +1674,7 @@ public record ChallengeReq(Guid ChallengerSnapshotId, Guid DefenderSnapshotId);
 public record ReplayReq(string? Replay);
 public record DepositReq(int Amount, string? IdemKey);
 public record EquipReq(string? PlateId, string? TitleId);
+public record DeleteReq(string? Confirm);
 public record FightResult(Guid MatchId, string? WorkerId, string? Verdict,
                           string[]? ReplayUrls, string[]? Bouts);
 public record ValidateResult(

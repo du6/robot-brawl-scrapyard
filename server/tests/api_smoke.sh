@@ -1058,6 +1058,44 @@ else
 fi
 
 echo
+echo "== R. account deletion (§M4, and a store requirement) =="
+# Apple and Google both require an in-app delete path; "email us" does not
+# satisfy it. The hard part is not deleting - it is what must SURVIVE. The
+# ledger is the audit trail a real-money phase needs (§2.3) and a match is
+# also the OTHER player's history, so this is a redaction, not a DELETE.
+#
+# It runs on the DEFENDER account rather than the main one, because deleting
+# the account every earlier section depends on would make the rest of this
+# file untestable.
+if [ -z "${DAUTH:-}" ] || [ -z "${DUSER:-}" ] || ! command -v psql >/dev/null 2>&1; then
+  skip "account deletion (7 checks)" "no second account to delete"
+else
+  LEDGER_BEFORE=$(dbq "SELECT count(*) FROM ledger WHERE user_id='$DUSER';")
+  MATCHES_BEFORE=$(dbq "SELECT count(*) FROM matches;")
+  # Irreversible, so it takes an explicit confirmation rather than a bare
+  # DELETE that a mis-wired client could send by accident.
+  S=$(req DELETE /v1/account '{"confirm":"nope"}' "$DAUTH")
+  expect "deletion without the confirmation phrase is refused" "$S" 400
+  S=$(req DELETE /v1/account '{"confirm":"DELETE MY ACCOUNT"}' "$DAUTH")
+  expect "…and with it, the account is deleted" "$S" 200
+
+  is "…the email is gone" \
+     "$(dbq "SELECT CASE WHEN email LIKE 'deleted+%@deleted.invalid' THEN 'redacted' ELSE 'STILL THERE' END FROM users WHERE id='$DUSER';")" redacted
+  is "…so is the display name" \
+     "$(dbq "SELECT display_name FROM users WHERE id='$DUSER';")" "deletedplayer"
+  is "…their robots are retired, so nothing of theirs can be fought again" \
+     "$(dbq "SELECT count(*) FROM robots WHERE user_id='$DUSER' AND NOT retired;")" 0
+  is "…and off the ladder entirely" \
+     "$(dbq "SELECT count(*) FROM ratings ra JOIN robots r ON r.id=ra.robot_id WHERE r.user_id='$DUSER';")" 0
+  # The half that is easy to get wrong: a hard DELETE would cascade through
+  # robots and snapshots and take other players' match history with it.
+  is "…but the ledger survives, because it is an audit trail" \
+     "$(dbq "SELECT count(*) FROM ledger WHERE user_id='$DUSER';")" "$LEDGER_BEFORE"
+  is "…and every match still exists, because each is also somebody else's" \
+     "$(dbq "SELECT count(*) FROM matches;")" "$MATCHES_BEFORE"
+fi
+
+echo
 echo "== N. ledger conservation, over everything this run just did (§8/M3) =="
 # M3's acceptance: "every scrap created is accounted to a config'd faucet".
 # This runs LAST on purpose - by now the bench has registered accounts, fought

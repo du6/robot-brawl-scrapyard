@@ -15,7 +15,7 @@ PASS  a wrong password and an unknown account are indistinguishable (both 401)
 
 == D. robots ==
 PASS  a robot is created
-      robot 52ff0d16-1aad-4308-b43e-14cdcdb39cf3
+      robot ab0d27d9-a4e9-4025-a238-29cb1809f015
 PASS  …but not without a token
 
 == E. snapshot upload stays opaque (§5.2) ==
@@ -30,7 +30,7 @@ PASS  …and a wrong key is refused too
 PASS  a keyed worker claims a job
 PASS  …and the job is the VALIDATE the upload enqueued
 PASS  …pointing at the snapshot just uploaded
-PASS  …and carries a payload location the worker can resolve (file:///tmp/rb-blobs/snapshots/52ff0d16-1aad-4308-b43e-14cdcdb39cf3/ed916fd166b8479f8497c380c6d32a61.json)
+PASS  …and carries a payload location the worker can resolve (file:///tmp/rb-blobs/snapshots/ab0d27d9-a4e9-4025-a238-29cb1809f015/932280411f6643e38593816766d64d13.json)
 PASS  …and the payload sha256 rides along, so the worker can verify storage
 PASS  another worker cannot heartbeat a job it does not hold
 PASS  …the holder can
@@ -181,6 +181,16 @@ PASS  an owned title equips to your robot
 PASS  …but one you do not own does not
 PASS  …and the title shows on the leaderboard, which is what makes it worth buying
 
+== R. account deletion (§M4, and a store requirement) ==
+PASS  deletion without the confirmation phrase is refused
+PASS  …and with it, the account is deleted
+PASS  …the email is gone
+PASS  …so is the display name
+PASS  …their robots are retired, so nothing of theirs can be fought again
+PASS  …and off the ladder entirely
+PASS  …but the ledger survives, because it is an audit trail
+PASS  …and every match still exists, because each is also somebody else's
+
 == N. ledger conservation, over everything this run just did (§8/M3) ==
 PASS  every CREDIT is a faucet the design doc names
 PASS  every DEBIT is a stake or the one-way career valve
@@ -193,4 +203,4 @@ PASS  a drawn match never paid a purse
 PASS  no wallet is overdrawn
       ledger: 25 rows, net 2940 scrap across 3 wallets
 
-===== passed 158  failed 0  skipped 0 =====
+===== passed 166  failed 0  skipped 0 =====
