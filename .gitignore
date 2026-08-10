@@ -73,6 +73,12 @@ Assets/Phase1/.bundle*/
 .telegram_token.local
 .telegram_chat.local
 
+# Personal Claude Code settings. Ignored rather than committed because the
+# Telegram notification hook hardcodes an absolute path on owen's Mac and
+# depends on the two gitignored files above — on any other machine it would
+# be a hook that silently does nothing.
+.claude/settings.local.json
+
 # scratch used to defeat the stale-file cache in device_stage_files
 Assets/Phase1/.push_tmp/
 
