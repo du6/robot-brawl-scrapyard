@@ -126,3 +126,8 @@ server/qa_api_server.log
 # A work queue between two sessions, not source. Anything in here worth
 # keeping graduates to docs/ as a dated record.
 _relay/
+
+# Unity worker player build output (132 MB) — produced by
+# server/scripts/build_worker.zsh, packaged by server/Dockerfile.worker.
+# Never in git: it is a build artefact and it is enormous.
+build/

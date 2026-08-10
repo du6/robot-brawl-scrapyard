@@ -1,0 +1,50 @@
+# The headless Unity worker. §5.2: the worker runs the REAL game code, so this
+# packages a Unity Linux DEDICATED SERVER build — not a reimplementation of
+# the rules in another language, which is the drift §5.2 exists to prevent.
+#
+# The player is built OUTSIDE this file, by server/scripts/build_worker.zsh,
+# because building it needs a Unity licence and a Unity install. So unlike the
+# API image this one is NOT self-contained: it expects build/worker/ to exist.
+# That is stated here rather than discovered, and the COPY below fails loudly
+# if it does not.
+#
+#   zsh server/scripts/build_worker.zsh
+#   docker build -f server/Dockerfile.worker -t rb-worker .      # from repo root
+#
+# ⚠ The build context is the REPO ROOT, not server/ — the player lives in
+# build/worker/ at the top level.
+
+FROM ubuntu:22.04
+
+# A Unity dedicated-server player still links against a handful of system
+# libraries even with no graphics: glibc/stdc++ for the runtime, and CA certs
+# because the worker talks to the API over HTTPS and would otherwise fail
+# every request with a certificate error that looks like a network fault.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        ca-certificates \
+        libc6 \
+        libstdc++6 \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+COPY build/worker/ /app/
+
+# Never root. The worker fetches attacker-influenced payloads from storage and
+# runs the physics engine over them; that is exactly the process not to give
+# root to.
+RUN useradd -u 10001 -m worker \
+    && chmod +x /app/RobotBrawlWorker \
+    && chown -R worker /app
+USER worker
+
+# Defaults that make a container without configuration fail SAFELY rather than
+# silently pointing at the wrong place. RB_WORKER_KEY is deliberately absent —
+# WorkerHost refuses to start without it instead of polling forever on 401s.
+ENV RB_API_URL=http://localhost:5000 \
+    RB_WORKER_KINDS=BOTH \
+    RB_IDLE_SECONDS=3
+
+# -batchmode -nographics: no display exists here. -logFile /dev/stdout puts
+# Unity's log where Cloud Logging can read it, which is also where the
+# rbmetrics-style lines and every worker warning surface.
+ENTRYPOINT ["/app/RobotBrawlWorker", "-batchmode", "-nographics", "-logFile", "/dev/stdout"]

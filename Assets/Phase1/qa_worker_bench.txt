@@ -1,3 +1,12 @@
+== 0. the worker key goes to our API and nowhere else ==
+PASS  the key is sent to our own API
+PASS  ...host comparison is case-insensitive, as DNS is
+PASS  a look-alike host that merely STARTS WITH ours is refused
+PASS  an unrelated host is refused
+PASS  the same host over plain http is refused — that is a downgrade
+PASS  a different port on the same host is refused
+PASS  an unparseable url is refused rather than assumed ours
+PASS  an empty url is refused
 == A. the wire format — where JsonUtility would have lied ==
       {"snapshotId":"11111111-2222-3333-4444-555555555555","workerId":"bench","legal":true,"massKg":1234,"aabbX":1.5,"aabbY":0.75,"aabbZ":2,"category":"FEATHER","partsManifest":["core","beam"],"programHash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","failReasons":[]}
 PASS  a category is sent as a string
@@ -44,4 +53,4 @@ PASS  and does no work
 PASS  a FIGHT job is left alone — the endpoints for it do not exist yet
 PASS  the bay is still owen's after every failure path
 PASS  the career object was never swapped
-RESULT: 39 pass, 0 fail - ALL GREEN
+RESULT: 47 pass, 0 fail - ALL GREEN

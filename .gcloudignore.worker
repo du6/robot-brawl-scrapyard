@@ -1,0 +1,14 @@
+# Upload only the player and the dockerfile. Without this the context is the
+# whole repo and Library/ alone is 5 GB.
+#
+# ⚠ The negations must re-open each PARENT directory before its children.
+# gitignore semantics say a file cannot be re-included if a parent directory
+# is excluded, so a bare `*` + `!build/worker/**` uploads NOTHING — measured:
+# a 54-byte context and a build that failed on a missing /workspace/server.
+/*
+!/build
+/build/*
+!/build/worker
+!/server
+/server/*
+!/server/Dockerfile.worker

@@ -25,6 +25,25 @@
 //   RB_WORKER_KINDS VALIDATE|FIGHT|BOTH   (default BOTH)
 //   RB_IDLE_SECONDS poll pause        (default 3)
 //   RB_MAX_JOBS     stop after N      (default 0 = forever; the bench uses it)
+//   RB_MAX_IDLE     exit after N consecutive empty polls (default 0 = never)
+//
+// ---------------------------------------------------------------------------
+// WHY RB_MAX_IDLE EXISTS: THE WORKER RUNS AS A CLOUD RUN *JOB*, NOT A SERVICE.
+//
+// A Cloud Run service must answer an HTTP health probe, and a poller serves
+// nothing — the first deploy failed exactly there. The deeper problem is cost:
+// keeping a service warm enough to poll needs min-instances=1 with CPU always
+// allocated, which is ~$35/mo of always-on CPU against a $25/mo budget whose
+// database already takes $10-15. §7 says this scales to zero and costs ~$0 at
+// prototype traffic, and an always-on worker is not that.
+//
+// So the worker DRAINS AND EXITS: Cloud Scheduler starts the job, it works
+// everything queued, and when the queue has been empty for RB_MAX_IDLE polls
+// it stops and stops billing. The cost of that choice is honest and worth
+// stating: a fight is not picked up the instant it is queued, but within the
+// scheduler's period. The ladder is asynchronous anyway — a challenge is
+// issued and the result read later — so this trades latency nobody is waiting
+// on for money that would otherwise be spent idling.
 //
 // ---------------------------------------------------------------------------
 // WHY IT CLAIMS BY KIND RATHER THAN CLAIMING ANYTHING AND SORTING IT OUT.
@@ -64,7 +83,7 @@ namespace RobotBrawl.Phase0
 
         string _url, _key, _id, _kinds;
         float _idleSeconds;
-        int _maxJobs;
+        int _maxJobs, _maxIdle;
         bool _savedAutosave;
         bool _stop;
 
@@ -98,6 +117,7 @@ namespace RobotBrawl.Phase0
             _kinds       = Env("RB_WORKER_KINDS", "BOTH").Trim().ToUpperInvariant();
             _idleSeconds = float.TryParse(Env("RB_IDLE_SECONDS", "3"), out var s) ? s : 3f;
             _maxJobs     = int.TryParse(Env("RB_MAX_JOBS", "0"), out var m) ? m : 0;
+            _maxIdle     = int.TryParse(Env("RB_MAX_IDLE", "0"), out var i) ? i : 0;
         }
 
         IEnumerator Start()
@@ -153,7 +173,7 @@ namespace RobotBrawl.Phase0
                 "[WorkerHost] up. id={0} kinds={1} api={2} idle={3}s maxJobs={4}",
                 _id, _kinds, _url, _idleSeconds, _maxJobs == 0 ? "unlimited" : _maxJobs.ToString()));
 
-            int handled = 0;
+            int handled = 0, idleRun = 0;
             while (!_stop)
             {
                 bool didSomething = false;
@@ -230,11 +250,22 @@ namespace RobotBrawl.Phase0
                     // using. Pause rather than spin: polling flat out would
                     // bill a Cloud Run CPU to discover nothing, repeatedly.
                     Idle++;
+                    idleRun++;
                     Status = "idle";
+                    if (_maxIdle > 0 && idleRun >= _maxIdle)
+                    {
+                        Debug.Log("[WorkerHost] queue empty for " + idleRun
+                                  + " consecutive polls; draining complete, exiting");
+                        break;
+                    }
                     yield return new WaitForSeconds(_idleSeconds);
                 }
                 else
                 {
+                    // CONSECUTIVE is the point — reset on any work. Otherwise a
+                    // long run with occasional gaps would eventually exit
+                    // mid-queue and leave jobs for the next scheduled run.
+                    idleRun = 0;
                     Status = "working";
                     yield return null;
                 }

@@ -62,6 +62,15 @@ namespace RobotBrawl.Phase0
         public bool CanFight { get { return !string.IsNullOrEmpty(activeSnapshotId); } }
     }
 
+    /// <summary>A shop item (§2.3's scrap sinks). Cosmetic only, by design:
+    /// nothing here touches a fight.</summary>
+    public class Cosmetic
+    {
+        public string id = "", kind = "", name = "";
+        public int price;
+        public bool owned;
+    }
+
     public static class LadderClient
     {
         public static string BaseUrl = "http://localhost:5000";
@@ -218,6 +227,147 @@ namespace RobotBrawl.Phase0
             }
         }
 
+        // ---------------------------------------------------------------
+        // §M1's "client: login UI + ENLIST flow". Until now Token was a field
+        // somebody set by hand, so there was no way to make or use an account
+        // from inside the game — the ladder was reachable only from a bench or
+        // a curl command.
+        //
+        // Register and Login are the same shape and deliberately kept
+        // separate: a player who mistypes an existing email should be told
+        // "that email is taken", not silently logged into someone else's
+        // account by a helpful upsert.
+
+        static UnityWebRequest PostJson(string path, string body)
+        {
+            var req = new UnityWebRequest(BaseUrl.TrimEnd('/') + path, "POST");
+            req.uploadHandler = new UploadHandlerRaw(System.Text.Encoding.UTF8.GetBytes(body));
+            req.downloadHandler = new DownloadHandlerBuffer();
+            req.SetRequestHeader("Content-Type", "application/json");
+            if (!string.IsNullOrEmpty(Token)) req.SetRequestHeader("Authorization", "Bearer " + Token);
+            return req;
+        }
+
+        /// <summary>done(displayName, err). On success the token is stored in
+        /// Token, so a caller never handles it — one less place to leak it.</summary>
+        public static IEnumerator Register(string email, string password, string displayName,
+                                           Action<string, string> done)
+        {
+            yield return Auth("/v1/auth/register",
+                "{\"email\":" + RobotWorker.Str(email)
+              + ",\"password\":" + RobotWorker.Str(password)
+              + ",\"displayName\":" + RobotWorker.Str(displayName) + "}", done);
+        }
+
+        public static IEnumerator Login(string email, string password, Action<string, string> done)
+        {
+            yield return Auth("/v1/auth/login",
+                "{\"email\":" + RobotWorker.Str(email)
+              + ",\"password\":" + RobotWorker.Str(password) + "}", done);
+        }
+
+        static IEnumerator Auth(string path, string body, Action<string, string> done)
+        {
+            using (var req = PostJson(path, body))
+            {
+                yield return req.SendWebRequest();
+                string text = req.downloadHandler != null ? req.downloadHandler.text : "";
+                if (req.result != UnityWebRequest.Result.Success)
+                {
+                    // The API explains itself — "that email is already
+                    // registered", "email or password is wrong". Show that,
+                    // not a status code.
+                    string why = RobotWorker.Field(text, "error") ?? req.error;
+                    LastError = why; done(null, why); yield break;
+                }
+                string tok = RobotWorker.Field(text, "token");
+                if (string.IsNullOrEmpty(tok))
+                {
+                    // A 200 with no token is a contract break, not a login.
+                    // Saying so beats appearing to sign in and then 401ing on
+                    // every subsequent call.
+                    LastError = "the server accepted the login but returned no token";
+                    done(null, LastError); yield break;
+                }
+                Token = tok;
+                done(RobotWorker.Field(text, "displayName") ?? "", null);
+            }
+        }
+
+        /// <summary>Sign out. Clears the token; there is no server call
+        /// because the JWT is stateless — it simply stops being sent.</summary>
+        public static void Logout() { Token = ""; }
+
+        public static bool SignedIn { get { return !string.IsNullOrEmpty(Token); } }
+
+        /// <summary>§2.3's one-way valve: ladder scrap into the career wallet.
+        /// idemKey is REQUIRED by the API and that is the point — a dropped
+        /// response must be retryable without paying twice. The caller passes
+        /// a stable key (not a fresh guid per attempt) or the guarantee is
+        /// worthless.</summary>
+        public static IEnumerator Deposit(int amount, string idemKey, Action<long, string> done)
+        {
+            using (var req = PostJson("/v1/wallet/deposit",
+                       "{\"amount\":" + amount + ",\"idemKey\":" + RobotWorker.Str(idemKey) + "}"))
+            {
+                yield return req.SendWebRequest();
+                string text = req.downloadHandler != null ? req.downloadHandler.text : "";
+                if (req.result != UnityWebRequest.Result.Success)
+                {
+                    string why = RobotWorker.Field(text, "error") ?? req.error;
+                    LastError = why; done(-1, why); yield break;
+                }
+                long bal; long.TryParse(RobotWorker.Field(text, "balance"), out bal);
+                done(bal, null);
+            }
+        }
+
+        /// <summary>The shop (§2.3's scrap sinks). Cosmetics only — they are
+        /// deliberately balance-free.</summary>
+        public static IEnumerator Cosmetics(Action<List<Cosmetic>, string> done)
+        {
+            using (var req = Get("/v1/cosmetics"))
+            {
+                yield return req.SendWebRequest();
+                if (req.result != UnityWebRequest.Result.Success)
+                { LastError = req.error; done(new List<Cosmetic>(), req.error); yield break; }
+                done(ParseCosmetics(req.downloadHandler.text), null);
+            }
+        }
+
+        public static IEnumerator BuyCosmetic(string id, Action<long, string> done)
+        {
+            using (var req = PostJson("/v1/cosmetics/" + UnityWebRequest.EscapeURL(id) + "/buy", "{}"))
+            {
+                yield return req.SendWebRequest();
+                string text = req.downloadHandler != null ? req.downloadHandler.text : "";
+                if (req.result != UnityWebRequest.Result.Success)
+                { string why = RobotWorker.Field(text, "error") ?? req.error;
+                  LastError = why; done(-1, why); yield break; }
+                long bal; long.TryParse(RobotWorker.Field(text, "balance"), out bal);
+                done(bal, null);
+            }
+        }
+
+        public static IEnumerator Equip(string robotId, string plateId, string titleId,
+                                        Action<bool, string> done)
+        {
+            // null means "leave alone", "" means "take it off" — so the two
+            // cannot be collapsed. RobotWorker.Str renders null as the JSON
+            // literal null, which is exactly the distinction the API reads.
+            string body = "{\"plateId\":" + (plateId == null ? "null" : RobotWorker.Str(plateId))
+                        + ",\"titleId\":" + (titleId == null ? "null" : RobotWorker.Str(titleId)) + "}";
+            using (var req = PostJson("/v1/robots/" + robotId + "/equip", body))
+            {
+                yield return req.SendWebRequest();
+                string text = req.downloadHandler != null ? req.downloadHandler.text : "";
+                if (req.result != UnityWebRequest.Result.Success)
+                { string why = RobotWorker.Field(text, "error") ?? req.error;
+                  LastError = why; done(false, why); yield break; }
+                done(true, null);
+            }
+        }
+
         public static IEnumerator Wallet(Action<long, string> done)
         {
             using (var req = Get("/v1/wallet"))
@@ -271,6 +421,22 @@ namespace RobotBrawl.Phase0
         /// are skipped so a brace inside a robot NAME cannot end an object.</summary>
         /// <summary>key == null means the body IS the array — GET /v1/robots
         /// returns a bare one while everything else wraps it.</summary>
+        static List<Cosmetic> ParseCosmetics(string json)
+        {
+            var rows = new List<Cosmetic>();
+            foreach (string obj in Objects(json, "cosmetics"))
+            {
+                var x = new Cosmetic();
+                x.id    = RobotWorker.Field(obj, "id")   ?? "";
+                x.kind  = RobotWorker.Field(obj, "kind") ?? "";
+                x.name  = RobotWorker.Field(obj, "name") ?? "";
+                int.TryParse(RobotWorker.Field(obj, "price"), out x.price);
+                x.owned = (RobotWorker.Field(obj, "owned") ?? "") == "true";
+                if (!string.IsNullOrEmpty(x.id)) rows.Add(x);
+            }
+            return rows;
+        }
+
         public static List<string> Objects(string json, string key)
         {
             var outv = new List<string>();

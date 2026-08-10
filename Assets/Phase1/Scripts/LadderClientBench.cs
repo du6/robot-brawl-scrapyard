@@ -86,6 +86,41 @@ namespace RobotBrawl.Phase0
             Check(RobotWorker.Field(objs[1], "provisional") == "true", "…and true when not");
             Check(RobotWorker.Field(objs[1], "activeSnapshotId") == null, "a JSON null comes back as null, not \"null\"");
 
+            // ================================================ F. the shop
+            // Same failure mode as the board: a parse that misses returns an
+            // EMPTY LIST, which renders as an empty shop and looks exactly
+            // like a shop with nothing in it.
+            log.Add("== F. the shop, whose empty state is indistinguishable from a parse failure ==");
+            string shopJson = "{\"count\":3,\"cosmetics\":["
+                + "{\"id\":\"plate_rust\",\"kind\":\"PLATE\",\"name\":\"Rust\",\"price\":60,\"owned\":false},"
+                + "{\"id\":\"title_scrapper\",\"kind\":\"TITLE\",\"name\":\"Scrapper\",\"price\":150,\"owned\":true},"
+                + "{\"id\":\"plate_gold\",\"kind\":\"PLATE\",\"name\":\"Gold Leaf\",\"price\":400,\"owned\":false}]}";
+            var shop = LadderClient.Objects(shopJson, "cosmetics");
+            Check(shop.Count == 3, "three items parse out of the shop payload (got " + shop.Count + ")");
+            if (shop.Count == 3)
+            {
+                Check(RobotWorker.Field(shop[0], "id") == "plate_rust", "the id survives");
+                Check(RobotWorker.Field(shop[2], "name") == "Gold Leaf",
+                      "a name containing a SPACE is not truncated at the space");
+                Check(RobotWorker.Field(shop[0], "price") == "60", "the price survives");
+                // owned drives whether the button says BUY or EQUIP. Reading
+                // it wrong offers to sell a player something they own.
+                Check(RobotWorker.Field(shop[1], "owned") == "true", "owned reads true");
+                Check(RobotWorker.Field(shop[0], "owned") == "false", "...and false");
+            }
+
+            // ============================================== G. auth responses
+            log.Add("== G. the auth response ==");
+            string authJson = "{\"token\":\"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.abc-_123\",\"displayName\":\"Owen\"}";
+            Check(RobotWorker.Field(authJson, "token") != null, "a token is found");
+            Check(RobotWorker.Field(authJson, "token").Contains("."),
+                  "...and the JWT's dots and -_ base64url chars survive the parse");
+            Check(RobotWorker.Field(authJson, "displayName") == "Owen", "the display name survives");
+            // A 200 with no token must be treated as a failure, not a login —
+            // otherwise the client "signs in" and then 401s on everything.
+            Check(RobotWorker.Field("{\"displayName\":\"Owen\"}", "token") == null,
+                  "a response with NO token yields null, so the client can refuse it");
+
             log.Add(" RESULT: " + passed + " pass, " + failed + " fail" + (failed == 0 ? " - ALL GREEN" : ""));
             Debug.Log("[LadderClientBench] RESULT: " + passed + " pass, " + failed + " fail");
             try

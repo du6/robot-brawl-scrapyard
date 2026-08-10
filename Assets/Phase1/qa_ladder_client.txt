@@ -21,4 +21,16 @@ PASS  a missing url array is empty, not a crash
 PASS  provisional reads false when earned
 PASS  …and true when not
 PASS  a JSON null comes back as null, not "null"
- RESULT: 18 pass, 0 fail - ALL GREEN
+== F. the shop, whose empty state is indistinguishable from a parse failure ==
+PASS  three items parse out of the shop payload (got 3)
+PASS  the id survives
+PASS  a name containing a SPACE is not truncated at the space
+PASS  the price survives
+PASS  owned reads true
+PASS  ...and false
+== G. the auth response ==
+PASS  a token is found
+PASS  ...and the JWT's dots and -_ base64url chars survive the parse
+PASS  the display name survives
+PASS  a response with NO token yields null, so the client can refuse it
+ RESULT: 28 pass, 0 fail - ALL GREEN
