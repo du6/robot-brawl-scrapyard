@@ -482,6 +482,13 @@ namespace RobotBrawl.Phase0
         /// <summary>done(url, err). The replay is opaque bytes to the API
         /// (§5.4: it is a recording, never re-simulated).</summary>
         IEnumerator UploadReplay(string matchId, string replayJson, Action<string, string> done);
+
+        /// <summary>The RECORDING, as raw bytes — a .rbr.gz ReplayRecorder
+        /// wrote. This is the one a client can actually play; the JSON form
+        /// above is a scorecard. Sent raw rather than base64'd into the JSON
+        /// body because a real bout is ~200 KB and base64 would add a third
+        /// to every one of them for nothing.</summary>
+        IEnumerator UploadReplayFile(string matchId, byte[] bytes, Action<string, string> done);
         IEnumerator PostFight(long jobId, string resultJson, Action<bool, string> done);
     }
 
@@ -549,6 +556,25 @@ namespace RobotBrawl.Phase0
             // parses them.
             string body = "{\"replay\":" + RobotWorker.Str(replayJson) + "}";
             using (var req = Post("/v1/worker/matches/" + matchId + "/replay", body))
+            {
+                yield return req.SendWebRequest();
+                if (req.result != UnityWebRequest.Result.Success)
+                { done(null, req.downloadHandler != null ? req.downloadHandler.text : req.error); yield break; }
+                done(RobotWorker.Field(req.downloadHandler.text, "url"), null);
+            }
+        }
+
+        public IEnumerator UploadReplayFile(string matchId, byte[] bytes, Action<string, string> done)
+        {
+            var req = new UnityWebRequest(_baseUrl + "/v1/worker/matches/" + matchId + "/replay", "POST");
+            req.uploadHandler = new UploadHandlerRaw(bytes);
+            req.downloadHandler = new DownloadHandlerBuffer();
+            // NOT application/json — the API branches on this, and sending
+            // gzip under a json content type would store the bytes as a
+            // "summary" nothing can play.
+            req.SetRequestHeader("Content-Type", "application/octet-stream");
+            req.SetRequestHeader(RobotWorker.HEADER_WORKER_KEY, _workerKey);
+            using (req)
             {
                 yield return req.SendWebRequest();
                 if (req.result != UnityWebRequest.Result.Success)

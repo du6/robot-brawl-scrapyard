@@ -37,7 +37,9 @@ namespace RobotBrawl.Phase0
 
         public string lastPostedJson = "", lastReplayDoc = "";
         public long lastPostedJobId;
-        public int claims, fetches, posts, uploads, heartbeats;
+        public int claims, fetches, posts, uploads, fileUploads, heartbeats;
+        public int lastFileBytes;
+        public string recordingUrlToReturn = "file:///tmp/replay-stub.rbr.gz";
 
         public IEnumerator Claim(string workerId, Action<WorkerJob, string> done)
         {
@@ -62,6 +64,12 @@ namespace RobotBrawl.Phase0
             uploads++; lastReplayDoc = replayJson; yield return null;
             if (!string.IsNullOrEmpty(uploadError)) { done(null, uploadError); yield break; }
             done(replayUrlToReturn, null);
+        }
+        public IEnumerator UploadReplayFile(string matchId, byte[] bytes, Action<string, string> done)
+        {
+            fileUploads++; lastFileBytes = bytes == null ? 0 : bytes.Length; yield return null;
+            if (!string.IsNullOrEmpty(uploadError)) { done(null, uploadError); yield break; }
+            done(recordingUrlToReturn, null);
         }
         public IEnumerator PostFight(long jobId, string resultJson, Action<bool, string> done)
         {
@@ -251,12 +259,20 @@ namespace RobotBrawl.Phase0
             yield return FightWorkerLoop.RunOnce(net, bm, null);
 
             Check(net.posts == 1, "the loop completes a real match and posts exactly once");
-            Check(net.uploads == 1, "…having uploaded the replay first");
+            Check(net.uploads == 1, "…having uploaded the summary");
+            // THE ONE THAT MATTERS. Until 2026-08-09 the worker uploaded only
+            // the summary, so every replay url on every match pointed at a
+            // scorecard and nothing could be played. A count of "uploads"
+            // alone still passed then — this asserts the RECORDING went too.
+            Check(net.fileUploads >= 1, "…and uploaded the actual .rbr.gz RECORDING, not just a scorecard");
+            Check(net.lastFileBytes > 0, "…with real bytes in it (" + net.lastFileBytes + ")");
             string v = RobotWorker.Field(net.lastPostedJson, "verdict");
             Check(v == "CHALLENGER" || v == "DEFENDER" || v == "DRAW",
                   "…with a verdict the API's CHECK accepts (" + v + ")");
-            Check(net.lastPostedJson.Contains("\"replayUrls\":[\"" + net.replayUrlToReturn + "\"]"),
-                  "…carrying the replay url the upload returned");
+            // The recording must come FIRST: a client that takes replayUrls[0] and
+            // hands it to ReplayPlayer must not be given a summary.
+            Check(net.lastPostedJson.Contains("\"replayUrls\":[\"" + net.recordingUrlToReturn + "\""),
+                  "…with the playable recording FIRST in replayUrls, ahead of the summary");
             Check(net.lastReplayDoc.Contains("\"replayVersion\":1"), "the replay doc is versioned");
             Check(net.lastReplayDoc.Contains("\"bouts\":["), "…and carries the bouts");
 

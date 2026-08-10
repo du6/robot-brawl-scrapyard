@@ -33,6 +33,12 @@ var cfg = builder.Configuration;
 // upload that could tie up a worker.
 const int MaxSnapshotBytes = 256 * 1024;
 
+// A recorded best-of-3 measured ~200 KB per bout on a real fight, so 8 MB is
+// generous by an order of magnitude and still refuses an upload that could
+// fill a disk. Bounded on purpose: the worker key is shared, so "trusted"
+// only means "not anonymous".
+const int MaxReplayBytes = 8 * 1024 * 1024;
+
 var connString = cfg.GetConnectionString("Postgres")
     ?? Environment.GetEnvironmentVariable("PG_CONN")
     ?? "Host=localhost;Username=rb;Password=rb;Database=rb";
@@ -642,14 +648,46 @@ app.MapPost("/v1/challenges", async (ChallengeReq req, ClaimsPrincipal user) =>
 
 // §5.3 step 2's upload half. The replay is a RECORDING of the worker's run
 // (§5.4), so it is opaque bytes to the API exactly like a snapshot payload.
+// Two content types, one endpoint, because there are genuinely two artifacts:
+//
+//   application/octet-stream  the RECORDING — a .rbr.gz ReplayRecorder wrote.
+//                             This is the one a client can actually watch.
+//   application/json          a text summary (verdict, bouts). Useful in a
+//                             fight report, useless for playback.
+//
+// 2026-08-09: the worker originally uploaded ONLY the summary, so every
+// "replay URL" on every match pointed at a scorecard. Nothing noticed,
+// because nothing had ever tried to PLAY one — the gap only appears the
+// moment you build the launcher. Binary is not base64'd into the JSON form:
+// a real best-of-3 is ~200 KB per bout and base64 would add a third to every
+// one of them for nothing.
 app.MapPost("/v1/worker/matches/{matchId:guid}/replay",
-    async (Guid matchId, HttpContext ctx, ReplayReq req, IBlobStore blobs) =>
+    async (Guid matchId, HttpContext ctx, IBlobStore blobs) =>
 {
     if (!WorkerAuthed(ctx)) return Results.Unauthorized();
-    if (string.IsNullOrEmpty(req.Replay)) return Bad("empty replay");
-    var bytes = System.Text.Encoding.UTF8.GetBytes(req.Replay);
-    var url = await blobs.PutAsync($"replays/{matchId}/{Guid.NewGuid():N}.json", bytes);
-    return Results.Ok(new { url, bytes = bytes.Length });
+
+    byte[] bytes; string ext;
+    var contentType = ctx.Request.ContentType ?? "";
+    if (contentType.Contains("json", StringComparison.OrdinalIgnoreCase))
+    {
+        var req = await ctx.Request.ReadFromJsonAsync<ReplayReq>();
+        if (string.IsNullOrEmpty(req?.Replay)) return Bad("empty replay");
+        bytes = System.Text.Encoding.UTF8.GetBytes(req.Replay);
+        ext = "json";
+    }
+    else
+    {
+        using var ms = new MemoryStream();
+        await ctx.Request.Body.CopyToAsync(ms);
+        bytes = ms.ToArray();
+        if (bytes.Length == 0) return Bad("empty replay");
+        ext = "rbr.gz";
+    }
+    if (bytes.Length > MaxReplayBytes)
+        return Bad($"replay is {bytes.Length} bytes; the cap is {MaxReplayBytes}");
+
+    var url = await blobs.PutAsync($"replays/{matchId}/{Guid.NewGuid():N}.{ext}", bytes);
+    return Results.Ok(new { url, bytes = bytes.Length, kind = ext });
 }).AllowAnonymous();
 
 // §5.3 step 3. Verify ownership -> write result -> settle escrow -> mark

@@ -15,7 +15,7 @@ PASS  a wrong password and an unknown account are indistinguishable (both 401)
 
 == D. robots ==
 PASS  a robot is created
-      robot 008f01c3-8a2e-4e93-aa05-2d8d9161161f
+      robot 1ba7cb48-418f-4b02-83fe-7f68d2c94731
 PASS  …but not without a token
 
 == E. snapshot upload stays opaque (§5.2) ==
@@ -30,7 +30,7 @@ PASS  …and a wrong key is refused too
 PASS  a keyed worker claims a job
 PASS  …and the job is the VALIDATE the upload enqueued
 PASS  …pointing at the snapshot just uploaded
-PASS  …and carries a payload location the worker can resolve (file:///tmp/rb-blobs/snapshots/008f01c3-8a2e-4e93-aa05-2d8d9161161f/c4dde43637a14cba9b44d6e7433034d1.json)
+PASS  …and carries a payload location the worker can resolve (file:///tmp/rb-blobs/snapshots/1ba7cb48-418f-4b02-83fe-7f68d2c94731/6d9a61f45fbc4f51854cdb8eabd78104.json)
 PASS  …and the payload sha256 rides along, so the worker can verify storage
 PASS  another worker cannot heartbeat a job it does not hold
 PASS  …the holder can

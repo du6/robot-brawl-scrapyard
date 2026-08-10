@@ -14,13 +14,15 @@ PASS  …and not fought
 PASS  an empty queue is not an error and posts nothing
 == I. one real fight, all the way through ==
 PASS  the loop completes a real match and posts exactly once
-PASS  …having uploaded the replay first
+PASS  …having uploaded the summary
+PASS  …and uploaded the actual .rbr.gz RECORDING, not just a scorecard
+PASS  …with real bytes in it (1340)
 PASS  …with a verdict the API's CHECK accepts (DRAW)
-PASS  …carrying the replay url the upload returned
+PASS  …with the playable recording FIRST in replayUrls, ahead of the summary
 PASS  the replay doc is versioned
 PASS  …and carries the bouts
 == J. owner state ==
 PASS  the career object was never swapped
 PASS  …and autosave was left as it was found
 PASS  the bay is still owen's after every path
- RESULT: 19 pass, 0 fail - ALL GREEN
+ RESULT: 21 pass, 0 fail - ALL GREEN

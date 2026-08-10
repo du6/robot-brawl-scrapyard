@@ -103,18 +103,43 @@ namespace RobotBrawl.Phase0
                 yield break;
             }
 
-            // ---- upload the replay -----------------------------------------
-            // One replay document for the match, carrying every bout. The API
-            // stores bytes; nothing server-side reads this.
-            string replayDoc = BuildReplayDoc(result, seeds);
-            string replayUrl = null;
-            yield return net.UploadReplay(job.matchId, replayDoc, (u, e) => { replayUrl = u; err = e; });
-            if (string.IsNullOrEmpty(replayUrl))
+            // ---- upload the RECORDINGS -------------------------------------
+            // One .rbr.gz per bout, raw. These are what a client plays.
+            //
+            // 2026-08-09: this used to upload ONLY the summary document below,
+            // so every replay URL on every match pointed at a scorecard.
+            // Nothing noticed because nothing had ever tried to PLAY one — the
+            // gap appears the moment you build the launcher, not before.
+            var replayUrls = new List<string>();
+            for (int i = 0; i < result.bouts.Count; i++)
+            {
+                string path = result.bouts[i].replayPath;
+                if (string.IsNullOrEmpty(path) || !System.IO.File.Exists(path)) continue;
+                byte[] bytes = null;
+                try { bytes = System.IO.File.ReadAllBytes(path); }
+                catch (Exception e) { LastError = "could not read " + path + ": " + e.Message; }
+                if (bytes == null || bytes.Length == 0) continue;
+
+                string url = null;
+                yield return net.UploadReplayFile(job.matchId, bytes, (u, e) => { url = u; err = e; });
+                if (!string.IsNullOrEmpty(url)) replayUrls.Add(url);
+                else LastError = "bout " + i + " recording did not upload: " + err;
+            }
+
+            // The scorecard rides along AFTER the recordings, so replayUrls[0]
+            // is always something playable. A client that takes the first URL
+            // and hands it to ReplayPlayer must not get a summary.
+            string summaryUrl = null;
+            yield return net.UploadReplay(job.matchId, BuildReplayDoc(result, seeds),
+                                          (u, e) => { summaryUrl = u; });
+            if (!string.IsNullOrEmpty(summaryUrl)) replayUrls.Add(summaryUrl);
+
+            if (replayUrls.Count == 0)
             {
                 // The fight really happened; losing the recording must not lose
                 // the verdict, so post anyway with no replay rather than
                 // discarding a result that cost a full best-of-3.
-                LastError = "replay upload failed, posting the verdict without it: " + err;
+                LastError = "no replay uploaded, posting the verdict without one: " + err;
             }
 
             var outcome = new FightOutcome
@@ -123,7 +148,7 @@ namespace RobotBrawl.Phase0
                 workerId = WorkerId,
                 verdict = ToApiVerdict(result.verdict),
             };
-            if (!string.IsNullOrEmpty(replayUrl)) outcome.replayUrls.Add(replayUrl);
+            outcome.replayUrls.AddRange(replayUrls);
             for (int i = 0; i < result.bouts.Count; i++)
                 outcome.bouts.Add(result.bouts[i].winner + ":" + result.bouts[i].outcome);
 
