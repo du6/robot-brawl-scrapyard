@@ -268,9 +268,14 @@ Things explicitly NOT done:
    tools render from a camera and never see IMGUI.
 4. **The end-to-end worker↔API runs are hand-run, not benches.** That path
    has no regression cover.
-5. **The ladder's 43% mutual disarm** — the biggest open single-player
-   problem, with three cheap explanations already ruled out. It needs its
-   own bench; `OpeningBench` is the template.
+5. **The ladder's 43% mutual disarm — ROOT CAUSE FOUND 2026-08-09**, see
+   `docs/Mutual_Disarm_Root_Cause_2026-08-09.md`. **The weapon is not the
+   fragile thing; the limb carrying it is.** 69% of weapons leave with a
+   mean 78% of their HP intact, shed when their structure fails, so
+   `WEAPON_VS_WEAPON` cannot reach them at ANY value — which is why two
+   fixes moved it by zero bouts. `DisarmBench` measures it. **The lever has
+   to act on structure, and "make weapons tougher" is the reading this
+   rules out.** What to change is owen's call, unmade.
 6. **Mirror lock is unsolved** — two identical robots still meet
    nose-to-nose and mutually disarm. A behaviour problem, not a damage
    constant; 0.10 was tested and rejected.
