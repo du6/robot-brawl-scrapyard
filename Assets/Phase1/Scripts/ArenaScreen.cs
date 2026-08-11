@@ -181,8 +181,52 @@ namespace RobotBrawl.Phase0
             Say("playing " + m.myRobot + " vs " + m.opponent, SC_INBOX);
             // attachCamera:true — watching a fight you cannot see is not
             // watching it.
+            // ⚠ THE NATURAL END OWES EXACTLY WHAT STOP OWES, and it used to pay
+            // none of it — 2026-08-10. This callback reopened the dock and spoke,
+            // and left `player` non-null forever.
+            //
+            // `Playing` is `player != null`, so after any replay ran to its own
+            // end the dock kept rebuilding a STOP REPLAY button for a replay that
+            // was over, and the ARENA believed a fight was still on screen.
+            // StopReplay() (below) always cleared it, which is exactly why this
+            // survived: pressing STOP exercises the path that already worked, and
+            // only letting it finish shows the leak.
+            //
+            // Close() is OWED, not optional. It is the only caller of
+            // bm.BackToBuild(), which is the sole thing pairing the
+            // EnterMatchArena() that ReplayPlayer.Play() performed — and
+            // BuildArena() is NOT idempotent (CLAUDE.md lists the unpaired pair
+            // as a trap). It also Destroys the FightCamera, which would otherwise
+            // be left driving Camera.main against transforms nothing updates any
+            // more. Leaving a replay to end naturally and then starting a career
+            // fight would have stacked a second EnterMatchArena on an arena that
+            // was never torn down, and nothing in the career path knows a replay
+            // was ever open.
+            //
+            // ORDER MATTERS. `player` is cleared FIRST because RestoreDock()
+            // reopens the dock, which runs ShowTab, which rebuilds the inbox off
+            // `Playing`; clearing it afterwards would rebuild the STOP button one
+            // last time and leave it on screen — the same "two writers, no
+            // ordering rule" trap DoEnlist carries two comments about. Then
+            // RESTORE, and only THEN speak.
+            //
+            // ⚠ TEARDOWN GOES THROUGH StopReplay(), NEVER A RAW player.Close().
+            // Close() fires bm.BackToBuild() unconditionally and its null guard
+            // lives at the CALL SITE, so every existing caller pairs it with
+            // clearing `player` (:180, StopReplay, the IMGUI button). A new site
+            // that reaches for Close() directly and forgets double-fires
+            // BackToBuild against a non-idempotent BuildArena. One owner.
+            //
+            // StopReplay() clears the status line as it goes, so the "replay
+            // finished" line is written AFTER it and after RestoreDock() — the
+            // restore-then-speak rule, for the same reason DoEnlist carries it.
             player = ReplayPlayer.Play(bm, path, 1f, true,
-                                       p => { RestoreDock(); Say("replay finished", SC_INBOX); });
+                                       p =>
+                                       {
+                                           StopReplay();
+                                           RestoreDock();
+                                           Say("replay finished", SC_INBOX);
+                                       });
             busy = false;
         }
 
@@ -508,10 +552,33 @@ namespace RobotBrawl.Phase0
             }
         }
         public void SubmitAuth() { if (CanSubmitAuth) StartCoroutine(DoAuth()); }
+
+        /// <summary>Sign out, and leave NOTHING of the person behind.
+        ///
+        /// ⚠ THE CREDENTIAL FIELDS ARE PART OF "EVERYTHING" — added 2026-08-10.
+        /// This method cleared seven things and missed `email`, so signing out
+        /// and handing someone the phone showed them the previous account's
+        /// address sitting in the sign-in form: RefreshArenaAccount() rebuilds
+        /// the field from `Email` (MobileBuilderUI, the ArenaField call), so
+        /// the model surviving sign-out is enough to render it. Found by a QA
+        /// pass reading the screen rather than the bench.
+        ///
+        /// Not persistence — there is no PlayerPrefs and no saved-email path,
+        /// so it never survived an app restart. It survived SIGN-OUT, which is
+        /// the case that matters: the same shared-device leak the email
+        /// greeting was removed for. Clearing six neighbours and not this one
+        /// is the shape of an oversight, not a decision.
+        ///
+        /// `password` is belt-and-braces: DoAuth already zeroes it before the
+        /// request and the UGUI field is always rebuilt with "", so this is not
+        /// the line that protects it. It costs nothing and means the invariant
+        /// holds here too rather than only at the two places that happen to
+        /// enforce it today.</summary>
         public void SignOut()
         {
             LadderClient.Logout(); who = ""; inbox.Clear(); mine.Clear(); balance = -1;
             card = null; pending = false; showInbox = false;
+            email = ""; password = ""; displayName = "";
             Say("signed out", SC_ACCOUNT);
         }
 

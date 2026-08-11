@@ -2688,8 +2688,22 @@ public class MobileBuilderUI : MonoBehaviour
                 () => { if (arenaScreen != null) { arenaScreen.ToggleRegistering(); arenaAccountStamp = ""; } });
             alt.GetComponent<Image>().color = new Color(0.16f,0.17f,0.21f,1f);
 
+            // ⚠ THIS USED TO SAY "the board is public" AND THE SCREEN DISAGREED
+            // WITH IT — 2026-08-10. Signed out, the precedence at the top of
+            // RefreshArena forces the ACCOUNT surface and dims THE BOARD, so
+            // the first sentence a new player reads promised a thing the very
+            // next control refused. A QA pass caught it as a player would:
+            // reading the screen, not running a bench.
+            //
+            // The sentence was the wrong half to keep, but note WHY it was
+            // written: GET /v1/leaderboard carries no RequireAuthorization, so
+            // the board genuinely IS public server-side and could be shown to a
+            // signed-out player. Only the app hides it, deliberately — see the
+            // rationale above `onAccount`. Whether that is right is owen's
+            // call; making the copy agree with the app is not, and had to
+            // happen either way.
             var note = MkText("accnote", arenaAccountContent,
-                "the board is public. signing in is what lets you enlist a robot,\n"
+                "signing in is what lets you see the ladder, enlist a robot,\n"
                 + "challenge, and spend what you win.", 13, TextAnchor.UpperLeft);
             note.color = new Color(0.70f, 0.76f, 0.86f);
             note.gameObject.AddComponent<LayoutElement>().minHeight = 38f;
@@ -2829,8 +2843,22 @@ public class MobileBuilderUI : MonoBehaviour
         for (int i = 0; i < inbox.Count; i++)
         {
             var m = inbox[i];
-            bool win = m.outcome != null && m.outcome.ToUpper().Contains("WIN");
-            bool loss = m.outcome != null && m.outcome.ToUpper().Contains("LOS");
+            // ⚠ EXACT COMPARISON, AND THE SUBSTRING VERSION WAS WRONG FOR THE
+            // WHOLE LIFE OF THIS SCREEN. The server sends "WON" (Program.cs's
+            // outcome derivation) and this line tested Contains("WIN") —
+            // W-O-N does not contain W-I-N, so `win` was NEVER true and every
+            // victory fell through to the PENDING grey below. The loss half
+            // passed only by luck: "LOST" does contain "LOS".
+            //
+            // So defeats glowed red and wins looked unresolved, on a ladder
+            // whose whole premise is coming back to see what happened. Nothing
+            // failed; a wrong colour is not an exception, and no bench asserts
+            // a background. Compare the contract exactly rather than sniffing
+            // at it — "WON"/"LOST" is what LadderClientBench pins.
+            //
+            // DRAW and PENDING deliberately keep falling through to neutral.
+            bool win  = m.outcome == "WON";
+            bool loss = m.outcome == "LOST";
             var row = MkPanel("inboxrow_" + i, arenaInboxContent,
                 win ? new Color(0.12f,0.18f,0.14f,1f)
                     : loss ? new Color(0.18f,0.12f,0.12f,1f)
@@ -3093,8 +3121,11 @@ public class MobileBuilderUI : MonoBehaviour
             {
                 bool own = arenaScreen.StatusScope == ArenaScreen.SC_ACCOUNT
                            && !string.IsNullOrEmpty(arenaScreen.Status);
+                // Same correction as the note in RefreshArenaAccount: signed
+                // out, this line sat directly above a dimmed THE BOARD while
+                // telling the player the board was public.
                 SetArenaStatus(own ? arenaScreen.Status
-                    : LadderClient.SignedIn ? "signed in" : "the board is public — signing in lets you play");
+                    : LadderClient.SignedIn ? "signed in" : "sign in to see the ladder and enlist a robot");
             }
             return;
         }
@@ -4068,6 +4099,32 @@ public class MobileBuilderUI : MonoBehaviour
         // component itself is the switch, and disabling it stops its OnGUI.
         // Built on first open, never before — Start() hits the ladder API.
         bool wantArena = open && i == 4 && Career.active;
+
+        // ⚠ A REPLAY MUST SURVIVE THE DOCK CLOSING AND MUST NOT SURVIVE A TAB
+        // CHANGE, AND THE DISCRIMINATOR IS `i`, NOT `open`.
+        //
+        // WATCH closes the dock ON PURPOSE so the fight is not played behind an
+        // opaque panel, and `wantArena` includes `open` — so the obvious hook,
+        // tearing down when arenaScreen is disabled (an OnDisable, or anything
+        // keyed on `wantArena`), would kill every replay the instant it started.
+        // It would present as a flaky replay rather than as a wrong hook, which
+        // is the expensive kind of wrong.
+        //
+        // Leaving the ARENA tab is the real abandonment: ReplayPlayer.Play is
+        // called with attachCamera:true, so the camera is on the arena for the
+        // length of the bout. Without this, tabbing to BUILD mid-replay leaves
+        // the player in the BUILD tab looking at a fight instead of their robot
+        // until the recording runs out — and then a BackToBuild() lands while
+        // they are mid-build.
+        //
+        // StopReplay() only, deliberately: it is null-guarded and safe to call
+        // on every tab change, and it is the single owner of Close(). The dock
+        // is NOT restored from here — we are already inside ShowTab, and
+        // RestoreDock() reopens the dock by calling SetDockOpen(true), which
+        // re-enters this method. The path that gets here has opened the dock
+        // itself anyway, because a tab BUTTON is what opens it.
+        if (arenaScreen != null && i != 4) arenaScreen.StopReplay();
+
         bool arenaJustBuilt = false;
         if (wantArena && arenaScreen == null)
         {
