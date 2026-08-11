@@ -1271,10 +1271,43 @@ public class FightManager : MonoBehaviour
     string SideDetail(Side s)
     {
         float span = Mathf.Max(1f, elapsed);
-        var pp = s.bot != null ? s.bot.GetComponent<PowerPlant>() : null;
-        string pwr = pp == null ? "none fitted"
-                   : pp.Flat ? "FLAT"
-                   : string.Format("{0:F0}%{1}", pp.Frac * 100f, pp.Strained ? " (straining)" : "");
+        // ⚠ THE BATTERY LINE READS THE BELL, NOT THE WRECKAGE — 2026-08-10, and
+        // this is the 07-29 gyro fix finally applied to its second path.
+        //
+        // It used to be `GetComponent<PowerPlant>()` right here, and three
+        // different states collapsed into two lies:
+        //   · a build that NEVER fitted a battery has a PowerPlant anyway (it is
+        //     added unconditionally to the robot root, capacity 0), so `pp` was
+        //     non-null and `Flat` was true — it reported "FLAT", as though a
+        //     pack had run down;
+        //   · a build whose battery was SHEARED OFF has capacityKJ recomputed to
+        //     0 every step ("shearing a battery off must take its energy with
+        //     it"), so it ALSO reported "FLAT" — the strategy that killed the
+        //     pack left no trace on the results screen;
+        //   · "none fitted" only ever appeared when the whole BOT was gone,
+        //     which is the one case where it says nothing useful.
+        //
+        // The datum needed to tell them apart was already here and already
+        // sampled AT THE BELL — startCapKJ, whose own doc says it exists so that
+        // "how much of my pack is still bolted on" is answerable after a battery
+        // shears off. The LIVE HUD twenty lines up has used it correctly the
+        // whole time ("no power part fitted" / "(pack damaged)"); only this
+        // results line was left on the live component. Two renderings of one
+        // fact, and the one nobody re-read went wrong — the same shape as the
+        // gyro line directly below, which was fixed on 07-29 and is the
+        // precedent this now matches.
+        //
+        // Cached Side fields rather than a fresh GetComponent, deliberately:
+        // they are updated every step (:488-491), zeroed on death (:447, :463),
+        // and the field comment says they are cached precisely so the numbers
+        // SURVIVE THE BODY'S DESTRUCTION — which is the situation this line is
+        // rendered in.
+        string pwr = s.startCapKJ <= 0.01f ? "none fitted"
+                   : s.capKJ      <= 0.01f ? "destroyed"
+                   : s.pwrFlat             ? "FLAT"
+                   : string.Format("{0:F0}%{1}{2}", s.pwrFrac * 100f,
+                                   s.capKJ < s.startCapKJ - 1f ? " (pack damaged)" : "",
+                                   s.pwrStrained ? " (straining)" : "");
         return string.Format("      seams sheared {0} · flipped {1:F0}% of the match · immobile {2:F0}% · gyros {3} · battery {4}",
             s.brokenSeams, 100f * s.flippedTime / span, 100f * s.immobileTime / span,
             s.startGyros == 0 ? "none fitted"
