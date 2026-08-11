@@ -10,6 +10,55 @@ using System.Collections.Generic;
 namespace RobotBrawl.Phase0
 {
 
+/// <summary>Hands a drag that STARTED ON A TEXT FIELD to the list the field
+/// sits in — 2026-08-10.
+///
+/// Unity's InputField implements IBeginDrag/IDrag/IEndDrag for text selection,
+/// so it CONSUMES the drag and the enclosing ScrollRect never sees it. In a
+/// scrolling panel made mostly of fields that reads as a dead list: the finger
+/// happens to land on a field, and nothing moves. Measured in the editor before
+/// this existed, same gesture, two start points:
+///
+///     from the FIELD  top hit=fill   handler=box                content y 0.0 -> 0.0
+///     from the PANEL  top hit=viewport handler=arenaaccountscroll  content y 0.0 -> 32.8
+///
+/// ⚠ ONLY WHEN THE FIELD IS NOT FOCUSED. A focused field keeps its own drag,
+/// because that is how you select text in it, and stealing that would trade one
+/// broken gesture for another. So this relays the "I meant to scroll the list"
+/// case and leaves the "I meant to select in this field" case exactly as Unity
+/// shipped it — the same division ProgramDragHandle makes for the program
+/// canvas, where a drag on a handle moves structure and a drag anywhere else
+/// scrolls.
+///
+/// The relay is deliberately dumb: it forwards the SAME PointerEventData, so
+/// the ScrollRect computes its own delta from the pointer, and there is no
+/// second copy of scroll maths to drift.</summary>
+public class FieldScrollRelay : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHandler
+{
+    public InputField field;
+    public ScrollRect target;
+    bool relaying;
+
+    bool ShouldRelay { get { return target != null && (field == null || !field.isFocused); } }
+
+    public void OnBeginDrag(PointerEventData e)
+    {
+        relaying = ShouldRelay;
+        if (relaying) ExecuteEvents.Execute(target.gameObject, e, ExecuteEvents.beginDragHandler);
+    }
+    public void OnDrag(PointerEventData e)
+    {
+        if (relaying) ExecuteEvents.Execute(target.gameObject, e, ExecuteEvents.dragHandler);
+    }
+    public void OnEndDrag(PointerEventData e)
+    {
+        // Ends what it began even if focus changed mid-drag: a ScrollRect that
+        // is begun and never ended keeps the content held by the pointer.
+        if (relaying) ExecuteEvents.Execute(target.gameObject, e, ExecuteEvents.endDragHandler);
+        relaying = false;
+    }
+}
+
 /// <summary>Phase 5 touch-native builder (uGUI). A runtime ScreenSpaceOverlay
 /// canvas with a CanvasScaler (density/DPI handled natively), a bottom tab dock
 /// (BUILD / FIGHT / GARAGE), big tap targets, and touch placement + camera that
@@ -2629,6 +2678,17 @@ public class MobileBuilderUI : MonoBehaviour
         fin.text = initial ?? "";
         if (secret) fin.contentType = InputField.ContentType.Password;
         fin.onValueChanged.AddListener(s => { if (onChanged != null) onChanged(s); });
+
+        // A drag begun on this field would otherwise be eaten by the InputField
+        // and the panel it sits in would not move. See FieldScrollRelay.
+        // Resolved from the hierarchy rather than passed in: the field does not
+        // need to know which list it is in, and a caller cannot forget.
+        var sr = boxGO.GetComponentInParent<ScrollRect>();
+        if (sr != null)
+        {
+            var relay = boxGO.AddComponent<FieldScrollRelay>();
+            relay.field = fin; relay.target = sr;
+        }
         return fin;
     }
 
