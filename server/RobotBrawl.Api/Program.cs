@@ -418,10 +418,39 @@ app.MapGet("/v1/robots", async (ClaimsPrincipal user) =>
     // was no endpoint that turned "my robot" into one. Adding it here rather
     // than a second round trip because the ladder browser needs the category
     // anyway, to know which fights are legal before offering them.
+    // ⚠ THE ACTIVE JOIN AND THE LATEST JOIN ARE TWO DIFFERENT QUESTIONS, and
+    // conflating them would break challenges. `s` answers "which snapshot may
+    // fight" and MUST stay ACTIVE-only, because POST /v1/challenges resolves a
+    // challenger through activeSnapshotId; widening it would silently offer a
+    // PENDING or REJECTED build as a challenger. `ls` answers "what happened to
+    // the last thing I uploaded", which is a question the ACTIVE join cannot
+    // answer even in principle: a rejected snapshot is not ACTIVE, so the row
+    // came back with activeSnapshotId = NULL and no status — byte-identical to
+    // a robot still being checked. The client therefore had no way to tell
+    // REJECTED from PENDING and said "waiting to be checked" forever. That was
+    // a missing COLUMN, not a missing label.
+    //
+    // Owner-only by construction: this endpoint filters WHERE r.user_id = $1,
+    // so every row is the caller's own robot. That is what makes it safe to
+    // return fail_reasons here when GET /v1/snapshots/{id} guards them behind
+    // `mine` — handing a scout the validator's reasons is handing them the
+    // build (see that endpoint's comment). Do not reuse this projection on any
+    // route that can return another player's robot.
+    //
+    // LATERAL + LIMIT 1 rides snapshots_robot_idx (robot_id, uploaded_at DESC),
+    // so it is an index hit per robot, not a sort of the history.
     await using var cmd = new NpgsqlCommand(@"
-        SELECT r.id, r.name, r.created_at, r.retired, s.id, s.category
+        SELECT r.id, r.name, r.created_at, r.retired, s.id, s.category,
+               ls.status, ls.fail_reasons
           FROM robots r
           LEFT JOIN snapshots s ON s.robot_id = r.id AND s.status = 'ACTIVE'
+          LEFT JOIN LATERAL (
+              SELECT status, fail_reasons
+                FROM snapshots
+               WHERE robot_id = r.id
+               ORDER BY uploaded_at DESC
+               LIMIT 1
+          ) ls ON TRUE
          WHERE r.user_id = $1 ORDER BY r.created_at;", c);
     cmd.Parameters.AddWithValue(UserId(user));
     var list = new List<object>();
@@ -433,6 +462,10 @@ app.MapGet("/v1/robots", async (ClaimsPrincipal user) =>
             createdAt = r.GetDateTime(2), retired = r.GetBoolean(3),
             activeSnapshotId = r.IsDBNull(4) ? (Guid?)null : r.GetGuid(4),
             category = r.IsDBNull(5) ? null : r.GetString(5),
+            // NULL when the robot has never been enlisted — distinct from
+            // "PENDING", and the client must not render either as a reason.
+            snapshotStatus = r.IsDBNull(6) ? null : r.GetString(6),
+            failReasons = r.IsDBNull(7) ? null : r.GetFieldValue<string[]>(7),
         });
     return Results.Ok(list);
 }).RequireAuthorization();

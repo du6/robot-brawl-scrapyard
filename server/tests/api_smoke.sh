@@ -108,8 +108,14 @@ body_upload() { "$PY" -c "import json,sys;print(json.dumps({'robotId':sys.argv[1
 # the same trap on the port mapping.
 #
 #   against compose:  PGPORT=5433 bash tests/api_smoke.sh http://localhost:8080
+#
+# RB_DB is a parameter for a different reason: concurrent AGENTS, not concurrent
+# ports. See the note in sql_bench.sh — it must name the same database the API
+# under test is connected to, or every db-side assertion reads an empty schema
+# and the HTTP checks pass while the SQL checks quietly compare nothing.
 RB_PGPORT="${PGPORT:-5432}"
-dbq() { PGPASSWORD=rb psql -h localhost -p "$RB_PGPORT" -U rb -d rb -qtA -c "$1" 2>/dev/null | tr -d '[:space:]'; }
+RB_DB="${RB_DB:-rb}"
+dbq() { PGPASSWORD=rb psql -h localhost -p "$RB_PGPORT" -U rb -d "$RB_DB" -qtA -c "$1" 2>/dev/null | tr -d '[:space:]'; }
 
 # Post a validate-result carrying a RAW JSON category value, on its own fresh
 # snapshot and job, and echo the HTTP status. The category argument is spliced
@@ -329,7 +335,7 @@ else
   SNAP3=$(jget id)
   req POST /v1/worker/jobs/claim '{"workerId":"smoke-1"}' "X-Worker-Key: $WKEY" >/dev/null; JOB3=$(jget id)
   if [ -z "$SNAP3" ] || [ -z "$JOB3" ]; then
-    skip "fail-reason visibility (3 checks)" "could not upload or claim the rejected snapshot"
+    skip "fail-reason visibility (6 checks)" "could not upload or claim the rejected snapshot"
   else
     VR3="{\"snapshotId\":\"$SNAP3\",\"workerId\":\"smoke-1\",\"legal\":false,\"massKg\":99,
           \"aabbX\":9.0,\"aabbY\":9.0,\"aabbZ\":9.0,\"category\":null,
@@ -345,6 +351,41 @@ else
     else ok "a scout cannot read the fail reasons"; fi
     req GET "/v1/snapshots/$SNAP2" "" "$AUTH" >/dev/null
     is "a REJECTED upload left the incumbent ACTIVE" "$(jget status)" ACTIVE
+
+    # ── GET /v1/robots has to tell REJECTED from PENDING ────────────────
+    # It used to join ACTIVE only, so a rejected robot came back with
+    # activeSnapshotId = NULL and nothing else — byte-identical to a robot
+    # still in the queue. The dock could only say "waiting to be checked",
+    # and said it forever. That was a missing COLUMN, not a missing label,
+    # which is why no client-side change could have fixed it.
+    #
+    # Pull the field off THIS robot's row by id: index 0 is right today and
+    # wrong the first time someone adds a robot to this section.
+    rfield() { "$PY" -c "import json
+rows=json.load(open('$BODY'))
+m=[x for x in rows if str(x.get('id'))=='$1']
+v=m[0].get('$2') if m else None
+print('' if v is None else (' '.join(v) if isinstance(v,list) else v))" 2>/dev/null; }
+
+    S=$(req GET /v1/robots "" "$AUTH")
+    if [ "$S" != "200" ]; then no "the robots list did not load (HTTP $S)"
+    else
+      # ⚠ THE ACTIVE CASE IS ASSERTED FIRST, DELIBERATELY. POST /v1/challenges
+      # resolves its challenger through activeSnapshotId, so widening this
+      # projection to reach the LATEST snapshot must not change which snapshot
+      # comes back here. If this line ever fails, the rejected-case checks
+      # below are meaningless — a challenger would be offered a PENDING or
+      # REJECTED build.
+      same "the challenge path still resolves the ACTIVE snapshot" \
+           "$(rfield "$ROBOT" activeSnapshotId)" "$SNAP2"
+      is "a rejected robot reports its LATEST snapshot status" \
+         "$(rfield "$ROBOT" snapshotStatus)" REJECTED
+      case "$(rfield "$ROBOT" failReasons)" in
+        *overweight*"unanchored part"*)
+          ok "the owner's robots list carries EVERY fail reason, in the validator's order" ;;
+        *) no "the robots list lost the fail reasons -- got '$(rfield "$ROBOT" failReasons)'" ;;
+      esac
+    fi
   fi
 fi
 
