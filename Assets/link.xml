@@ -48,6 +48,27 @@
   which is why a store capture must be checked on the FINAL build, immediately
   before capturing, rather than inherited from an earlier verification.
 
+  ⚠ BUT DO NOT OVER-READ THE ABOVE EITHER — IT IS MEASURED ON THE SIMULATOR.
+  Every observation here comes from a Simulator-SDK player. A second one landed
+  after this note was written: the [dev] status line, gated on
+  Debug.isDebugBuild (MobileBuilderUI.cs:3161), ALSO renders on the flag-clean
+  release simulator build — so isDebugBuild is TRUE there, and that file's own
+  comment at :3154 ("false in a release build, so a shipped player…") describes
+  something the simulator does not honour.
+  The economical explanation is that Unity ships ONE dev-flavoured SIMULATOR
+  runtime per architecture — Trampoline carries -sim-arm64 / -sim-x64 variants,
+  i.e. an ARCH split, with no dev/release split beside it. If that holds, the
+  console-on-release and [dev]-on-release are ONE platform fact rather than two,
+  and BOTH are properties of the simulator runtime.
+  So the honest scope is: on the SIMULATOR the console is error-triggered
+  regardless of the flag. WHETHER A DEVICE RELEASE BUILD BEHAVES THE SAME IS
+  UNTESTED — no device build has ever been made from this code. It is on owen's
+  first-device-build checklist. Preserving CapsuleCollider is worth doing either
+  way, because the hollow yard pillars are a device defect independent of who
+  can see the log; this paragraph exists so the NEXT reader does not inherit a
+  simulator measurement as a device fact — which is the mistake this whole note
+  is a record of, made once already in the other direction.
+
   ONE IS NOT NOISE, AND IT IS WHY THIS FILE IS A FIX RATHER THAN A MUTE:
 
       ArenaHazards.cs, PillarHazard.Build() — Prim(..., collider: true)
