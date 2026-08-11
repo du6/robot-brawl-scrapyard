@@ -346,7 +346,10 @@ app.MapPost("/v1/auth/register", async (RegisterReq req) =>
             await l.ExecuteNonQueryAsync();
         }
         await tx.CommitAsync();
-        return Results.Ok(new { token = tokens.Issue(id, req.Email!), userId = id });
+        // displayName comes back, and it is not decoration — see the note on
+        // /v1/auth/login below. LadderClient.Auth has always read this field
+        // out of BOTH replies and neither one has ever sent it.
+        return Results.Ok(new { token = tokens.Issue(id, req.Email!), userId = id, displayName = name });
     }
     catch (PostgresException ex) when (ex.SqlState == "23505")
     {
@@ -358,7 +361,7 @@ app.MapPost("/v1/auth/login", async (LoginReq req) =>
 {
     await using var c = await db.OpenAsync();
     await using var cmd = new NpgsqlCommand(
-        "SELECT id, pw_hash, email FROM users WHERE email_lower = lower($1);", c);
+        "SELECT id, pw_hash, email, display_name FROM users WHERE email_lower = lower($1);", c);
     cmd.Parameters.AddWithValue(req.Email ?? "");
     await using var r = await cmd.ExecuteReaderAsync();
     // Same response and roughly the same work whether the account exists or
@@ -370,8 +373,26 @@ app.MapPost("/v1/auth/login", async (LoginReq req) =>
         return Results.Unauthorized();
     }
     var id = r.GetGuid(0); var hash = r.GetString(1); var email = r.GetString(2);
+    var displayName = r.IsDBNull(3) ? "" : r.GetString(3);
     if (!Passwords.Verify(req.Password ?? "", hash)) return Results.Unauthorized();
-    return Results.Ok(new { token = tokens.Issue(id, email), userId = id });
+    // ⚠ displayName IS PART OF THE REPLY — found 2026-08-10 by the first bench
+    // that ever signed a player back IN rather than registering a new one.
+    //
+    // LadderClient.Auth reads "displayName" out of this body and ArenaScreen
+    // does `who = string.IsNullOrEmpty(name) ? email : name`. Neither auth
+    // endpoint had ever sent the field, so that fallback fired EVERY TIME and
+    // the ARENA greeted every player, on every path, by their EMAIL ADDRESS —
+    // on the status line and across the face of the SIGN OUT button. On a
+    // screen this project screenshots on purpose (docs/ARENA_Judged and
+    // ArenaShots both photograph it) that is a player's email in the
+    // repository, and the client had been asking for the right thing all
+    // along. It read as correct because the only sessions anyone ever
+    // exercised were brand-new accounts nobody knew the name of.
+    //
+    // Note this is returned only AFTER the password verifies — moving it above
+    // the check would turn a login attempt into an account-enumeration oracle,
+    // which is the exact thing the decoy-hash branch above exists to prevent.
+    return Results.Ok(new { token = tokens.Issue(id, email), userId = id, displayName });
 }).RequireRateLimiting("auth");
 
 // ---------------------------------------------------------------- robots
