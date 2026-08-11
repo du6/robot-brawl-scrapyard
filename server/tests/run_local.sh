@@ -107,7 +107,46 @@ echo "starting the API (log: qa_api_server.log)…"
   ASPNETCORE_URLS="$BASE" \
   dotnet run ) > "$SRV" 2>&1 &
 API_PID=$!
-trap 'kill $API_PID 2>/dev/null' EXIT INT TERM
+
+# ⚠ $! IS THE SUBSHELL, NOT THE SERVER — 2026-08-10, and this leaked for months.
+#
+# `( cd … && dotnet run ) &` backgrounds a SUBSHELL. `dotnet run` then execs a
+# second process which builds and launches a THIRD, `RobotBrawl.Api`, and that
+# last one is what holds the port. Killing $API_PID reaped the wrapper and left
+# the listener running: measured, pid 93703 still serving 5099 long after this
+# script had exited 0.
+#
+# It was invisible before today because a leaked listener on a port nobody
+# re-checked just sat there. THE PORT GUARD ABOVE IS WHAT MADE IT MATTER: with
+# a guard, run_local.sh run twice in a row failed the second time — "Something
+# already answers on …" — because the thing answering was its own previous run.
+# The guard is correct and stays; it did not cause this, it EXPOSED it. Blaming
+# the guard and deleting it would restore a silent leak in place of a loud one.
+#
+# Everything holding $RB_PORT right now is OURS, and the guard is what licenses
+# that claim: it refused to start unless the port was free, so nothing else can
+# have taken it in the seconds since. That is the whole reason this is safe to
+# do by port at all — never blanket-kill a port you did not prove was free.
+cleanup_api() {
+  kill $API_PID 2>/dev/null
+  local held
+  held="$(lsof -nP -iTCP:"$RB_PORT" -sTCP:LISTEN -t 2>/dev/null | sort -u)"
+  [ -n "$held" ] && kill $=held 2>/dev/null
+  for _ in {1..10}; do
+    lsof -nP -iTCP:"$RB_PORT" -sTCP:LISTEN -t >/dev/null 2>&1 || return 0
+    sleep 1
+  done
+  # Escalate rather than exit quietly. A leak that announces itself is the
+  # difference between this bug and the version of it that hid.
+  held="$(lsof -nP -iTCP:"$RB_PORT" -sTCP:LISTEN -t 2>/dev/null | sort -u)"
+  [ -n "$held" ] && kill -9 $=held 2>/dev/null
+  sleep 1
+  if lsof -nP -iTCP:"$RB_PORT" -sTCP:LISTEN -t >/dev/null 2>&1; then
+    echo "⚠ something is STILL listening on $RB_PORT after cleanup — the next run will refuse to start."
+    lsof -nP -iTCP:"$RB_PORT" -sTCP:LISTEN
+  fi
+}
+trap cleanup_api EXIT INT TERM
 
 # dotnet run compiles first, so allow for a cold build.
 echo -n "waiting for /healthz "
@@ -149,7 +188,9 @@ echo "running restore_drill.sh (result: qa_restore_drill.txt)…"
 bash tests/restore_drill.sh > "$PWD/qa_restore_drill.txt" 2>&1
 RC=$?
 
-kill $API_PID 2>/dev/null; wait $API_PID 2>/dev/null
+# One implementation of stopping the server, so the happy path and the trap
+# cannot drift. The trap still fires afterwards; cleanup_api is idempotent.
+cleanup_api; wait $API_PID 2>/dev/null
 echo
 tail -1 "$SQL"
 tail -1 "$OUT"
