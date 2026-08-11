@@ -54,12 +54,79 @@ namespace RobotBrawl.Phase0
         /// <summary>Part IDS only — §1.3 makes the design public and the code
         /// private, so this is the closest a scout gets to the build.</summary>
         public List<string> parts = new List<string>();
+
+        /// <summary>Why the validator refused it. The SERVER decides who may
+        /// read these — GET /v1/snapshots/{id} sends them only when `mine` is
+        /// true — so a scout simply receives an empty list here and there is
+        /// nothing for this client to gate. Do NOT add a client-side check that
+        /// implies otherwise, and do not render a placeholder when it is empty:
+        /// "REJECTED" with no reason tells the player nothing, which FuzzBench
+        /// documents as a known bad state.</summary>
+        public List<string> failReasons = new List<string>();
     }
 
     public class MyRobot
     {
         public string id = "", name = "", activeSnapshotId = "", category = "";
         public bool CanFight { get { return !string.IsNullOrEmpty(activeSnapshotId); } }
+
+        /// <summary>Status of the LATEST snapshot, whatever it is — "PENDING",
+        /// "ACTIVE", "REJECTED", "SUPERSEDED" — or "" for a robot that has
+        /// never been enlisted.
+        ///
+        /// ⚠ THIS IS NOT DERIVABLE FROM CanFight, WHICH IS WHY IT EXISTS. The
+        /// endpoint used to join ACTIVE only, so a REJECTED robot and a PENDING
+        /// one both came back with activeSnapshotId = "" and were byte-
+        /// identical here. The dock could only say "waiting to be checked", and
+        /// said it forever. No client-side change could have fixed that: it was
+        /// a missing COLUMN, not a missing label.</summary>
+        public string snapshotStatus = "";
+
+        /// <summary>Why the validator refused this build, in ITS order. Owner-
+        /// only by construction: GET /v1/robots filters on the caller's user id,
+        /// so every row here is your own robot. Never render these for anyone
+        /// else — handing a scout the validator's reasons is handing them the
+        /// build, which is why GET /v1/snapshots/{id} guards them behind
+        /// `mine`.</summary>
+        public List<string> failReasons = new List<string>();
+
+        /// <summary>Rejected AND we know why. Kept as one place so the two
+        /// renderers cannot disagree about what counts as rejected.</summary>
+        public bool Rejected { get { return snapshotStatus == "REJECTED"; } }
+
+        /// <summary>Where this robot stands, in one line, for the MY ROBOTS row.
+        /// Lives on the MODEL because there are two renderers — the dock's UGUI
+        /// list and ArenaScreen's standalone OnGUI — and every other ARENA
+        /// surface shares one model for exactly this reason. Two copies of this
+        /// sentence would drift, and the half nobody looks at would be the one
+        /// that goes wrong.
+        ///
+        /// ONE line and the FIRST reason only: these rows are a single touch
+        /// row high, and the validator emits full prose. The whole list has a
+        /// home — the scouting card receives failReasons for the owner already.
+        ///
+        /// ⚠ An empty reasons list still renders as plain "not accepted" rather
+        /// than a dangling dash: FuzzBench records "REJECTED with an empty
+        /// fail_reasons list tells the player nothing" as a known bad state, and
+        /// inventing a placeholder would imply a reason the server never
+        /// sent.</summary>
+        public string StatusText
+        {
+            get
+            {
+                if (CanFight) return category;
+                if (Rejected)
+                    return failReasons.Count > 0 && !string.IsNullOrEmpty(failReasons[0])
+                         ? "not accepted — " + failReasons[0]
+                         : "not accepted";
+                // No status at all means it has never been uploaded; PENDING and
+                // SUPERSEDED both mean the worker has yet to speak for the
+                // build that matters. Neither is a rejection and neither may
+                // read like one.
+                if (string.IsNullOrEmpty(snapshotStatus)) return "not enlisted yet";
+                return "waiting to be checked";
+            }
+        }
     }
 
     /// <summary>A shop item (§2.3's scrap sinks). Cosmetic only, by design:
@@ -253,6 +320,8 @@ namespace RobotBrawl.Phase0
                 card.mine = string.Equals(RobotWorker.Field(j, "mine"), "true",
                                           StringComparison.OrdinalIgnoreCase);
                 card.parts.AddRange(StringArray(j, "partsManifest"));
+                // Owner-only at the SERVER: a scout's response simply has none.
+                card.failReasons.AddRange(StringArray(j, "failReasons"));
                 done(card, null);
             }
         }
@@ -274,7 +343,11 @@ namespace RobotBrawl.Phase0
                         name = RobotWorker.Field(obj, "name") ?? "",
                         activeSnapshotId = RobotWorker.Field(obj, "activeSnapshotId") ?? "",
                         category = RobotWorker.Field(obj, "category") ?? "",
+                        snapshotStatus = RobotWorker.Field(obj, "snapshotStatus") ?? "",
                     };
+                    // Same helper the scouting card uses for partsManifest — a
+                    // real JSON array, not a quoted string, so no second parse.
+                    m.failReasons.AddRange(StringArray(obj, "failReasons"));
                     rows.Add(m);
                 }
                 done(rows, null);

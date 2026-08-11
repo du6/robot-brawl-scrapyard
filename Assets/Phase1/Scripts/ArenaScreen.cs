@@ -256,6 +256,49 @@ namespace RobotBrawl.Phase0
             if (name.Length == 0) name = (ar.name ?? "").Trim();
             if (name.Length == 0) { status = "give your robot a name first"; yield break; }
 
+            // ---- LOCAL PRE-FLIGHT, and read the gate before touching it -----
+            //
+            // The worker runs RobotSnapshot.Describe to decide legality, so the
+            // same call here gives the IDENTICAL verdict instantly instead of
+            // after a trip through the queue — up to a full scheduler period in
+            // the cloud. That is the whole value: no round trip to learn you are
+            // 1 kg overweight.
+            //
+            // ⚠ BUT Describe READS THE LOADED BUILDER, NOT THE PAYLOAD. Its own
+            // doc comment says so: "Everything returned is derived from the
+            // loaded build; nothing is read from the payload's claims." And this
+            // function uploads the SAVED robot (ar.snapshot), deliberately —
+            // see the comment above about the ladder fighting this build for
+            // days unattended. Those are two different robots whenever the bench
+            // has been touched since the last save.
+            //
+            // So the pre-flight only runs when the bay IS the upload, byte for
+            // byte. When they differ we say NOTHING and let the server answer:
+            // a client that stays quiet when it cannot know is correct; one that
+            // guesses is the bug. Guessing here would refuse a legal saved robot
+            // or pass one the server then rejects — the exact confusion this
+            // feature exists to remove.
+            //
+            // ⚠ Compared DIRECTLY rather than through bm.ActiveEditDirty(),
+            // which compares against the BLUEPRINT when one is open. That is not
+            // what gets uploaded, so reusing it would reintroduce this same
+            // mismatch one level down. Do not "simplify" this to that call.
+            //
+            // ⚠ Its cover is NARROWER than it looks: it cannot catch "edited the
+            // bench, enlisted the old saved robot", because in that case there
+            // is nothing local to check the upload against. The server's real
+            // reason still reaches the MY ROBOTS row on the next ARENA open.
+            var bmPre = FindFirstObjectByType<BuilderManager>();
+            if (bmPre != null && ar.snapshot == bmPre.SnapshotString())
+            {
+                var pre = RobotSnapshot.Describe(bmPre, new SnapshotPayload { program = ar.program });
+                if (pre != null && !pre.legal && pre.failReasons.Count > 0)
+                {
+                    status = "not accepted — " + pre.failReasons[0];
+                    yield break;                       // nothing uploaded
+                }
+            }
+
             busy = true; status = "enlisting " + name + "…";
 
             SnapshotEnvelope env = null;
@@ -775,9 +818,9 @@ namespace RobotBrawl.Phase0
             {
                 GUILayout.Space(6);
                 GUILayout.Label("already on the ladder:");
+                // Same StatusText as the dock's row — one model, two renderers.
                 foreach (var m in mine)
-                    GUILayout.Label("  " + m.name
-                        + (m.CanFight ? "  " + m.category : "  waiting to be checked"));
+                    GUILayout.Label("  " + m.name + "  " + m.StatusText);
             }
         }
 

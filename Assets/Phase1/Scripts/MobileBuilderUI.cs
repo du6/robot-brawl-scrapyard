@@ -2768,10 +2768,19 @@ public class MobileBuilderUI : MonoBehaviour
             t.gameObject.AddComponent<LayoutElement>().minHeight = 20f;
             foreach (var m in arenaScreen.MyRobots)
             {
+                // StatusText lives on MyRobot so this row and ArenaScreen's
+                // OnGUI copy cannot drift. It used to say "waiting to be
+                // checked" for a REJECTED robot as well as a pending one,
+                // forever, because the server sent nothing that told them apart.
                 var r = MkText("mine_" + m.id, arenaAccountContent,
-                    "   " + m.name + (m.CanFight ? "   ·   " + m.category : "   ·   waiting to be checked"),
+                    "   " + m.name + "   ·   " + m.StatusText,
                     13, TextAnchor.MiddleLeft);
-                r.color = m.CanFight ? new Color(0.82f, 0.88f, 0.96f) : new Color(0.72f, 0.74f, 0.66f);
+                // Amber for a refusal — it is the one state the player can act
+                // on, and it must not read as the same "still waiting" grey it
+                // was indistinguishable from until now.
+                r.color = m.CanFight  ? new Color(0.82f, 0.88f, 0.96f)
+                        : m.Rejected  ? new Color(1.00f, 0.75f, 0.30f)
+                                      : new Color(0.72f, 0.74f, 0.66f);
                 r.gameObject.AddComponent<LayoutElement>().minHeight = 20f;
             }
         }
