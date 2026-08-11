@@ -1,0 +1,68 @@
+ReturningPlayerBench — 2026-08-10, against a local API on http://localhost:5099
+
+Run twice ON PURPOSE. A regression test nobody has seen fail is a hope, not a
+test, so the gate it guards (MobileBuilderUI.arenaFetchAt) was disabled, the
+bench run, and the gate restored.
+
+=========================================================================
+WITH the refetch gate — 22 passed, 0 failed, 0 skipped
+=========================================================================
+      server: http://localhost:5099
+PASS  the API answers
+      pound-for-pound board holds 30 row(s)
+PASS  the autosave hold is COUNTED, not a boolean anyone can stamp on
+== A. the first session ==
+PASS  an account can be created
+PASS  the first session enlists a robot and a worker validates it (FEATHER)
+== B. signing back in ==
+PASS  signing out clears the token
+PASS  the WRONG password is refused -- HTTP/1.1 401 Unauthorized
+PASS  …and a refused login leaves you signed OUT, holding no token
+PASS  a RETURNING player can sign back in with the same credentials
+PASS  …and the server hands back who they are (Returning Player)
+PASS  the returning session still owns the robot the first session enlisted
+== C. leaving the ARENA and coming back ==
+PASS  the mobile dock attaches
+PASS  opening the ARENA tab builds the ladder screen
+PASS  …and it loads the board once on first open
+PASS  the first session's own robot is on the board it is looking at
+      board on first open: 27 row(s) in FEATHER
+PASS  re-entering within the window spends NO request (1 vs 1)
+      rival RivalBot-001226-5941 category=FEATHER  visible on the public
+      FEATHER board: True  (board holds 28)
+      waiting 21.5s — the dock's refetch window
+PASS  coming back after the window REFETCHES the board (1 -> 2)
+PASS  the row that landed SERVER-SIDE while the player was away is now on
+      their board
+== D. owner state ==
+PASS  career state was restored in a finally, not on the happy path
+PASS  Career.Data is the object it was before
+PASS  Career.active is what it was, restored not assumed
+PASS  the autosave hold was released — count is back to 0
+PASS  the bay is byte-identical to before the bench
+===== passed 22  failed 0  skipped 0 =====
+
+=========================================================================
+WITHOUT it (the `arenaScreen.RefreshNow()` branch short-circuited to
+`false &&`, nothing else changed) — 20 passed, 2 failed
+=========================================================================
+== C. leaving the ARENA and coming back ==
+PASS  re-entering within the window spends NO request (1 vs 1)
+      rival RivalBot-001046-1284 category=FEATHER  visible on the public
+      FEATHER board: True  (board holds 26)
+      waiting 21.5s — the dock's refetch window
+FAIL  coming back after the window REFETCHES the board (1 -> 1)
+FAIL  the row that landed SERVER-SIDE while the player was away is now on
+      their board
+===== passed 20  failed 2  skipped 0 =====
+
+Note the shape of the failure: 1 -> 1. Not an error, not an exception, not a
+wrong number — the dock simply never asked. That is what the defect looked
+like to every other bench in this project, which is why none of them saw it.
+
+-------------------------------------------------------------------------
+Owner state, either side of both runs and of every play session today:
+  md5   18614d0e6603869f28fb65992b7d1484
+  size  5438
+  mtime 1786354063
+Unchanged, mtime included — the save was never written.
