@@ -629,6 +629,70 @@ public class PillarHazard : HazardBase
     public override bool Dangerous { get { return false; } }
     public void Build()
     {
+        // ⚠ THE COLLIDER IS ADDED EXPLICITLY, AND THAT IS A FIX, NOT A STYLE
+        // CHOICE — 2026-08-10. Read this before "simplifying" it back to
+        // Prim(..., collider: true).
+        //
+        // GameObject.CreatePrimitive(PrimitiveType.Cylinder) attaches a
+        // CAPSULECOLLIDER — the cylinder is the odd primitive out (Cube→Box,
+        // Sphere→Sphere, Plane→Mesh). So this pillar's collider used to arrive
+        // implicitly, and NO managed code anywhere named the type. With
+        // stripEngineCode: 1 the engine stripper therefore dropped the class,
+        // and the built player could not create one:
+        //
+        //     Can't add component because class 'CapsuleCollider' doesn't exist!
+        //
+        // Measured in the shipped Xcode export rather than guessed —
+        // build/ios/Il2CppOutputProject/Source/il2cppOutput/UnityClassRegistration.cpp
+        // registers BoxCollider, Collider, MeshCollider and SphereCollider
+        // under "Physics" and NOT CapsuleCollider. Device and simulator builds
+        // both. The other hazards survive because their damage volumes are
+        // explicit AddComponent<BoxCollider>() calls, and BoxCollider is named
+        // in managed code.
+        //
+        // WHAT IT COST: this is the ONLY cylinder in the project that keeps its
+        // collider (every other one is decoration and destroys it), so on
+        // device the pillars were NOT SOLID and robots drove through them —
+        // silently, with no exception beyond the log spam. The yard is L1
+        // "Scrapyard Open", the first league in the game, and the league card
+        // advertises its hazard as "pillars": the app promised an obstacle it
+        // did not have, in the first fights every new player sees.
+        //
+        // WHY NO BENCH CAUGHT IT: HazardBench is green at 23/23 in the EDITOR,
+        // and the editor does not strip. This class of defect is invisible to
+        // every bench in this project by construction — it can only be seen in
+        // a built player.
+        //
+        // THE FIX LIVES IN Assets/link.xml, which preserves
+        // UnityEngine.CapsuleCollider so the stripper cannot drop it. This call
+        // is therefore UNCHANGED — `collider: true` still means "the primitive's
+        // own capsule is this pillar's real collider".
+        //
+        // ⚠ AN EXPLICIT AddComponent<CapsuleCollider>() HERE WAS TRIED FIRST AND
+        // IS WORSE. It is the obvious fix — a managed reference to the type,
+        // right where the bug bites — and it was measured rather than assumed,
+        // which is the only reason these two faults were found:
+        //
+        //   1. THE DEFAULTS DO NOT MATCH. Measured in the editor against a
+        //      primitive-supplied capsule:
+        //          primitive-supplied    r=0.5 h=2 dir=1  bounds (0.60, 1.00, 0.60)
+        //          AddComponent default  r=0.5 h=1 dir=1  bounds (0.60, 0.60, 0.60)
+        //      CreatePrimitive's capsule is height 2; a bare AddComponent is
+        //      height 1. Taking the defaults gives the pillar a collider 60% of
+        //      its own height — a quieter version of this same bug, and one that
+        //      looks perfectly correct in every screenshot.
+        //   2. IT NEEDS `collider: false`, AND THAT RELIES ON Object.Destroy.
+        //      Destroy is deferred to end of frame in play mode and is a NO-OP in
+        //      edit mode, so the pillar carries TWO overlapping capsules for a
+        //      frame at runtime and permanently under any edit-mode caller —
+        //      measured, 2 colliders per pillar, 4 across the yard.
+        //
+        // link.xml has neither problem: the primitive keeps supplying a capsule
+        // that is correctly sized by construction and cannot drift from the mesh,
+        // there is exactly one collider in every mode, and preservation is the
+        // documented mechanism rather than a reliance on the linker noticing a
+        // type reference. The cost is that the reason lives in another file,
+        // which is what this comment is for. link.xml names this line.
         Prim(PrimitiveType.Cylinder, transform, new Vector3(0f, 0.5f, 0f),
              new Vector3(0.6f, 0.5f, 0.6f), new Color(0.45f, 0.42f, 0.38f, 1f), true);
     }

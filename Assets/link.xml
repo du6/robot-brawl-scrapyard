@@ -1,0 +1,70 @@
+<!--
+  WHY THIS FILE EXISTS — 2026-08-10.
+
+  ProjectSettings has stripEngineCode: 1, so Unity registers only the native
+  engine classes it can SEE referenced. UnityEngine.CapsuleCollider is never
+  named by any line of managed code in this project, and it was therefore
+  stripped from every player build. Measured in the shipped Xcode export
+  rather than inferred:
+
+      build/ios/Il2CppOutputProject/Source/il2cppOutput/UnityClassRegistration.cpp
+
+  registers BoxCollider, Collider, MeshCollider and SphereCollider under
+  "Physics" — and no CapsuleCollider. Device and simulator builds alike. The
+  built app then said, from first launch, before any input, repeatedly:
+
+      Can't add component because class 'CapsuleCollider' doesn't exist!
+
+  IT IS REQUESTED BECAUSE OF A UNITY QUIRK. GameObject.CreatePrimitive(
+  PrimitiveType.Cylinder) attaches a CAPSULECOLLIDER — the cylinder is the odd
+  primitive out (Cube -> Box, Sphere -> Sphere, Plane -> Mesh). So the type is
+  demanded only at runtime and is invisible to a source grep, which is why this
+  looked like a phantom for a day. There are 33 live CreatePrimitive(Cylinder)
+  sites: PartVisualFactory (25), ArenaHazards (6), BuilderManager (2).
+
+  MOST OF THOSE 33 ARE HARMLESS NOISE — PartVisualFactory.Deco and the
+  decorative ArenaHazards.Prim(..., collider: false) sites destroy the collider
+  on the next line, and with the class stripped GetComponent returns null and
+  Destroy(null) is a no-op, so the end state is identical.
+
+  ONE IS NOT NOISE, AND IT IS WHY THIS FILE IS A FIX RATHER THAN A MUTE:
+
+      ArenaHazards.cs, PillarHazard.Build() — Prim(..., collider: true)
+      "Static pillar: an obstacle, never a damager. Real collider."
+
+  It is the only cylinder in the project that KEEPS its collider. Without this
+  preservation the yard's two pillars are created with no collider at all and
+  robots drive straight through them — silently, with no exception beyond the
+  spam above. The yard is L1 "Scrapyard Open", the FIRST league in the game, and
+  ArenaHazards.Summary("yard") returns the literal string "pillars", which the
+  league card renders: the app advertised an obstacle it did not have, in the
+  first fights every new player sees.
+
+  WHY NO BENCH CAUGHT IT: HazardBench is 23/23 green in the EDITOR, and the
+  editor does not strip engine code. This class of defect is invisible to every
+  bench in this project by construction — it can only be seen in a built player.
+
+  WHY NOT AN EXPLICIT AddComponent<CapsuleCollider>() IN PillarHazard: it was
+  tried first and measured, and it is worse on two counts. Unity's default
+  capsule is height 1 while CreatePrimitive's is height 2, so the pillar would
+  silently get a collider 60% of its height; and it requires collider: false,
+  whose Object.Destroy is deferred in play mode and a no-op in edit mode,
+  leaving two overlapping capsules. The numbers are in PillarHazard's comment.
+
+  HOW TO VERIFY THIS IS WORKING: after a build, that generated
+  UnityClassRegistration.cpp must contain
+
+      RegisterUnityClass<CapsuleCollider>("Physics");
+
+  If it does not, this file is not being picked up and the pillars are hollow
+  again. That check is the whole point; a green editor bench cannot replace it.
+
+  SCOPE: deliberately one type. This is not a blanket "preserve physics" — the
+  other collider types are named in managed code and survive on their own, and
+  a broad preserve would hide the next instance of exactly this bug.
+-->
+<linker>
+  <assembly fullname="UnityEngine.PhysicsModule">
+    <type fullname="UnityEngine.CapsuleCollider" preserve="all" />
+  </assembly>
+</linker>
