@@ -1270,7 +1270,35 @@ public class MobileBuilderUI : MonoBehaviour
         // says `own N` for the total. Two different numbers in the same bare
         // ownership language read as a bug, so this one now says what it is.
         int stock = bm.CareerRemaining(i);
-        if (stock >= 0) t += "  " + Mathf.Max(0, stock) + " free";
+        if (stock >= 0)
+        {
+            t += "  " + Mathf.Max(0, stock) + " free";
+            // ⚠ "0 free" WAS A LIE FOR A PART YOU OWN IN ANOTHER MATERIAL —
+            // 2026-08-10. CareerRemaining is keyed on the material the SELECTOR
+            // is set to, so an owned Steel wedge read "Wedge 28 kg 0 free" with
+            // the chips on Aluminum — the 28 kg confirming which key was
+            // consulted. Measured on device; same effect on the ABS armour
+            // plate. This is Career.ResolveMat's documented shape (":129-135",
+            // the four wheels a new player owned and could not see) surfacing
+            // in the palette BADGE rather than the grant path.
+            //
+            // The badge is the half that lies, so the badge is the half fixed.
+            // The GREY stays: it answers "can I place this right now", and the
+            // honest answer in the wrong material is still no. Ungreying would
+            // make an unplaceable tile look placeable, which trades one wrong
+            // signal for another — and a third intermediate tint is a design
+            // decision nobody asked for. The badge now names the remedy instead.
+            if (stock == 0 && bm.PartPinnedMat(i) == null)
+            {
+                string cur = MatDB.Canon(bm.PartMatKey(i));
+                foreach (var m in MatDB.Order)
+                {
+                    if (MatDB.Canon(m) == cur) continue;
+                    int other = bm.CareerRemainingMat(i, m);
+                    if (other > 0) { t += " · " + other + " in " + MatDB.Get(m).name; break; }
+                }
+            }
+        }
         return t;
     }
 
