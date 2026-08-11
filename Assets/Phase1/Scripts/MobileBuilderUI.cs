@@ -117,6 +117,35 @@ public class MobileBuilderUI : MonoBehaviour
     readonly List<Button> arenaCatBtns = new List<Button>();
     LayoutElement arenaCatLE;
     int arenaBoardStamp = -1;   // rebuild the rows only when the board changes
+    // ⚠ REPAINTING IS NOT REFETCHING — the ARENA's launch blocker, 2026-08-10.
+    //
+    // Opening the tab did `arenaBoardStamp = -1; RefreshArena();`, which forces
+    // a REDRAW of the model ArenaScreen already holds. The only thing that ever
+    // asked the server anything was ArenaScreen.Start(), which runs ONCE, on
+    // first open. So the board a player saw the first time they opened the
+    // ARENA was the board they saw for the rest of the session — on a screen
+    // whose entire premise is "enlist, go away, come back and see what
+    // happened". Matches settled, ratings moved, challenges arrived, and the
+    // dock showed none of it.
+    //
+    // The gate is elapsed REALTIME, not a frame count or a stamp, because the
+    // thing being rationed is a network request and the thing that triggers it
+    // is a human hand: flicking BUILD/ARENA/BUILD must not fire three GETs, and
+    // coming back from a fight must not show yesterday's board. 20 s is chosen
+    // to sit well inside the worker's 5-minute scheduling period — anything
+    // that landed server-side while you were away is at least a scheduler
+    // period old, so a refetch on any real return is not merely cheap, it is
+    // the only way to see it.
+    //
+    // RefreshNow() already no-ops while a fetch is in flight; there is no
+    // second guard here on purpose. Two places deciding whether the ladder is
+    // busy is how they come to disagree.
+    //
+    // The window is PUBLIC so ReturningPlayerBench waits on the product's own
+    // number instead of a copy of it. Two constants that have to agree, kept in
+    // two files, is the shape of half the bugs in this repo.
+    float arenaFetchAt = -999f;
+    public const float ARENA_REFETCH_S = 20f;
     // Surface 2: the scouting card and the challenge flow. It replaces the
     // board list rather than floating over it — the dock has one column and a
     // card that covers the thing it came from is how you lose your place.
@@ -1596,6 +1625,27 @@ public class MobileBuilderUI : MonoBehaviour
         ShowTab(tab);
     }
 
+    /// <summary>Give the dock back after WATCH closed it.
+    ///
+    /// ⚠ THIS IS NOT A PLAYER RETURNING TO THE ARENA, and the difference is
+    /// one line. They never left — the dock closed itself so the replay was not
+    /// played behind an opaque panel — and watching a recording changes nothing
+    /// server-side, so this must not spend a refetch.
+    ///
+    /// It did, and it was measured: a 30-second replay outlasts the 20-second
+    /// window, so reopening fired a GET whose "28 ranked" landed on top of
+    /// "replay finished" about 200 ms later. Exactly the failure DoEnlist
+    /// carries two comments about — a status line with two writers and no
+    /// ordering rule loses, every time, the message that mattered.
+    ///
+    /// Claiming the window rather than adding a suppress flag: the same one
+    /// assignment already means "a fetch has just happened, do not chase it".</summary>
+    public void ReopenDockAfterReplay()
+    {
+        arenaFetchAt = Time.realtimeSinceStartup;
+        SetDockOpen(true);
+    }
+
     /// <summary>True when the content panel is showing. Read by the suite.</summary>
     public bool DockOpen { get { return dockOpen; } }
 
@@ -2370,10 +2420,48 @@ public class MobileBuilderUI : MonoBehaviour
         arenaSecLE.minHeight = TouchRow(); arenaSecLE.preferredHeight = TouchRow();
         var sh = secRow.AddComponent<HorizontalLayoutGroup>();
         sh.spacing = 4f; sh.childForceExpandWidth = true; sh.childForceExpandHeight = true;
+        // ⚠ SIGNED OUT, TWO OF THESE THREE CANNOT WORK — and they used to look
+        // exactly like the one that can. RefreshArena's view precedence forces
+        // the ACCOUNT surface whenever `!LadderClient.SignedIn`, so a signed-out
+        // tap on THE BOARD or MY FIGHTS set the flag, got overruled on the very
+        // next frame, and changed NOTHING on screen: a live-looking button that
+        // silently ate the tap. The player's reasonable reading is that the tab
+        // is broken.
+        //
+        // owen, 2026-08-03: "whenever a button is disabled, it should show hint
+        // to user on why it is disabled." Same answer as the SHOP's SELL — keep
+        // the slot, keep the label, read DEAD, and say why when tapped. The
+        // saying-why is not optional; a dead button with no explanation is the
+        // unexplained gap that rule was written against.
         arenaSecBoard = MkButton("arenasec_board", secRow.transform, "THE BOARD", 14,
-            () => { if (arenaScreen != null) { arenaScreen.ShowInbox = false; arenaScreen.CloseCard(); arenaBoardStamp = -1; } });
+            () =>
+            {
+                if (arenaScreen == null) return;
+                if (!LadderClient.SignedIn)
+                {
+                    // SC_ACCOUNT, because the account panel is the ONLY surface
+                    // on screen while signed out and §2.4's renderer shows the
+                    // line only on the surface that wrote it. Any other scope
+                    // here is a message nobody can read.
+                    arenaScreen.SetStatus("sign in first — the board opens once you have an account.",
+                                          ArenaScreen.SC_ACCOUNT);
+                    return;
+                }
+                arenaScreen.ShowInbox = false; arenaScreen.CloseCard(); arenaBoardStamp = -1;
+            });
         arenaSecInbox = MkButton("arenasec_inbox", secRow.transform, "MY FIGHTS", 14,
-            () => { if (arenaScreen != null) { arenaScreen.ShowInbox = true; arenaScreen.ShowEnlistPanel = false; arenaScreen.CloseCard(); arenaInboxStamp = ""; } });
+            () =>
+            {
+                if (arenaScreen == null) return;
+                if (!LadderClient.SignedIn)
+                {
+                    arenaScreen.SetStatus("sign in first — your fights are tied to an account.",
+                                          ArenaScreen.SC_ACCOUNT);
+                    return;
+                }
+                arenaScreen.ShowInbox = true; arenaScreen.ShowEnlistPanel = false;
+                arenaScreen.CloseCard(); arenaInboxStamp = "";
+            });
         arenaSecAccount = MkButton("arenasec_account", secRow.transform, "ENLIST", 14,
             () => { if (arenaScreen != null) { arenaScreen.ShowEnlistPanel = true; arenaScreen.ShowInbox = false; arenaScreen.CloseCard(); arenaAccountStamp = ""; } });
 
@@ -2496,9 +2584,20 @@ public class MobileBuilderUI : MonoBehaviour
     /// <summary>A labelled text field, the dock's way. `secret` switches the
     /// InputField to Password content type, which masks it — and the value is
     /// pushed OUT to the caller and never read back, so nothing here ever
-    /// holds what was typed.</summary>
+    /// holds what was typed.
+    ///
+    /// <paramref name="hint"/> is the placeholder, and it is a PARAMETER rather
+    /// than a constant for one specific reason: MkInput exists, does exactly
+    /// this, and has "robot name…" hard-coded into it. Calling MkInput here
+    /// would have shipped "robot name…" inside the PASSWORD box. The lines are
+    /// copied; the string is not.
+    ///
+    /// ⚠ STILL WRITE-ONLY. The placeholder and the border are paint. Nothing
+    /// added here reads `fin.text` back, and nothing may: this field carries
+    /// the password, ArenaScreen.SetPassword is a one-way push, and a getter
+    /// here is one screenshot or one log line away from leaking it.</summary>
     InputField ArenaField(Transform parent, string label, string initial,
-                          bool secret, System.Action<string> onChanged)
+                          bool secret, string hint, System.Action<string> onChanged)
     {
         var row = MkPanel("field_" + label, parent, new Color(0f,0f,0f,0f));
         var rle = row.AddComponent<LayoutElement>();
@@ -2511,13 +2610,22 @@ public class MobileBuilderUI : MonoBehaviour
         lbl.color = new Color(0.74f, 0.80f, 0.90f);
         lbl.gameObject.AddComponent<LayoutElement>().minWidth = 92f;
 
-        var boxGO = MkPanel("box", row.transform, new Color(0.06f,0.07f,0.09f,1f));
+        GameObject fill;
+        var boxGO = MkFieldBox("box", row.transform, out fill);
         boxGO.AddComponent<LayoutElement>().flexibleWidth = 1f;
-        var txt = MkText("lbl", boxGO.transform, "", 14, TextAnchor.MiddleLeft);
+        var txt = MkText("lbl", fill.transform, "", 14, TextAnchor.MiddleLeft);
         Stretch(txt.rectTransform);
         txt.rectTransform.offsetMin = new Vector2(8f, 0f); txt.rectTransform.offsetMax = new Vector2(-8f, 0f);
+        var ph = MkText("ph", fill.transform, hint ?? "", 14, TextAnchor.MiddleLeft);
+        Stretch(ph.rectTransform);
+        ph.rectTransform.offsetMin = new Vector2(8f, 0f); ph.rectTransform.offsetMax = new Vector2(-8f, 0f);
+        ph.color = new Color(1f, 1f, 1f, 0.35f);
         var fin = boxGO.AddComponent<InputField>();
+        // textComponent and placeholder BEFORE text: setting text is what makes
+        // InputField decide whether the placeholder shows, so a placeholder
+        // assigned afterwards starts out visible under a pre-filled value.
         fin.textComponent = txt;
+        fin.placeholder = ph;
         fin.text = initial ?? "";
         if (secret) fin.contentType = InputField.ContentType.Password;
         fin.onValueChanged.AddListener(s => { if (onChanged != null) onChanged(s); });
@@ -2555,11 +2663,14 @@ public class MobileBuilderUI : MonoBehaviour
             head.gameObject.AddComponent<LayoutElement>().minHeight = 26f;
 
             ArenaField(arenaAccountContent, "email", arenaScreen.Email, false,
+                       "you@example.com",
                        s => { if (arenaScreen != null) arenaScreen.Email = s; });
             ArenaField(arenaAccountContent, "password", "", true,
+                       "password",
                        s => { if (arenaScreen != null) arenaScreen.SetPassword(s); });
             if (arenaScreen.Registering)
                 ArenaField(arenaAccountContent, "display name", arenaScreen.DisplayName, false,
+                           "what the board calls you",
                            s => { if (arenaScreen != null) arenaScreen.DisplayName = s; });
 
             var row = MkPanel("accbtns", arenaAccountContent, new Color(0f,0f,0f,0f));
@@ -2619,6 +2730,7 @@ public class MobileBuilderUI : MonoBehaviour
             sending.gameObject.AddComponent<LayoutElement>().minHeight = 22f;
 
             ArenaField(arenaAccountContent, "ladder name", arenaScreen.EnlistName, false,
+                       ar.name ?? "your robot's name",
                        s => { if (arenaScreen != null) arenaScreen.EnlistName = s; });
 
             var rule = MkText("enlistrule", arenaAccountContent,
@@ -2741,8 +2853,37 @@ public class MobileBuilderUI : MonoBehaviour
             if (m.replayUrls.Count > 0)
             {
                 var mm = m;
+                // ⚠ THE DOCK CLOSES BEFORE THE REPLAY STARTS, and the order of
+                // these three lines is the whole fix.
+                //
+                // ArenaScreen.Watch attaches the camera to the fight, so the
+                // replay was rendering behind an opaque dock panel: the player
+                // pressed WATCH, the status line said "playing X vs Y", and
+                // they looked at MY FIGHTS for the length of the bout. Nothing
+                // about it read as broken, which is why it survived.
+                //
+                // CLOSE FIRST, then call. StartCoroutine runs a coroutine's
+                // body up to its first yield SYNCHRONOUSLY, so Watch's
+                // early-outs — no replay, failed download — fire inside
+                // WatchNow. Closing afterwards would slam the dock shut again
+                // right after Watch had reopened it, and a failed download
+                // would strand the player on an empty arena with no control on
+                // screen. Closing first means every one of those exits runs
+                // with the dock already shut and reopens it for real.
+                //
+                // The dock HANDLE stays live while it is closed (it always
+                // does), so a long replay is still escapable by hand — which is
+                // the only way to reach STOP while the panel is down.
                 var wb = MkButton("inboxwatch_" + i, row.transform, "WATCH", 13,
-                                  () => { if (arenaScreen != null) { arenaScreen.WatchNow(mm); arenaInboxStamp = ""; } });
+                                  () =>
+                                  {
+                                      if (arenaScreen == null) return;
+                                      SetDockOpen(false);
+                                      // Refused (already busy): nothing will
+                                      // ever reopen it, so undo our own half.
+                                      if (!arenaScreen.WatchNow(mm)) SetDockOpen(true);
+                                      arenaInboxStamp = "";
+                                  });
                 wb.gameObject.AddComponent<LayoutElement>().minWidth = 86f;
                 wb.GetComponent<Image>().color = new Color(0.20f,0.45f,0.65f,1f);
             }
@@ -2935,9 +3076,14 @@ public class MobileBuilderUI : MonoBehaviour
         if (arenaCatRow != null && arenaCatRow.activeSelf != onBoard)
             arenaCatRow.SetActive(onBoard);
 
-        TintSection(arenaSecBoard, onBoard);
-        TintSection(arenaSecInbox, onInbox);
-        TintSection(arenaSecAccount, onAccount);
+        // Signed out, only the ACCOUNT section is reachable — the other two are
+        // overruled by the precedence above no matter what they are set to, so
+        // they must not look otherwise. Signed in, all three are live and this
+        // is exactly the call it was before.
+        bool secLive = LadderClient.SignedIn;
+        TintSection(arenaSecBoard, onBoard, secLive);
+        TintSection(arenaSecInbox, onInbox, secLive);
+        TintSection(arenaSecAccount, onAccount, true);
 
         if (onCard) { RefreshArenaCard(); return; }
         if (onAccount)
@@ -3105,13 +3251,25 @@ public class MobileBuilderUI : MonoBehaviour
         else RefreshShop();
     }
 
-    void TintSection(Button b, bool on)
+    void TintSection(Button b, bool on) { TintSection(b, on, true); }
+
+    /// <summary>Selected / unselected / DEAD, in one place. `live` is the third
+    /// state and it is not the same as "unselected": an unselected section is
+    /// somewhere you can go, a dead one is somewhere you cannot, and painting
+    /// them the same is what made the signed-out ARENA look functional. Dead
+    /// borrows the SHOP's gate palette rather than inventing a fourth grey —
+    /// one vocabulary for "you cannot do this yet" across the whole dock.</summary>
+    void TintSection(Button b, bool on, bool live)
     {
         if (b == null) return;
         var img = b.GetComponent<Image>();
-        if (img != null) img.color = on ? new Color(0.20f,0.45f,0.65f,1f) : new Color(0.16f,0.17f,0.21f,1f);
+        if (img != null)
+            img.color = !live ? GATE_DEAD
+                      : on ? new Color(0.20f,0.45f,0.65f,1f) : new Color(0.16f,0.17f,0.21f,1f);
         var t = b.GetComponentInChildren<Text>();
-        if (t != null) t.color = on ? Color.white : new Color(0.72f,0.78f,0.88f);
+        if (t != null)
+            t.color = !live ? GATE_TXT_DEAD
+                    : on ? Color.white : new Color(0.72f,0.78f,0.88f);
     }
 
     /// <summary>Wallet THEN catalogue, both before drawing. Affordability greys
@@ -3205,12 +3363,19 @@ public class MobileBuilderUI : MonoBehaviour
         vh.padding = new RectOffset(8,6,2,2);
         var vlbl = MkText("lbl", vrow.transform, "move ladder scrap to career", 13, TextAnchor.MiddleLeft);
         vlbl.gameObject.AddComponent<LayoutElement>().flexibleWidth = 1f;
-        var fieldGO = MkPanel("cos_deposit_field", vrow.transform, new Color(0.06f,0.07f,0.09f,1f));
+        // Same box, same reason: this one sat at 1.22:1 against the green
+        // deposit row and was the second-hardest field in the dock to see.
+        // A player who cannot find the box cannot spend what they won.
+        GameObject ffill;
+        var fieldGO = MkFieldBox("cos_deposit_field", vrow.transform, out ffill);
         fieldGO.AddComponent<LayoutElement>().minWidth = 90f;
-        var ftxt = MkText("lbl", fieldGO.transform, "", 14, TextAnchor.MiddleCenter);
+        var ftxt = MkText("lbl", ffill.transform, "", 14, TextAnchor.MiddleCenter);
         Stretch(ftxt.rectTransform);
+        var fph = MkText("ph", ffill.transform, "amount", 14, TextAnchor.MiddleCenter);
+        Stretch(fph.rectTransform);
+        fph.color = new Color(1f, 1f, 1f, 0.35f);
         var fin = fieldGO.AddComponent<InputField>();
-        fin.textComponent = ftxt; fin.text = depositText ?? "";
+        fin.textComponent = ftxt; fin.placeholder = fph; fin.text = depositText ?? "";
         fin.contentType = InputField.ContentType.IntegerNumber;
         fin.onValueChanged.AddListener(s => depositText = s);
         var dbtn = MkButton("cos_deposit_go", vrow.transform, "TO CAREER", 13,
@@ -3461,6 +3626,60 @@ public class MobileBuilderUI : MonoBehaviour
             mr.sellT.color = canSell ? GATE_TXT_LIVE : GATE_TXT_DEAD;
             mr.sell.GetComponent<Image>().color = canSell ? GATE_LIVE : GATE_DEAD;
         }
+    }
+
+    // ---- an input box you can SEE before you touch it --------------------
+    //
+    // ⚠ THE FILL ALONE DOES NOT DO IT, and the arithmetic is the reason.
+    // The ARENA's fields were `MkPanel("box", …, 0.06,0.07,0.09)` sitting on
+    // the dock, whose own background is `0.06,0.07,0.09` under a 15%-black
+    // viewport — so the box and the space around it were the SAME COLOUR:
+    //
+    //     field  (0.06,0.07,0.09)              relative luminance 0.00593
+    //     behind (0.051,0.0595,0.0765)         relative luminance 0.00480
+    //     ratio  (0.00593+0.05)/(0.00480+0.05)                  = 1.02:1
+    //
+    // which is exactly what the UX review measured. The floor for the boundary
+    // of an interactive control is 3:1 (WCAG 1.4.11 non-text contrast).
+    //
+    // Lifting the fill to MkInput's `0.13,0.14,0.18` — the obvious fix, and the
+    // one first prescribed — gets 0.01766, i.e. **1.23:1**. Still nowhere near.
+    // It cannot get there: any fill dark enough to read white text on is too
+    // dark to separate from a dark dock. So the boundary is carried by a
+    // BORDER, which is the thing the 3:1 rule is actually about:
+    //
+    //     border (0.42,0.44,0.50)              relative luminance 0.16311
+    //     vs the dock behind it                                 = 3.89:1  ✓
+    //     vs the fill inside it                                 = 3.15:1  ✓
+    //     vs the SHOP's green deposit row (0.098,0.155,0.127)   = 3.13:1  ✓
+    //
+    // Both adjacent colours clear the floor at both sites, which is what the
+    // rule asks and what a single lifted fill could not have given. The fill
+    // still moves to 0.13,0.14,0.18 so these boxes look like every other input
+    // in the dock — that part of the prescription was right, it was just not
+    // sufficient on its own.
+    //
+    // Implemented as two panels rather than an outline sprite because this dock
+    // builds everything from code and owns no sprite: the outer panel IS the
+    // border and the inner one, inset by 2, is the fill.
+    static readonly Color FIELD_FILL   = new Color(0.13f, 0.14f, 0.18f, 1f);
+    static readonly Color FIELD_BORDER = new Color(0.42f, 0.44f, 0.50f, 1f);
+    const float FIELD_BORDER_PX = 2f;
+
+    /// <summary>The box half of a text field. Returns the OUTER panel — that is
+    /// the one to hang the InputField and the LayoutElement on — and hands back
+    /// the inner fill through <paramref name="fill"/>, which is what the text
+    /// and placeholder must be parented to (UGUI puts the caret under the text
+    /// component's parent, so it has to be inside the border).</summary>
+    GameObject MkFieldBox(string name, Transform parent, out GameObject fill)
+    {
+        var border = MkPanel(name, parent, FIELD_BORDER);
+        fill = MkPanel("fill", border.transform, FIELD_FILL);
+        var frt = fill.GetComponent<RectTransform>();
+        Stretch(frt);
+        frt.offsetMin = new Vector2(FIELD_BORDER_PX, FIELD_BORDER_PX);
+        frt.offsetMax = new Vector2(-FIELD_BORDER_PX, -FIELD_BORDER_PX);
+        return border;
     }
 
     InputField MkInput(string name, Transform parent)
@@ -3798,6 +4017,13 @@ public class MobileBuilderUI : MonoBehaviour
     /// instead of the screen.</summary>
     public void TestShowTab(int i) { ShowTab(i); }
     public int TestTab { get { return tab; } }
+    /// <summary>The ladder model behind the ARENA tab, or null before the tab
+    /// has ever been opened. A seam, not a shortcut: whether re-entering the
+    /// tab REFETCHES is a property of this dock's ShowTab and is only visible
+    /// as ArenaScreen.TestRefreshes moving. Without it a harness can read the
+    /// board's contents and learn nothing — a stale board and a freshly
+    /// reloaded identical board look exactly the same.</summary>
+    public ArenaScreen TestArenaScreen { get { return arenaScreen; } }
     /// <summary>PARTS (0) or COSMETICS (1) within the one SHOP tab. A seam,
     /// not a shortcut: the cosmetics shelf is a network read behind a section
     /// button, and a harness that cannot reach it is a harness that will keep
@@ -3842,11 +4068,13 @@ public class MobileBuilderUI : MonoBehaviour
         // component itself is the switch, and disabling it stops its OnGUI.
         // Built on first open, never before — Start() hits the ladder API.
         bool wantArena = open && i == 4 && Career.active;
+        bool arenaJustBuilt = false;
         if (wantArena && arenaScreen == null)
         {
             var ago = new GameObject("arena_screen");
             ago.transform.SetParent(transform, false);
             arenaScreen = ago.AddComponent<ArenaScreen>();
+            arenaJustBuilt = true;
         }
         if (arenaScreen != null)
         {
@@ -3860,7 +4088,23 @@ public class MobileBuilderUI : MonoBehaviour
             arenaScreen.SuppressImgui = wantArena;
         }
         if (arenaPanel != null) arenaPanel.SetActive(wantArena);
-        if (wantArena) { arenaBoardStamp = -1; RefreshArena(); }
+        if (wantArena)
+        {
+            arenaBoardStamp = -1; RefreshArena();      // repaint what we hold…
+            // …and ASK THE SERVER, which is a different verb. See arenaFetchAt.
+            float now = Time.realtimeSinceStartup;
+            if (arenaJustBuilt)
+            {
+                // ArenaScreen.Start() is already fetching. Claiming the window
+                // rather than firing a second identical GET into it.
+                arenaFetchAt = now;
+            }
+            else if (arenaScreen != null && now - arenaFetchAt >= ARENA_REFETCH_S)
+            {
+                arenaFetchAt = now;
+                arenaScreen.RefreshNow();
+            }
+        }
 
         if (i == 3) { shopNote = ""; shopNoteBad = false; RefreshShop(); }
         if (robots) RefreshRobots();

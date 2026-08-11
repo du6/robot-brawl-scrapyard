@@ -106,8 +106,21 @@ namespace RobotBrawl.Phase0
             if (LadderClient.SignedIn) yield return Refresh();
         }
 
+        /// <summary>How many times Refresh() has actually STARTED. A harness
+        /// seam (the ProgramCanvas Test* precedent): the dock is supposed to
+        /// refetch when a player comes back to the ARENA and to stay quiet when
+        /// they flick in and out, and neither half is observable from the
+        /// board's CONTENTS — an unchanged board looks identical whether it was
+        /// refetched or never asked for. Counting the asks is the only way a
+        /// bench can tell "came back and reloaded" from "came back and showed
+        /// you a cached screen", which is precisely the defect that survived a
+        /// green suite. See ReturningPlayerBench.</summary>
+        public int TestRefreshes { get { return refreshes; } }
+        int refreshes;
+
         IEnumerator Refresh()
         {
+            refreshes++;
             busy = true; Say("loading the ladder…", SC_BOARD);
             yield return LadderClient.Leaderboard(Cats[catIndex], (rows, err) =>
             {
@@ -123,28 +136,53 @@ namespace RobotBrawl.Phase0
             busy = false;
         }
 
+        /// <summary>Give the dock back after a WATCH.
+        ///
+        /// ⚠ EVERY EXIT FROM Watch MUST COME THROUGH HERE, 2026-08-10. The
+        /// dock closes BEFORE the replay starts — otherwise the fight plays
+        /// behind an opaque panel and the player watches a UI — and the only
+        /// thing that can reopen it is this coroutine. The happy path is the
+        /// easy half; the ones that matter are the early-outs, because a
+        /// download that 404s used to leave the dock shut with the camera on an
+        /// empty arena and NO CONTROL ON SCREEN to get out of it. A failed
+        /// fetch must cost you a status line, not the game.
+        ///
+        /// Null-guarded because ArenaScreen.Open() runs this screen with no
+        /// dock at all; there the IMGUI never closed anything.</summary>
+        void RestoreDock()
+        {
+            if (MobileBuilderUI.inst != null) MobileBuilderUI.inst.ReopenDockAfterReplay();
+        }
+
         /// <summary>Fetch the recording and hand it to the game's own player.
         /// replayUrls[0] is the playable one — the worker puts the summary
         /// last precisely so this can take the first without checking.</summary>
         IEnumerator Watch(InboxEntry m)
         {
-            if (m.replayUrls.Count == 0) { Say("that match has no replay", SC_INBOX); yield break; }
+            // ⚠ RESTORE FIRST, THEN SPEAK — the DoEnlist rule, and the same
+            // trap. Reopening the dock runs ShowTab, and ShowTab is a writer of
+            // this status line; anything said before it is said into a message
+            // that is about to be overwritten.
+            if (m.replayUrls.Count == 0)
+            { RestoreDock(); Say("that match has no replay", SC_INBOX); yield break; }
             busy = true; Say("downloading the replay…", SC_INBOX);
-            string path = null;
+            string path = null, fetchErr = null;
             yield return LadderClient.FetchReplay(m.replayUrls[0], (p, err) =>
             {
-                if (err != null) Say("replay: " + err, SC_INBOX); else path = p;
+                if (err != null) fetchErr = err; else path = p;
             });
-            if (path == null) { busy = false; yield break; }
+            if (path == null)
+            { busy = false; RestoreDock(); Say("replay: " + (fetchErr ?? "no file"), SC_INBOX); yield break; }
 
             var bm = FindFirstObjectByType<BuilderManager>();
-            if (bm == null) { Say("no BuilderManager to play into", SC_INBOX); busy = false; yield break; }
+            if (bm == null)
+            { busy = false; RestoreDock(); Say("no BuilderManager to play into", SC_INBOX); yield break; }
             if (player != null) { player.Close(); player = null; }
             Say("playing " + m.myRobot + " vs " + m.opponent, SC_INBOX);
             // attachCamera:true — watching a fight you cannot see is not
             // watching it.
             player = ReplayPlayer.Play(bm, path, 1f, true,
-                                       p => { Say("replay finished", SC_INBOX); });
+                                       p => { RestoreDock(); Say("replay finished", SC_INBOX); });
             busy = false;
         }
 
@@ -327,8 +365,31 @@ namespace RobotBrawl.Phase0
 
         public void RefreshNow() { if (!busy) StartCoroutine(Refresh()); }
         public void ScoutNow(LadderEntry e) { if (!busy) StartCoroutine(Scout(e)); }
-        public void WatchNow(InboxEntry m) { if (!busy) StartCoroutine(Watch(m)); }
+
+        /// <summary>Start a replay. RETURNS WHETHER IT STARTED, and the caller
+        /// has to look: the dock closes itself before calling this so the fight
+        /// is not played behind a panel, and Watch is what reopens it. Refused
+        /// while busy, the coroutine never runs, nothing reopens the dock, and
+        /// the player is left staring at a closed dock over a still arena. The
+        /// bool is the caller's cue to undo its own half.</summary>
+        public bool WatchNow(InboxEntry m)
+        {
+            if (busy) return false;
+            StartCoroutine(Watch(m));
+            return true;
+        }
         public void CloseCard() { card = null; pending = false; }
+
+        /// <summary>Write the status line from a renderer. The dock owns
+        /// surfaces this class does not draw — the section switches, for one —
+        /// and a tap there that is refused has to be able to SAY SO on the one
+        /// status line, in the right SCOPE, or the refusal is silent.
+        ///
+        /// The scope is not decorative: §2.4's rule is that the line shows only
+        /// on the surface that wrote it. Signed out, the account panel is the
+        /// only surface on screen, so a refusal aimed at anything else must be
+        /// written as SC_ACCOUNT or nobody will ever read it.</summary>
+        public void SetStatus(string s, int scope) { Say(s, scope); }
 
         // ---- the challenge gate, in ONE place ------------------------------
         // Surface 2 of the port. The eligibility rule and its three DISTINCT
