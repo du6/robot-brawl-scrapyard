@@ -22,10 +22,31 @@
   looked like a phantom for a day. There are 33 live CreatePrimitive(Cylinder)
   sites: PartVisualFactory (25), ArenaHazards (6), BuilderManager (2).
 
-  MOST OF THOSE 33 ARE HARMLESS NOISE — PartVisualFactory.Deco and the
-  decorative ArenaHazards.Prim(..., collider: false) sites destroy the collider
-  on the next line, and with the class stripped GetComponent returns null and
-  Destroy(null) is a no-op, so the end state is identical.
+  MOST OF THOSE 33 ARE HARMLESS NOISE *TO THE SIMULATION* — PartVisualFactory.Deco
+  and the decorative ArenaHazards.Prim(..., collider: false) sites destroy the
+  collider on the next line, and with the class stripped GetComponent returns
+  null and Destroy(null) is a no-op, so the end state is identical.
+
+  ⚠ BUT THE NOISE IS NOT INVISIBLE, AND THIS IS THE PART THAT WAS GOT WRONG.
+  It was reasoned — from boot.config carrying player-connection lines on one
+  build and not the other — that Unity's on-screen console is a DEVELOPMENT
+  BUILD feature, and therefore that a release build would log quietly and no
+  tester would ever see this. THAT IS FALSE ON THIS il2cpp TARGET. Measured
+  2026-08-10 against the RELEASE build's installed bundle — boot.config with
+  ZERO player-connection lines, confirmed by process lineage and Editor.log —
+  the console appeared anyway: it is ERROR-TRIGGERED, not flag-gated.
+
+  So without this file, EVERY TESTER'S FIRST LAUNCH SHOWS RED ERROR TEXT OVER
+  THE PRODUCT, on any configuration, before they touch anything. That is the
+  difference between a clean first launch and a screen of red, and it is
+  recorded here precisely because the flag-gated assumption is the reasonable
+  one and the next person will make it too.
+
+  ⚠ AND IT INVERTS A GUARANTEE: "clean screen" now depends on the code logging
+  no errors rather than on a build setting. Any NEW error introduced anywhere
+  puts the console back over the product without a single build flag changing —
+  which is why a store capture must be checked on the FINAL build, immediately
+  before capturing, rather than inherited from an earlier verification.
 
   ONE IS NOT NOISE, AND IT IS WHY THIS FILE IS A FIX RATHER THAN A MUTE:
 
