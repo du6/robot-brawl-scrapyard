@@ -1006,21 +1006,49 @@ public class CareerSmoke : MonoBehaviour
         // check cannot: is it big enough to read, does it fit its box, and does
         // it fit without being cut off. It runs over whatever happens to be on
         // screen, so it covers controls nobody thought to name.
-        ui.SetDockOpen(true);
-        ui.TestShowTab(0);
-        yield return null; yield return null;
+        // ⚠ THIS SWEEP ONLY EVER SAW THE BUILD TAB, AND SAID SO NOWHERE — fixed
+        // 2026-08-10. It was `TestShowTab(0)` and then a scan of every ACTIVE
+        // label; every other tab's panel is inactive, so `activeInHierarchy`
+        // silently filtered five of the six tabs out. The check passed for
+        // months while measuring one screen.
+        //
+        // That is the same disease as the rest of this file's history: a check
+        // positioned where it cannot see the thing it checks. It is also a
+        // direct breach of house rule 1 — measure over EVERYTHING rather than
+        // over a named list — which is exactly what `ApplyTouchSizes` does
+        // wrong, and this sweep is supposed to be the thing that catches it.
+        //
+        // Now it walks all six tabs. Findings are PREFIXED WITH THE TAB, because
+        // "lbl(8.3pt)" tells you a label is too small and nothing about where to
+        // go and look at it.
+        //
+        // Every dock panel is gated on dockOpen, so SetDockOpen(true) is
+        // re-asserted inside the loop rather than once before it: a tab switch
+        // against a collapsed dock scans an empty screen and reports a clean
+        // pass, which is the failure this whole comment is about.
+        string[] tabName = { "BUILD", "LEAGUE", "ROBOTS", "SHOP", "ARENA", "PROGRAM" };
 
         float sfL = ui.CanvasScaleForTest;
         float pxPerPtL = UnityEngine.Device.Screen.dpi / 163f;
         string tooSmallTxt = "", overflowTxt = "", cutTxt = "";
         int scanned = 0;
+        string perTab = "";
+
+        for (int tabIx = 0; tabIx < tabName.Length; tabIx++)
+        {
+        ui.SetDockOpen(true);
+        ui.TestShowTab(tabIx);
+        yield return null; yield return null;
+
+        int scannedHere = 0;
         if (sfL > 0.01f && pxPerPtL > 0.01f)
         {
             foreach (var t in Object.FindObjectsByType<UnityEngine.UI.Text>(FindObjectsSortMode.None))
             {
                 if (!t.gameObject.activeInHierarchy || string.IsNullOrEmpty(t.text)) continue;
-                scanned++;
-                string who = t.transform.parent != null ? t.transform.parent.name : t.name;
+                scanned++; scannedHere++;
+                string who = tabName[tabIx] + ":"
+                           + (t.transform.parent != null ? t.transform.parent.name : t.name);
                 float pt = t.fontSize * sfL / pxPerPtL;
                 if (pt < 10.5f) tooSmallTxt += who + "(" + pt.ToString("F1") + "pt) ";
                 bool wraps = t.horizontalOverflow == HorizontalWrapMode.Wrap;
@@ -1041,6 +1069,12 @@ public class CareerSmoke : MonoBehaviour
                     cutTxt += who + " ";
             }
         }
+        perTab += tabName[tabIx] + "=" + scannedHere + " ";
+        }   // end tab loop
+
+        // Per-tab counts, not just the total: a tab that contributed ZERO
+        // labels was not measured, and a total alone cannot tell you which.
+        log.Add("      legibility sweep coverage: " + perTab.Trim());
         Check(scanned > 10, "the legibility sweep actually saw the UI (" + scanned + " labels)");
         Check(tooSmallTxt.Length == 0,
               "every label is at least 10.5 pt"
@@ -1349,9 +1383,23 @@ public class CareerSmoke : MonoBehaviour
     /// this. The result line alone tells you a number, not which number.</summary>
     public static string failLines = "";
 
+    /// <summary>The counts, readable from outside. `failLines` already told a
+    /// harness WHICH checks failed but never HOW MANY ran, and the result line
+    /// goes to Debug.Log, which a bridge session cannot read back — so the one
+    /// number this project insists on ("look at the pass COUNT, not just the
+    /// fail count") was the one number this bench could not hand over. Every
+    /// other bench here exposes these; this one did not, and it was found the
+    /// obvious way, by needing it. `notes` carries the non-check lines, which
+    /// is where the sweep's per-tab coverage lives.</summary>
+    public static int lastPassed, lastFailed;
+    public static string notes = "";
+
     void Finish()
     {
         failLines = "";
+        lastPassed = passed; lastFailed = failed;
+        notes = "";
+        foreach (var l in log) if (!l.StartsWith("FAIL") && !l.StartsWith("PASS")) notes += l.Trim() + "\n";
         foreach (var l in log) if (l.StartsWith("FAIL")) failLines += l + "\n";
         foreach (var l in log) Debug.Log("[CareerSmoke] " + l);
         Debug.Log(string.Format("[CareerSmoke] RESULT: {0} pass, {1} fail{2}",
