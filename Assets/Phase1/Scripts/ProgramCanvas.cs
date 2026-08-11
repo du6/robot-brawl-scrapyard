@@ -918,14 +918,42 @@ public class ProgramCanvas : MonoBehaviour
         Refresh();
     }
 
+    /// <summary>⚠ OWNING AND MOUNTING ARE DIFFERENT FACTS — and this line got
+    /// them wrong for every sensor, 2026-08-10.
+    ///
+    /// It read BuildIds() — what is BOLTED TO THE CHASSIS — and ended every
+    /// sentence in "— SHOP". So a player who had already bought all six sensors
+    /// and left them in the crate was told to go and buy them again. On a paid
+    /// title that is the game misreporting what the player has paid for.
+    ///
+    /// The distinction already exists and is already used TWICE IN THIS FILE
+    /// (:760 and :906, both passing OwnedIds() into MissingPartsLine). Its
+    /// author wrote the same lesson into RobotProgram.MissingPartsLine after
+    /// the identical bug bit wheels: "a fresh career holding four granted
+    /// wheels in its crate was told to go buy a wheel." This line was simply
+    /// never brought along.
+    ///
+    /// Not reusing MissingPartsLine itself, deliberately: that answers "what
+    /// does this PROGRAM require", and this hint answers a different question —
+    /// "what would unlock MORE BLOCKS to choose from" — over a fixed sensor
+    /// list, regardless of what the current program uses. Same split, same
+    /// vocabulary, different question.</summary>
     void RefreshLockedHint()
     {
         var ids = BuildIds();
-        var missing = new List<string>();
+        var owned = OwnedIds();
+        var bolt = new List<string>();   // owned, just not on the chassis
+        var buy  = new List<string>();   // genuinely not owned
         foreach (var sid in new[] { "rangefinder", "compass", "tiltsensor", "wallsensor", "trapsensor", "dmgbus" })
-            if (!ids.Contains(sid)) missing.Add(sid);
-        lockedHint.text = missing.Count == 0 ? ""
-            : "more blocks with: " + string.Join(", ", missing) + " — SHOP";
+        {
+            if (ids.Contains(sid)) continue;
+            if (owned != null && owned.Contains(sid)) bolt.Add(sid); else buy.Add(sid);
+        }
+        string s = "";
+        if (bolt.Count > 0) s = "more blocks with: " + string.Join(", ", bolt) + " — BUILD tab";
+        if (buy.Count > 0)
+            s += (s.Length > 0 ? "; " : "") + "more blocks with: " + string.Join(", ", buy) + " — SHOP";
+        lockedHint.text = s;
     }
 
     // ---- the canvas itself ------------------------------------------------
