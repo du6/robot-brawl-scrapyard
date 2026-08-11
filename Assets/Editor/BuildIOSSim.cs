@@ -1,0 +1,146 @@
+// ===========================================================================
+// BuildIOSSim.cs — build the game for APPLE'S iOS SIMULATOR, 2026-08-10.
+//
+//   RobotBrawl.Editor.BuildIOSSim.Build();
+//
+// WHY THIS EXISTS, AND WHY IT IS NOT THE DEVICE SIMULATOR.
+//
+// Unity's Device Simulator (which is installed, and which was active while the
+// ARENA was being judged: Screen.dpi 460, safeArea inset 141/63) simulates the
+// SCREEN — resolution, dpi, safe area, orientation. It does not simulate the
+// PLATFORM. Measured in this editor on 2026-08-10:
+//
+//     TouchScreenKeyboard.isSupported = False
+//
+// so "does the on-screen keyboard cover the sign-in field" cannot be asked
+// there at all. Worse, and more quietly: the Device Simulator runs EDITOR code,
+// so `#if UNITY_EDITOR` is defined and LadderClient.DefaultBaseUrl resolves to
+// LOCAL_DEV. The Device Simulator can never answer which server a BUILD talks
+// to, because it is not a build. That is item 2 on the launch checklist and it
+// is structurally out of reach from the editor — not merely untested.
+//
+// A Simulator-SDK player is a real iOS player: il2cpp, UIKit, the real on-screen
+// keyboard, real App Transport Security, real app lifecycle. UNITY_EDITOR is
+// NOT defined, so it takes the same branch the TestFlight build takes.
+//
+// ⚠ WHAT IT STILL IS NOT. It runs on the Mac's CPU with no thermal envelope and
+// no phone GPU, so it says nothing about frame rate, battery or heat. And no
+// finger has touched it: occlusion (your thumb covers the control you tap),
+// one-handed reach and gesture conflicts with iOS's own edge swipes are
+// properties of a hand holding a slab of glass. Those still need the phone.
+//
+// ⚠ IT MUTATES A PROJECT SETTING AND MUST PUT IT BACK. Building for the
+// simulator flips PlayerSettings.iOS.sdkVersion, which lives in the tracked
+// file ProjectSettings/ProjectSettings.asset. The restore is in a `finally`, on
+// purpose: if it were after the build, a failed build would leave owen's
+// project configured for a simulator it cannot ship to — the same class of
+// mistake as a bench that leaves the career save rewritten. Baseline md5 before
+// this ran: db18d7c6e050d8b3653ca8f031642966.
+// ===========================================================================
+using System;
+using System.IO;
+using UnityEditor;
+using UnityEditor.Build;
+using UnityEditor.Build.Reporting;
+using UnityEngine;
+
+namespace RobotBrawl.Editor
+{
+    public static class BuildIOSSim
+    {
+        const string OUT_DIR = "build/ios-sim";
+
+        public static void Build()
+        {
+            if (!BuildPipeline.IsBuildTargetSupported(BuildTargetGroup.iOS, BuildTarget.iOS))
+            { Debug.LogError("[BuildIOSSim] the iOS module is not installed"); return; }
+
+            var scenes = new System.Collections.Generic.List<string>();
+            foreach (var s in EditorBuildSettings.scenes)
+                if (s.enabled && File.Exists(s.path)) scenes.Add(s.path);
+            if (scenes.Count == 0) { Debug.LogError("[BuildIOSSim] no enabled scenes"); return; }
+
+            var priorSdk = PlayerSettings.iOS.sdkVersion;
+            int priorSimArch = -1;
+            Debug.Log("[BuildIOSSim] sdkVersion was " + priorSdk);
+
+            try
+            {
+                PlayerSettings.iOS.sdkVersion = iOSSdkVersion.SimulatorSDK;
+
+                // ⚠ THE ARCHITECTURE SETTING IS READ DIFFERENTLY UNDER THE
+                // SIMULATOR SDK, AND THE DEFAULT IS WRONG ON APPLE SILICON.
+                //
+                // First run of this script produced an x86_64 player on an
+                // arm64 Mac. Both the build AND `xcodebuild` reported SUCCESS;
+                // it failed at `simctl install`, with "Needs to Be Updated /
+                // This app needs to be updated by the developer" — a message
+                // about the DEVELOPER, for what is a host-architecture
+                // mismatch. Forcing ARCHS=arm64 in xcodebuild alone cannot fix
+                // it: Unity ships PREBUILT binaries (Frameworks/UnityRuntime
+                // and Libraries/baselib.a) and had already copied the x86_64
+                // ones, so the link failed on thousands of "found architecture
+                // x86_64, required architecture arm64".
+                //
+                // Unity has the right ones on disk — Trampoline/ holds
+                // UnityRuntime-sim-arm64 and baselib-sim-arm64.a beside the
+                // -sim-x64 pair. Picking between them is a SETTING, so it
+                // belongs here rather than in a flag passed to Xcode after the
+                // fact, which cannot relink a prebuilt binary.
+                //
+                // ⚠ IT IS NOT `SetArchitecture`. That one already read ARM64
+                // (it governs DEVICE builds) and changing it did nothing —
+                // measured, twice. The simulator has its OWN field, found by
+                // reading ProjectSettings.asset rather than guessing at the
+                // API: `iOSSimulatorArchitecture`, 0=x86_64 1=ARM64
+                // 2=Universal, matching the three baselib variants on disk.
+                // `PlayerSettings.iOS.simulatorArchitecture` does not exist;
+                // the compiler was asked and said so. Hence SerializedObject
+                // against the name the asset actually uses.
+                var so = new SerializedObject(
+                    AssetDatabase.LoadAllAssetsAtPath("ProjectSettings/ProjectSettings.asset")[0]);
+                var simArch = so.FindProperty("iOSSimulatorArchitecture");
+                if (simArch == null)
+                { Debug.LogError("[BuildIOSSim] iOSSimulatorArchitecture not found — Unity renamed it"); return; }
+                priorSimArch = simArch.intValue;
+                simArch.intValue = 1;                       // ARM64
+                so.ApplyModifiedProperties();
+                Debug.Log("[BuildIOSSim] iOSSimulatorArchitecture " + priorSimArch + " -> 1 (ARM64)");
+                Directory.CreateDirectory(OUT_DIR);
+
+                var opts = new BuildPlayerOptions
+                {
+                    scenes           = scenes.ToArray(),
+                    locationPathName = OUT_DIR,
+                    target           = BuildTarget.iOS,
+                    targetGroup      = BuildTargetGroup.iOS,
+                    // Development build so the ARENA status line prints its base
+                    // URL — that print is the whole point of running this.
+                    options          = BuildOptions.Development,
+                };
+
+                Debug.Log("[BuildIOSSim] building " + OUT_DIR + " from " + scenes.Count + " scene(s)");
+                BuildReport report = BuildPipeline.BuildPlayer(opts);
+                var sum = report.summary;
+                Debug.Log(string.Format("[BuildIOSSim] result={0} size={1} errors={2} time={3}",
+                                        sum.result, sum.totalSize, sum.totalErrors, sum.totalTime));
+            }
+            finally
+            {
+                PlayerSettings.iOS.sdkVersion = priorSdk;
+                // -1 means we never got as far as changing it; writing that
+                // back would invent a value the project never held.
+                if (priorSimArch >= 0)
+                {
+                    var so = new SerializedObject(
+                        AssetDatabase.LoadAllAssetsAtPath("ProjectSettings/ProjectSettings.asset")[0]);
+                    var p = so.FindProperty("iOSSimulatorArchitecture");
+                    if (p != null) { p.intValue = priorSimArch; so.ApplyModifiedProperties(); }
+                }
+                AssetDatabase.SaveAssets();
+                Debug.Log("[BuildIOSSim] restored sdkVersion=" + priorSdk + " simArch=" + priorSimArch
+                          + " — verify ProjectSettings.asset with git diff");
+            }
+        }
+    }
+}
