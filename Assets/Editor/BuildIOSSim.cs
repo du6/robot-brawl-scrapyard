@@ -50,10 +50,41 @@ namespace RobotBrawl.Editor
     {
         const string OUT_DIR = "build/ios-sim";
 
+        /// <summary>Set true (in the SAME synchronous bridge command that then
+        /// calls Build() — a domain reload would reset it) to produce a
+        /// RELEASE-configuration player in build/ios-sim-rel: no
+        /// BuildOptions.Development, so no on-screen dev console. Needed
+        /// 2026-08-10: the dev console occludes product UI in four places
+        /// (BUILD tab button, LEAGUE locked rows, a sensor label, the ARENA
+        /// sign-in caption + button), which both blocked a store capture and
+        /// made "the sign-in fields don't focus" ambiguous between a broken
+        /// InputField and an overlay eating touches.</summary>
+        public static bool ReleaseMode = false;
+
         public static void Build()
         {
+            string outDir = ReleaseMode ? "build/ios-sim-rel" : OUT_DIR;
             if (!BuildPipeline.IsBuildTargetSupported(BuildTargetGroup.iOS, BuildTarget.iOS))
             { Debug.LogError("[BuildIOSSim] the iOS module is not installed"); return; }
+
+            // ⚠ RELEASE BUILDS REFUSE A NON-EMPTY OUTPUT DIR — 2026-08-10. The
+            // release path exists to produce MATCHED PAIRS (a BEFORE and an
+            // AFTER differing by one change), and the second build of a pair
+            // overwrote the first IN PLACE: build/ios-sim-rel silently became
+            // the BEFORE build, so anyone checking its UnityClassRegistration
+            // for the link.xml fix found it absent and would conclude the fix
+            // failed — the right file for the wrong build. Caught only because
+            // one agent had read the file before the overwrite (17025 bytes ->
+            // 16863, the registration line gone). An experiment's control must
+            // not be deletable by running the experiment again.
+            // The DEV path stays overwritable on purpose: incremental append
+            // is how Unity iOS builds work, and that path carries no pairs.
+            if (ReleaseMode && System.IO.Directory.Exists(outDir)
+                && System.IO.Directory.GetFileSystemEntries(outDir).Length > 0)
+            {
+                Debug.LogError("[BuildIOSSim] " + outDir + " is non-empty — it may hold a matched pair's other half. Move it aside first; refusing to overwrite a control.");
+                return;
+            }
 
             var scenes = new System.Collections.Generic.List<string>();
             foreach (var s in EditorBuildSettings.scenes)
@@ -106,20 +137,22 @@ namespace RobotBrawl.Editor
                 simArch.intValue = 1;                       // ARM64
                 so.ApplyModifiedProperties();
                 Debug.Log("[BuildIOSSim] iOSSimulatorArchitecture " + priorSimArch + " -> 1 (ARM64)");
-                Directory.CreateDirectory(OUT_DIR);
+                Directory.CreateDirectory(outDir);
 
                 var opts = new BuildPlayerOptions
                 {
                     scenes           = scenes.ToArray(),
-                    locationPathName = OUT_DIR,
+                    locationPathName = outDir,
                     target           = BuildTarget.iOS,
                     targetGroup      = BuildTargetGroup.iOS,
-                    // Development build so the ARENA status line prints its base
-                    // URL — that print is the whole point of running this.
-                    options          = BuildOptions.Development,
+                    // Development by default so the ARENA status line prints its
+                    // base URL. ReleaseMode drops it — no console overlay, no
+                    // player-connection: what a tester would actually see.
+                    options          = ReleaseMode ? BuildOptions.None
+                                                   : BuildOptions.Development,
                 };
 
-                Debug.Log("[BuildIOSSim] building " + OUT_DIR + " from " + scenes.Count + " scene(s)");
+                Debug.Log("[BuildIOSSim] building " + outDir + " (release=" + ReleaseMode + ") from " + scenes.Count + " scene(s)");
                 BuildReport report = BuildPipeline.BuildPlayer(opts);
                 var sum = report.summary;
                 Debug.Log(string.Format("[BuildIOSSim] result={0} size={1} errors={2} time={3}",
