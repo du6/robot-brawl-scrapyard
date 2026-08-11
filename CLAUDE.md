@@ -201,6 +201,26 @@ hits that matter.**
   COLLAPSED dock switches the tab and shows nothing; the tab BUTTON opens the
   dock, a direct call does not. A harness that skips `SetDockOpen(true)`
   photographs an empty screen under a correct tab strip.
+- ⚠ **A CONTROL'S BEHAVIOUR CAN LIVE IN ITS `onClick`, NOT IN THE METHOD THE
+  SEAM EXPOSES — so a harness that calls the seam measures the half that was
+  never broken.** The worked example, 2026-08-10: `SetDockOpen(false)` lives
+  in the WATCH button's `onClick` (`MobileBuilderUI.cs`, `inboxwatch_*`).
+  `ArenaScreen.WatchNow()` deliberately does NOT own dock state, because
+  `ArenaScreen.Open()` renders this screen with no dock at all. A QA pass
+  drove `WatchNow()` directly, faithfully reproduced the OLD behaviour, and
+  photographed it as proof the fix had failed. **The two images are committed
+  side by side in `c886459` — `docs/shots/17` and `18` — precisely because
+  they look like a pass and a fail of one fix and are a fix and a bypassed
+  fix.** 18 carries its own tell: the status line reads `replay t=6.4s` while
+  the dock sits over it, and a working WATCH cannot produce that frame.
+  **To check any UI behaviour, fire `b.onClick.Invoke()` on the named button;
+  never the seam.**
+  ⚠ **And the gap this leaves is REAL AND STILL OPEN.** A click-synthesising
+  harness would have caught this one and will miss the next, because our
+  `Test*` seams are drawn BELOW the layer where UI behaviour actually lives.
+  This class of defect is invisible to every bench in this project. Naming it
+  is worth more than a bench that reaches through the seam and proves nothing
+  — do not "close" it with one.
 - **A UI PATH ONLY A HUMAN CAN DRIVE IS A UI PATH NOTHING CHECKS.** ENLIST
   shipped with its network half 21/21 and the button itself never once
   pressed; the first run of `EnlistUiBench` found the confirmation message
@@ -408,8 +428,18 @@ Things explicitly NOT done:
    ⚠ **The password is PUSHED, never pulled** — `SetPassword` has no getter and
    the panel's rebuild key is not derived from it. Keep it that way; this dock
    is screenshotted on purpose.
-   Still owen's, and only styling now: every text field in this dock is a dark
-   box on a dark row and is near-invisible until focused.
+   ⚠ **CONTRAST: THE ARENA FIELDS ARE FIXED, THE SHIPPED ONES ARE NOT.**
+   Measured 2026-08-10, off the live hierarchy rather than computed: the ARENA
+   fields were **1.02:1** against their row (floor is 3:1). The obvious fix —
+   lift the fill to `MkInput`'s `#21242E` — reaches only **1.23:1** and CANNOT
+   reach 3:1, because any fill dark enough to read white text on is too dark to
+   separate from a dark dock. So the boundary moved to a 2px border `#6B7080`:
+   **3.89:1** vs the dock, **3.15:1** vs the fill. Do not "simplify" that back
+   into a fill change; it was tried and measured.
+   **`MkInput` still carries the 1.23:1 defect** — the ROBOTS name field and
+   every other dock input built through it, i.e. shipped single-player. It is a
+   one-line change now that the border helper exists, and it is **owen's call**
+   because it touches the shipped game's look, not a forgotten task.
 3. ~~**The worker fight path has no BENCH.**~~ **CLOSED 2026-08-10** —
    `EnlistLiveBench` 21/21 drives the real `HttpWorkerTransport` against a
    live API for both halves: validate, then a real best-of-3 fought and posted
