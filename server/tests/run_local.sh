@@ -44,8 +44,34 @@ OUT="$PWD/qa_api_smoke.txt"
 # that TESTS it can only ever be told the same thing.
 export TRUST_PROXY="1"
 
-if lsof -nP -iTCP:5000 -sTCP:LISTEN >/dev/null 2>&1; then
-  echo "Port 5000 is already in use — stop the API running in your other tab (Ctrl-C) and re-run."
+# ⚠ PORT 5099, NOT 5000 — 2026-08-10, and this was NOT a cosmetic change.
+#
+# macOS enables AirPlay Receiver by default and it LISTENS ON 5000, on
+# loopback. Measured on owen's Mac:
+#   curl -i http://localhost:5000/  ->  403 Forbidden, Server: AirTunes/960.13.1
+#   bind(127.0.0.1:5000)            ->  EADDRINUSE
+# The guard below could not see it either: `lsof` without sudo does not list a
+# process owned by another user, so this script sailed past its own port check
+# and then sat in the /healthz loop until it timed out.
+#
+# The Unity client had the same literal (LadderClient.LOCAL_DEV) and there it
+# was far worse: the live benches SKIP when no server answers, so
+# EnlistLiveBench read 0 passed / 0 failed / 1 skipped and the suite summary
+# said "failed 0". Green, and covering nothing.
+#
+# ONE port for local dev, in one place per side. Override with RB_PORT if 5099
+# is ever taken too.
+RB_PORT="${RB_PORT:-5099}"
+BASE="http://localhost:$RB_PORT"
+
+if lsof -nP -iTCP:"$RB_PORT" -sTCP:LISTEN >/dev/null 2>&1; then
+  echo "Port $RB_PORT is already in use — stop the API running in your other tab (Ctrl-C) and re-run."
+  exit 2
+fi
+# lsof cannot see another user's listener, so ASK THE PORT rather than trust the
+# scan. This is the check that would have caught AirTunes on 5000.
+if curl -s -o /dev/null -m 2 "$BASE/" 2>/dev/null; then
+  echo "Something already answers on $BASE — it is not this API. Free the port or set RB_PORT."
   exit 2
 fi
 
@@ -78,6 +104,7 @@ echo "starting the API (log: qa_api_server.log)…"
   BLOB_ROOT="/tmp/rb-blobs" \
   TRUST_PROXY="$TRUST_PROXY" \
   Queue__ReapEverySeconds="5" \
+  ASPNETCORE_URLS="$BASE" \
   dotnet run ) > "$SRV" 2>&1 &
 API_PID=$!
 trap 'kill $API_PID 2>/dev/null' EXIT INT TERM
@@ -85,7 +112,7 @@ trap 'kill $API_PID 2>/dev/null' EXIT INT TERM
 # dotnet run compiles first, so allow for a cold build.
 echo -n "waiting for /healthz "
 for i in {1..90}; do
-  if curl -sf http://localhost:5000/healthz >/dev/null 2>&1; then echo " up after ${i}s"; break; fi
+  if curl -sf "$BASE/healthz" >/dev/null 2>&1; then echo " up after ${i}s"; break; fi
   if ! kill -0 $API_PID 2>/dev/null; then
     echo " — the API exited before it listened."
     echo "LAST 40 LINES OF qa_api_server.log:"; tail -40 "$SRV"
@@ -111,7 +138,7 @@ bash tests/sql_bench.sh > "$SQL" 2>&1
 SQLRC=$?
 
 echo "running api_smoke.sh (result: qa_api_smoke.txt)…"
-bash tests/api_smoke.sh > "$OUT" 2>&1
+bash tests/api_smoke.sh "$BASE" > "$OUT" 2>&1
 
 # The restore drill runs LAST and against the database the benches just
 # filled: a backup of an empty schema proves nothing, and by now this one

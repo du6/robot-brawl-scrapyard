@@ -76,7 +76,8 @@ namespace RobotBrawl.Phase0
         // ===================================================================
         // WHICH SERVER, and this was a LAUNCH BLOCKER until 2026-08-10.
         //
-        // This field was `= "http://localhost:5000"` and NOTHING in the game
+        // This field was `= "http://localhost:5000"` (see the port note below;
+        // that number was wrong too) and NOTHING in the game
         // ever assigned it. The production URL lived in the deploy scripts and
         // five documents and in ZERO lines of game code, so a shipped iOS
         // build would have reached for localhost ON THE PHONE, found nothing,
@@ -100,8 +101,32 @@ namespace RobotBrawl.Phase0
         //     LadderClient.BaseUrl = LadderClient.PRODUCTION;
         // The setter is the override; it is not a secret and not a toggle a
         // player can reach.
+        // ⚠ PORT 5099, NOT 5000 — and the number is the whole finding, 2026-08-10.
+        //
+        // macOS ships AirPlay Receiver LISTENING ON PORT 5000, on loopback,
+        // enabled by default. Measured on owen's Mac:
+        //     curl -i http://localhost:5000/   ->  HTTP/1.1 403 Forbidden
+        //                                          Server: AirTunes/960.13.1
+        //     bind(127.0.0.1:5000)             ->  EADDRINUSE
+        // So on a stock Mac the dev API cannot even BIND 5000, and every
+        // UnityWebRequest to it either fails or is answered by AirTunes.
+        //
+        // WHY THAT MATTERED MORE THAN A WRONG NUMBER USUALLY DOES. Every live
+        // bench treats "no server" as a SKIP, on the LadderLiveBench argument
+        // that a red for a missing Postgres teaches people to ignore reds. With
+        // LOCAL_DEV pointing at a port nothing could ever serve, EnlistLiveBench
+        // reported **0 passed / 0 failed / 1 skipped** — zero failures, zero
+        // coverage — and a suite summary that says "failed 0" reads green. That
+        // is how a board that never refetches survived a fully green run.
+        // (Report() has always appended "NOTHING RAN — this is not a pass"; the
+        // line was true, present, and read by nobody.)
+        //
+        // 5099 is verified free and is now the ONE local-dev port: the API's
+        // launch line, server/tests/run_local.sh and server/tests/api_smoke.sh
+        // all say 5099 too. Two numbers that have to agree, kept in two places,
+        // is the shape of this bug — so there is only one.
         public const string PRODUCTION = "https://rb-api-902243335343.us-central1.run.app";
-        public const string LOCAL_DEV  = "http://localhost:5000";
+        public const string LOCAL_DEV  = "http://localhost:5099";
 
         static string _baseUrl;
         public static string BaseUrl

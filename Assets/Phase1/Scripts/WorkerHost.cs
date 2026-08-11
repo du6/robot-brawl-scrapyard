@@ -19,7 +19,9 @@
 // CONFIGURED BY ENVIRONMENT, because it has to run in a container where there
 // is nobody to click anything:
 //
-//   RB_API_URL      base url          (default http://localhost:5000)
+//   RB_API_URL      base url          (default LadderClient.LOCAL_DEV, :5099 —
+//                                     NOT 5000; macOS AirPlay Receiver owns
+//                                     that port. See LadderClient's port note.)
 //   RB_WORKER_KEY   shared secret     (required; refuses to start without it)
 //   RB_WORKER_ID    identity          (default rb-worker-<random>)
 //   RB_WORKER_KINDS VALIDATE|FIGHT|BOTH   (default BOTH)
@@ -111,7 +113,10 @@ namespace RobotBrawl.Phase0
 
         void Awake()
         {
-            _url         = Env("RB_API_URL", "http://localhost:5000");
+            // One local-dev port, written down once. A second literal here is
+            // exactly how the client and the worker came to disagree about
+            // where "local" is.
+            _url         = Env("RB_API_URL", LadderClient.LOCAL_DEV);
             _key         = Env("RB_WORKER_KEY", "");
             _id          = Env("RB_WORKER_ID", "rb-worker-" + UnityEngine.Random.Range(1000, 9999));
             _kinds       = Env("RB_WORKER_KINDS", "BOTH").Trim().ToUpperInvariant();

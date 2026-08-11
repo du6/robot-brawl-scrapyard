@@ -9,7 +9,11 @@
 # it asks — "does an anonymous scout see the payload URL", "does the second
 # upload supersede the first" — are not answerable from either half alone.
 #
-# Usage:  bash tests/api_smoke.sh [base-url]      (default http://localhost:5000)
+# Usage:  bash tests/api_smoke.sh [base-url]      (default http://localhost:5099)
+#
+# ⚠ 5099, NOT 5000. macOS AirPlay Receiver listens on 5000 by default, answers
+# 403 as AirTunes, and holds the bind — so the API cannot start there and this
+# bench cannot reach it. run_local.sh boots on the same port and passes it in.
 #
 # TWO RULES LEARNED THE HARD WAY, on this bench's first run (08-09):
 #
@@ -28,7 +32,7 @@
 # ===========================================================================
 set -uo pipefail
 
-BASE="${1:-http://localhost:5000}"
+BASE="${1:-http://localhost:5099}"
 WKEY="${WORKER_KEY:-dev-only-worker-key}"
 PY=$(command -v python3 || command -v python) || { echo "python3 is required"; exit 2; }
 
