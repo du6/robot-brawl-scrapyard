@@ -72,7 +72,7 @@ Two kinds of session work on this project, and neither can do everything.
 |---|---|---|
 | edit files here | yes | yes |
 | `git`, `rm` | **no** | yes |
-| `dotnet`, `psql`, `curl localhost:5000` | **no** | yes |
+| `dotnet`, `psql`, `curl localhost:5099` | **no** | yes |
 | run an edit-mode Unity bench | **yes** | **yes — measured 2026-08-09** |
 | run a PLAY-MODE Unity bench | **yes** | **yes — measured 2026-08-09** |
 
@@ -240,6 +240,18 @@ hits that matter.**
 - **`server/tests/run_local.sh`** — one command: reset the dev DB, build,
   boot, `sql_bench.sh`, `api_smoke.sh`, stop, leave the logs on disk.
   `sql_bench` is the ONLY cover for `server/RobotBrawl.Api/Sql/*.sql`.
+- ⚠ **LOCAL DEV IS PORT 5099, NOT 5000 — changed 2026-08-10.** macOS ships
+  AirPlay Receiver **listening on 5000**: `curl localhost:5000` answers `403
+  … Server: AirTunes`, and `bind(127.0.0.1:5000)` is `EADDRINUSE`. The dev
+  API cannot start there. `LadderClient.LOCAL_DEV`, `run_local.sh` (via
+  `RB_PORT`) and `api_smoke.sh` now all say 5099; older docs saying 5000 are
+  stale on this point. **This is why it mattered:** every live Unity bench
+  SKIPS when no server answers, so `EnlistLiveBench` read **0 pass / 0 fail /
+  1 skip** — and a summary saying "failed 0" reads green. Zero failures and
+  zero coverage look identical in a total. On 5099 the same bench is 21/21.
+- ⚠ **A "green" bench with `passed == 0` is not a pass.** `Report()` has
+  always printed "NOTHING RAN — this is not a pass" and nobody read it. Look
+  at the pass COUNT, not just the fail count.
 - ⚠ **CareerSmoke is not isolated.** Run it first or in its own play
   session, or it reports 115/128.
 - ⚠ **`LadderSweepBench` and `OpeningBench` are MEASUREMENT benches** —
@@ -294,7 +306,24 @@ compose**) · `restore_drill.sh` 10/10 · WorkerBench **47/47** · FuzzBench
 · LadderLiveBench 11/11 · DisarmBench 32/32 · **CareerSmoke 128/128** ·
 **VerbBench 32/32** · **AutonomyBench 24/24** · **CanvasDragBench 31/31** ·
 **TestDebugBench 30/30** · **TouchSmoke 29/29** · **HazardBench 23/23** ·
-**EnlistLiveBench 21/21** · **EnlistUiBench 17/17**.
+**EnlistLiveBench 21/21** · **EnlistUiBench 17/17** ·
+**ReturningPlayerBench 22/22**.
+
+⚠ **EnlistLiveBench's 21/21 is NEW, and its old "green" was 0/0/1-skip.** It
+had never once executed: `LOCAL_DEV` pointed at port 5000, which macOS
+AirPlay owns. See the port note under Bench notes. Treat any live bench you
+have not personally seen a PASS COUNT from as unmeasured.
+
+✅ **`ReturningPlayerBench` is new, 2026-08-10, and it closes a hole in the
+SHAPE of the suite.** **Not one bench had ever called `LadderClient.Login`** —
+every one registers a fresh account, does its errand in a single session, and
+exits, so the only player ever exercised was a player in their first thirty
+seconds, on a ladder whose whole premise is leaving and coming back. That is
+the direct reason "the ARENA board never refetched" survived everything: a
+bench that never comes back cannot see a screen that never updates. The new
+bench signs out, signs back IN, and proves the dock re-asks the server after
+a real absence and stays quiet on a quick flick. **Run it after any change to
+`ShowTab`, `RefreshArena` or `ArenaScreen.Refresh`.**
 
 ✅ **The palette touch-floor regression is FIXED, 2026-08-10.** It was a UNIT
 BUG: `FitPaletteRows` floored the cell at `44f` — 44 CANVAS UNITS — while the

@@ -15,7 +15,7 @@ PASS  a wrong password and an unknown account are indistinguishable (both 401)
 
 == D. robots ==
 PASS  a robot is created
-      robot e2ee309c-af72-416c-b5d3-d15598983dcd
+      robot beda8a74-1f53-4820-b8e8-e5dd971d104f
 PASS  …but not without a token
 
 == E. snapshot upload stays opaque (§5.2) ==
@@ -30,7 +30,7 @@ PASS  …and a wrong key is refused too
 PASS  a keyed worker claims a job
 PASS  …and the job is the VALIDATE the upload enqueued
 PASS  …pointing at the snapshot just uploaded
-PASS  …and carries a payload location the worker can resolve (file:///tmp/rb-blobs/snapshots/e2ee309c-af72-416c-b5d3-d15598983dcd/64a88557c0364e88b2f3e16a08217326.json)
+PASS  …and carries a payload location the worker can resolve (file:///tmp/rb-blobs/snapshots/beda8a74-1f53-4820-b8e8-e5dd971d104f/1098ca19ee4e4307a77c1992ffbe1774.json)
 PASS  …and the payload sha256 rides along, so the worker can verify storage
 PASS  another worker cannot heartbeat a job it does not hold
 PASS  …the holder can
@@ -232,7 +232,7 @@ PASS  metrics carry pendingSnapshots
 PASS  pendingSnapshots agrees with the database
 PASS  failed agrees with the database
 PASS  the rbmetrics log line keeps its shape
-      rbmetrics ready=1 claimed=0 failed=4 done=16 oldest_ready_s=1 oldest_heartbeat_s=0 pending_snapshots=3 oldest_pending_s=4
+      rbmetrics ready=1 claimed=0 failed=4 done=16 oldest_ready_s=0 oldest_heartbeat_s=0 pending_snapshots=3 oldest_pending_s=4
 PASS  …and reports real counts, not a row of zeros
 
 --- B. season badges ---
