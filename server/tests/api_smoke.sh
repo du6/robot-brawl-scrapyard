@@ -1081,8 +1081,14 @@ else
   S=$(req POST /v1/admin/season/rollover '{}' "X-Worker-Key: $WKEY")
   expect "an unforced rollover before the season is over refuses politely" "$S" 200
   is "…saying rolled=false" "$(jget rolled)" "False"
-  is "…and the refusal STARTED the season clock (a seasons row now exists)" \
-     "$(dbq "SELECT count(*) FROM seasons WHERE id=$S0;")" 1
+  # NOT merely "a row exists" — 003_ratings seeds season 1 with a 2099
+  # sentinel end, so an existence check passes vacuously on every migrated
+  # DB. The claim is that the tick RETIRED the sentinel and started a real
+  # season_weeks clock.
+  is "…and the refusal RETIRED the 2099 sentinel (the clock is real now)" \
+     "$(dbq "SELECT count(*) FROM seasons WHERE id=$S0 AND ends_at = TIMESTAMPTZ '2099-01-01 00:00:00+00';")" 0
+  is "…starting a clock that ends within season_weeks, not decades out" \
+     "$(dbq "SELECT count(*) FROM seasons WHERE id=$S0 AND ends_at <= now() + interval '9 weeks';")" 1
   is "…still on the same season" \
      "$(dbq "SELECT value::int FROM ladder_config WHERE key='current_season';")" "$S0"
 

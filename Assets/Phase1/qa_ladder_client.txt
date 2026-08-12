@@ -43,4 +43,7 @@ PASS  …with its category
 PASS  …and badges keep their own seasons
 PASS  a STRING array does not masquerade as badge objects
 PASS  a card with no history parses to an empty shelf, not a crash
- RESULT: 37 pass, 0 fail - ALL GREEN
+PASS  a sentinel end date renders as no countdown, not 'ends in 4500d' (got 'season 1')
+PASS  a real clock renders its countdown (got 'season 1 · ends in 7d')
+PASS  no board yet renders as silence
+ RESULT: 40 pass, 0 fail - ALL GREEN

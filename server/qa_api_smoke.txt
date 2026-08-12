@@ -15,7 +15,7 @@ PASS  a wrong password and an unknown account are indistinguishable (both 401)
 
 == D. robots ==
 PASS  a robot is created
-      robot 1b53bb1f-ccb9-4d03-8351-fdfa3075e1e6
+      robot cd6ccd97-f775-4223-bd67-89db4134d676
 PASS  …but not without a token
 
 == E. snapshot upload stays opaque (§5.2) ==
@@ -30,7 +30,7 @@ PASS  …and a wrong key is refused too
 PASS  a keyed worker claims a job
 PASS  …and the job is the VALIDATE the upload enqueued
 PASS  …pointing at the snapshot just uploaded
-PASS  …and carries a payload location the worker can resolve (file:///tmp/rb-blobs/snapshots/1b53bb1f-ccb9-4d03-8351-fdfa3075e1e6/63d1b1c60fa245cb8d3885921482a960.json)
+PASS  …and carries a payload location the worker can resolve (file:///tmp/rb-blobs/snapshots/cd6ccd97-f775-4223-bd67-89db4134d676/cdbe5424a0f4431781f1f9f92a8808da.json)
 PASS  …and the payload sha256 rides along, so the worker can verify storage
 PASS  another worker cannot heartbeat a job it does not hold
 PASS  …the holder can
@@ -167,7 +167,8 @@ PASS  …while still moving the ladder, which is the entire point
 == P. season rollover (§2.4) ==
 PASS  an unforced rollover before the season is over refuses politely
 PASS  …saying rolled=false
-PASS  …and the refusal STARTED the season clock (a seasons row now exists)
+PASS  …and the refusal RETIRED the 2099 sentinel (the clock is real now)
+PASS  …starting a clock that ends within season_weeks, not decades out
 PASS  …still on the same season
 PASS  a FORCED season rolls over
 PASS  …into the next season
@@ -261,4 +262,4 @@ SKIP  blob URLs are built with the forwarded scheme -- no object store configure
   blob URLs are built with the forwarded scheme -- no object store configured (BLOB_S3_BUCKET unset); file:// rows are passed through verbatim
 ----- a skip is not a pass; each line above is cover this run did not provide -----
 
-===== passed 208  failed 0  skipped 1 =====
+===== passed 209  failed 0  skipped 1 =====

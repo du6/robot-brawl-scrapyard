@@ -168,6 +168,20 @@ namespace RobotBrawl.Phase0
             Check(LadderClient.Objects("{\"id\":\"s-1\"}", "seasonHistory").Count == 0,
                   "a card with no history parses to an empty shelf, not a crash");
 
+            // The 2099 sentinel (003_ratings): before the first scheduler
+            // tick retires it, the board's end stamp is decades out, and the
+            // label must not say "ends in 4500d".
+            LadderClient.BoardSeason = 1;
+            LadderClient.BoardSeasonEndsAt = "2099-01-01T00:00:00Z";
+            Check(LadderClient.SeasonLabel() == "season 1",
+                  "a sentinel end date renders as no countdown, not 'ends in 4500d' (got '" + LadderClient.SeasonLabel() + "')");
+            LadderClient.BoardSeasonEndsAt = System.DateTime.UtcNow.AddDays(6.5).ToString("o");
+            Check(LadderClient.SeasonLabel() == "season 1 · ends in 7d",
+                  "a real clock renders its countdown (got '" + LadderClient.SeasonLabel() + "')");
+            LadderClient.BoardSeason = 0; LadderClient.BoardSeasonEndsAt = "";
+            Check(LadderClient.SeasonLabel() == "",
+                  "no board yet renders as silence");
+
             log.Add(" RESULT: " + passed + " pass, " + failed + " fail" + (failed == 0 ? " - ALL GREEN" : ""));
             Debug.Log("[LadderClientBench] RESULT: " + passed + " pass, " + failed + " fail");
             try

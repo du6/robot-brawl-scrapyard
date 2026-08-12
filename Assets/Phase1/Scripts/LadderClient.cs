@@ -257,12 +257,20 @@ namespace RobotBrawl.Phase0
             if (BoardSeason <= 0) return "";
             string s = "season " + BoardSeason;
             System.DateTime end;
+            // RoundtripKind ALONE — combining it with AdjustToUniversal is an
+            // ArgumentException by contract, thrown on the first real date
+            // this ever parsed (caught by LadderClientBench, not a player).
+            // ToUniversalTime() normalises the offset forms ("+00:00" parses
+            // as Local-adjusted) and is the identity for a trailing Z.
             if (System.DateTime.TryParse(BoardSeasonEndsAt, null,
-                    System.Globalization.DateTimeStyles.RoundtripKind
-                    | System.Globalization.DateTimeStyles.AdjustToUniversal, out end))
+                    System.Globalization.DateTimeStyles.RoundtripKind, out end))
             {
-                double d = (end - System.DateTime.UtcNow).TotalDays;
-                s += d <= 1.0 ? " · ends today" : " · ends in " + (int)System.Math.Ceiling(d) + "d";
+                double d = (end.ToUniversalTime() - System.DateTime.UtcNow).TotalDays;
+                // The pre-rollover scaffolding (003_ratings) ends season 1 at
+                // a 2099 SENTINEL, and "ends in 4500d" is a bug report waiting
+                // to be filed. Anything over a year is treated as "no clock".
+                if (d <= 1.0) s += " · ends today";
+                else if (d <= 366.0) s += " · ends in " + (int)System.Math.Ceiling(d) + "d";
             }
             return s;
         }

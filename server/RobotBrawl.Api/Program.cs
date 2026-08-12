@@ -1640,10 +1640,19 @@ app.MapPost("/v1/admin/season/rollover", async (HttpContext ctx) =>
                  && fv.ToString() is "1" or "true";
     if (!force)
     {
+        // 003_ratings seeded season 1 ending at a 2099 SENTINEL, explicitly
+        // because "§2.4's season rollover does not exist yet". It exists now,
+        // so the first unforced tick RETIRES the sentinel — clock starts at
+        // that tick, the roll comes season_weeks later. The WHERE keeps this
+        // from ever touching a season whose clock is real: a legitimate
+        // ends_at is rewritten by nothing but the rollover itself.
         await using (var boot = new NpgsqlCommand(@"
             INSERT INTO seasons (id, starts_at, ends_at)
             VALUES ($1, now(), now() + make_interval(weeks => $2))
-            ON CONFLICT (id) DO NOTHING;", c))
+            ON CONFLICT (id) DO UPDATE
+               SET starts_at = now(),
+                   ends_at   = now() + make_interval(weeks => $2)
+             WHERE seasons.ends_at = TIMESTAMPTZ '2099-01-01 00:00:00+00';", c))
         {
             boot.Parameters.AddWithValue(from);
             boot.Parameters.AddWithValue(weeks);
