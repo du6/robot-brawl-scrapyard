@@ -1493,6 +1493,43 @@ public class MobileBuilderUI : MonoBehaviour
         var tdb = MkButton("test", fightPanel.transform, "TEST DRIVE", 14, () => { if (bm != null) bm.StartTest(); });
         var tdl = tdb.gameObject.AddComponent<LayoutElement>();
         tdl.ignoreLayout = true;
+        // ⚠ LAST SIBLING, OR THE BOTTOM HALF OF THIS BUTTON IS DEAD — 2026-08-12.
+        //
+        // careerBoard and its cbviewport are created BELOW this line, so they
+        // were later siblings: drawn on top, and hit-tested first. cbviewport is
+        // MkPanel(..., alpha 0.15), and MkPanel sets raycastTarget = a > 0.001,
+        // so a near-invisible scroll viewport sat over this chip and ate the
+        // taps. MEASURED, raycast ladder down the button's own rect:
+        //
+        //   y  0-50%   top hit 'cbviewport'  -> click handler none   DEAD
+        //   y 60-100%  top hit 'test'        -> click handler 'test' live
+        //   overlap 109px of 197px = 55%, from the bottom up
+        //   live band 88px = 31.1pt, under the 44pt floor
+        //
+        // The rect was never the problem — it is 69.9pt, comfortably over the
+        // floor, which is why the touch-floor check passed it. Nothing in this
+        // project measures whether one control is drawn on top of another.
+        //
+        // SetAsLastSibling is this file's existing treatment for a floating
+        // overlay (saveDlg, matSheetGO), not a new idea. It also stops the
+        // 0.15 wash rendering over the chip, so the button reads at full
+        // opacity again.
+        //
+        // ⚠ DO NOT "fix" this by clearing cbviewport.raycastTarget. A
+        // ScrollRect's viewport must receive drags; that would trade a dead
+        // button for a dead board — the #13 lesson running backwards.
+        //
+        // ⚠ Two consequences, deliberate: the board's rows still scroll BENEATH
+        // this rect (input is fixed, the overlap is not), and a drag that starts
+        // on this rect now belongs to the button, so a board scroll cannot be
+        // begun from this corner. Correct for a button; recorded because it is a
+        // real behaviour change.
+        //
+        // ⚠ THE SetAsLastSibling CALL IS AT THE END OF THIS METHOD, NOT HERE.
+        // It was here first and it did NOTHING: careerBoard and cbviewport are
+        // created BELOW, so they became later siblings again immediately.
+        // Measured — sibling index still 3, live 5 / dead 6, byte-identical to
+        // the broken state. "Last" is only meaningful once every sibling exists.
         var trt = tdb.GetComponent<RectTransform>();
         trt.anchorMin = new Vector2(1f, 1f); trt.anchorMax = new Vector2(1f, 1f);
         trt.pivot = new Vector2(1f, 1f);
@@ -1521,6 +1558,17 @@ public class MobileBuilderUI : MonoBehaviour
         cbs.viewport = cbvprt; cbs.content = cbcrt;
         AddListOverflow(careerBoard, cbs, cbvprt);   // R2 finding 8: LEAGUE
         careerBoardContent = cbc.transform;
+
+        // ⚠ LAST LINE OF THIS METHOD, AND IT MUST STAY LAST. See the TEST DRIVE
+        // block above for why the button needs to be the final sibling: the
+        // board's viewport is raycastTarget at alpha 0.15 and was covering the
+        // chip's bottom 55%, eating the taps that start a test drive.
+        //
+        // It belongs HERE rather than beside the button because careerBoard and
+        // cbviewport are created after it — putting the call at the creation
+        // site left the sibling index unchanged and the button just as dead.
+        // Anything added to fightPanel below this line re-opens the defect.
+        tdb.transform.SetAsLastSibling();
         RefreshFightTab();
         RefreshFightInfo();
     }
@@ -1992,8 +2040,32 @@ public class MobileBuilderUI : MonoBehaviour
         if (t != null)
         {
             var trt = t.rectTransform;
-            trt.offsetMin = new Vector2(10f + safeL, trt.offsetMin.y);
-            trt.offsetMax = new Vector2(-(10f + safeR), trt.offsetMax.y);
+            // ⚠ COMPOSE WITH THE EXISTING INSET, NEVER OVERWRITE IT — 2026-08-12.
+            //
+            // These two lines used to ASSIGN, and that silently ate a layout
+            // intent. The tip strip reserves 206 units on its right for the
+            // < > and SKIP TIPS controls; this pass replaced that with
+            // -(10 + safeR) — about -88 on the reference device — so the tip
+            // text gained ~118 units and ran underneath its own controls, cut
+            // mid-sentence with no ellipsis.
+            //
+            // Max on the left and Min on the right because these are inset
+            // offsets with opposite signs: larger positive and more negative
+            // both mean MORE inset. So an existing reservation survives, and a
+            // notch bigger than the reservation still wins. Whichever inset is
+            // stricter is the one that is correct.
+            //
+            // SYMMETRIC ON PURPOSE. Only the right edge was reported, because
+            // only the right edge had a reservation to destroy — the left had
+            // the identical overwrite and nothing to lose yet. Fixing one side
+            // would leave the bug armed for the next caller that reserves space.
+            //
+            // Verified against all three callers rather than assumed: statsText
+            // and msgText carry plain symmetric padding and no reservation, so
+            // statsText is unchanged, msgText recovers a silent 14→10 padding
+            // regression, and the tip bar gets its 206 back.
+            trt.offsetMin = new Vector2(Mathf.Max(trt.offsetMin.x,   10f + safeL),  trt.offsetMin.y);
+            trt.offsetMax = new Vector2(Mathf.Min(trt.offsetMax.x, -(10f + safeR)), trt.offsetMax.y);
         }
     }
 
