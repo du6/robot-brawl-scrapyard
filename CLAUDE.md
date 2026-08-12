@@ -410,23 +410,32 @@ and nearly cost two testers a production account each. Whether it appears
 on a real TestFlight build is a QUESTION for the first device build, not a
 derivation: `isDebugBuild`-on-device claims failed twice tonight.
 
-⚠ **OPEN DEFECT, 2026-08-12: PART PLACEMENT IS DEAD IN RELEASE SIMULATOR
-PLAYERS.** TIP 1 says "tap the robot"; on the release sim builds no part can
-be added or removed — the ghost snaps to a valid socket and TRACKS a live
-drag (so delivery, classification and preview all work), and the COMMIT
-fails silently, writing no `message`. Localised by four control legs (the
-strongest: REMOVE armed, eight taps, nothing deleted — REMOVE has no socket
-rules to hide behind). The fault is in the commit branch OR a picking/render
-matrix desync: release-edge logic, `dClick` consumption, the `byCollider`
-lookup, or `ScreenPointToRay` reading a matrix the renderer is not using.
-Dev-config builds place fine, which is why no earlier pass saw it. Device
-behaviour unknown. ⚠ The `[ray]` readout (`RayDeltaReadout`, `6932c26`,
-marked TEMPORARY — delete it) round-trips ONE camera against itself, which
-returns ~0 for ANY consistently-applied matrix — its own vacuity test was
-unrepresentative (it skewed the matrix BETWEEN the two calls, a mismatch
-the real code path cannot produce). Its 0.000 licenses nothing. The correct
-instrument compares the PICKING path's ray against the RENDER camera — two
-producers, never one round-tripped.
+✅ **#15 RESOLVED, 2026-08-12: PLACEMENT WAS NEVER DEAD — the commit chain
+measured healthy in a release sim player, BOTH verbs.** A temporary trace at
+every link (release edge → `DebugClick` → `TakeClick` → `UpdateBuild` gates →
+commit) showed place AND remove complete end-to-end (`ADD done`, `REM
+hit=True`) under finger-speed input. "Dead placement" decomposed into TWO
+mechanisms, one per instrument leg:
+1. **Sub-frame synthetic taps (instrument artifact, already catalogued).** A
+   synthetic click's down+up fits inside ONE frame and `Pointers()` samples
+   `isPressed` as a LEVEL — a quick tap produced ZERO trace lines: it never
+   existed as input. A real finger holds 50 ms+ and is safe; a 150 ms
+   synthetic press placed every time. "Dev places fine" was frame rate, not
+   code path.
+2. **The REMOVE-armed geometry trap (product defect, real, FIXED).** Arming
+   REMOVE writes a message; the message bar deepens the top band; with the
+   dock OPEN the robot's last visible sliver vanishes under UI — "tap a part
+   on the robot" had ZERO tappable pixels and every tap was silently eaten by
+   `OverUI` ("eight taps, nothing deleted", reproduced exactly, trace shows
+   `overUI=True` at coordinates that placed parts a minute earlier). Fix: the
+   REMOVE button's onClick now collapses the dock (the WATCH precedent —
+   behaviour lives in the onClick). TouchSmoke asserts the new contract,
+   31/31.
+The `[ray]` matrix-desync hypothesis is dead — picking was never wrong (the
+readout was already deleted in `dfa60f9`). Trace method note: three
+independent writers (UI queue, input seam, builder gates) whose frame numbers
+must line up, each logging INPUTS at the decision — that is what let one
+missing line name the fault.
 
 **The ladder API is LIVE**: `https://rb-api-902243335343.us-central1.run.app`
 on Cloud Run, against Cloud SQL over a unix socket, with blobs in GCS.

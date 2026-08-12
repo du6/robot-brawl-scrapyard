@@ -826,7 +826,15 @@ public class MobileBuilderUI : MonoBehaviour
         matBtn = MkButton("matbtn", actRow.transform, "MATERIAL", 17, ToggleMatSheet);
         MkButton("rot", actRow.transform, "ROTATE", 17, () => Phase0Input.DebugRotate());
         MkButton("undo", actRow.transform, "UNDO", 17, () => Phase0Input.DebugUndo());
-        removeBtn = MkButton("del", actRow.transform, "REMOVE", 17, () => { removeArmed = !removeArmed; if (removeArmed && bm != null && bm.HasSelection) bm.SelectPart(bm.SelectedPart); RefreshRemoveBtn(); });
+        // #15 root cause (2026-08-12, measured on a release sim player): arming
+        // REMOVE writes a message, the message bar deepens the top band, and
+        // with the dock OPEN the robot's last visible sliver disappears under
+        // it — "tap a part on the robot" had ZERO tappable pixels and every
+        // try was silently eaten by OverUI. So arming REMOVE now collapses the
+        // dock, exactly like WATCH does (the onClick owns dock state — see the
+        // inboxwatch_* precedent). Disarm is unaffected: a miss-tap already
+        // disarms, and SHOW PANEL -> REMOVE re-toggles.
+        removeBtn = MkButton("del", actRow.transform, "REMOVE", 17, () => { removeArmed = !removeArmed; if (removeArmed && bm != null && bm.HasSelection) bm.SelectPart(bm.SelectedPart); if (removeArmed && dockOpen) SetDockOpen(false); RefreshRemoveBtn(); });
         MkButton("desel", actRow.transform, "DONE", 17, () => { if (bm != null && bm.HasSelection) bm.SelectPart(bm.SelectedPart); Phase0Input.debugPointer = false; RefreshHighlight(); });
         // OWEN 2026-08-02: SAVE belongs where the work happens. DONE, one slot
         // to the left, only puts down the held part - it was never a commit,

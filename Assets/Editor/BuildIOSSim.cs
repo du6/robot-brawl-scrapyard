@@ -61,6 +61,13 @@ namespace RobotBrawl.Editor
         /// InputField and an overlay eating touches.</summary>
         public static bool ReleaseMode = false;
 
+        /// <summary>Batchmode entry point: `-executeMethod ...BuildRelease`.
+        /// -executeMethod cannot set a static field first, so the flag is set
+        /// here, in the same invocation, which is the same discipline the
+        /// bridge path uses (same synchronous call, no domain reload between).
+        /// </summary>
+        public static void BuildRelease() { ReleaseMode = true; Build(); }
+
         public static void Build()
         {
             string outDir = ReleaseMode ? "build/ios-sim-rel" : OUT_DIR;

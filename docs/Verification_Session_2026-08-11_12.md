@@ -28,7 +28,7 @@ tester refused to leave a measurement at "points that worked".
 | 19 | Material-keyed palette counts (`7f92884`) | Device: "0 free · 1 in Steel" rendering, correctly absent when truly unowned. |
 | 23 | Stale draft palette | **Isolated**: NEW-DRAFT entry path only; and a *correct* draft palette shows **no counts at all**, so the fix is a rendering change, not a recolour. |
 | 14 | Tip text under its own controls | Root-caused: `InsetBar` overwrites `offsetMax.x` wholesale, eating a commented 206-unit reservation. Fix in `3a61d72` (compose, both axes); `msgText`'s silent 14→10 regression repaired by the same change. |
-| 15 | "Tap the robot" does nothing | **Localised positively** (not fixed): nothing-selected drag orbits; selected drag makes the ghost *track the pointer live*; tap and press-drag-release do nothing, silently. Fault is in the commit branch. |
+| 15 | "Tap the robot" does nothing | **RESOLVED 2026-08-12** (superseding the row below): the commit chain measured healthy in a release player, both verbs — see §3's closure note. |
 | 18 | targetGraphic | Refuted by runtime (Unity auto-assigns from the same GameObject). |
 
 Also measured: **the starter crate affords the full 4-wheel beam assembly**
@@ -61,10 +61,26 @@ No device operator remains. These ship on editor evidence only:
 
 ## 3. Carried open
 
-- **#15 — placement dead in built players.** The one open defect a player
-  meets in the first minute. Lead: a commit path that refuses **without
-  writing `message`**. Needs a **two-producer instrument** (picking-path ray
-  vs render camera), not a round-trip.
+- ✅ **#15 — CLOSED 2026-08-12, and it was never what it said it was.** A
+  trace at every link of the commit chain (three independent writers — UI
+  release edge, input seam, builder gates — frame numbers aligned, each
+  logging INPUTS at its decision) ran on a fresh release sim build. Result:
+  **place and remove both complete end-to-end** (`ADD done, parts=2` on the
+  first drag; `REM hit=True` on a finger-speed tap). The observation
+  decomposed into two mechanisms:
+  1. *Instrument:* a quick synthetic tap produced **zero trace lines** — the
+     catalogued sub-frame artifact; the touch never existed as input. A
+     150 ms press placed every time. "Dev places fine" was frame rate.
+  2. *Product (real, fixed):* arming REMOVE writes a message → the message
+     bar deepens the top band → with the dock OPEN the robot's last visible
+     sliver is 100% covered, so "tap a part on the robot" had zero tappable
+     pixels; the trace shows `overUI(lastP)=True` at coordinates that placed
+     parts a minute earlier. Fix: REMOVE's onClick collapses the dock (WATCH
+     precedent). TouchSmoke 31/31 with two new contract checks; career save
+     byte-identical, mtime included. The matrix-desync lead is dead — picking
+     was never wrong. Prediction written before measurement; the outcome was
+     the fifth branch ("the original test was wrong"), which the prediction
+     file had named explicitly.
 - **#8** — rescoped: the type pass has no per-panel concept; not a list fix.
 - **#25** — two post-launch benches: a swept Button floor check (fail on
   unresolvable names; fail on dpi<1 instead of returning 99f), and a

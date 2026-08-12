@@ -173,6 +173,13 @@ public class TouchSmoke : MonoBehaviour
         Check(Btn("REMOVE") != null, "REMOVE button present");
         Tap("REMOVE"); yield return null;
         Check(ui.RemoveArmed, "REMOVE arms on tap");
+        // #15 (2026-08-12): arming REMOVE must CLOSE the dock. With it open,
+        // the armed message deepens the top band and the robot's last visible
+        // sliver vanishes under UI — "tap a part" had zero tappable pixels and
+        // every try was silently eaten. Measured on a release sim player.
+        Check(!ui.DockOpen, "arming REMOVE collapses the dock");
+        ui.SetDockOpen(true); yield return null;   // rest of this flow drives dock buttons; reopening does not disarm
+        Check(ui.RemoveArmed, "reopening the dock does not disarm REMOVE");
         Check(ui.StatsLine.Contains("REMOVE armed"), "stats bar shows the armed instruction");
         Vector3 beamPos = PartOnScreen(false);
         Check(beamPos != Vector3.zero, "placed part visible for removal");
