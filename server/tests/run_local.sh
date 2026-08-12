@@ -64,6 +64,23 @@ export TRUST_PROXY="1"
 RB_PORT="${RB_PORT:-5099}"
 BASE="http://localhost:$RB_PORT"
 
+# ⚠ ONE DATABASE AND ONE PORT ARE NOT ENOUGH FOR TWO AGENTS — 2026-08-10.
+#
+# The port guard below makes a second concurrent run FAIL LOUDLY, which is
+# right. The database had no such guard: two sessions both reset `rb` and both
+# kept running, so each saw the other's truncations as its own data vanishing.
+# Measured during a verification pass — an account created at 17:33 was gone by
+# 17:41 and its login began returning 401, and the cost was two wasted probe
+# runs before the tester worked out it was not their bug. Nothing was
+# destroyed; the VERIFICATION was, which is worse than a crash because it looks
+# like a finding.
+#
+# A second worker gets its own everything:
+#     RB_DB=rb_test RB_PORT=5098 bash server/tests/run_local.sh
+# Create it once with:  createdb -h localhost -U rb -O rb rb_test
+RB_DB="${RB_DB:-rb}"
+export RB_DB
+
 if lsof -nP -iTCP:"$RB_PORT" -sTCP:LISTEN >/dev/null 2>&1; then
   echo "Port $RB_PORT is already in use — stop the API running in your other tab (Ctrl-C) and re-run."
   exit 2
@@ -91,14 +108,14 @@ fi
 # repeatable, which is the one thing this block exists to guarantee. Six
 # checks failed this way before anyone noticed the counter was the problem.
 echo "resetting the dev database…"
-PGPASSWORD=rb psql -h localhost -U rb -d rb -qtA \
+PGPASSWORD=rb psql -h localhost -U rb -d "$RB_DB" -qtA \
   -c "TRUNCATE ledger, match_jobs, matches, snapshots, robots, users, tickets, ratings, seasons RESTART IDENTITY CASCADE;" \
   -c "UPDATE ladder_config SET value = '1' WHERE key = 'current_season';" \
   >/dev/null 2>&1 || echo "  (nothing to reset — first run, or the schema is not up yet)"
 
 echo "starting the API (log: qa_api_server.log)…"
 ( cd RobotBrawl.Api && \
-  PG_CONN="Host=localhost;Username=rb;Password=rb;Database=rb" \
+  PG_CONN="Host=localhost;Username=rb;Password=rb;Database=$RB_DB" \
   JWT_SECRET="dev-only-change-me-0123456789abcdef" \
   WORKER_KEY="dev-only-worker-key" \
   BLOB_ROOT="/tmp/rb-blobs" \

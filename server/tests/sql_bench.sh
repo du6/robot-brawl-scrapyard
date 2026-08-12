@@ -16,7 +16,15 @@ set -uo pipefail
 
 API_SQL="$(dirname "$0")/../RobotBrawl.Api/Sql"
 export PGPASSWORD=${PGPASSWORD:-rb}
-PSQL=(psql -h 127.0.0.1 -U rb -d rb -v ON_ERROR_STOP=0 -qtA)
+
+# RB_DB is a parameter because THIS BENCH TRUNCATES EVERY TABLE, and more than
+# one agent works this repo at once — 2026-08-10. Two sessions sharing one `rb`
+# is not a slow bench, it is a WRONG one: a verification pass measured an
+# account vanish mid-run and spent two probes hunting a bug that was another
+# session resetting the database underneath it. Point a second worker at its
+# own database (RB_DB=rb_test) and neither can see the other.
+RB_DB="${RB_DB:-rb}"
+PSQL=(psql -h 127.0.0.1 -U rb -d "$RB_DB" -v ON_ERROR_STOP=0 -qtA)
 
 pass=0; fail=0
 ok()   { pass=$((pass+1)); printf 'PASS  %s\n' "$1"; }
