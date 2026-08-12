@@ -70,12 +70,18 @@ No device operator remains. These ship on editor evidence only:
   unresolvable names; fail on dpi<1 instead of returning 99f), and a
   separate occlusion bench.
 - **#11 predictions 3-5** — both fights were undriven; needs a driven fight.
-- **The dpi question** — `3a61d72` says TEST DRIVE's rect is "69.9pt,
-  comfortably over the floor", but the ladder's own 197px at sf≈1.79 implies
-  `TouchRow()` at its 110-unit **ceiling**, which binds only above dpi≈730 —
-  where the rect is 44pt *or less* and a bound ceiling is a shipped floor
-  breach on every TouchRow-sized control, invisible to the check (it divides
-  by the same dpi). Resolving datum: `Screen.dpi` as the build reports it.
+- **The dpi question — CLOSED (probe, post-assembly), and what it found is
+  a new defect.** dpi is 460 in both APIs; `TapTargetPt("test")` itself
+  returns 69.9 pt; the `3a61d72` sentence stands. But the rect is 110.00
+  units against a live `TouchRow()` of 69.26 — **it was sized in `Awake`,
+  when `canvas.scaleFactor` was still 1**, so the formula overshot to 124,
+  hit the 110 ceiling, and froze. TEST DRIVE is 59% OVERSIZED by accident
+  of sign; the same mechanism can UNDERSHOOT on other geometry, and every
+  `TouchRow()`-sized control built in `Awake` and not revisited by
+  `ApplyTouchSizes` shares it. The floor check reads the frozen value and
+  calls it correct — correct against a scale factor that no longer applies.
+  This is the file's own `:1947` stale-Awake warning firing for real, and
+  it belongs in #25's sweep design: enumerate the Awake-sized set.
 - #21, #22, #10, #20, #3, #4 — unchanged, previously scoped.
 
 ## 4. Owen's register — decisions, never scheduled as work
