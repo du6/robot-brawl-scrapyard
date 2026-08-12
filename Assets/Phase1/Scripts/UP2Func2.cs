@@ -184,7 +184,7 @@ public class UP2Func2 : MonoBehaviour
         W("   selfMove = how far the ATTACKER moved, so pull can be told from the attacker closing.");
         var cases = new[] {
             new[]{"pivot","blade"}, new[]{"pivot","wedge"}, new[]{"pivot","hook"}, new[]{"pivot","spike"},
-            new[]{"-","spinner"}, new[]{"-","spinnerSaw"}, new[]{"-","spike"}, new[]{"-","blade"}, new[]{"-","-"},
+            new[]{"-","spinner"}, new[]{"-","spike"}, new[]{"-","blade"}, new[]{"-","-"},   // saw removed 2026-08-12
         };
         foreach (var c in cases)
         {

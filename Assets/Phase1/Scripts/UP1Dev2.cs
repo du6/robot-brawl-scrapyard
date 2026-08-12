@@ -198,8 +198,7 @@ public class UP1Dev2 : MonoBehaviour
     IEnumerator F_Discs()
     {
         W("\n## F2. SPINNER / SPINNERSAW - do they spin, and what do they cost?");
-        foreach (var pair in new[] { new KeyValuePair<string, string>("spinner", "0.675"),
-                                     new KeyValuePair<string, string>("spinnerSaw", "0.655") })
+        foreach (var pair in new[] { new KeyValuePair<string, string>("spinner", "0.675") })   // saw removed 2026-08-12
         {
             string snap = SK + ENG1 + pair.Key + "|0.000,0.975," + pair.Value + "|0|0.00,0.00,1.00|Steel\n";
             bm.LoadSnapshot(snap); yield return null;

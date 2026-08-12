@@ -219,7 +219,8 @@ public static class DamageResolver
     /// WHY 0.012 m3. It is the smallest value that puts the blade at parity with
     /// the LEGACY DISC CLASS (spinner 0.0116 / spinnerSaw 0.0127) - the game's
     /// own statement of how tough a spinning steel weapon is - rather than an
-    /// invented number. Resulting blade hp: ABS 25 / Alu 43 / Steel 72 /
+    /// invented number. (The saw was removed from the catalog 2026-08-12; the
+    /// floor stands on the spinner's 0.0116, which it still brackets.) Resulting blade hp: ABS 25 / Alu 43 / Steel 72 /
     /// CarbonFiber 79 / Tungsten 86 / Titanium 101, against a chassis 126-504.
     /// An edge is still the softest thing on the machine, as it should be; it
     /// now survives its own second swing, and - the part that was actually

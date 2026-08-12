@@ -251,10 +251,10 @@ public class UP3Func : MonoBehaviour
     IEnumerator SecSpin()
     {
         W("## SPINNERS: omega ramp with the trigger held, then bite against the dummy");
-        string[] ids = { "spinner", "spinnerSaw" };
+        string[] ids = { "spinner" };   // saw removed 2026-08-12
         foreach (var id in ids)
         {
-            float hz = id == "spinnerSaw" ? 0.03f : 0.05f;
+            float hz = 0.05f;
             string rig = SKEL + string.Format("{0}|0.000,0.700,{1:F3}|0|0.00,0.00,1.00|Steel\n", id, 0.65f + hz);
             bool ok = false; yield return Enter(rig, o => ok = o);
             if (!ok) { W("  " + id + ": rig failed"); yield return Leave(); continue; }

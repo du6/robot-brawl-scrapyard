@@ -110,17 +110,13 @@ public static class PartVisualFactory
         // 11 identical-looking beams told the player nothing about a build that
         // mixed three alloys.
         Material body = Mat(fallback, metallic, smoothness);
-        // ROUND-UP2 FIX A2, found while fixing the builder's axis-code path and
-        // MEASURED here: "spinnerSaw" also StartsWith("spinner"), so the saw
-        // was parsed with the WRONG PREFIX - ParseAxis read id[7] = 'S' out of
-        // "spinnerSawXP_0", failed to match X/Y/Z and returned the +Y fallback.
-        // Measured drawn bounds: spinnerXP 0.237x0.338x0.348 vs spinnerYP
-        // 0.338x0.237x0.348 (correctly different), but spinnerSawXP and
-        // spinnerSawYP both 0.457x0.276x0.471 - IDENTICAL. Every side-mounted
-        // circular saw in the arena, on the player's machine and on every enemy
-        // recipe that carries one, was drawn as a horizontal disc. Longest
-        // prefix first, which is the only ordering that is safe here.
-        if (id.StartsWith("spinnerSaw")) { SpinnerArena(root, size, ParseAxis(id, "spinnerSaw", Vector3.up)); return; }
+        // The saw branch that used to sit above this line is gone with the
+        // part (2026-08-12), but its lesson is load-bearing and stays: when
+        // two ids share a prefix, match the LONGEST PREFIX FIRST. ROUND-UP2
+        // FIX A2 measured "spinnerSaw".StartsWith("spinner") sending every
+        // side-mounted saw through the wrong ParseAxis and drawing it as a
+        // horizontal disc. If a part family ever grows a suffixed sibling
+        // again, its branch goes ABOVE the shorter prefix, not below.
         if (id.StartsWith("spinner")) { SpinnerArena(root, size, ParseAxis(id, "spinner", Vector3.up)); return; }     // weapons: no sockets
         if (id.StartsWith("spike")) { SpikeArena(root, size, ParseAxis(id, "spike", Vector3.forward)); return; }
         // ---- Phase 4 base components. Actuators KEEP their socket dots: unlike

@@ -134,7 +134,7 @@ public class UP2Func : MonoBehaviour
         W("   tip = the part on the pivot; direct = bolted to the chassis, no actuator");
         var cases = new[] {
             new[]{"blade","pivot"}, new[]{"wedge","pivot"}, new[]{"hook","pivot"}, new[]{"spike","pivot"},
-            new[]{"spinner","-"}, new[]{"spinnerSaw","-"}, new[]{"spike","-"}, new[]{"none","-"},
+            new[]{"spinner","-"}, new[]{"spike","-"}, new[]{"none","-"},   // saw removed 2026-08-12
         };
         foreach (var c in cases)
         {
@@ -281,7 +281,7 @@ public class UP2Func : MonoBehaviour
         {
             string snap = SKEL + (b == 2 ? "battery|0.000,1.250,0.000|0|0.00,0.00,0.00|ABS\n" : "")
                 + "spindle|0.000,0.700,-0.775|0|0.00,0.00,-1.00|Steel\n"
-                + "spinnerSaw|0.000,0.700,-1.100|0|0.00,0.00,-1.00|Tungsten\n";
+                + "spinner|0.000,0.700,-1.100|0|0.00,0.00,-1.00|Tungsten\n";   // was the saw; removed 2026-08-12
             yield return Enter(snap);
             var pp = bm.testRobot != null ? bm.testRobot.GetComponentInChildren<PowerPlant>(true) : null;
             if (pp == null) { W("batteries=" + b + ": no powerplant"); yield return Leave(); continue; }

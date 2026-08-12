@@ -239,9 +239,13 @@ public class P1PartDef
             new P1PartDef { id = "spinner", label = "Spinner blade",     category = P1Category.Weapon,     size = new Vector3(0.34f, 0.10f, 0.34f),
                             matName = "Steel", edgeHardness = 1.5f, massMul = 1.67f,
                             desc = "Dense steel flywheel. NO motor - bolt it past a spindle. Short reach, but the heaviest rim in the catalog: slow to wind up and it hits like nothing else." },
-            new P1PartDef { id = "spinnerSaw", label = "Circular saw",   category = P1Category.Weapon,     size = new Vector3(0.46f, 0.06f, 0.46f),
-                            matName = "Steel", edgeHardness = 1.6f, massMul = 0.60f,
-                            desc = "Wide, thin rotor. NO motor - bolt it past a spindle. 35% more reach than the spinner and spins up in a third of the time, but far less rim mass behind each bite." },
+            // "spinnerSaw" (Circular saw) was REMOVED 2026-08-12 — owen's
+            // call, redundancy cut: same role as the spinner (rotor bolted
+            // past a spindle), differentiated only on paper (reach/spin-up vs
+            // rim mass) and never once measured against it. No shipped save,
+            // no enemy recipe and no production ladder snapshot carried one —
+            // verified before the cut. If a saved id ever surfaces anyway,
+            // the loader's unknown-part path answers for it, not this table.
             new P1PartDef { id = "spike",   label = "Ram spike",         category = P1Category.Weapon,     size = new Vector3(0.22f, 0.22f, 0.30f),
                             matName = "Steel", edgeHardness = 1.2f,
                             desc = "Hardened steel wedge. No motor - point it at the enemy and drive." },
