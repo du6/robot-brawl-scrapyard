@@ -82,3 +82,28 @@ scheduler change.
   Order matters: the scheduler's first tick against the OLD api would roll
   the season instantly (no guard). Deliberately left for owen — it changes
   the live service and starts a real (guarded) scrap faucet.
+
+## Postscript — deployed the same day (c2649cc)
+
+Owen said run it, and the deploy immediately surfaced a fourth finding:
+**production's season 1 already had a row — ending at a 2099 sentinel**
+(`003_ratings.sql`, "runs to 2099 because §2.4's season rollover does not
+exist yet"). Two consequences, both fixed before the scheduler went in:
+
+- The guard would have ticked politely until 2099. It now **retires the
+  sentinel on the first unforced tick** (`ON CONFLICT DO UPDATE … WHERE
+  ends_at = sentinel` — structurally unable to touch a real clock), and the
+  smoke checks assert the retirement, not row-existence — the existence
+  check had been passing **vacuously** against the migrated row.
+- `SeasonLabel` would have rendered "ends in 4500d"; it now caps the
+  countdown at a year. Its new fixtures also caught
+  `RoundtripKind|AdjustToUniversal` being an illegal `DateTimeStyles`
+  combination — the label would have **thrown on the first real date it
+  ever parsed**. The first caller was the bench, not a player.
+
+**Live state, verified**: API revision `20260812-151959`; scheduler
+`rb-season-rollover` ENABLED, daily 09:30 UTC; first tick fired manually —
+production season 1 ends **2026-09-09**, board lists 3 robots once, ledger
+untouched. The first real podium pays out on that day's tick.
+Re-measured after: run_local 53/53 + **209/209**, LadderClientBench
+**40/40**. Still owed: a screenshot of a badge on a live scouting card.
