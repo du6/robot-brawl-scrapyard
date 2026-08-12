@@ -1265,71 +1265,6 @@ public class MobileBuilderUI : MonoBehaviour
     /// answer that survives the tiles scrolling. A per-category base tint on
     /// the tile makes the shelf legible at a glance without spending the two
     /// lines of tile text on a category name.</summary>
-    /// <summary>⚠ TEMPORARY DIAGNOSTIC, 2026-08-11 — delete once the
-    /// builder-inert question is settled. It answers ONE question and is not a
-    /// feature.
-    ///
-    /// THE QUESTION. On RELEASE builds no part can be placed or removed by
-    /// tapping the robot, while camera orbit responds and every dock control
-    /// works. That isolates the failure to the WORLD-SPACE raycast, and
-    /// BuilderManager already documents a mechanism that would produce exactly
-    /// it — PumpUiFraming overrides cam.projectionMatrix for the dock lens
-    /// shift, and its own comment warns:
-    ///
-    ///     "overriding projectionMatrix can desynchronise ScreenPointToRay, and
-    ///      ScreenPointToRay is how parts get placed — a silent version of this
-    ///      bug would leave the robot looking right and dropping parts a few
-    ///      centimetres from the finger."
-    ///
-    /// (BuilderManager.PumpUiFraming, the TRAP paragraph.) The author described
-    /// tonight's symptom before it happened. This prints the round trip that
-    /// comment says it verified once, so it can be read off a BUILD instead.
-    ///
-    /// WHAT IT MEASURES. Take a real point on the machine, ask the camera where
-    /// it APPEARS (WorldToScreenPoint), then ask the camera for the ray THROUGH
-    /// that same screen point (ScreenPointToRay). If the two agree, the ray
-    /// passes through the point and `perp` is ~0. If the projection override
-    /// has desynchronised them, the ray misses by `perp` world-metres and every
-    /// tap lands somewhere the part is not.
-    ///
-    /// ⚠ PREDICTION, WRITTEN BEFORE THE MEASUREMENT (house rule 6):
-    ///   1. If the desync is real AND caused by the lens shift, perp is NONZERO
-    ///      and CHANGES when the dock opens or closes — because the shift is
-    ///      driven by coverBottom/coverTop, which is what the dock changes.
-    ///   2. If perp is nonzero but IDENTICAL in both dock states, the offset is
-    ///      real but is NOT the lens shift, and PumpUiFraming is exonerated.
-    ///   3. If perp is ~0 in both states, the projection is fine and the fault
-    ///      is upstream — the tap never reaches the world layer at all.
-    /// Read it twice, dock OPEN and dock COLLAPSED. That pair is the control
-    /// leg; a single reading cannot separate 1 from 2.
-    ///
-    /// Gated on Debug.isDebugBuild, which on this project's simulator builds is
-    /// true even in release config (measured 2026-08-10) — the one time that
-    /// platform quirk is convenient, since it means this renders on the very
-    /// build that fails.</summary>
-    string RayDeltaReadout()
-    {
-        if (!Debug.isDebugBuild || bm == null) return "";
-        var cam = Camera.main;
-        if (cam == null) return "   ·   [ray] no camera";
-
-        // A real point ON the machine, not an invented one: the thing a player
-        // is trying to tap. Falls back to the build origin on an empty bench.
-        Vector3 p = bm.transform.position;
-        if (bm.placed != null && bm.placed.Count > 0 && bm.placed[0] != null
-            && bm.placed[0].go != null) p = bm.placed[0].go.transform.position;
-
-        Vector3 s = cam.WorldToScreenPoint(p);
-        if (s.z <= 0f) return "   ·   [ray] behind camera";
-        Ray r = cam.ScreenPointToRay(s);
-        // Perpendicular distance from the point to the ray that should hit it.
-        float perp = Vector3.Cross(r.direction.normalized, p - r.origin).magnitude;
-
-        return string.Format("   ·   [ray] perp {0:F3}m  dock {1}  cover {2:F0}/{3:F0}",
-                             perp, dockOpen ? "OPEN" : "SHUT",
-                             MobileBuilderUI.coverBottom, MobileBuilderUI.coverTop);
-    }
-
     Color CatTint(int i)
     {
         switch (bm != null ? bm.PartCategory(i) : "")
@@ -4559,7 +4494,6 @@ public class MobileBuilderUI : MonoBehaviour
             statsText.text = bm.HasSelection
                 ? string.Format("HOLDING {0} — tap the robot to place  ·  {1} kg · {2} part{3}", bm.PartLabel(bm.SelectedPart), bm.BuildMassInt, bm.PlacedCount, bm.PlacedCount == 1 ? "" : "s")
                 : string.Format("{0} kg · {1} part{2}  ·  {3}", bm.BuildMassInt, bm.PlacedCount, bm.PlacedCount == 1 ? "" : "s", TabHint());
-            statsText.text += RayDeltaReadout();
             // C3: live weight-cap readout against the targeted league
             if (Career.active)
             {
