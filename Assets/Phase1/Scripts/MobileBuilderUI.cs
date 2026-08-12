@@ -217,6 +217,29 @@ public class MobileBuilderUI : MonoBehaviour
     Button arenaSecAccount;
     // ---- P3a: the Program Bench canvas (career-only tab, index 5) ----
     GameObject programPanel; ProgramCanvas programCanvas;
+
+    /// <summary>⚠ THE ONE LIST OF TAB PANELS. Every pass that treats "the tab
+    /// panels" as a set MUST iterate this and never a hand-written array.
+    ///
+    /// It exists because there were two such arrays and they disagreed. The
+    /// creation loop listed SEVEN panels; the safe-area inset pass in
+    /// ApplyTouchSizes listed SIX, omitting programPanel — so the PROGRAM tab
+    /// received no notch inset at all and its content started ~70 px left of
+    /// every other tab. On a notched iPhone in landscape that put the title,
+    /// the hint and two buttons under the Dynamic Island: "PR[#]GRAM",
+    /// "[#]GRAMS", and a green button reduced to "[#]HAT" that could not be
+    /// identified. Career-only, i.e. every tester in the whole of career mode.
+    ///
+    /// ⚠ ADDING "programPanel" AS A SEVENTH NAME WOULD HAVE BEEN THE FIX THAT
+    /// RECREATES THIS BUG — the next panel would be added to one array and not
+    /// the other, exactly as this one was. House rule 1: measure over
+    /// EVERYTHING, not over a named list. One field, two consumers.
+    ///
+    /// (The touch-floor pass in the same method has the SAME disease over a
+    /// different named set — see the ApplyTouchSizes font list and #8. That one
+    /// is a list of TEXT elements, not panels, so this field does not fix it;
+    /// it is the same lesson needing its own application.)</summary>
+    GameObject[] tabPanels;
     InputField nameInput;
     int retireArmM = -1;
     int bpDelArmM = -1;   // OWEN: blueprint armed for deletion
@@ -521,7 +544,9 @@ public class MobileBuilderUI : MonoBehaviour
         robotsPanel = MkPanel("robots", dock.transform, new Color(0f, 0f, 0f, 0f));
         arenaPanel = MkPanel("arena", dock.transform, new Color(0f, 0f, 0f, 0f));
         programPanel = MkPanel("program", dock.transform, new Color(0f, 0f, 0f, 0f));   // P3a
-        foreach (var p in new[] { buildPanel, fightPanel, garagePanel, shopPanel, robotsPanel, arenaPanel, programPanel })
+        tabPanels = new[] { buildPanel, fightPanel, garagePanel, shopPanel,
+                            robotsPanel, arenaPanel, programPanel };
+        foreach (var p in tabPanels)
         {
             var rt = p.GetComponent<RectTransform>();
             rt.anchorMin = new Vector2(0f, 0f); rt.anchorMax = new Vector2(1f, 1f);
@@ -1982,8 +2007,9 @@ public class MobileBuilderUI : MonoBehaviour
             var rt = tb.GetComponent<RectTransform>();
             if (rt != null) rt.sizeDelta = new Vector2(-4f, R);
         }
-        foreach (var pn in new[] { buildPanel, fightPanel, garagePanel, shopPanel,
-                                   robotsPanel, arenaPanel })
+        // tabPanels, never a fresh array — this pass used to list six of the
+        // seven and PROGRAM went uninset. See the field's comment.
+        foreach (var pn in tabPanels ?? new GameObject[0])
         {
             if (pn == null) continue;
             var rt = pn.GetComponent<RectTransform>();
