@@ -125,7 +125,16 @@ namespace RobotBrawl.Phase0
             yield return LadderClient.Leaderboard(Cats[catIndex], (rows, err) =>
             {
                 if (err != null) { Say("leaderboard: " + err, SC_BOARD); }
-                else { board = rows; Say(rows.Count + " ranked", SC_BOARD); }
+                else
+                {
+                    board = rows;
+                    // §2.4: the season IS the re-entry point, so it rides the
+                    // board's own status line. Empty until the first board
+                    // ever fetched; no countdown until the rollover
+                    // scheduler's first tick starts the season clock.
+                    string seas = LadderClient.SeasonLabel();
+                    Say(rows.Count + " ranked" + (seas.Length > 0 ? " · " + seas : ""), SC_BOARD);
+                }
             });
             if (!string.IsNullOrEmpty(LadderClient.Token))
             {
@@ -489,6 +498,26 @@ namespace RobotBrawl.Phase0
         //
         // Named for BuilderManager.AutonomyBlocker, the same idiom: null means
         // "nothing is stopping you".
+
+        /// <summary>One line of podium history — "podium: S1 #1 MIDDLE (1574)
+        /// · S1 #2 FEATHER (1502)". Static and shared by BOTH card renderers,
+        /// the ChallengeBlocker idiom: one producer, so the OnGUI card and the
+        /// dock card cannot drift. Capped at four — a scouting card is a
+        /// glance, not a trophy room.</summary>
+        public static string BadgeLine(ScoutCard card)
+        {
+            var sb = new System.Text.StringBuilder("podium: ");
+            int n = card.badges.Count < 4 ? card.badges.Count : 4;
+            for (int i = 0; i < n; i++)
+            {
+                var b = card.badges[i];
+                if (i > 0) sb.Append("  ·  ");
+                sb.Append("S").Append(b.season).Append(" #").Append(b.place)
+                  .Append(" ").Append(b.category).Append(" (").Append((int)b.rating).Append(")");
+            }
+            if (card.badges.Count > n) sb.Append("  +").Append(card.badges.Count - n).Append(" more");
+            return sb.ToString();
+        }
 
         /// <summary>Your robots that may legally answer this card. §1.2: you
         /// may punch UP, never down, so a robot's class index must be ≤ the
@@ -858,6 +887,11 @@ namespace RobotBrawl.Phase0
             GUILayout.Label("<b>" + card.robotName + "</b>   " + card.category + "   "
                             + card.massKg + " kg",
                             new GUIStyle(GUI.skin.label) { richText = true });
+            // Past podiums, before the parts: what this robot has DONE is
+            // scouting information of a different order than what it is made
+            // of. Absent entirely when there are none — an empty trophy shelf
+            // is not a fact worth a line.
+            if (card.badges.Count > 0) GUILayout.Label(BadgeLine(card));
             GUILayout.Label(card.parts.Count + " parts: " + string.Join(", ", card.parts.ToArray()));
             // Whether they have a program, never WHAT it is.
             GUILayout.Label(card.hasProgram ? "has a program (contents private)" : "no program");

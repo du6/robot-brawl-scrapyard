@@ -38,6 +38,7 @@ The records, most recent first:
 
 | doc | what |
 |---|---|
+| `docs/Seasons_Live_2026-08-12.md` | seasons wired end-to-end; the board double-listing the first rollover would have detonated; deploy is TWO commands IN ORDER, owen's go |
 | `docs/LAUNCH_CHECKLIST_2026-08-10.md` | **START HERE before shipping** — what is ready, what needs a phone, what needs owen |
 | `docs/CareerBench_Sample_Size_2026-08-10.md` | three of eleven balance verdicts were coin flips |
 | `docs/Disarm_Lever_Sweep_2026-08-10.md` | which lever moves the 43% — and the one that sounds right does nothing |
@@ -318,11 +319,12 @@ RUN**. Read a skip line as missing cover, never as a pass.
 
 ## Current state, briefly
 
-**Green, all re-measured 2026-08-10:** CategoryBench 44/44 · ReplayBench 60/60
+**Green, all re-measured 2026-08-10 (counts updated 2026-08-12 where a bench
+grew):** CategoryBench 44/44 · ReplayBench 60/60
 · ProgramBench 40/40 · MatrixBench 10/10 FLOOR + 3/3 SWEEP · `sql_bench.sh`
-**53/53** · `api_smoke.sh` **198/198** (and **196/196 against docker
-compose**) · `restore_drill.sh` 10/10 · WorkerBench **47/47** · FuzzBench
-25/25 · FightWorkerBench 21/21 play + 26/26 pure · LadderClientBench **28/28**
+**53/53** · `api_smoke.sh` **208/208** (196/196 against docker compose was
+measured at the old count) · `restore_drill.sh` 10/10 · WorkerBench **47/47** · FuzzBench
+25/25 · FightWorkerBench 21/21 play + 26/26 pure · LadderClientBench **37/37**
 · LadderLiveBench 11/11 · DisarmBench 32/32 · **CareerSmoke 128/128** ·
 **VerbBench 32/32** · **AutonomyBench 24/24** · **CanvasDragBench 31/31** ·
 **TestDebugBench 30/30** · **TouchSmoke 29/29** · **HazardBench 23/23** ·

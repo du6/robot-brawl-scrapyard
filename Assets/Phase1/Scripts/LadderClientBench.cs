@@ -129,6 +129,45 @@ namespace RobotBrawl.Phase0
             Check(RobotWorker.Field("{\"displayName\":\"Owen\"}", "token") == null,
                   "a response with NO token yields null, so the client can refuse it");
 
+            log.Add("== H. seasons — the board's identity and the card's podium (2026-08-12) ==");
+            // The board response carries "season" AND "seasonEndsAt"; the
+            // probe is an exact quoted key, so one must never half-match the
+            // other. Same silence-shaped failure mode as everything above:
+            // dropped season fields render as a board with no season line,
+            // which looks exactly like the old server.
+            string lb2 = "{\"category\":\"ALL\",\"count\":1,\"season\":2,"
+              + "\"seasonEndsAt\":\"2026-09-05T09:30:00Z\",\"entries\":["
+              + "{\"rank\":1,\"category\":\"MIDDLE\",\"rating\":1400,\"deviation\":80,"
+              + "\"provisional\":false,\"robotId\":\"r-1\",\"robotName\":\"Defiant\",\"owner\":\"DF\","
+              + "\"activeSnapshotId\":\"s-1\",\"updatedAt\":\"2026-08-12T00:00:00Z\"}]}";
+            Check(RobotWorker.Field(lb2, "season") == "2", "the top-level season reads 2, not seasonEndsAt's prefix");
+            Check(RobotWorker.Field(lb2, "seasonEndsAt") == "2026-09-05T09:30:00Z", "…and the end stamp survives");
+            // An old-server response (no season fields) must parse as season
+            // 0 / empty, so SeasonLabel() says nothing rather than lying.
+            Check(RobotWorker.Field(lb, "season") == null, "a board with NO season field yields null, so the label stays silent");
+
+            // seasonHistory on a scouting card: the server has sent it since
+            // the badges shipped; parsing it wrong renders a champion as a
+            // nobody, silently.
+            string cardJson = "{\"id\":\"s-9\",\"status\":\"ACTIVE\",\"robotName\":\"Vice\","
+              + "\"massKg\":220,\"category\":\"MIDDLE\",\"partsManifest\":[\"beam\",\"wheel\"],"
+              + "\"seasonHistory\":["
+              + "{\"season\":2,\"category\":\"MIDDLE\",\"place\":1,\"rating\":1574.3},"
+              + "{\"season\":1,\"category\":\"FEATHER\",\"place\":3,\"rating\":1302.0}],"
+              + "\"mine\":false}";
+            var hist = LadderClient.Objects(cardJson, "seasonHistory");
+            Check(hist.Count == 2, "two badges split out of seasonHistory (got " + hist.Count + ")");
+            if (hist.Count == 2)
+            {
+                Check(RobotWorker.Field(hist[0], "place") == "1", "the podium place survives");
+                Check(RobotWorker.Field(hist[0], "category") == "MIDDLE", "…with its category");
+                Check(RobotWorker.Field(hist[1], "season") == "1", "…and badges keep their own seasons");
+            }
+            Check(LadderClient.Objects(cardJson, "partsManifest").Count == 0,
+                  "a STRING array does not masquerade as badge objects");
+            Check(LadderClient.Objects("{\"id\":\"s-1\"}", "seasonHistory").Count == 0,
+                  "a card with no history parses to an empty shelf, not a crash");
+
             log.Add(" RESULT: " + passed + " pass, " + failed + " fail" + (failed == 0 ? " - ALL GREEN" : ""));
             Debug.Log("[LadderClientBench] RESULT: " + passed + " pass, " + failed + " fail");
             try

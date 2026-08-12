@@ -33,4 +33,14 @@ PASS  a token is found
 PASS  ...and the JWT's dots and -_ base64url chars survive the parse
 PASS  the display name survives
 PASS  a response with NO token yields null, so the client can refuse it
- RESULT: 28 pass, 0 fail - ALL GREEN
+== H. seasons — the board's identity and the card's podium (2026-08-12) ==
+PASS  the top-level season reads 2, not seasonEndsAt's prefix
+PASS  …and the end stamp survives
+PASS  a board with NO season field yields null, so the label stays silent
+PASS  two badges split out of seasonHistory (got 2)
+PASS  the podium place survives
+PASS  …with its category
+PASS  …and badges keep their own seasons
+PASS  a STRING array does not masquerade as badge objects
+PASS  a card with no history parses to an empty shelf, not a crash
+ RESULT: 37 pass, 0 fail - ALL GREEN

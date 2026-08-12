@@ -3159,6 +3159,16 @@ public class MobileBuilderUI : MonoBehaviour
         head.color = new Color(0.90f, 0.94f, 1f);
         head.gameObject.AddComponent<LayoutElement>().minHeight = 26f;
 
+        // Past podiums, same producer as the OnGUI card (BadgeLine), in the
+        // career gold. Absent entirely when the shelf is empty.
+        if (card.badges.Count > 0)
+        {
+            var bd = MkText("cardbadges", arenaCardContent,
+                ArenaScreen.BadgeLine(card), 13, TextAnchor.MiddleLeft);
+            bd.color = new Color(1f, 0.82f, 0.25f);
+            bd.gameObject.AddComponent<LayoutElement>().minHeight = 20f;
+        }
+
         var parts = MkText("cardparts", arenaCardContent,
             card.parts.Count + " parts: " + string.Join(", ", card.parts.ToArray()),
             13, TextAnchor.UpperLeft);
@@ -3362,8 +3372,12 @@ public class MobileBuilderUI : MonoBehaviour
             // wrote, and otherwise says its own count.
             bool ownStatus = arenaScreen.StatusScope == ArenaScreen.SC_BOARD
                              && !string.IsNullOrEmpty(arenaScreen.Status);
+            // One producer for the season text (LadderClient.SeasonLabel), so
+            // this header and the OnGUI one cannot disagree.
+            string seas = LadderClient.SeasonLabel();
             SetArenaStatus(ownStatus ? arenaScreen.Status
-                : arenaScreen.CategoryLabel + " · " + arenaScreen.Board.Count + " ranked");
+                : arenaScreen.CategoryLabel + " · " + arenaScreen.Board.Count + " ranked"
+                  + (seas.Length > 0 ? " · " + seas : ""));
         }
         for (int i = 0; i < arenaCatBtns.Count; i++)
         {

@@ -51,6 +51,13 @@ namespace RobotBrawl.Phase0
         public string snapshotId = "", status = "", robotName = "", category = "", programHash = "";
         public int massKg;
         public bool hasProgram, mine;
+        /// <summary>§M3's "season history on robot cards": past PODIUM places,
+        /// public by design — the server has sent `seasonHistory` on every
+        /// scouting card since the badges shipped, and this client dropped it
+        /// unparsed until 2026-08-12. A card that says "1st in FEATHER at
+        /// 1574" two seasons on is what the badges exist FOR.</summary>
+        public struct SeasonBadge { public int season, place; public string category; public float rating; }
+        public List<SeasonBadge> badges = new List<SeasonBadge>();
         /// <summary>Part IDS only — §1.3 makes the design public and the code
         /// private, so this is the closest a scout gets to the build.</summary>
         public List<string> parts = new List<string>();
@@ -235,6 +242,31 @@ namespace RobotBrawl.Phase0
             return req;
         }
 
+        /// <summary>The board's season identity, set by every successful
+        /// Leaderboard() fetch. 0 until the first board arrives. EndsAt is the
+        /// server's ISO timestamp, "" while season 1's clock has not been
+        /// started by the rollover scheduler's first tick.</summary>
+        public static int BoardSeason;
+        public static string BoardSeasonEndsAt = "";
+
+        /// <summary>"season 2 · ends in 6d", or "" before any board has been
+        /// fetched. One producer for the two board renderers (OnGUI + dock),
+        /// so their headers cannot disagree.</summary>
+        public static string SeasonLabel()
+        {
+            if (BoardSeason <= 0) return "";
+            string s = "season " + BoardSeason;
+            System.DateTime end;
+            if (System.DateTime.TryParse(BoardSeasonEndsAt, null,
+                    System.Globalization.DateTimeStyles.RoundtripKind
+                    | System.Globalization.DateTimeStyles.AdjustToUniversal, out end))
+            {
+                double d = (end - System.DateTime.UtcNow).TotalDays;
+                s += d <= 1.0 ? " · ends today" : " · ends in " + (int)System.Math.Ceiling(d) + "d";
+            }
+            return s;
+        }
+
         public static IEnumerator Leaderboard(string category, Action<List<LadderEntry>, string> done)
         {
             string path = "/v1/leaderboard" + (string.IsNullOrEmpty(category) ? "" : "/" + category);
@@ -243,6 +275,12 @@ namespace RobotBrawl.Phase0
                 yield return req.SendWebRequest();
                 if (req.result != UnityWebRequest.Result.Success)
                 { LastError = req.error; done(null, req.error); yield break; }
+
+                // Top-level fields, read off the whole body: "season" is an
+                // exact quoted-key probe, so it cannot half-match
+                // "seasonEndsAt", and no entry object carries either key.
+                int.TryParse(RobotWorker.Field(req.downloadHandler.text, "season"), out BoardSeason);
+                BoardSeasonEndsAt = RobotWorker.Field(req.downloadHandler.text, "seasonEndsAt") ?? "";
 
                 var rows = new List<LadderEntry>();
                 foreach (string obj in Objects(req.downloadHandler.text, "entries"))
@@ -322,6 +360,17 @@ namespace RobotBrawl.Phase0
                 card.parts.AddRange(StringArray(j, "partsManifest"));
                 // Owner-only at the SERVER: a scout's response simply has none.
                 card.failReasons.AddRange(StringArray(j, "failReasons"));
+                foreach (string b in Objects(j, "seasonHistory"))
+                {
+                    var sb = new ScoutCard.SeasonBadge();
+                    int.TryParse(RobotWorker.Field(b, "season"), out sb.season);
+                    int.TryParse(RobotWorker.Field(b, "place"), out sb.place);
+                    sb.category = RobotWorker.Field(b, "category") ?? "";
+                    float.TryParse(RobotWorker.Field(b, "rating"),
+                        System.Globalization.NumberStyles.Float,
+                        System.Globalization.CultureInfo.InvariantCulture, out sb.rating);
+                    card.badges.Add(sb);
+                }
                 done(card, null);
             }
         }

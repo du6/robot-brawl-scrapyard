@@ -15,7 +15,7 @@ PASS  a wrong password and an unknown account are indistinguishable (both 401)
 
 == D. robots ==
 PASS  a robot is created
-      robot e0fa8af0-035a-48bf-93cb-fdadb50440ee
+      robot 1b53bb1f-ccb9-4d03-8351-fdfa3075e1e6
 PASS  …but not without a token
 
 == E. snapshot upload stays opaque (§5.2) ==
@@ -30,7 +30,7 @@ PASS  …and a wrong key is refused too
 PASS  a keyed worker claims a job
 PASS  …and the job is the VALIDATE the upload enqueued
 PASS  …pointing at the snapshot just uploaded
-PASS  …and carries a payload location the worker can resolve (file:///tmp/rb-blobs/snapshots/e0fa8af0-035a-48bf-93cb-fdadb50440ee/a403e07e179d4d88ac4b91c57ffa2e0e.json)
+PASS  …and carries a payload location the worker can resolve (file:///tmp/rb-blobs/snapshots/1b53bb1f-ccb9-4d03-8351-fdfa3075e1e6/63d1b1c60fa245cb8d3885921482a960.json)
 PASS  …and the payload sha256 rides along, so the worker can verify storage
 PASS  another worker cannot heartbeat a job it does not hold
 PASS  …the holder can
@@ -165,15 +165,22 @@ PASS  …without creating a single scrap of currency from nothing
 PASS  …while still moving the ladder, which is the entire point
 
 == P. season rollover (§2.4) ==
-PASS  a season rolls over
+PASS  an unforced rollover before the season is over refuses politely
+PASS  …saying rolled=false
+PASS  …and the refusal STARTED the season clock (a seasons row now exists)
+PASS  …still on the same season
+PASS  a FORCED season rolls over
 PASS  …into the next season
 PASS  …and the config now points at it
 PASS  …with a seasons row to point at
 PASS  …compressing 1574 halfway toward 1200 -> 1387
 PASS  …and resetting deviation HIGH, so the new season is genuinely open
 PASS  …leaving wallets intact apart from the season payouts
-PASS  …and closing the SAME season twice is refused
+PASS  …and closing the SAME season twice is refused, even forced
 PASS  …so nobody was paid for that season twice
+PASS  the board still answers after a rollover
+PASS  …scoped to the CURRENT season
+PASS  …listing each rated robot exactly once, not once per season
 
 == Q. cosmetics: the economy finally has a sink (§M3) ==
 PASS  the catalogue is public — you can window-shop signed out
@@ -235,7 +242,7 @@ PASS  metrics carry pendingSnapshots
 PASS  pendingSnapshots agrees with the database
 PASS  failed agrees with the database
 PASS  the rbmetrics log line keeps its shape
-      rbmetrics ready=0 claimed=0 failed=4 done=15 oldest_ready_s=0 oldest_heartbeat_s=0 pending_snapshots=3 oldest_pending_s=5
+      rbmetrics ready=0 claimed=0 failed=4 done=15 oldest_ready_s=0 oldest_heartbeat_s=0 pending_snapshots=3 oldest_pending_s=3
 PASS  …and reports real counts, not a row of zeros
 
 --- B. season badges ---
@@ -254,4 +261,4 @@ SKIP  blob URLs are built with the forwarded scheme -- no object store configure
   blob URLs are built with the forwarded scheme -- no object store configured (BLOB_S3_BUCKET unset); file:// rows are passed through verbatim
 ----- a skip is not a pass; each line above is cover this run did not provide -----
 
-===== passed 201  failed 0  skipped 1 =====
+===== passed 208  failed 0  skipped 1 =====

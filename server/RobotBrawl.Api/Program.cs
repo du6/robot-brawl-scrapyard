@@ -1242,6 +1242,23 @@ app.MapGet("/v1/leaderboard/{category?}", async (string? category, int? limit) =
     int take = Math.Clamp(limit ?? 50, 1, 200);
 
     await using var c = await db.OpenAsync();
+    // ⚠ THE SEASON FILTER IS LOAD-BEARING — found 2026-08-12, the day the
+    // rollover got a scheduler. ratings is keyed (robot, category, SEASON)
+    // and the rollover CARRIES rows into the new season while keeping the
+    // old season's rows for the record — so a board with no season filter
+    // lists every robot once per season it has existed in. Nobody had seen
+    // it because no rollover had ever run outside api_smoke's dev DB, i.e.
+    // the bug was armed by the same missing caller that hid the feature.
+    var cfg = await LadderConfig(c);
+    int curSeason = cfg.TryGetValue("current_season", out var cs) ? (int)cs : 1;
+    DateTime? seasonEndsAt = null;
+    await using (var se = new NpgsqlCommand(
+        "SELECT ends_at FROM seasons WHERE id = $1;", c))
+    {
+        se.Parameters.AddWithValue(curSeason);
+        var v = await se.ExecuteScalarAsync();
+        if (v is DateTime dt) seasonEndsAt = dt;
+    }
     // Rank by rating, but surface deviation too: a 1400 at RD 350 has not
     // earned the same claim as a 1400 at RD 60, and a board that hides that
     // is a board that lies about its own confidence.
@@ -1256,11 +1273,13 @@ app.MapGet("/v1/leaderboard/{category?}", async (string? category, int? limit) =
           JOIN users  u ON u.id = r.user_id
           LEFT JOIN cosmetics ct ON ct.id = r.title_id
           LEFT JOIN cosmetics cp ON cp.id = r.plate_id
-         WHERE ($1::text IS NULL OR ra.category = $1)
+         WHERE ra.season_id = $3
+           AND ($1::text IS NULL OR ra.category = $1)
          ORDER BY ra.rating DESC, ra.deviation ASC
          LIMIT $2;", c);
     cmd.Parameters.AddWithValue((object?)category ?? DBNull.Value);
     cmd.Parameters.AddWithValue(take);
+    cmd.Parameters.AddWithValue(curSeason);
 
     var rows = new List<object>();
     await using var r = await cmd.ExecuteReaderAsync();
@@ -1285,7 +1304,12 @@ app.MapGet("/v1/leaderboard/{category?}", async (string? category, int? limit) =
             plate = r.IsDBNull(10) ? null : r.GetString(10),
             updatedAt = r.GetDateTime(4),
         });
-    return Results.Ok(new { category = category ?? "ALL", count = rows.Count, entries = rows });
+    // The season identity travels WITH the board: a board that says "Season 2
+    // ends Friday" is a re-entry point (§2.4's whole purpose); a bare list of
+    // ratings is not. seasonEndsAt is null until the first scheduler tick
+    // starts season 1's clock — render the season number alone in that case.
+    return Results.Ok(new { category = category ?? "ALL", count = rows.Count,
+                            season = curSeason, seasonEndsAt, entries = rows });
 }).AllowAnonymous();
 
 // A single match, public. M2's acceptance requires that "a third account can
@@ -1597,6 +1621,43 @@ app.MapPost("/v1/admin/season/rollover", async (HttpContext ctx) =>
     int places = (int)(cfg.TryGetValue("season_payout_places", out var pl) ? pl : 3);
     int weeks = (int)(cfg.TryGetValue("season_weeks", out var sw) ? sw : 4);
 
+    // THE TIMING GUARD, 2026-08-12 — what makes this endpoint schedulable.
+    // Until now nothing in production ever called this (api_smoke's curl was
+    // its only caller, the missing-caller pattern for the third time), and it
+    // rolled the season THE MOMENT it was asked. A dumb daily scheduler needs
+    // the endpoint itself to know whether the season is actually over:
+    //   - no seasons row yet (season 1 has none until something writes it):
+    //     start the clock NOW and refuse — the first scheduled tick after
+    //     deploy begins season 1 rather than instantly closing it.
+    //   - now < ends_at: refuse, 200 not 4xx, because "not due yet" is the
+    //     scheduler's NORMAL daily outcome and Cloud Scheduler retries and
+    //     alerts on non-2xx — a 409 here would page somebody every midnight.
+    //   - ?force=1 skips the clock (api_smoke's staging rollover, an operator
+    //     ending a season early). The duplicate-season check below still
+    //     applies to forced calls: force skips the CLOCK, never the ledger
+    //     protections.
+    bool force = ctx.Request.Query.TryGetValue("force", out var fv)
+                 && fv.ToString() is "1" or "true";
+    if (!force)
+    {
+        await using (var boot = new NpgsqlCommand(@"
+            INSERT INTO seasons (id, starts_at, ends_at)
+            VALUES ($1, now(), now() + make_interval(weeks => $2))
+            ON CONFLICT (id) DO NOTHING;", c))
+        {
+            boot.Parameters.AddWithValue(from);
+            boot.Parameters.AddWithValue(weeks);
+            await boot.ExecuteNonQueryAsync();
+        }
+        await using var due = new NpgsqlCommand(
+            "SELECT ends_at, now() >= ends_at FROM seasons WHERE id = $1;", c);
+        due.Parameters.AddWithValue(from);
+        await using var dr = await due.ExecuteReaderAsync();
+        if (await dr.ReadAsync() && !dr.GetBoolean(1))
+            return Results.Ok(new { rolled = false, season = from,
+                                    endsAt = dr.GetDateTime(0) });
+    }
+
     await using var tx = await c.BeginTransactionAsync();
 
     // Refuse to roll into a season that already exists. Rolling over twice
@@ -1736,7 +1797,8 @@ app.MapPost("/v1/admin/season/rollover", async (HttpContext ctx) =>
     await tx.CommitAsync();
     // Wallet scrap persisting needed no code: the ledger is append-only and
     // this never touched it.
-    return Results.Ok(new { fromSeason = from, toSeason = to, ratingsCarried = carried,
+    return Results.Ok(new { rolled = true, fromSeason = from, toSeason = to,
+                            ratingsCarried = carried,
                             compressedToPct = keep * 100, awards });
 }).AllowAnonymous();
 

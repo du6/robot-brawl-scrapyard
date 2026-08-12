@@ -1073,8 +1073,21 @@ else
   PR=${PICK%%|*}; REST=${PICK#*|}; PC=${REST%%|*}; PRATE=${REST##*|}
   WALLET_BEFORE=$(dbq "SELECT COALESCE(SUM(delta),0) FROM ledger;")
 
+  # --- the timing guard, 2026-08-12: what makes the rollover SCHEDULABLE ---
+  # A fresh DB has no seasons row for the current season. An UNFORCED call
+  # must not roll: it starts the season clock (writes the row) and answers
+  # 200 rolled=false — 200 and not 4xx, because "not due" is the daily
+  # scheduler's normal outcome and Cloud Scheduler alerts on non-2xx.
   S=$(req POST /v1/admin/season/rollover '{}' "X-Worker-Key: $WKEY")
-  expect "a season rolls over" "$S" 200
+  expect "an unforced rollover before the season is over refuses politely" "$S" 200
+  is "…saying rolled=false" "$(jget rolled)" "False"
+  is "…and the refusal STARTED the season clock (a seasons row now exists)" \
+     "$(dbq "SELECT count(*) FROM seasons WHERE id=$S0;")" 1
+  is "…still on the same season" \
+     "$(dbq "SELECT value::int FROM ladder_config WHERE key='current_season';")" "$S0"
+
+  S=$(req POST '/v1/admin/season/rollover?force=1' '{}' "X-Worker-Key: $WKEY")
+  expect "a FORCED season rolls over" "$S" 200
   S1=$(jget toSeason)
   is "…into the next season" "$S1" "$((S0 + 1))"
   is "…and the config now points at it" \
@@ -1107,11 +1120,26 @@ else
   # the season just closed and try to close it again, which is what a retried
   # cron job or a double-clicked operator button actually does.
   dbq "UPDATE ladder_config SET value=$S0 WHERE key='current_season';" >/dev/null
-  S=$(req POST /v1/admin/season/rollover '{}' "X-Worker-Key: $WKEY")
-  expect "…and closing the SAME season twice is refused" "$S" 409
+  # force, because the guard would otherwise answer rolled=false for a season
+  # whose clock was restarted above — the point HERE is the ledger protection
+  # underneath, which force must never skip.
+  S=$(req POST '/v1/admin/season/rollover?force=1' '{}' "X-Worker-Key: $WKEY")
+  expect "…and closing the SAME season twice is refused, even forced" "$S" 409
   dbq "UPDATE ladder_config SET value=$S1 WHERE key='current_season';" >/dev/null
   is "…so nobody was paid for that season twice" \
      "$(dbq "SELECT count(*) FROM (SELECT idem_key FROM ledger WHERE reason='SEASON' GROUP BY idem_key HAVING count(*)>1) d;")" 0
+
+  # --- the board across a rollover: the DOUBLE-LISTING regression ----------
+  # ratings keeps the old season's rows for the record and carries compressed
+  # copies into the new season, so a board with no season filter lists every
+  # robot once PER SEASON. Armed the day the rollover got a scheduler; this
+  # is the check that keeps it dead.
+  S=$(req GET /v1/leaderboard)
+  expect "the board still answers after a rollover" "$S" 200
+  is "…scoped to the CURRENT season" "$(jget season)" "$S1"
+  is "…listing each rated robot exactly once, not once per season" \
+     "$(jget count)" \
+     "$(dbq "SELECT count(*) FROM ratings WHERE season_id=$S1;")"
 fi
 
 echo
