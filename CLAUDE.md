@@ -391,6 +391,38 @@ purpose, it stopped before any request). Override with
 `LadderClient.BaseUrl = LadderClient.PRODUCTION`.
 ⚠ The BUILD side of that default is **verified by inspection only** — no iOS
 build has ever been made from this code. Confirm it on the first one.
+✅ **First supporting observation, 2026-08-12:** a Simulator-SDK player —
+which takes the same compile-time `#if` branch TestFlight takes — rendered
+the PRODUCTION URL in the ARENA status line. Device confirmation still owed.
+⚠ **THE SIMULATOR CANNOT TESTIFY ABOUT RUNTIME BUILD FLAGS — measured,
+2026-08-12.** Unity ships ONE simulator runtime per arch (no dev/release
+variant on disk), so `Debug.isDebugBuild` is TRUE on a `BuildOptions.None`
+sim build with a clean boot.config. Two consequences, both observed on a
+verified-release sim build: the on-screen Development Console appears ON
+ERRORS regardless of flags, and the `[dev]` status-line badge prints beside
+whatever URL is live. Compile-time symbols (`#if UNITY_EDITOR`) ARE honest
+there; runtime flags are not. Build identity on the simulator comes from
+ARTIFACTS — bundle path, boot.config, process lineage — never from anything
+on screen. Two instrument rules failed the same way before this was learned.
+⚠ And the `[dev]` badge (MobileBuilderUI ~:3161) encodes BUILD-flavour but
+reads as SERVER-environment — on the sim it sat beside the production URL
+and nearly cost two testers a production account each. Whether it appears
+on a real TestFlight build is a QUESTION for the first device build, not a
+derivation: `isDebugBuild`-on-device claims failed twice tonight.
+
+⚠ **OPEN DEFECT, 2026-08-12: PART PLACEMENT IS DEAD IN RELEASE SIMULATOR
+PLAYERS.** TIP 1 says "tap the robot"; on the release sim builds no part can
+be added or removed — the ghost snaps to a valid socket and TRACKS a live
+drag (so delivery, classification and preview all work), and the COMMIT
+fails silently, writing no `message`. Localised by four control legs (the
+strongest: REMOVE armed, eight taps, nothing deleted — REMOVE has no socket
+rules to hide behind). Projection is consistent (`[ray]` readout, vacuity-
+checked). The fault is in the commit branch: release-edge logic, `dClick`
+consumption, or the `byCollider` lookup. Dev-config builds place fine, which
+is why no earlier pass saw it. Device behaviour unknown. The `[ray]` readout
+(`RayDeltaReadout`, marked TEMPORARY) measures one camera against itself and
+cannot see two-producer desyncs — do not read its 0.000 as clearing the
+picking path.
 
 **The ladder API is LIVE**: `https://rb-api-902243335343.us-central1.run.app`
 on Cloud Run, against Cloud SQL over a unix socket, with blobs in GCS.
@@ -421,7 +453,19 @@ Things explicitly NOT done:
    are UGUI **in the dock**, so they inherit the safe-area insets, the 44 pt
    touch floor and the benches that measure both — `TouchSmoke`'s fixed-axis
    invariant now covers all four ARENA scrollers and could see none of them as
-   IMGUI. `ArenaScreen` keeps its OnGUI only for the standalone
+   IMGUI.
+   ⚠ **CORRECTION, 2026-08-12: the sentence above overstates the benches.**
+   The 44 pt floor check lives in `CareerSmoke:~898` (not TouchSmoke), and it
+   runs over a NAMED LIST of six BUILD-tab controls — the ARENA surfaces, TEST
+   DRIVE, the tip strip and four whole tabs were never in its scope. "Inherit
+   the benches" was inference, this file's own prose, and it was quoted as
+   fact twice before anyone opened the bench. Two more limits, measured:
+   `TapTargetPt` returns −1 for a missing name and the check SKIPS it (a stale
+   name passes silently), and no bench anywhere asks whether one control is
+   DRAWN ON TOP of another — which is how TEST DRIVE shipped with its bottom
+   55% eaten by a transparent viewport (fixed `3a61d72`) while every check
+   stayed green. The floor is also met with ZERO margin by design
+   (`TouchRow()` = 44.0 pt exactly), so any occlusion puts a control under it. `ArenaScreen` keeps its OnGUI only for the standalone
    `ArenaScreen.Open()` path and cannot drift, because both renderers share
    one model and one set of flows.
    Pictures: `docs/shots/07..16`, re-shoot with `ArenaShots.RunMobileTab(dir)`.
