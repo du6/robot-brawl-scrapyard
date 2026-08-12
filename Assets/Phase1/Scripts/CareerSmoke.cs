@@ -894,8 +894,22 @@ public class CareerSmoke : MonoBehaviour
             float pt = ui.TapTargetPt(nm);
             if (pt >= 0f && pt < 40f) tooSmall += nm + "=" + pt.ToString("F1") + "pt ";
         }
+        // ⚠ THE MESSAGE NAMES THE THRESHOLD IT ACTUALLY APPLIES. It used to say
+        // "clear the 44 pt touch floor" while testing < 40f, and the sentence
+        // explaining that 40 is rounding tolerance rather than a negotiated-down
+        // target lives in the comment above — which a bench reader never sees.
+        // A reader of the OUTPUT would have believed six controls had cleared
+        // 44 pt when what was proven was 40. House rule 3 is satisfied in the
+        // file; this makes the printed line satisfy it too.
+        //
+        // ⚠ AND THE COVERAGE IS NARROWER THAN THIS LINE SOUNDS: tapNames is six
+        // BUILD-tab controls. TEST DRIVE, the tip strip and five whole tabs are
+        // outside it, so "build controls" is doing load-bearing work in that
+        // sentence — see #25. Nothing here measures whether one control is drawn
+        // ON TOP OF another either, which is how TEST DRIVE's bottom 55% was
+        // dead while its rect measured 69.9 pt.
         Check(tooSmall.Length == 0,
-              "build controls clear the 44 pt touch floor"
+              "the six checked build controls clear 40 pt (44 pt floor, 40 = rounding tolerance)"
               + (tooSmall.Length > 0 ? " (too small: " + tooSmall.Trim() + ")" : ""));
 
         // The whole palette must fit its viewport. The original R1 critic
