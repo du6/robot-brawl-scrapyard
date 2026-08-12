@@ -104,6 +104,24 @@ No device operator remains. These ship on editor evidence only:
 9. Copy riders (parts-in-stock wording; ellipsis-on-truncation).
 10. Does `[dev]` appear on a real TestFlight build — a question, not a
     derivation.
+11. **Account recovery before money moves** (filed 2026-08-12, owen's
+    request). Signup performs NO email verification — `/v1/auth/register`
+    checks only `@`-present, password ≥10, name 2-24, then issues a token
+    immediately — **and there is no password-reset path anywhere** (server
+    or client, grepped both). The two absences compound: a typo'd or
+    unowned email is never noticed, and a forgotten password loses the
+    account, its ratings and its wallet permanently — with no safe manual
+    recovery either, because an unverified email proves nothing about
+    ownership. Not a TestFlight blocker; pairs with item 3 (PITR) as the
+    same decision shape — account-loss protection before money is taken.
+    Under the premium recommendation a lost paying account is a refund and
+    a one-star. Cheapest sound path if wanted: skip verification-at-signup,
+    add a RESET flow before charging (that is the half with the real cost);
+    verification proper can wait for evidence of abuse. Costs to weigh: an
+    email provider (SES/Resend) is a new operational dependency against the
+    $25/mo budget. What exists today: case-insensitive email uniqueness,
+    decoy-hash login timing defense, 10/min auth rate limit, and a
+    `users.flags TEXT[]` column that could carry a `verified` flag later.
 
 ## 5. Instrument catalogue — seven artifacts, each produced a confident wrong reading
 
