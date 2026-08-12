@@ -131,7 +131,14 @@ closes it.
    unrepresentative test; the engineer retracted on re-reading their own
    instrument. The correct instrument compares two PRODUCERS (picking ray
    vs render camera), never one round-tripped. A vacuity test must exercise
-   the same code path it vouches for.
+   the same code path it vouches for. Two riders from the participants'
+   own ledger entries: the PM who accepted the refutation never asked what
+   the test DID — took a note about a test as the test, one indirection
+   past "check the artifact" — and the tester was argued out of a right
+   answer by two agents with more context and better tools. **When an
+   agent overturns a tester's call, the reversal must carry the test's
+   code path, not its result** — a tester cannot audit a number they are
+   handed.
 3. A compound prediction fires only on the clause the measurement
    addresses.
 4. Before refining a measurement, check whether the hypotheses differ in
