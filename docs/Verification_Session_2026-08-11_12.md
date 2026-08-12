@@ -120,8 +120,18 @@ closes it.
    instances, including a ratio used to validate a unit assumption —
    ratios are invariant under rescaling).
 2. A prediction set is not a falsifier if every branch predicts the same
-   reading. (Not true of the `[ray]` instrument, whose vacuity test was
-   pre-registered — instance struck, hypothetical kept.)
+   reading. **The `[ray]` instrument turned out to be the worked example
+   after all** (correction, post-assembly): its pre-registered vacuity test
+   skewed the matrix BETWEEN the two calls — a two-matrix mismatch the real
+   code path cannot produce — so it vouched for a sensitivity the readout
+   does not have. A one-camera round trip returns ~0 for ANY consistent
+   matrix; all three prediction branches produced the same reading, and
+   prediction 3 fires on NEITHER clause. The tester who called the readout
+   "not evidence" was right in substance and was argued out of it with the
+   unrepresentative test; the engineer retracted on re-reading their own
+   instrument. The correct instrument compares two PRODUCERS (picking ray
+   vs render camera), never one round-tripped. A vacuity test must exercise
+   the same code path it vouches for.
 3. A compound prediction fires only on the clause the measurement
    addresses.
 4. Before refining a measurement, check whether the hypotheses differ in

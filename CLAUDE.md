@@ -416,13 +416,17 @@ be added or removed — the ghost snaps to a valid socket and TRACKS a live
 drag (so delivery, classification and preview all work), and the COMMIT
 fails silently, writing no `message`. Localised by four control legs (the
 strongest: REMOVE armed, eight taps, nothing deleted — REMOVE has no socket
-rules to hide behind). Projection is consistent (`[ray]` readout, vacuity-
-checked). The fault is in the commit branch: release-edge logic, `dClick`
-consumption, or the `byCollider` lookup. Dev-config builds place fine, which
-is why no earlier pass saw it. Device behaviour unknown. The `[ray]` readout
-(`RayDeltaReadout`, marked TEMPORARY) measures one camera against itself and
-cannot see two-producer desyncs — do not read its 0.000 as clearing the
-picking path.
+rules to hide behind). The fault is in the commit branch OR a picking/render
+matrix desync: release-edge logic, `dClick` consumption, the `byCollider`
+lookup, or `ScreenPointToRay` reading a matrix the renderer is not using.
+Dev-config builds place fine, which is why no earlier pass saw it. Device
+behaviour unknown. ⚠ The `[ray]` readout (`RayDeltaReadout`, `6932c26`,
+marked TEMPORARY — delete it) round-trips ONE camera against itself, which
+returns ~0 for ANY consistently-applied matrix — its own vacuity test was
+unrepresentative (it skewed the matrix BETWEEN the two calls, a mismatch
+the real code path cannot produce). Its 0.000 licenses nothing. The correct
+instrument compares the PICKING path's ray against the RENDER camera — two
+producers, never one round-tripped.
 
 **The ladder API is LIVE**: `https://rb-api-902243335343.us-central1.run.app`
 on Cloud Run, against Cloud SQL over a unix socket, with blobs in GCS.
