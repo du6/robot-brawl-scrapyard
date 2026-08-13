@@ -34,6 +34,14 @@ cube, and covers that case in the R-cycle sweeps).
   where it lives.
 - **Long beam** — real mechanical identity (fewer seams) in a game whose
   central failure mode is seam shear; premise never benched, kept anyway.
+- **Chassis block** — proposed for deletion the same evening and KEPT (owen,
+  option (a), full facts on the table): it is the SKELETON of the entire
+  enemy roster (core + 2×chassis + 4 wheels, all eight bots), and the
+  flagship-hardening calibration (~1,500 fights) is measured on
+  chassis-built enemies. Player-side retirement was offered and declined;
+  the part stays fully live. Note for later: players barely use it (all
+  production robots are all-beam) — a soft data point for the material/part
+  telemetry wishlist, not a cut.
 
 ## Safety facts both cuts rest on
 
