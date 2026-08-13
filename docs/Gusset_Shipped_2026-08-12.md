@@ -57,9 +57,12 @@ NEXT format bump gets a rejection instead of a silent partial load.
 
 ## NOT done / owed
 
-- **Worker redeploy** — required before any new client build enlists a
-  gusseted robot (build_worker.zsh from a clone of pushed main, then
-  deploy_worker.zsh). The old worker rejects nothing; ordering is the guard.
+- ~~**Worker redeploy**~~ — **DONE the same evening**: the gusset-aware
+  assembly was verified IN the built worker (`#fmt4-gusset` present in
+  Assembly-CSharp.dll before packaging), deployed as
+  `worker:20260812-182949`, schedule intact, and executed once in the cloud
+  to a clean drain (`rb-worker-tdf29`, succeeded). The lockstep is closed:
+  the ladder reads fmt4 before any client can write it.
 - **Arena visual** — the gold band renders in the BUILDER (and survives
   repaint and reload); the fight-arena spawn does not draw it yet. The
   PHYSICS is in the arena (measured above); only the band is builder-only.
