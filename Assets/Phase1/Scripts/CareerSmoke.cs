@@ -1290,6 +1290,31 @@ public class CareerSmoke : MonoBehaviour
         bm.LoadSnapshot(savedBuild);
         yield return null;
 
+        // ---- GUSSET stock gate (2026-08-12): career mode is where "No
+        // Gusset left" exists (free build is unlimited — TouchSmoke owns that
+        // half). The career kit grants none, so the refusal leg is real; one
+        // granted = one applied = zero remaining. In-memory only, like C1.
+        {
+            string gSaved = bm.SnapshotString();
+            int gIdx = bm.PaletteIndexOf("gusset");
+            Check(gIdx >= 0, "GUSSET: tile present in career mode");
+            var gTarget = bm.placed.Count > 1 ? bm.placed[1] : null;
+            bm.selected = gIdx;
+            bm.ApplyGusset(gTarget);
+            Check(gTarget != null && !gTarget.reinforced
+                  && bm.LastMessage != null && bm.LastMessage.Contains("No Gusset"),
+                  "GUSSET: with no stock the career refuses in words");
+            Career.AddItem("gusset", "Steel", 1);
+            bm.ApplyGusset(gTarget);
+            Check(gTarget != null && gTarget.reinforced, "GUSSET: one granted, one applied");
+            Check(bm.CareerRemaining(gIdx) == 0, "GUSSET: …and the shelf reads zero");
+            bm.ApplyGusset(bm.placed.Count > 2 ? bm.placed[2] : gTarget);
+            Check(bm.LastMessage != null
+                  && (bm.LastMessage.Contains("No Gusset") || bm.LastMessage.Contains("already")),
+                  "GUSSET: the next application is refused (no stock / no stacking)");
+            bm.LoadSnapshot(gSaved); yield return null;
+        }
+
         // ---- C6.4: telemetry schema landed (§14) ----
         Check(Career.Data.fights > 0, "telemetry: fights counted (" + Career.Data.fights + ")");
         Check(Career.Data.scrapCurve.Count == Career.Data.fights,

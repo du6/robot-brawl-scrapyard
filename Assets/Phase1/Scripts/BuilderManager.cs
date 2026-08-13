@@ -74,8 +74,17 @@ public class BuilderManager : MonoBehaviour
             return "Z (front-to-back)";
         }
 
+        /// <summary>GUSSET (owen, 2026-08-12): this placement's joints are
+        /// reinforced — every seam this part makes breaks at x1.5 (see
+        /// GUSSET_SEAM_MULT and the conn builder in SpawnBot). Serialized as
+        /// a 6th snapshot field ("|G"); costs GUSSET_KG of mass, counted in
+        /// Mass() so category, the cap readout and the rim-energy of a
+        /// gusseted DISC all see it (that last one is real and documented:
+        /// a welded collar on a spinning disc is heavier rim).</summary>
+        public bool reinforced;
+
         public string MatName() { return def.EffectiveMat(matName); }
-        public float Mass()     { return def.MassOf(MatName()); }
+        public float Mass()     { return def.MassOf(MatName()) + (reinforced ? BuilderManager.GUSSET_KG : 0f); }
         public int Cost()       { return def.CostOf(MatName()); }
         public MatDef Mat()     { return MatDB.Get(MatName()); }
 
@@ -1345,7 +1354,15 @@ public class BuilderManager : MonoBehaviour
 
         if (Phase0Input.UndoDown() && clicksLive) Undo();
 
-        if (down0 && !overPanel && clicksLive && selected >= 0 && ghostValid && !CareerAllows(selected))
+        // GUSSET: with an applique held, a left click is an APPLICATION, not
+        // a placement — it rides the same consumed-click, same PartUnderMouse
+        // the other verbs use, so everything the click pipeline learned this
+        // week (sub-frame taps, OverUI geometry) covers it for free.
+        if (down0 && !overPanel && clicksLive && selected >= 0 && palette[selected].applique)
+        {
+            ApplyGusset(PartUnderMouse());
+        }
+        else if (down0 && !overPanel && clicksLive && selected >= 0 && ghostValid && !CareerAllows(selected))
         {
             // C1: the placement is legal but the shelf is empty - refuse in the
             // same amber channel every other refusal uses.
@@ -1406,6 +1423,58 @@ public class BuilderManager : MonoBehaviour
         }
     }
 
+    /// <summary>GUSSET application — the whole verb. Refusals speak in the
+    /// same `message` channel every other builder refusal uses, and each one
+    /// says WHY (the red-ghost lesson: a buzz with no words teaches nothing).</summary>
+    public void ApplyGusset(PlacedPart hit)
+    {
+        if (hit == null) return;                       // missed the machine: same silence as a missed REMOVE
+        if (placed.Count > 0 && hit == placed[0])
+        {
+            message = "The core is the frame — gussets go on the parts bolted to it.";
+            SfxSynth.Deny(); return;
+        }
+        if (hit.reinforced)
+        {
+            message = hit.def.label + " is already gusseted — a second adds nothing (measured).";
+            SfxSynth.Deny(); return;
+        }
+        if (!CareerAllows(selected))
+        {
+            message = "No Gusset left — shop or sell-back.";
+            SfxSynth.Deny(); return;
+        }
+        PushUndo();
+        hit.reinforced = true;
+        RefreshGussetBand(hit);
+        message = hit.def.label + " joints reinforced ×1.5 · +" + Mathf.RoundToInt(GUSSET_KG) + " kg";
+        RefreshOverlay();
+        SfxSynth.Place();
+    }
+
+    /// <summary>The gusset's visibility promise: no geometry, no collider, no
+    /// socket — but you can SEE it. A gold band around the part's waist, a
+    /// visual-only child beside the factory's own (the placement collider
+    /// lives on the root; children carry none, same contract as every other
+    /// visual). Re-called after SetPartMaterial's child rebuild, which would
+    /// otherwise eat it.</summary>
+    public void RefreshGussetBand(PlacedPart p)
+    {
+        if (p == null || p.go == null) return;
+        var old = p.go.transform.Find("gussetband");
+        if (old != null) Destroy(old.gameObject);
+        if (!p.reinforced) return;
+        var band = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        band.name = "gussetband";
+        Destroy(band.GetComponent<Collider>());   // visible, never occupying
+        band.transform.SetParent(p.go.transform, false);
+        Vector3 s = p.Half() * 2f;
+        band.transform.localScale = new Vector3(s.x * 1.045f, Mathf.Min(0.05f, s.y * 0.35f), s.z * 1.045f);
+        band.transform.localPosition = Vector3.zero;
+        var rend = band.GetComponent<Renderer>();
+        if (rend != null) rend.material.color = new Color(1f, 0.82f, 0.25f);   // the career gold
+    }
+
     /// <summary>Phase 3: change one placed part's material in place. The part
     /// keeps its position, yaw, mount axis and place in the build order; only
     /// the §4.3 numbers and its colour change.</summary>
@@ -1460,6 +1529,10 @@ public class BuilderManager : MonoBehaviour
         // The rebuild above destroyed the children the lens had saved; re-apply
         // it so the recoloured part immediately shows its NEW audit colour.
         if (matView) ApplyMatView();
+        // The child rebuild above ate the gusset band with the old visuals;
+        // give it back. (Repainting does NOT consume or refund a gusset —
+        // the flag rides the placement, not the material.)
+        if (p.reinforced) RefreshGussetBand(p);
         message = def.label + " -> " + MatDB.Get(want).name;
         RefreshOverlay();
         return true;
@@ -2273,6 +2346,11 @@ public class BuilderManager : MonoBehaviour
     {
         if (selected < 0) { HideGhost(); return; }
         var def = palette[selected];
+        // An APPLIQUE never places, so it never ghosts: the pointer's job
+        // while one is held is to pick the PART to reinforce (UpdateBuild's
+        // gusset branch), and a red box chasing the cursor would say
+        // "placement, refused" — the wrong sentence.
+        if (def.applique) { HideGhost(); ghostValid = false; ghostReason = ""; return; }
         bool isWheelSel = def.category == P1Category.Mobility;
 
         Vector3 m = Phase0Input.MousePos();
@@ -2855,6 +2933,15 @@ public class BuilderManager : MonoBehaviour
     }
     int CareerUsed(string id, string mat)
     {
+        // GUSSET: an applique is consumed by REINFORCED placements, not by
+        // rows of its own — it never appears in `placed`. Pinned to Steel,
+        // so the material key is always the def's own and needs no canon.
+        if (id == "gusset")
+        {
+            int g = 0;
+            for (int k = 1; k < placed.Count; k++) if (placed[k].reinforced) g++;
+            return g;
+        }
         string cm = MatDB.Canon(mat);
         int u = 0;
         for (int k = 1; k < placed.Count; k++)
@@ -2868,6 +2955,9 @@ public class BuilderManager : MonoBehaviour
     /// <summary>C1 placement gate. Negative remaining (a shortfall build was
     /// loaded) refuses further placement too.</summary>
     public bool CareerAllows(int i) { int r = CareerRemaining(i); return r == -1 || r > 0; }
+    /// <summary>The held part is an applique (gusset): the status line says
+    /// "tap a part to reinforce" instead of "tap the robot to place".</summary>
+    public bool SelectedApplique { get { return selected >= 0 && selected < PaletteCount && palette[selected].applique; } }
     bool CareerAllowsMat(PlacedPart pp, string newMat)
     {
         if (!Career.active || Career.FreeParts) return true;
@@ -2890,6 +2980,12 @@ public class BuilderManager : MonoBehaviour
             int miss = CareerUsed(id, mat) - Career.CountOf(id, mat);
             if (miss > 0) lack.Add(miss + "× " + MatDB.Get(mat).name + " " + placed[k].def.label);
         }
+        // GUSSET: reinforced flags consume stock without a row of their own,
+        // so the loop above cannot see a shortfall of them. Same rule, said
+        // for the applique: a loaded build wearing more gussets than the
+        // career owns is a shortfall build.
+        int gMiss = CareerUsed("gusset", "Steel") - Career.CountOf("gusset", "Steel");
+        if (gMiss > 0) lack.Add(gMiss + "× Steel Gusset (weld kit)");
         return lack;
     }
     // PoolWarning() lived here. It warned that "the stable is over the parts
@@ -3540,6 +3636,10 @@ public class BuilderManager : MonoBehaviour
 
     public string Validate()
     {
+        // A file from a NEWER format is refused whole, never loaded "minus
+        // whatever the format added" — see SNAP_STAMP4's note for the trap.
+        if (!string.IsNullOrEmpty(UnknownStamp))
+            return "This build uses a newer save format (" + UnknownStamp + ") — update the game.";
         int wheels = 0, power = 0;
         foreach (var p in placed)
         {
@@ -3904,6 +4004,13 @@ public class BuilderManager : MonoBehaviour
                     // matches. A weapon that falls off the instant it touches
                     // anything is not a weapon, so actuator seams carry x3.
                     if (body[i].def.actuator || body[j].def.actuator) mult *= 3f;
+                    // GUSSET: a reinforced part strengthens EVERY seam it
+                    // makes, x1.5 — the multiplier the lever sweep measured
+                    // (40% -> 27% mutual disarm; x2 buys nothing, which is
+                    // why one flag per part and no stacking). Applied ONCE
+                    // even when both ends are gusseted: two gussets on one
+                    // seam would be the sweep's measured dead zone.
+                    if (body[i].reinforced || body[j].reinforced) mult *= GUSSET_SEAM_MULT;
                     conns.Add(new CompoundRobot.Conn(i, j, mult));
                 }
 
@@ -5211,6 +5318,24 @@ public class BuilderManager : MonoBehaviour
     /// so an OLD build of the game loads a NEW file unharmed too.</summary>
     public const string SNAP_STAMP = "#fmt3-disc";
 
+    /// <summary>GUSSET format stamp, 2026-08-12. Written IN ADDITION to
+    /// SNAP_STAMP (never instead — a file without "#fmt3-disc" triggers the
+    /// disc-repair migration, which a modern file must never do), and ONLY
+    /// when the build actually carries a gusset, so gusset-free saves stay
+    /// byte-compatible with every older reader. An OLD reader drops this
+    /// line (1 field) and the "|G" suffix silently — which is exactly why
+    /// the cloud worker must be redeployed IN LOCKSTEP with any client that
+    /// can write it: an old worker would fight a gusseted robot 10 kg light
+    /// with soft seams. LoadSnapshot also NAMES any "#fmt" stamp it does not
+    /// know and Validate() refuses the build, so the NEXT format bump gets a
+    /// rejection instead of this comment.</summary>
+    public const string SNAP_STAMP4 = "#fmt4-gusset";
+    public const float GUSSET_KG = 10f;
+    public const float GUSSET_SEAM_MULT = 1.5f;
+    /// <summary>Set by LoadSnapshot when the file carries a format stamp this
+    /// build does not know; Validate() turns it into a refusal.</summary>
+    public string UnknownStamp { get; private set; }
+
     // ============ MULTIPLAYER v3 - PHASE M0 SEAMS =====================
     /// <summary>The build's canonical drive direction, derived from its
     /// wheels when the snapshot loads. MatchRunner needs it to face two
@@ -5247,7 +5372,11 @@ public class BuilderManager : MonoBehaviour
         var inv = System.Globalization.CultureInfo.InvariantCulture;
         var sb = new System.Text.StringBuilder();
         sb.Append(SNAP_STAMP).Append('\n');
+        // fmt4 stamp only when needed: a gusset-free save stays readable by
+        // every older build, byte for byte. See SNAP_STAMP4's note.
+        foreach (var q in placed) if (q.reinforced) { sb.Append(SNAP_STAMP4).Append('\n'); break; }
         foreach (var p in placed)
+        {
             sb.Append(p.def.id).Append('|')
               .Append(p.pos.x.ToString("F3", inv)).Append(',')
               .Append(p.pos.y.ToString("F3", inv)).Append(',')
@@ -5256,7 +5385,10 @@ public class BuilderManager : MonoBehaviour
               .Append(p.wheelAxis.x.ToString("F2", inv)).Append(',')
               .Append(p.wheelAxis.y.ToString("F2", inv)).Append(',')
               .Append(p.wheelAxis.z.ToString("F2", inv)).Append('|')
-              .Append(p.MatName()).Append('\n');   // v2: trailing material field
+              .Append(p.MatName());                // v2: trailing material field
+            if (p.reinforced) sb.Append("|G");     // fmt4: gusset flag
+            sb.Append('\n');
+        }
         return sb.ToString();
     }
 
@@ -5410,6 +5542,7 @@ public class BuilderManager : MonoBehaviour
         byCollider.Clear();
         foulDirty = true;
         var badMats = new List<string>();
+        UnknownStamp = null;   // per-load; Validate() reads it
         var badLines = new List<string>();
         // Float, but NOT AllowThousands or currency — a build file is machine
         // written, and being liberal about its number format only widens what
@@ -5422,6 +5555,19 @@ public class BuilderManager : MonoBehaviour
         {
             string line = raw.Trim();
             if (line.Length == 0) continue;
+            // Format stamps. Known ones are inert here (SNAP_STAMP gates the
+            // disc repair below; SNAP_STAMP4 marks a gusset-carrying file).
+            // An UNKNOWN "#fmt" stamp is a file from a NEWER build — name it,
+            // and Validate() refuses the whole build, because loading it
+            // "minus whatever the new format adds" is the silent-drop trap
+            // this stamp system exists to close.
+            if (line[0] == '#')
+            {
+                if (line.StartsWith("#fmt", System.StringComparison.Ordinal)
+                    && line != SNAP_STAMP && line != SNAP_STAMP4)
+                    UnknownStamp = line;
+                continue;
+            }
             var f = line.Split('|');
             if (f.Length < 4) continue;
             // V2.2 sensor split migration: a placed edge sentinel loads as
@@ -5485,7 +5631,15 @@ public class BuilderManager : MonoBehaviour
             var probe = new PlacedPart { def = def, pos = pos, yaw = yaw, wheelAxis = axis };
             PlacedPart attach = null;
             foreach (var q in placed) if (Touching(probe, q)) { attach = q; break; }
-            AddPart(def, pos, yaw, axis, attach, mat);
+            var added = AddPart(def, pos, yaw, axis, attach, mat);
+            // fmt4: "|G" = this part's joints are gusseted. Never the core —
+            // the frame has no parent joint, and ApplyGusset refuses it too.
+            if (added != null && f.Length >= 6 && f[5].Trim() == "G"
+                && placed.Count > 1 && added != placed[0])
+            {
+                added.reinforced = true;
+                RefreshGussetBand(added);
+            }
         }
         // Round-5 fix 8: the material panel used to keep describing whatever
         // was selected before the load, so a Tungsten build read "Aluminum —
@@ -6324,9 +6478,10 @@ public class BuilderManager : MonoBehaviour
         if (hoverPart != null)
         {
             var hm = hoverPart.Mat();
-            GUILayout.Label(string.Format("▸ {0}  ·  {1}  ·  {2} kg  ·  cost {3}  ·  seam {4}",
+            GUILayout.Label(string.Format("▸ {0}  ·  {1}  ·  {2} kg  ·  cost {3}  ·  seam {4}{5}",
                 hoverPart.def.label, hm.name, Mathf.RoundToInt(hoverPart.Mass()),
-                hoverPart.Cost(), Mathf.RoundToInt(hm.strengthRel * CompoundRobot.BREAK_K)), bodyStyle);
+                hoverPart.Cost(), Mathf.RoundToInt(hm.strengthRel * CompoundRobot.BREAK_K),
+                hoverPart.reinforced ? "  ·  GUSSETED ×1.5" : ""), bodyStyle);
             // The cascade says its price BEFORE you pay it, not after.
             if (hoverPart == placed[0])
                 GUILayout.Label("right-click: the core cannot be removed", descStyle);

@@ -66,6 +66,19 @@ public class P1PartDef
     /// carbon-fibre engine block is not a thing.</summary>
     public string[] allowedMats = null;
 
+    /// <summary>GUSSET (owen, 2026-08-12): this part is an APPLIQUE — it is
+    /// never PLACED as geometry. Selecting it and tapping a placed part
+    /// applies it TO that part (BuilderManager.ApplyGusset). It occupies no
+    /// socket, adds no collider and no bounding box; only mass and an effect.
+    /// The palette, the shop, inventory and the stock counters all treat it
+    /// as an ordinary part, which is the point of it living in this table.</summary>
+    public bool applique = false;
+    /// <summary>Non-zero replaces the derived mass x costPerKg price. The
+    /// gusset needs it: its 10 kg of Steel derives to 8 scrap, and a seam
+    /// upgrade priced like a bracket-and-a-half is not a decision. Priced as
+    /// a premium consumable (~1.5 L1 wins in the halved economy).</summary>
+    public int flatCost = 0;
+
     /// <summary>P1 (Programmable Robots, 2026-08-05): this part is a SENSOR —
     /// a destructible eye that feeds SensorBus. Consequences elsewhere: the
     /// ghost stores its mount-face normal in wheelAxis (a nose rangefinder sees
@@ -98,9 +111,11 @@ public class P1PartDef
         return bill * massMul;
     }
 
-    /// <summary>§4.3: cost = mass × the material's cost/kg.</summary>
+    /// <summary>§4.3: cost = mass × the material's cost/kg — unless the def
+    /// carries a flat price (see flatCost).</summary>
     public int CostOf(string mat)
     {
+        if (flatCost > 0) return flatCost;
         return Mathf.RoundToInt(MassOf(mat) * MatDB.Get(EffectiveMat(mat)).costPerKg);
     }
 
@@ -182,6 +197,18 @@ public class P1PartDef
                             desc = "Big load-bearing block. Lots of sockets, so the joints around it are strong." },
             new P1PartDef { id = "plate",   label = "Armor plate",       category = P1Category.Structural, size = new Vector3(0.50f, 0.06f, 0.50f),
                             desc = "Thin armor sheet. Cheap protection for the core and engine." },
+            // GUSSET (owen, 2026-08-12). The disarm lever sweep (105 fights,
+            // docs/Disarm_Lever_Sweep_2026-08-10.md) measured that seam
+            // strength x1.5 takes mutual disarm 40% -> 27% and that x2 buys
+            // NOTHING more — this part is that lever made local, priced and
+            // handed to the player. One per part, no stacking (the second
+            // step is the measured dead zone). size/massMul make MassOf(Steel)
+            // = 10.0 kg (0.001 m3 x 7850 kg/m3 x 1.274) — mass is the ladder's
+            // category currency, so reinforcing costs weight-class headroom.
+            new P1PartDef { id = "gusset",  label = "Gusset (weld kit)", category = P1Category.Structural, size = new Vector3(0.10f, 0.10f, 0.10f),
+                            matName = "Steel", materialChoice = false, massMul = 1.274f,
+                            applique = true, flatCost = 200,
+                            desc = "Weld kit. Pick it up, then tap a placed part: every joint that part makes gets x1.5 break strength. +10 kg, no space. One per part - a second adds nothing." },
             // OWEN 2026-07-29: "Looks like I can move the robot and the weapon
             // as long as I have battery." Correct, and the old description was
             // the reason it read as a mystery - it led with the +14 kW ceiling

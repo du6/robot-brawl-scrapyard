@@ -4514,7 +4514,10 @@ public class MobileBuilderUI : MonoBehaviour
             {
             statsText.color = Color.white;
             statsText.text = bm.HasSelection
-                ? string.Format("HOLDING {0} — tap the robot to place  ·  {1} kg · {2} part{3}", bm.PartLabel(bm.SelectedPart), bm.BuildMassInt, bm.PlacedCount, bm.PlacedCount == 1 ? "" : "s")
+                ? string.Format(bm.SelectedApplique
+                      ? "HOLDING {0} — tap a part to reinforce its joints (+10 kg)  ·  {1} kg · {2} part{3}"
+                      : "HOLDING {0} — tap the robot to place  ·  {1} kg · {2} part{3}",
+                      bm.PartLabel(bm.SelectedPart), bm.BuildMassInt, bm.PlacedCount, bm.PlacedCount == 1 ? "" : "s")
                 : string.Format("{0} kg · {1} part{2}  ·  {3}", bm.BuildMassInt, bm.PlacedCount, bm.PlacedCount == 1 ? "" : "s", TabHint());
             // C3: live weight-cap readout against the targeted league
             if (Career.active)

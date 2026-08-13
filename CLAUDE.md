@@ -38,6 +38,7 @@ The records, most recent first:
 
 | doc | what |
 |---|---|
+| `docs/Gusset_Shipped_2026-08-12.md` | the seam-reinforcement part: fmt4 snapshots, the LOCKSTEP worker rule, what is measured and what is owed |
 | `docs/League_Purse_Halving_2026-08-12.md` | the league pays HALF (owen) — what moved, what deliberately did not, and the dpi-sensitive legibility check |
 | `docs/Catalog_Cuts_2026-08-12.md` | the saw and the bracket are GONE (hard deletes); the spike was reprieved — read before resurrecting a part id |
 | `docs/Seasons_Live_2026-08-12.md` | seasons wired end-to-end; the board double-listing the first rollover would have detonated; deploy is TWO commands IN ORDER, owen's go |

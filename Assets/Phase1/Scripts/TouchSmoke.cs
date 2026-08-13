@@ -194,6 +194,78 @@ public class TouchSmoke : MonoBehaviour
         yield return null;
         Check(!ui.RemoveArmed, "REMOVE disarms");
 
+        // ---- GUSSET (2026-08-12): the applique verb, end to end -----------
+        // The whole chain a player walks: no stock refuses with words; stocked
+        // applies with mass, band and consumption; a second application is
+        // refused (the sweep's measured dead zone); the flag survives a
+        // snapshot round-trip; UNDO returns the stock; the core refuses; and
+        // an unknown format stamp refuses the BUILD, not just the line.
+        Check(Btn("Gusset") != null, "the gusset tile is on the palette");
+        // The REMOVE flow above consumed the loose beam — place a fresh one
+        // to gusset, same idiom as the re-place step.
+        Tap("Beam"); yield return null;
+        Phase0Input.debugPointer = true;
+        Phase0Input.debugMousePos = corePos;
+        yield return null; yield return null;
+        Phase0Input.DebugClick(0);
+        yield return null; yield return null;
+        Tap("DONE"); yield return null;
+        int giBeam = -1;
+        for (int i = 1; i < bm.placed.Count; i++)
+            if (bm.placed[i].def.id == "beam") { giBeam = i; break; }
+        Check(giBeam > 0, "a beam is on the machine to gusset");
+        Tap("Gusset"); yield return null;
+        Check(bm.HasSelection && bm.SelectedApplique, "picking up the gusset holds an APPLIQUE, not a placement");
+        Check(bm.TestGhostShown == false, "an applique shows no ghost");
+
+        Vector3 gBeamPos = giBeam > 0 ? Camera.main.WorldToScreenPoint(bm.placed[giBeam].go.transform.position) : Vector3.zero;
+        int massBefore = bm.BuildMassInt;
+        // This suite runs FREE BUILD, where every part is unlimited — the
+        // career "No Gusset left" refusal is CareerSmoke's to check, in the
+        // mode where stock exists. Here the tap must simply work.
+        Phase0Input.debugPointer = true;
+        Phase0Input.debugMousePos = gBeamPos;
+        yield return null;
+        Phase0Input.DebugClick(0);
+        yield return null; yield return null;
+        Check(giBeam > 0 && bm.placed[giBeam].reinforced, "the tap reinforces the beam (free build: unlimited, like every part)");
+        Check(bm.BuildMassInt == massBefore + 10, "…and the machine weighs +10 kg (" + massBefore + " -> " + bm.BuildMassInt + ")");
+        Check(giBeam > 0 && bm.placed[giBeam].go.transform.Find("gussetband") != null, "…and the gold band is visible on the part");
+
+        Phase0Input.debugPointer = true;
+        Phase0Input.debugMousePos = gBeamPos;
+        yield return null;
+        Phase0Input.DebugClick(0);
+        yield return null; yield return null;
+        Check(bm.LastMessage != null && bm.LastMessage.Contains("already"),
+              "a second gusset on the same part is refused — the measured dead zone");
+        Check(bm.BuildMassInt == massBefore + 10, "…and no second mass was added");
+
+        string gSnap = bm.SnapshotString();
+        Check(gSnap.Contains(BuilderManager.SNAP_STAMP4) && gSnap.Contains("|G"),
+              "the save carries the fmt4 stamp and the |G flag");
+        Tap("UNDO"); yield return null; yield return null;
+        bool anyReinforced = false;
+        foreach (var pp in bm.placed) if (pp.reinforced) anyReinforced = true;
+        Check(!anyReinforced, "UNDO takes the gusset off again");
+
+        bm.LoadSnapshot(gSnap); yield return null;
+        int reinCount = 0; BuilderManager.PlacedPart gPart = null;
+        foreach (var pp in bm.placed) if (pp.reinforced) { reinCount++; gPart = pp; }
+        Check(reinCount == 1, "the gusset survives a snapshot round-trip");
+        Check(gPart != null && gPart.go.transform.Find("gussetband") != null, "…band included");
+
+        string held = bm.SnapshotString();
+        bm.LoadSnapshot(BuilderManager.SNAP_STAMP + "\n#fmt9-future\ncore|0,0.7,0|0|0,0,0\n");
+        yield return null;
+        string vErr = bm.Validate();
+        Check(vErr != null && vErr.Contains("newer save format"),
+              "an UNKNOWN format stamp refuses the whole build, never a silent partial load");
+        bm.LoadSnapshot(held); yield return null;
+        Check(bm.Validate() == null || !bm.Validate().Contains("newer save format"),
+              "…and a known-format build clears the refusal");
+        Tap("DONE"); yield return null;
+
         Tap("GARAGE"); yield return null;
         Check(Btn("SAVE") != null && Btn("LOAD") != null, "garage SAVE/LOAD buttons present (not tapped: would overwrite owner slots)");
 
