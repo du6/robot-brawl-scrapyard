@@ -2958,6 +2958,9 @@ public class BuilderManager : MonoBehaviour
     /// <summary>The held part is an applique (gusset): the status line says
     /// "tap a part to reinforce" instead of "tap the robot to place".</summary>
     public bool SelectedApplique { get { return selected >= 0 && selected < PaletteCount && palette[selected].applique; } }
+    /// <summary>Player-side retirement flag for palette index i — the tile
+    /// hides, the shop skips, the def lives on for the roster.</summary>
+    public bool PartRosterOnly(int i) { return i >= 0 && i < PaletteCount && palette[i].rosterOnly; }
     bool CareerAllowsMat(PlacedPart pp, string newMat)
     {
         if (!Career.active || Career.FreeParts) return true;

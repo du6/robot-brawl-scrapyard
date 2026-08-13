@@ -139,7 +139,10 @@ public static class CareerDB
             // bracket x4 removed with the part (2026-08-12). What, if
             // anything, replaces the ~88 kg of kit budget is the register's
             // tutorial-assembly decision, not this line's.
-            new KitItem("chassis",  "Aluminum", 1),
+            // chassis x1 removed from the kit with the part's player-side
+            // retirement (owen, 2026-08-12) — the block still exists, but only
+            // under enemy robots. Kit composition overall remains the
+            // register's tutorial-assembly decision.
             new KitItem("plate",    "ABS",      2),
             new KitItem("wheel",    "Rubber",   4),   // R2: the wheel def PINS itself to Rubber
                                                       // (materialChoice=false) and Rubber is deliberately

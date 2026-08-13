@@ -66,6 +66,16 @@ public class P1PartDef
     /// carbon-fibre engine block is not a thing.</summary>
     public string[] allowedMats = null;
 
+    /// <summary>ROSTER-ONLY (owen, 2026-08-12): the part exists for ENEMY
+    /// recipes but is retired from the player experience — no palette tile,
+    /// no shop rows, no kit grant. The def stays in Palette() so every
+    /// index-keyed site keeps its numbering (the tab-renumbering trap), old
+    /// saves keep loading, and EnemyRoster.D() keeps finding it. First (and
+    /// so far only) case: the chassis block — the skeleton of all eight
+    /// roster bots, which players demonstrably never use (every production
+    /// ladder robot is all-beam).</summary>
+    public bool rosterOnly = false;
+
     /// <summary>GUSSET (owen, 2026-08-12): this part is an APPLIQUE — it is
     /// never PLACED as geometry. Selecting it and tapping a placed part
     /// applies it TO that part (BuilderManager.ApplyGusset). It occupies no
@@ -194,6 +204,7 @@ public class P1PartDef
             // FOUR that no author ever placed. The R-key symmetric-shape
             // fallback it motivated stays (the battery is also a cube).
             new P1PartDef { id = "chassis", label = "Chassis block",     category = P1Category.Structural, size = new Vector3(0.40f, 0.30f, 0.50f),
+                            rosterOnly = true,   // player-side retirement, owen 2026-08-12 — see the rosterOnly note
                             desc = "Big load-bearing block. Lots of sockets, so the joints around it are strong." },
             new P1PartDef { id = "plate",   label = "Armor plate",       category = P1Category.Structural, size = new Vector3(0.50f, 0.06f, 0.50f),
                             desc = "Thin armor sheet. Cheap protection for the core and engine." },

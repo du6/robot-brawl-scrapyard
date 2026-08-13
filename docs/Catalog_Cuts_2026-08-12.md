@@ -34,14 +34,17 @@ cube, and covers that case in the R-cycle sweeps).
   where it lives.
 - **Long beam** — real mechanical identity (fewer seams) in a game whose
   central failure mode is seam shear; premise never benched, kept anyway.
-- **Chassis block** — proposed for deletion the same evening and KEPT (owen,
-  option (a), full facts on the table): it is the SKELETON of the entire
-  enemy roster (core + 2×chassis + 4 wheels, all eight bots), and the
-  flagship-hardening calibration (~1,500 fights) is measured on
-  chassis-built enemies. Player-side retirement was offered and declined;
-  the part stays fully live. Note for later: players barely use it (all
-  production robots are all-beam) — a soft data point for the material/part
-  telemetry wishlist, not a cut.
+- **Chassis block** — proposed for deletion, and after the facts ("(a)" was
+  a typo) owen chose **PLAYER-SIDE RETIREMENT**: `rosterOnly = true`. The
+  def stays in Palette() so every index-keyed site keeps its numbering, old
+  saves load, and EnemyRoster.D() keeps finding it — but the palette tile is
+  created hidden (partButtons stays index-parallel), the shop skips its
+  rows, and the kit no longer grants one. The enemy roster is untouched:
+  all eight bots still stand on core + 2×chassis + 4 wheels, and the
+  flagship-hardening calibration stays valid. Verified: CareerSmoke 133/133,
+  TouchSmoke 44/44 after the change; MAULER recipe still carries 2 chassis;
+  kit clean. A player who somehow owns chassis stock keeps it counted but
+  cannot buy more or select the tile.
 
 ## Safety facts both cuts rest on
 
