@@ -16,8 +16,19 @@ public static class CareerDB
     public const float UNDERDOG_K = 0.6f;      // bonus slope vs value gap
     public const float UNDERDOG_CAP = 1.6f;    // never above 1.6x (owen, resolved)
     public const float REENTRY_FRAC = 0.4f;    // re-entering a beaten contest
-    public const int FIRST_WIN_BONUS = 150;    // one-time, per contest
-    public const float WIN_DMG_K = 0.5f;       // + min(dealt,400) * this on wins
+    // ---- THE HALVING, 2026-08-12 (owen). CareerBench's surviving verdicts
+    // say the league is too easy at the top (CEILING L4 92%, STRETCH failing
+    // L3/L4/L5 the same way) and owen has low confidence in tuning the AI
+    // itself — so the ECONOMY moved instead: every league WIN payment is
+    // half of the doc-section-5 value, and the ARENA (whose purses and
+    // season podium did NOT move) becomes the richer place to earn. What was
+    // deliberately NOT halved: loss consolation (it pays the struggling
+    // player, not the winning one), entry fees (a cost, not a reward), and
+    // every fraction/multiplier that scales WITH the purse. Season payouts
+    // (300/150/100) were sized against the OLD purses; they now buy
+    // relatively more, which is the point.
+    public const int FIRST_WIN_BONUS = 75;     // one-time, per contest (was 150)
+    public const float WIN_DMG_K = 0.25f;      // + min(dealt,400) * this on wins (was 0.5)
     public const float WIN_DMG_CAP = 400f;
     public const int LOSS_BASE = 40;           // consolation floor
     public const float LOSS_DMG_K = 0.3f;
@@ -77,27 +88,27 @@ public static class CareerDB
         // ~1.3 t under a 4 t cap it is not. This progression is +133% HP from
         // L2 to L4 on every structural part.
         new League("L1", "Scrapyard Open", "The Yard", "yard", 1500f, new[] {
-            new Contest("L1C1", "scout",  AiTier.Rookie, 250, 0),
-            new Contest("L1C2", "tipper", AiTier.Rookie, 300, 0) }),
+            new Contest("L1C1", "scout",  AiTier.Rookie, 125, 0),
+            new Contest("L1C2", "tipper", AiTier.Rookie, 150, 0) }),
         new League("L2", "Garage League", "The Loading Dock", "dock", 2000f, new[] {
-            new Contest("L2C1", "mauler", AiTier.Rookie,  400, 0),
-            new Contest("L2C2", "scout",  AiTier.Veteran, 450, 0, "Aluminum"),
-            new Contest("L2C3", "tipper", AiTier.Veteran, 500, 0, "Aluminum") }),
+            new Contest("L2C1", "mauler", AiTier.Rookie,  200, 0),
+            new Contest("L2C2", "scout",  AiTier.Veteran, 225, 0, "Aluminum"),
+            new Contest("L2C3", "tipper", AiTier.Veteran, 250, 0, "Aluminum") }),
         new League("L3", "Regional Circuit", "The Sawmill", "sawmill", 2800f, new[] {
-            new Contest("L3C1", "bulwark", AiTier.Veteran, 700, 50, "Steel"),
-            new Contest("L3C2", "mauler",  AiTier.Veteran, 800, 50, "Steel"),
-            new Contest("L3C3", "ripper",  AiTier.Veteran, 900, 50, "Steel"),
+            new Contest("L3C1", "bulwark", AiTier.Veteran, 350, 50, "Steel"),
+            new Contest("L3C2", "mauler",  AiTier.Veteran, 400, 50, "Steel"),
+            new Contest("L3C3", "ripper",  AiTier.Veteran, 450, 50, "Steel"),
             // The first disc a player ever meets. Before this the roster had
             // none until L4, which is exactly why one spinner cleared three
             // leagues unopposed.
-            new Contest("L3C4", "millstone", AiTier.Veteran, 950, 50, "Steel") }),
+            new Contest("L3C4", "millstone", AiTier.Veteran, 475, 50, "Steel") }),
         new League("L4", "National Series", "The Press", "press", 4000f, new[] {
-            new Contest("L4C1", "widowmaker", AiTier.Veteran,  1200, 100, "Titanium"),
-            new Contest("L4C2", "bulwark",    AiTier.Champion, 1400, 100, "Titanium"),
-            new Contest("L4C3", "ripper",     AiTier.Champion, 1600, 100, "Titanium"),
-            new Contest("L4C4", "bastion",    AiTier.Champion, 1800, 100, "Titanium") }),
+            new Contest("L4C1", "widowmaker", AiTier.Veteran,  600, 100, "Titanium"),
+            new Contest("L4C2", "bulwark",    AiTier.Champion, 700, 100, "Titanium"),
+            new Contest("L4C3", "ripper",     AiTier.Champion, 800, 100, "Titanium"),
+            new Contest("L4C4", "bastion",    AiTier.Champion, 900, 100, "Titanium") }),
         new League("L5", "World Championship", "The Crucible", "crucible", 5500f, new[] {
-            new Contest("L5C1", "widowmaker", AiTier.Champion, 3000, 200, "Titanium") }),
+            new Contest("L5C1", "widowmaker", AiTier.Champion, 1500, 200, "Titanium") }),
     };
 
     public class KitItem { public string partId; public string mat; public int count;

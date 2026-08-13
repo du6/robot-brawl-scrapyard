@@ -57,16 +57,20 @@ public static class Progression
     /// 7) — content variety with zero physics dishonesty: the box changes,
     /// the bots never do. AI pathing is straight-line pursuit, so a smaller
     /// box is strictly harder (less room to run) without new failure modes.</summary>
+    // HALVED 2026-08-12 (owen) alongside CareerDB's purses — one economy,
+    // one cut. Consolation and costs untouched; see CareerDB's note. The
+    // R1-CRITIC anti-grind ordering still holds: max exhibition win is now
+    // 75+100=175, loss consolation stays capped at 100.
     public static readonly Rung[] Ladder =
     {
-        new Rung("scout",      AiTier.Rookie,    250, null,          7f,   "SCOUT"),
-        new Rung("tipper",     AiTier.Rookie,    300, "Titanium",    7f,   "TIPPER"),
-        new Rung("mauler",     AiTier.Rookie,    350, null,          7f,   "MAULER"),
-        new Rung("ripper",     AiTier.Veteran,   450, "CarbonFiber", 7f,   "RIPPER"),
-        new Rung("mauler",     AiTier.Veteran,   500, null,          5.5f, "MAULER"),
-        new Rung("bulwark",    AiTier.Veteran,   600, "Tungsten",    5.5f, "BULWARK"),
-        new Rung("widowmaker", AiTier.Champion,  800, null,          5.5f, "WIDOWMAKER"),
-        new Rung("bulwark",    AiTier.Champion, 1000, null,          5f,   "BULWARK"),
+        new Rung("scout",      AiTier.Rookie,    125, null,          7f,   "SCOUT"),
+        new Rung("tipper",     AiTier.Rookie,    150, "Titanium",    7f,   "TIPPER"),
+        new Rung("mauler",     AiTier.Rookie,    175, null,          7f,   "MAULER"),
+        new Rung("ripper",     AiTier.Veteran,   225, "CarbonFiber", 7f,   "RIPPER"),
+        new Rung("mauler",     AiTier.Veteran,   250, null,          5.5f, "MAULER"),
+        new Rung("bulwark",    AiTier.Veteran,   300, "Tungsten",    5.5f, "BULWARK"),
+        new Rung("widowmaker", AiTier.Champion,  400, null,          5.5f, "WIDOWMAKER"),
+        new Rung("bulwark",    AiTier.Champion,  500, null,          5f,   "BULWARK"),
     };
 
     /// <summary>P4c — build-constraint challenges (§9: "beat this bot with a
@@ -82,15 +86,15 @@ public static class Progression
     public static readonly Challenge[] Challenges =
     {
         new Challenge { id = "feather", label = "FEATHERWEIGHT", desc = "Beat SCOUT (Rookie) at 400 kg or less — ABS everything and a lean frame gets you there",
-                        oppId = "scout", tier = AiTier.Rookie, reward = 400, maxMass = 400 },
+                        oppId = "scout", tier = AiTier.Rookie, reward = 200, maxMass = 400 },
         new Challenge { id = "budget", label = "BUDGET BRAWL", desc = "Beat MAULER (Veteran) spending 1500 cr or less",
-                        oppId = "mauler", tier = AiTier.Veteran, reward = 600, maxCost = 1500 },
+                        oppId = "mauler", tier = AiTier.Veteran, reward = 300, maxCost = 1500 },
         new Challenge { id = "plastic", label = "PLASTIC CHAMPION", desc = "Beat TIPPER (Rookie) with every choosable part in ABS",
-                        oppId = "tipper", tier = AiTier.Rookie, reward = 500, onlyMat = "ABS" },
+                        oppId = "tipper", tier = AiTier.Rookie, reward = 250, onlyMat = "ABS" },
         new Challenge { id = "unarmed", label = "UNARMED", desc = "Beat SCOUT (Veteran) with wedges as your only weapon — ramp shots and shoves do the scoring",   // R3-CRITIC: text matched to how the fight is actually won (0 flip s measured; damage 93-27)
-                        oppId = "scout", tier = AiTier.Veteran, reward = 600, noWeapons = true },
+                        oppId = "scout", tier = AiTier.Veteran, reward = 300, noWeapons = true },
         new Challenge { id = "giant", label = "GIANT KILLER", desc = "Beat WIDOWMAKER (Champion) at 800 kg or less",
-                        oppId = "widowmaker", tier = AiTier.Champion, reward = 1000, maxMass = 800 },
+                        oppId = "widowmaker", tier = AiTier.Champion, reward = 500, maxMass = 800 },
     };
     public static bool ChallengeDone(string id) { return Data.doneChallenges.Contains(id); }
 
@@ -218,13 +222,13 @@ public static class Progression
         if (Career.active && Career.SettleFight(win, dealt)) return;
         int ri = activeRungIndex;
         Rung r = ri >= 0 && ri < Ladder.Length ? Ladder[ri] : null;
-        int basePay = r != null ? r.reward : 150;   // exhibitions: small flat purse
+        int basePay = r != null ? r.reward : 75;    // exhibitions: small flat purse (halved 2026-08-12 with the league economy)
         // R1-CRITIC FIX (finding 3): loss consolation used to scale with the
         // rung reward (25%), so AFK-losing to rung 8 (+250) out-earned
         // actively WINNING exhibitions (~223 max) — a degenerate grind.
         // Consolation is now effort-based and capped at 100: 25 flat plus a
         // quarter of the damage you actually dealt (up to 300).
-        int pay = win ? basePay + Mathf.RoundToInt(Mathf.Min(dealt, 400f) * 0.5f)
+        int pay = win ? basePay + Mathf.RoundToInt(Mathf.Min(dealt, 400f) * 0.25f)   // dmg slope halved with the purses, 2026-08-12
                       : Mathf.Min(100, 25 + Mathf.RoundToInt(Mathf.Min(dealt, 300f) * 0.25f));
         Data.scrap += pay;
         Data.fightsFought++;
