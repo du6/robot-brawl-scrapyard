@@ -134,6 +134,17 @@ public class CareerSmoke : MonoBehaviour
               "SHOP tab appears in career mode");
         Tap("SHOP"); yield return null;
 
+        // CUBE (2026-08-12) sits before Beam in the palette, so Beam's
+        // accordion section is no longer the default-open first row. Open it
+        // by id-scan, the same idiom the later shop blocks already use — the
+        // renumbering trap, caught on the BENCH side this time.
+        if (GameObject.Find("buy_beam_Aluminum") == null)
+        {
+            int beamSec0 = -1;
+            for (int i = 1; i < bm.PaletteCount; i++)
+                if (bm.PartId(i) == "beam") beamSec0 = i;
+            TapNamed("shophead_" + beamSec0); yield return null;
+        }
         int beamP = CareerDB.PartPrice("beam", "Aluminum");
         int sellP = CareerDB.SellPrice("beam", "Aluminum");
         int s0 = Career.Data.scrap;

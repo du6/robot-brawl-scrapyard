@@ -149,7 +149,9 @@ public static class CareerDB
                                                       // absent from MatDB.Order, so an "Aluminum" grant was
                                                       // inventory no chip could ever reveal. See ResolveMat.
             new KitItem("battery",  "Aluminum", 1),
-            new KitItem("gyro",     "Aluminum", 1),
+            // gyro x1 removed with its player-side retirement (owen, 2026-08-12);
+            // a Cube x1 takes the slot so the crate keeps a small block.
+            new KitItem("cube",     "Aluminum", 1),
             new KitItem("spindle",  "Aluminum", 1),
             new KitItem("wedge",    "Steel",    1),
             new KitItem("spike",    "Steel",    1),

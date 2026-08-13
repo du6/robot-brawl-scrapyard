@@ -70,10 +70,10 @@ public class P1PartDef
     /// recipes but is retired from the player experience — no palette tile,
     /// no shop rows, no kit grant. The def stays in Palette() so every
     /// index-keyed site keeps its numbering (the tab-renumbering trap), old
-    /// saves keep loading, and EnemyRoster.D() keeps finding it. First (and
-    /// so far only) case: the chassis block — the skeleton of all eight
-    /// roster bots, which players demonstrably never use (every production
-    /// ladder robot is all-beam).</summary>
+    /// saves keep loading, and EnemyRoster.D() keeps finding it. Cases: the
+    /// chassis block (the skeleton of all eight roster bots, which players
+    /// demonstrably never use) and the gyro stabilizer (retired with the
+    /// Cube's arrival — see its own note for the consequence).</summary>
     public bool rosterOnly = false;
 
     /// <summary>GUSSET (owen, 2026-08-12): this part is an APPLIQUE — it is
@@ -194,6 +194,15 @@ public class P1PartDef
             new P1PartDef { id = "core",    label = "Core (controller)", category = P1Category.Control,    size = new Vector3(0.30f, 0.30f, 0.30f),
                             materialChoice = false,
                             desc = "The robot's brain and KO target. Lose it, lose the fight. Always aluminium - protect it with armour plate and frame, not by rebuilding it." },
+            // CUBE (owen, 2026-08-12): a plain structural block in the gyro's
+            // 0.24 m form, deliberately FIRST after the core — the simplest
+            // thing a new player can bolt on. No function, no mechanism, no
+            // pinned material: in Aluminium it lands at the gyro's familiar
+            // ~37 kg by pure volume x density. (Family resemblance to the
+            // deleted bracket is acknowledged: this is the "plain small block"
+            // role back in the catalog, in a bigger size, on purpose.)
+            new P1PartDef { id = "cube",    label = "Cube",              category = P1Category.Structural, size = new Vector3(0.24f, 0.24f, 0.24f),
+                            desc = "Plain block. Bolt it anywhere - filler, spacer, armour core. Does nothing but hold things together." },
             new P1PartDef { id = "beam",    label = "Beam",              category = P1Category.Structural, size = new Vector3(0.20f, 0.20f, 0.60f),
                             desc = "Structural spar. Extends the chassis and gives wheels somewhere to mount. R rotates it." },
             new P1PartDef { id = "beamlong", label = "Long beam",        category = P1Category.Structural, size = new Vector3(0.20f, 0.20f, 1.00f),
@@ -266,7 +275,16 @@ public class P1PartDef
             // costs dead weight - a trap. Making authority scale with the gyro's
             // own mass would make the material meaningful; that is a behaviour
             // change and wants its own tuning pass, so the trap is closed first.
+            // GYRO retired PLAYER-SIDE with the Cube's arrival (owen, option
+            // (c), 2026-08-12). The FUNCTION stays fully alive — WIDOWMAKER
+            // and BASTION still stabilize, TIPPER's no-gyro lesson still
+            // teaches, the flip-recovery physics is untouched — but players
+            // can no longer buy or place one. ⚠ CONSEQUENCE, stated plainly:
+            // the player side now has NO flip recovery, and the wedge's flip
+            // win-path has no part-based counter. Owen chose this with the
+            // gate-fight measurement (gyro: flips 100% -> 4%) on the table.
             new P1PartDef { id = "gyro",    label = "Gyro stabilizer",   category = P1Category.Control,    size = new Vector3(0.24f, 0.24f, 0.24f),
+                            rosterOnly = true,
                             materialChoice = false,
                             desc = "Reaction wheel. Rights the bot faster when it flips. Mount low and central." },
             // Pinned to Rubber: a wheel is a raycast anchor, not a body part -

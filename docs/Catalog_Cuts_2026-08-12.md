@@ -46,6 +46,28 @@ cube, and covers that case in the R-cycle sweeps).
   kit clean. A player who somehow owns chassis stock keeps it counted but
   cannot buy more or select the tile.
 
+- **Gyro stabilizer** — retired PLAYER-SIDE (owen, option (c)) when the
+  "Cube" arrived: `rosterOnly = true`, kit slot swapped gyro→cube. The
+  FUNCTION is fully alive — WIDOWMAKER and BASTION still stabilize, TIPPER's
+  lesson still teaches — but the player side now has NO flip recovery and the
+  wedge's flip win-path has no part-based counter. Owen chose this with the
+  gate-fight measurement (gyro: flips 100%→4%) on the table.
+- **Cube** — NEW (owen): a plain 0.24 m structural block, first tile after
+  the core, ~37 kg in Aluminium by pure derivation. The "plain small block"
+  role returns to the catalog after the bracket's deletion, in a bigger
+  size, on purpose.
+
+## Editor-session degradation, witnessed twice (2026-08-12, late)
+
+A 3.5-day-old editor session produced BOTH unexplained failures of the
+evening: the polyEdges short-list crash and, later, silently lost debug
+clicks (ghost valid, click consumed, nothing placed, no message) that took
+TouchSmoke from 44/44 to 22/22 with NO causal code change — a control leg
+with the palette change reverted failed identically. A clean editor restart
+cured it completely (44/44 with the change in). Rule of thumb earned: when a
+bench regresses in ways no diff explains, RESTART THE EDITOR before touching
+the product.
+
 ## Safety facts both cuts rest on
 
 - The snapshot loader SKIPS unknown part ids by design (FuzzBench-hardened
