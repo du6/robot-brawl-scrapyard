@@ -158,7 +158,7 @@ public class UP2Path : MonoBehaviour
     IEnumerator SecR()
     {
         W("\n## B. R FULL CYCLE BEFORE PLACING, AND DOES THE PLACED PART KEEP IT");
-        foreach (string id in new[] { "beam", "beamlong", "plate", "chassis", "bracket", "engine", "battery", "gyro" })
+        foreach (string id in new[] { "beam", "beamlong", "plate", "chassis", "engine", "battery", "gyro" })   // bracket removed 2026-08-12; battery keeps the symmetric-cube case
         {
             yield return Load(BARE);
             bm.selected = Idx(id);
@@ -234,7 +234,7 @@ public class UP2Path : MonoBehaviour
     {
         W("\n## D. ESC / PANEL / EMPTY / INVALID / REMOVE / REPAINT");
         yield return Load(SKEL);
-        bm.selected = Idx("bracket");
+        bm.selected = Idx("beam");
         bool r0 = false; yield return Reach(1, Vector3.up, x => r0 = x);
         bool shownBefore = bm.TestGhostShown;
         Phase0Input.DebugEsc();
@@ -242,7 +242,7 @@ public class UP2Path : MonoBehaviour
         CK(bm.selected == -1 && !bm.TestGhostShown, "Esc clears selection and ghost (shown " + shownBefore + " -> " + bm.TestGhostShown + ", selected=" + bm.selected + ")");
 
         // panel click
-        bm.selected = Idx("bracket");
+        bm.selected = Idx("beam");
         yield return Reach(1, Vector3.up, x => r0 = x);
         int pc = bm.placed.Count;
         Phase0Input.debugMousePos = new Vector3(120f, 300f, 0f);
@@ -305,7 +305,7 @@ public class UP2Path : MonoBehaviour
         // material of a POINTER-PLACED part follows activeMat
         yield return Load(SKEL);
         bm.activeMat = "Tungsten";
-        int ni2 = -1; yield return Place("bracket", 2, Vector3.up, r => ni2 = r);
+        int ni2 = -1; yield return Place("beam", 2, Vector3.up, r => ni2 = r);
         CK(ni2 >= 0 && bm.placed[ni2].MatName() == "Tungsten",
            "pointer-placed part takes the active material (" + (ni2 >= 0 ? bm.placed[ni2].MatName() : "not placed") + ")");
         bm.activeMat = "Aluminum";

@@ -102,7 +102,7 @@ public class UP1Sweep : MonoBehaviour
     {
         W("\n## B. MULTI-PART STACK (4 deep), every step by pointer");
         bm.LoadSnapshot(CORE); yield return null;
-        string[] chain = { "chassis", "bracket", "beam", "blade" };
+        string[] chain = { "chassis", "beam", "beam", "blade" };   // bracket removed 2026-08-12
         Vector3[] face  = { Vector3.forward, Vector3.forward, Vector3.forward, Vector3.forward };
         int target = 0;
         for (int s = 0; s < chain.Length; s++)
@@ -263,7 +263,7 @@ public class UP1Sweep : MonoBehaviour
 
         // E5: rapid double click on one valid face - must place exactly ONE part
         bm.LoadSnapshot(CORE); yield return null;
-        bm.selected = Idx("bracket");
+        bm.selected = Idx("beam");
         got = false; yield return EParkOnCoreTop(r => got = r);
         if (got && bm.TestGhostValid)
         {

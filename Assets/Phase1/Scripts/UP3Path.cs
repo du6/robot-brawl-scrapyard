@@ -260,7 +260,7 @@ public class UP3Path : MonoBehaviour
         W("\n## MIXED STACK core->chassis->beam->bracket->blade, each onto the LAST one");
         bm.LoadSnapshot(BARE); yield return null;
         bm.activeMat = "Aluminum";
-        string[] chain = { "chassis", "beam", "bracket", "blade" };
+        string[] chain = { "chassis", "beam", "beam", "blade" };   // bracket removed 2026-08-12
         host = 0;
         foreach (var id in chain)
         {
@@ -278,7 +278,7 @@ public class UP3Path : MonoBehaviour
     IEnumerator SecRYaw()
     {
         W("## R AT EVERY YAW: does the PLACED part match the GHOST the player was shown?");
-        string[] ids = { "beam", "beamlong", "plate", "chassis", "bracket" };
+        string[] ids = { "beam", "beamlong", "plate", "chassis" };   // bracket removed 2026-08-12
         foreach (var id in ids)
         {
             W("  --- " + id);
@@ -481,7 +481,7 @@ public class UP3Path : MonoBehaviour
 
         // -- two clicks in consecutive frames on the same spot
         bm.LoadSnapshot(BARE); yield return null;
-        bm.selected = Idx("bracket");
+        bm.selected = Idx("beam");
         yield return null;
         bool gotD = false;
         yield return Reach(0, Vector3.forward, r => gotD = r);

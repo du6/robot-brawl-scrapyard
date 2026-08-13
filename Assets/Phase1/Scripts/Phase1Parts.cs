@@ -173,8 +173,11 @@ public class P1PartDef
                             desc = "Structural spar. Extends the chassis and gives wheels somewhere to mount. R rotates it." },
             new P1PartDef { id = "beamlong", label = "Long beam",        category = P1Category.Structural, size = new Vector3(0.20f, 0.20f, 1.00f),
                             desc = "Full-length spar. One piece instead of two seams - fewer joints to shear." },
-            new P1PartDef { id = "bracket", label = "Bracket",           category = P1Category.Structural, size = new Vector3(0.20f, 0.20f, 0.20f),
-                            desc = "Short cube joiner. Cheap filler for tying two runs together." },
+            // "bracket" (0.20 cube joiner) was REMOVED 2026-08-12 — owen's
+            // call, redundancy-by-usage: zero uses in the enemy roster, zero
+            // in owen's save, zero in production, and the starter kit granted
+            // FOUR that no author ever placed. The R-key symmetric-shape
+            // fallback it motivated stays (the battery is also a cube).
             new P1PartDef { id = "chassis", label = "Chassis block",     category = P1Category.Structural, size = new Vector3(0.40f, 0.30f, 0.50f),
                             desc = "Big load-bearing block. Lots of sockets, so the joints around it are strong." },
             new P1PartDef { id = "plate",   label = "Armor plate",       category = P1Category.Structural, size = new Vector3(0.50f, 0.06f, 0.50f),
@@ -241,11 +244,17 @@ public class P1PartDef
                             desc = "Dense steel flywheel. NO motor - bolt it past a spindle. Short reach, but the heaviest rim in the catalog: slow to wind up and it hits like nothing else." },
             // "spinnerSaw" (Circular saw) was REMOVED 2026-08-12 — owen's
             // call, redundancy cut: same role as the spinner (rotor bolted
-            // past a spindle), differentiated only on paper (reach/spin-up vs
-            // rim mass) and never once measured against it. No shipped save,
-            // no enemy recipe and no production ladder snapshot carried one —
-            // verified before the cut. If a saved id ever surfaces anyway,
-            // the loader's unknown-part path answers for it, not this table.
+            // past a spindle). The HISTORY, corrected: owen flagged this same
+            // pair on 2026-07-28, and the measurement then showed the SAW
+            // dominating on every axis — which is what massMul (above) was
+            // invented to fix. The post-massMul trade (rim mass vs reach and
+            // spin-up) was engineered to be real but never re-measured
+            // head-to-head; the cut resolves the pair the other way round,
+            // keeping the disc every roster bot and production robot already
+            // carries. No shipped save, no enemy recipe and no production
+            // snapshot carried a saw — verified before the cut. If a saved id
+            // ever surfaces anyway, the loader's unknown-part path answers
+            // for it, not this table.
             new P1PartDef { id = "spike",   label = "Ram spike",         category = P1Category.Weapon,     size = new Vector3(0.22f, 0.22f, 0.30f),
                             matName = "Steel", edgeHardness = 1.2f,
                             desc = "Hardened steel wedge. No motor - point it at the enemy and drive." },

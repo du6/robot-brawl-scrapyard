@@ -147,7 +147,7 @@ public class UP2Path2 : MonoBehaviour
         // Keep a part selected so the ghost raycast runs and Reach can confirm
         // which face the pointer is genuinely on; button 1/2 are independent of it.
         yield return Load(SKEL);
-        bm.selected = Idx("bracket");
+        bm.selected = Idx("beam");
         bool rc = false;
         yield return Reach(0, Vector3.up, x => rc = x);     // core top is under the battery
         if (!rc) yield return Reach(0, Vector3.right, x => rc = x);
@@ -161,7 +161,7 @@ public class UP2Path2 : MonoBehaviour
 
         // leaf wheel
         yield return Load(SKEL);
-        bm.selected = Idx("bracket");
+        bm.selected = Idx("beam");
         bool rw = false;
         yield return Reach(3, Vector3.right, x => rw = x);
         b4 = bm.placed.Count; tgt = bm.TestGhostTarget;
@@ -172,7 +172,7 @@ public class UP2Path2 : MonoBehaviour
 
         // repaint
         yield return Load(SKEL);
-        bm.selected = Idx("bracket");
+        bm.selected = Idx("beam");
         bm.activeMat = "Titanium";
         bool rp = false;
         yield return Reach(2, Vector3.back, x => rp = x);

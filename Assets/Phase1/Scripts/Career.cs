@@ -111,7 +111,9 @@ public static class CareerDB
         {
             new KitItem("beam",     "Aluminum", 6),
             new KitItem("beamlong", "Aluminum", 1),
-            new KitItem("bracket",  "Aluminum", 4),
+            // bracket x4 removed with the part (2026-08-12). What, if
+            // anything, replaces the ~88 kg of kit budget is the register's
+            // tutorial-assembly decision, not this line's.
             new KitItem("chassis",  "Aluminum", 1),
             new KitItem("plate",    "ABS",      2),
             new KitItem("wheel",    "Rubber",   4),   // R2: the wheel def PINS itself to Rubber

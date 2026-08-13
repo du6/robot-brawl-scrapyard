@@ -169,7 +169,7 @@ public class UP1Dev : MonoBehaviour
         W(string.Format("   baseline (no belly part): drove {0:F2} m in 6 s at full throttle", baseDist));
 
         bm.LoadSnapshot(SK); yield return null;
-        int iBr = Idx("bracket");
+        int iBr = Idx("beam");
         bm.selected = iBr;
         bool got = false;
         yield return Reach(0, Vector3.down, r => got = r);
@@ -204,7 +204,7 @@ public class UP1Dev : MonoBehaviour
         if (err != null) { BAD("SKHI fixture illegal, positive control unusable"); yield break; }
 
         // fore chassis is index 1; its underside is at y 0.750, deck is 0.520.
-        bm.selected = Idx("bracket");
+        bm.selected = Idx("beam");
         bool got = false;
         yield return Reach(1, Vector3.down, r => got = r);
         if (!got) { BAD("chassis underside never resolved under the pointer"); yield break; }
@@ -222,7 +222,7 @@ public class UP1Dev : MonoBehaviour
         W("   clicked; parts now " + added);
         // Now hang a SECOND bracket off the first one's underside: bottom
         // 0.350, i.e. 0.170 below the wheel line. This one must be refused.
-        bm.selected = Idx("bracket");
+        bm.selected = Idx("beam");
         got = false;
         yield return Reach(added - 1, Vector3.down, r => got = r);
         if (!got) { W("   (second bracket face not reachable - skipped)"); yield break; }
@@ -289,7 +289,7 @@ public class UP1Dev : MonoBehaviour
     {
         W("\n## E. RIGHT-CLICK REMOVE and MIDDLE-CLICK REPAINT through the pointer");
         bm.LoadSnapshot(SK); yield return null;
-        bm.selected = Idx("bracket");   // arms the ghost pipeline so Reach can verify the hit
+        bm.selected = Idx("beam");   // arms the ghost pipeline so Reach can verify the hit
 
         // AFT chassis (index 2 in SK): a structural part with a free roof and
         // no material restriction. The battery roof carries nothing either but

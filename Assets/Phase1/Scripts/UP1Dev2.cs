@@ -89,7 +89,7 @@ public class UP1Dev2 : MonoBehaviour
     IEnumerator R_PerPress()
     {
         W("\n## R. DOES EVERY R PRESS CHANGE THE DRAWING? (per-press, normalised start)");
-        string[] ids = { "beam", "beamlong", "plate", "chassis", "bracket", "engine", "battery" };
+        string[] ids = { "beam", "beamlong", "plate", "chassis", "engine", "battery" };   // bracket removed 2026-08-12; battery keeps the symmetric-cube case
         foreach (string id in ids)
         {
             int pi = Idx(id);

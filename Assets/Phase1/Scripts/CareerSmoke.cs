@@ -1225,8 +1225,7 @@ public class CareerSmoke : MonoBehaviour
         int iSpindle = bm.PaletteIndexOf("spindle");
         int iSpinner = bm.PaletteIndexOf("spinner");
         int iBattery = bm.PaletteIndexOf("battery");
-        int iBracket = bm.PaletteIndexOf("bracket");
-        Check(iSpindle >= 0 && iSpinner >= 0 && iBattery >= 0 && iBracket >= 0,
+        Check(iSpindle >= 0 && iSpinner >= 0 && iBattery >= 0,
               "C20: the fixture's parts are all in the palette");
         const string BARE = BuilderManager.SNAP_STAMP + "\ncore|0,0.7,0|0|0,0,0";
 
@@ -1283,7 +1282,7 @@ public class CareerSmoke : MonoBehaviour
         //     NEW part put INSIDE the existing circle is still refused.
         int loaded2 = bm.LoadSnapshot(SAWYER);
         yield return null;
-        bool intoCircle = !bm.PlaceByFace(iBracket, 0, Vector3.forward, 0);
+        bool intoCircle = !bm.PlaceByFace(iBattery, 0, Vector3.forward, 0);   // was the bracket; removed 2026-08-12 — the battery is the same small-cube probe
         yield return null;
         Check(loaded2 == 3, "C20: fixture reloaded for the last case");
         Check(intoCircle, "C20: a NEW part inside an existing circle is still refused");
