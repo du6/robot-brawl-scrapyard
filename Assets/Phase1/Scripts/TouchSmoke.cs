@@ -263,6 +263,37 @@ public class TouchSmoke : MonoBehaviour
                 if (gPart.go.transform.GetChild(gi3).name.StartsWith("gussetface")) gPlate2 = true;
         Check(gPlate2, "…face plate included");
 
+        // ---- v3 rule 3: REMOVE peels the weld BEFORE the part -------------
+        // The aim comes FROM THE MASK: project a point just outside the
+        // welded face, so the ray hits that face by construction rather than
+        // by hoping the center ray lands where the weld did. A selection is
+        // held (the gusset tile) so MobileBuilderUI keeps debugPointer alive
+        // between frames — the leaked-click trap from the #15 casebook.
+        int rParts = bm.placed.Count;
+        int wBit = -1;
+        if (gPart != null) for (int b = 0; b < 6; b++)
+            if (((gPart.gussetFaces >> b) & 1) != 0) { wBit = b; break; }
+        Check(wBit >= 0, "a welded face exists to aim at");
+        Vector3 gpPos = Vector3.zero;
+        if (gPart != null && wBit >= 0)
+            gpPos = Camera.main.WorldToScreenPoint(
+                gPart.go.transform.position + BuilderManager.FaceDir(wBit) * 0.05f);
+        Tap("Gusset"); yield return null;   // hold a selection; keeps the debug pointer alive
+        Phase0Input.debugPointer = true;
+        Phase0Input.debugMousePos = gpPos;
+        yield return null;
+        Phase0Input.DebugClick(1);
+        yield return null; yield return null;
+        Check(gPart != null && bm.placed.Count == rParts && gPart.gussetFaces == 0,
+              "REMOVE on a welded surface peels the gusset and keeps the part");
+        Phase0Input.debugPointer = true;
+        Phase0Input.debugMousePos = gpPos;
+        yield return null;
+        Phase0Input.DebugClick(1);
+        yield return null; yield return null;
+        Check(bm.placed.Count == rParts - 1, "…and the next REMOVE takes the part itself");
+        Tap("DONE"); yield return null;
+
         string held = bm.SnapshotString();
         bm.LoadSnapshot(BuilderManager.SNAP_STAMP + "\n#fmt9-future\ncore|0,0.7,0|0|0,0,0\n");
         yield return null;

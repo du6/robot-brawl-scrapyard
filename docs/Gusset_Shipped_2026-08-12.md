@@ -5,7 +5,48 @@ joints… to enforce weapon attachment… doesn't occupy real space but should
 be visible." Built same day; the numbers are the recommended defaults he
 approved.
 
-## What it is
+⚠ **AMENDED SAME DAY — v3, owen's third spec, and it is the shipped one.**
+The sections below describe v1 (whole part) and carry v2's amendment (one
+joint per gusset, nearest-joint tap). Owen found the joint-tap confusing and
+respecified: **the gusset welds a SURFACE, before anything is attached.**
+As shipped:
+
+1. **Tap a face to weld it** — the literal face under the tap
+   (`hit.normal`, never a nearest-joint guess). The face turns gold (a thin
+   plate, no collider). Welding a face with nothing on it is the NORMAL
+   flow, so a bare face — the core's included — accepts a weld.
+2. **A part bolted onto a welded face holds ×1.5**; parts on unwelded faces
+   hold normal. The seam mult fires when EITHER side's mating face bit is
+   set (`FaceBitFromDelta` of the centre delta), applied once.
+3. **REMOVE peels before it deletes** — REMOVE on a welded face takes the
+   gusset first and says so; the next REMOVE takes the part. No way to lose
+   a part when you meant to lose a weld.
+4. The intended order is **weld first, attach second** (the HOLDING banner
+   says so); welding an already-mated face still works and strengthens that
+   seam retroactively.
+
+Format moved with it: `|G` (whole part) → **`|G:mask`** (6-bit world-axis
+face mask; parts never rotate off-axis). The loader reads legacy `|G` as
+mask 63. Mass and stock are now PER WELD (+10 kg each, `GussetCount()`
+popcount), and stacking on one face is still refused by measurement.
+Re-measured under v3: seam ×1.5000 exact and DIRECTIONAL (the wrong face
+buys nothing), **TouchSmoke 47/47** (REMOVE-peel legs included),
+**CareerSmoke 133/133**, career save byte-identical, mtime included.
+⚠ v3 REOPENED the worker lockstep that v1 closed below —
+`worker:20260812-182949` reads `|G` but not `|G:mask`. Redeploy owed
+tonight; no production snapshot carries any gusset yet, so nothing live
+misreads meanwhile.
+
+⚠ **And one incident, so it is on the record:** the v3 probe session drove
+REAL shop clicks in owen's career with no `SuspendAutosave` hold — the
+counted hold protects BENCHES, not a hand-driven probe — and autosave wrote
+six `buy gusset Steel` lines into the career save at 22:50. Caught by the
+fingerprint discipline, restored byte-identical (mtime included) from
+`career_backups/pre_stalegreen_20260810_010747.json`; the damaged copy is
+preserved beside it. **A probe that clicks the real UI in career mode needs
+the same isolation a bench does.**
+
+## What it is (v1 text, superseded above)
 
 **Gusset (weld kit)** — an APPLIQUE, the palette's first: never placed as
 geometry. Pick up the tile, tap a placed part, and **every seam that part
@@ -63,6 +104,8 @@ NEXT format bump gets a rejection instead of a silent partial load.
   `worker:20260812-182949`, schedule intact, and executed once in the cloud
   to a clean drain (`rb-worker-tdf29`, succeeded). The lockstep is closed:
   the ladder reads fmt4 before any client can write it.
+  ⚠ **Reopened by v3 the same night** (`|G:mask`) — see the amendment at the
+  top; a second redeploy is owed and in progress.
 - **Arena visual** — the gold band renders in the BUILDER (and survives
   repaint and reload); the fight-arena spawn does not draw it yet. The
   PHYSICS is in the arena (measured above); only the band is builder-only.

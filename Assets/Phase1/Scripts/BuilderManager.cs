@@ -1365,9 +1365,9 @@ public class BuilderManager : MonoBehaviour
         // week (sub-frame taps, OverUI geometry) covers it for free.
         if (down0 && !overPanel && clicksLive && selected >= 0 && palette[selected].applique)
         {
-            Vector3 gTap;
-            var gHit = PartUnderMouse(out gTap);
-            ApplyGusset(gHit, gHit != null ? gTap : Vector3.zero);
+            Vector3 gTap, gNorm;
+            var gHit = PartUnderMouse(out gTap, out gNorm);
+            ApplyGusset(gHit, gTap, gNorm);
         }
         else if (down0 && !overPanel && clicksLive && selected >= 0 && ghostValid && !CareerAllows(selected))
         {
@@ -1410,8 +1410,12 @@ public class BuilderManager : MonoBehaviour
         }
         if (down1 && !overPanel && clicksLive)
         {
-            var hitPart = PartUnderMouse();
-            if (hitPart != null)
+            Vector3 rTap, rNorm;
+            var hitPart = PartUnderMouse(out rTap, out rNorm);
+            // v3 rule 3: a welded surface gives up its gusset FIRST; the part
+            // itself takes the NEXT remove.
+            if (hitPart != null && TryRemoveGusset(hitPart, rNorm)) { }
+            else if (hitPart != null)
             {
                 // Push BEFORE the edit and only if the edit can actually happen,
                 // so Z never burns a step on a refused core click.
@@ -1430,44 +1434,37 @@ public class BuilderManager : MonoBehaviour
         }
     }
 
-    /// <summary>GUSSET application, PER JOINT (owen v2). The tap picks the
-    /// nearest UNGUSSETED joint on the tapped part — the mating faces are
-    /// buried between parts, so "tap near the joint you want" is the honest
-    /// gesture, and tapping N times gussets N joints without pixel-precision.
-    /// Refusals speak in the same `message` channel every other builder
-    /// refusal uses, and each one says WHY.</summary>
-    public void ApplyGusset(PlacedPart hit) { if (hit != null) ApplyGusset(hit, hit.pos); }
+    /// <summary>GUSSET v3 (owen: "always apply it BEFORE attaching"). A
+    /// FACE verb: tap a surface, that literal surface is welded — the gold
+    /// plate is the indicator — and any part later bolted onto a welded
+    /// face makes a x1.5 joint (the seam builder has been face-directional
+    /// since v2, measured with positive and negative controls). A welded
+    /// face with nothing on it is DORMANT mass, visible and deliberate.
+    /// The core is weldable too: welding the frame before bolting is the
+    /// natural first move. No retrofit gesture — a buried face means you
+    /// remove the covering part first, which is rule 4 working as written.
+    /// Refusals speak in the message channel and say WHY.</summary>
+    public void ApplyGusset(PlacedPart hit) 
+    {
+        // Bench convenience: no tap ray — weld the lowest un-welded face.
+        if (hit == null) return;
+        for (int b = 0; b < 6; b++)
+            if (((hit.gussetFaces >> b) & 1) == 0) { ApplyGussetFace(hit, b); return; }
+        ApplyGussetFace(hit, 0);   // all welded: falls into the refusal below
+    }
     public void ApplyGusset(PlacedPart hit, Vector3 tapPoint)
+    { if (hit != null) ApplyGusset(hit); }
+    public void ApplyGusset(PlacedPart hit, Vector3 tapPoint, Vector3 faceNormal)
     {
         if (hit == null) return;                       // missed the machine: same silence as a missed REMOVE
-        if (placed.Count > 0 && hit == placed[0])
+        if (faceNormal.sqrMagnitude < 0.5f) { ApplyGusset(hit); return; }
+        ApplyGussetFace(hit, FaceBitFromDelta(faceNormal));
+    }
+    void ApplyGussetFace(PlacedPart hit, int bit)
+    {
+        if (((hit.gussetFaces >> bit) & 1) != 0)
         {
-            message = "The core is the frame — gusset the parts bolted to it (their joints cover the core's).";
-            SfxSynth.Deny(); return;
-        }
-        // Every joint this part makes, with the face bit that names it.
-        PlacedPart bestQ = null; int bestBit = -1; float bestD = float.MaxValue;
-        bool anyJoint = false, allDone = true;
-        foreach (var q in placed)
-        {
-            if (q == hit || !Touching(hit, q)) continue;
-            anyJoint = true;
-            int bit = FaceBitFromDelta(q.pos - hit.pos);
-            int oppBit = FaceBitFromDelta(hit.pos - q.pos);
-            bool done = ((hit.gussetFaces >> bit) & 1) != 0 || ((q.gussetFaces >> oppBit) & 1) != 0;
-            if (done) continue;
-            allDone = false;
-            float d = ((hit.pos + q.pos) * 0.5f - tapPoint).sqrMagnitude;
-            if (d < bestD) { bestD = d; bestQ = q; bestBit = bit; }
-        }
-        if (!anyJoint)
-        {
-            message = hit.def.label + " has no joints yet — bolt it to something first.";
-            SfxSynth.Deny(); return;
-        }
-        if (allDone)
-        {
-            message = "Every joint on this " + hit.def.label + " is already gusseted — a second adds nothing (measured).";
+            message = "This surface is already welded — a second gusset adds nothing (measured).";
             SfxSynth.Deny(); return;
         }
         if (!CareerAllows(selected))
@@ -1476,12 +1473,30 @@ public class BuilderManager : MonoBehaviour
             SfxSynth.Deny(); return;
         }
         PushUndo();
-        hit.gussetFaces |= 1 << bestBit;
+        hit.gussetFaces |= 1 << bit;
         RefreshGussetFaces(hit);
-        message = hit.def.label + " ↔ " + bestQ.def.label + " joint reinforced ×1.5 · +"
+        message = hit.def.label + " surface welded · parts bolted here hold ×1.5 · +"
                 + Mathf.RoundToInt(GUSSET_KG) + " kg";
         RefreshOverlay();
         SfxSynth.Place();
+    }
+
+    /// <summary>REMOVE's gusset layer (owen v3 rule 3): with REMOVE armed, a
+    /// tap on a WELDED surface peels the gusset and leaves the part — the
+    /// next remove takes the part. Returns true when a gusset was peeled, so
+    /// the caller skips the part removal.</summary>
+    public bool TryRemoveGusset(PlacedPart hit, Vector3 faceNormal)
+    {
+        if (hit == null || hit.gussetFaces == 0 || faceNormal.sqrMagnitude < 0.5f) return false;
+        int bit = FaceBitFromDelta(faceNormal);
+        if (((hit.gussetFaces >> bit) & 1) == 0) return false;
+        PushUndo();
+        hit.gussetFaces &= ~(1 << bit);
+        RefreshGussetFaces(hit);
+        message = "Gusset removed from " + hit.def.label + " — the part stays; remove again for the part.";
+        RefreshOverlay();
+        SfxSynth.Remove();
+        return true;
     }
 
     /// <summary>The gusset's visibility promise, per joint: a gold plate on
@@ -2304,16 +2319,19 @@ public class BuilderManager : MonoBehaviour
         Vector3 hp;
         return PartUnderMouse(out hp);
     }
-    /// <summary>Same raycast, but the HIT POINT comes too — the gusset verb
-    /// needs it to pick the joint nearest the tap.</summary>
+    /// <summary>Same raycast, but the HIT POINT and FACE NORMAL come too —
+    /// the gusset verbs are FACE verbs (owen v3: "tap a surface"), and a box
+    /// collider's hit normal names the face exactly.</summary>
     PlacedPart PartUnderMouse(out Vector3 hitPoint)
+    { Vector3 n; return PartUnderMouse(out hitPoint, out n); }
+    PlacedPart PartUnderMouse(out Vector3 hitPoint, out Vector3 hitNormal)
     {
         Vector3 m = Phase0Input.MousePos();
         Ray ray = cam.ScreenPointToRay(m);
         RaycastHit hit = default(RaycastHit);
-        hitPoint = Vector3.zero;
+        hitPoint = Vector3.zero; hitNormal = Vector3.zero;
         if (Physics.Raycast(ray, out hit, 60f) && byCollider.ContainsKey(hit.collider))
-        { hitPoint = hit.point; return byCollider[hit.collider]; }
+        { hitPoint = hit.point; hitNormal = hit.normal; return byCollider[hit.collider]; }
         return null;
     }
 
@@ -2990,8 +3008,8 @@ public class BuilderManager : MonoBehaviour
         // so the material key is always the def's own and needs no canon.
         if (id == "gusset")
         {
-            int g = 0;
-            for (int k = 1; k < placed.Count; k++) g += placed[k].GussetCount();
+            int g = 0;   // k=0 too: the CORE is weldable in v3
+            for (int k = 0; k < placed.Count; k++) g += placed[k].GussetCount();
             return g;
         }
         string cm = MatDB.Canon(mat);
@@ -5722,7 +5740,7 @@ public class BuilderManager : MonoBehaviour
             // fmt4: "|G:mask" = per-joint gussets; bare legacy "|G" (v1, one
             // evening old, no durable saves) loads as all six faces. Never
             // the core — the frame refuses in ApplyGusset too.
-            if (added != null && f.Length >= 6 && placed.Count > 1 && added != placed[0])
+            if (added != null && f.Length >= 6)   // v3: the core is weldable too
             {
                 string gf = f[5].Trim();
                 int mask = 0;
