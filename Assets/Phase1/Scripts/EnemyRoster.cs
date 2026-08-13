@@ -320,7 +320,7 @@ public static class EnemyRoster
             {
                 if (p.def == null || p.def.id == "core") continue;
                 if (p.def.category == P1Category.Mobility) continue;
-                p.reinforced = true;
+                p.gussetFaces = 63;   // every face — the whole-machine x1.5 the calibration measured
             }
         return L;
     }

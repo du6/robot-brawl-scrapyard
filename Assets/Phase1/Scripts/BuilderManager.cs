@@ -74,17 +74,22 @@ public class BuilderManager : MonoBehaviour
             return "Z (front-to-back)";
         }
 
-        /// <summary>GUSSET (owen, 2026-08-12): this placement's joints are
-        /// reinforced — every seam this part makes breaks at x1.5 (see
-        /// GUSSET_SEAM_MULT and the conn builder in SpawnBot). Serialized as
-        /// a 6th snapshot field ("|G"); costs GUSSET_KG of mass, counted in
-        /// Mass() so category, the cap readout and the rim-energy of a
-        /// gusseted DISC all see it (that last one is real and documented:
-        /// a welded collar on a spinning disc is heavier rim).</summary>
-        public bool reinforced;
+        /// <summary>GUSSET, PER-JOINT (owen, 2026-08-12 v2: "it should only
+        /// be applied to one surface"). Bit i marks the WORLD-axis face
+        /// (+x,-x,+y,-y,+z,-z — parts never rotate off-axis) of THIS part
+        /// whose mating JOINT is reinforced x1.5. One gusset = one joint;
+        /// each costs GUSSET_KG and one stock. Serialized "|G:mask"; a bare
+        /// legacy "|G" (v1, same evening, no durable saves carry it) loads
+        /// as all six faces. Mass counts per joint, so category, the cap
+        /// readout and a gusseted DISC's rim energy all see every one.</summary>
+        public int gussetFaces;
+        /// <summary>Compat reader: any joint gusseted at all.</summary>
+        public bool reinforced { get { return gussetFaces != 0; } }
+        public int GussetCount()
+        { int n = 0, m = gussetFaces & 63; while (m != 0) { n += m & 1; m >>= 1; } return n; }
 
         public string MatName() { return def.EffectiveMat(matName); }
-        public float Mass()     { return def.MassOf(MatName()) + (reinforced ? BuilderManager.GUSSET_KG : 0f); }
+        public float Mass()     { return def.MassOf(MatName()) + BuilderManager.GUSSET_KG * GussetCount(); }
         public int Cost()       { return def.CostOf(MatName()); }
         public MatDef Mat()     { return MatDB.Get(MatName()); }
 
@@ -1360,7 +1365,9 @@ public class BuilderManager : MonoBehaviour
         // week (sub-frame taps, OverUI geometry) covers it for free.
         if (down0 && !overPanel && clicksLive && selected >= 0 && palette[selected].applique)
         {
-            ApplyGusset(PartUnderMouse());
+            Vector3 gTap;
+            var gHit = PartUnderMouse(out gTap);
+            ApplyGusset(gHit, gHit != null ? gTap : Vector3.zero);
         }
         else if (down0 && !overPanel && clicksLive && selected >= 0 && ghostValid && !CareerAllows(selected))
         {
@@ -1423,20 +1430,44 @@ public class BuilderManager : MonoBehaviour
         }
     }
 
-    /// <summary>GUSSET application — the whole verb. Refusals speak in the
-    /// same `message` channel every other builder refusal uses, and each one
-    /// says WHY (the red-ghost lesson: a buzz with no words teaches nothing).</summary>
-    public void ApplyGusset(PlacedPart hit)
+    /// <summary>GUSSET application, PER JOINT (owen v2). The tap picks the
+    /// nearest UNGUSSETED joint on the tapped part — the mating faces are
+    /// buried between parts, so "tap near the joint you want" is the honest
+    /// gesture, and tapping N times gussets N joints without pixel-precision.
+    /// Refusals speak in the same `message` channel every other builder
+    /// refusal uses, and each one says WHY.</summary>
+    public void ApplyGusset(PlacedPart hit) { if (hit != null) ApplyGusset(hit, hit.pos); }
+    public void ApplyGusset(PlacedPart hit, Vector3 tapPoint)
     {
         if (hit == null) return;                       // missed the machine: same silence as a missed REMOVE
         if (placed.Count > 0 && hit == placed[0])
         {
-            message = "The core is the frame — gussets go on the parts bolted to it.";
+            message = "The core is the frame — gusset the parts bolted to it (their joints cover the core's).";
             SfxSynth.Deny(); return;
         }
-        if (hit.reinforced)
+        // Every joint this part makes, with the face bit that names it.
+        PlacedPart bestQ = null; int bestBit = -1; float bestD = float.MaxValue;
+        bool anyJoint = false, allDone = true;
+        foreach (var q in placed)
         {
-            message = hit.def.label + " is already gusseted — a second adds nothing (measured).";
+            if (q == hit || !Touching(hit, q)) continue;
+            anyJoint = true;
+            int bit = FaceBitFromDelta(q.pos - hit.pos);
+            int oppBit = FaceBitFromDelta(hit.pos - q.pos);
+            bool done = ((hit.gussetFaces >> bit) & 1) != 0 || ((q.gussetFaces >> oppBit) & 1) != 0;
+            if (done) continue;
+            allDone = false;
+            float d = ((hit.pos + q.pos) * 0.5f - tapPoint).sqrMagnitude;
+            if (d < bestD) { bestD = d; bestQ = q; bestBit = bit; }
+        }
+        if (!anyJoint)
+        {
+            message = hit.def.label + " has no joints yet — bolt it to something first.";
+            SfxSynth.Deny(); return;
+        }
+        if (allDone)
+        {
+            message = "Every joint on this " + hit.def.label + " is already gusseted — a second adds nothing (measured).";
             SfxSynth.Deny(); return;
         }
         if (!CareerAllows(selected))
@@ -1445,34 +1476,47 @@ public class BuilderManager : MonoBehaviour
             SfxSynth.Deny(); return;
         }
         PushUndo();
-        hit.reinforced = true;
-        RefreshGussetBand(hit);
-        message = hit.def.label + " joints reinforced ×1.5 · +" + Mathf.RoundToInt(GUSSET_KG) + " kg";
+        hit.gussetFaces |= 1 << bestBit;
+        RefreshGussetFaces(hit);
+        message = hit.def.label + " ↔ " + bestQ.def.label + " joint reinforced ×1.5 · +"
+                + Mathf.RoundToInt(GUSSET_KG) + " kg";
         RefreshOverlay();
         SfxSynth.Place();
     }
 
-    /// <summary>The gusset's visibility promise: no geometry, no collider, no
-    /// socket — but you can SEE it. A gold band around the part's waist, a
-    /// visual-only child beside the factory's own (the placement collider
-    /// lives on the root; children carry none, same contract as every other
-    /// visual). Re-called after SetPartMaterial's child rebuild, which would
-    /// otherwise eat it.</summary>
-    public void RefreshGussetBand(PlacedPart p)
+    /// <summary>The gusset's visibility promise, per joint: a gold plate on
+    /// each gusseted face — visual-only children beside the factory's own
+    /// (the placement collider lives on the root; children carry none).
+    /// Re-called after SetPartMaterial's child rebuild, which would
+    /// otherwise eat them.</summary>
+    public void RefreshGussetFaces(PlacedPart p)
     {
         if (p == null || p.go == null) return;
-        var old = p.go.transform.Find("gussetband");
-        if (old != null) Destroy(old.gameObject);
-        if (!p.reinforced) return;
-        var band = GameObject.CreatePrimitive(PrimitiveType.Cube);
-        band.name = "gussetband";
-        Destroy(band.GetComponent<Collider>());   // visible, never occupying
-        band.transform.SetParent(p.go.transform, false);
-        Vector3 s = p.Half() * 2f;
-        band.transform.localScale = new Vector3(s.x * 1.045f, Mathf.Min(0.05f, s.y * 0.35f), s.z * 1.045f);
-        band.transform.localPosition = Vector3.zero;
-        var rend = band.GetComponent<Renderer>();
-        if (rend != null) rend.material.color = new Color(1f, 0.82f, 0.25f);   // the career gold
+        for (int i = p.go.transform.childCount - 1; i >= 0; i--)
+        {
+            var c = p.go.transform.GetChild(i);
+            if (c.name.StartsWith("gussetface") || c.name == "gussetband") Destroy(c.gameObject);
+        }
+        if (p.gussetFaces == 0) return;
+        Vector3 h = p.Half();
+        for (int bit = 0; bit < 6; bit++)
+        {
+            if (((p.gussetFaces >> bit) & 1) == 0) continue;
+            var plate = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            plate.name = "gussetface_" + bit;
+            Destroy(plate.GetComponent<Collider>());   // visible, never occupying
+            plate.transform.SetParent(p.go.transform, false);
+            Vector3 dir = FaceDir(bit);
+            int axis = bit / 2;
+            Vector3 sc = new Vector3(
+                axis == 0 ? 0.012f : h.x * 2f * 0.92f,
+                axis == 1 ? 0.012f : h.y * 2f * 0.92f,
+                axis == 2 ? 0.012f : h.z * 2f * 0.92f);
+            plate.transform.localScale = sc;
+            plate.transform.localPosition = dir * (Mathf.Abs(Vector3.Dot(dir, h)) + 0.007f);
+            var rend = plate.GetComponent<Renderer>();
+            if (rend != null) rend.material.color = new Color(1f, 0.82f, 0.25f);   // the career gold
+        }
     }
 
     /// <summary>Phase 3: change one placed part's material in place. The part
@@ -1532,7 +1576,7 @@ public class BuilderManager : MonoBehaviour
         // The child rebuild above ate the gusset band with the old visuals;
         // give it back. (Repainting does NOT consume or refund a gusset —
         // the flag rides the placement, not the material.)
-        if (p.reinforced) RefreshGussetBand(p);
+        if (p.reinforced) RefreshGussetFaces(p);
         message = def.label + " -> " + MatDB.Get(want).name;
         RefreshOverlay();
         return true;
@@ -2257,11 +2301,19 @@ public class BuilderManager : MonoBehaviour
 
     PlacedPart PartUnderMouse()
     {
+        Vector3 hp;
+        return PartUnderMouse(out hp);
+    }
+    /// <summary>Same raycast, but the HIT POINT comes too — the gusset verb
+    /// needs it to pick the joint nearest the tap.</summary>
+    PlacedPart PartUnderMouse(out Vector3 hitPoint)
+    {
         Vector3 m = Phase0Input.MousePos();
         Ray ray = cam.ScreenPointToRay(m);
         RaycastHit hit = default(RaycastHit);
+        hitPoint = Vector3.zero;
         if (Physics.Raycast(ray, out hit, 60f) && byCollider.ContainsKey(hit.collider))
-            return byCollider[hit.collider];
+        { hitPoint = hit.point; return byCollider[hit.collider]; }
         return null;
     }
 
@@ -2939,7 +2991,7 @@ public class BuilderManager : MonoBehaviour
         if (id == "gusset")
         {
             int g = 0;
-            for (int k = 1; k < placed.Count; k++) if (placed[k].reinforced) g++;
+            for (int k = 1; k < placed.Count; k++) g += placed[k].GussetCount();
             return g;
         }
         string cm = MatDB.Canon(mat);
@@ -4016,13 +4068,17 @@ public class BuilderManager : MonoBehaviour
                     // matches. A weapon that falls off the instant it touches
                     // anything is not a weapon, so actuator seams carry x3.
                     if (body[i].def.actuator || body[j].def.actuator) mult *= 3f;
-                    // GUSSET: a reinforced part strengthens EVERY seam it
-                    // makes, x1.5 — the multiplier the lever sweep measured
-                    // (40% -> 27% mutual disarm; x2 buys nothing, which is
-                    // why one flag per part and no stacking). Applied ONCE
-                    // even when both ends are gusseted: two gussets on one
-                    // seam would be the sweep's measured dead zone.
-                    if (body[i].reinforced || body[j].reinforced) mult *= GUSSET_SEAM_MULT;
+                    // GUSSET, per-joint: x1.5 when EITHER side's mating face
+                    // carries the gusset bit — the lever sweep's measured
+                    // multiplier (40% -> 27%; x2 buys nothing, hence applied
+                    // ONCE even if both sides are gusseted).
+                    {
+                        Vector3 gd = body[j].pos - body[i].pos;
+                        int gfi = FaceBitFromDelta(gd), gfj = FaceBitFromDelta(-gd);
+                        if (((body[i].gussetFaces >> gfi) & 1) != 0
+                            || ((body[j].gussetFaces >> gfj) & 1) != 0)
+                            mult *= GUSSET_SEAM_MULT;
+                    }
                     conns.Add(new CompoundRobot.Conn(i, j, mult));
                 }
 
@@ -5344,6 +5400,25 @@ public class BuilderManager : MonoBehaviour
     public const string SNAP_STAMP4 = "#fmt4-gusset";
     public const float GUSSET_KG = 10f;
     public const float GUSSET_SEAM_MULT = 1.5f;
+    /// <summary>WORLD-axis face bits: 0/1 = ±x, 2/3 = ±y, 4/5 = ±z. Parts sit
+    /// axis-aligned (yaw only swaps footprint dims), so a face is fully named
+    /// by the dominant axis and sign of any world direction through it.</summary>
+    public static int FaceBitFromDelta(Vector3 d)
+    {
+        float ax = Mathf.Abs(d.x), ay = Mathf.Abs(d.y), az = Mathf.Abs(d.z);
+        if (ax >= ay && ax >= az) return d.x >= 0f ? 0 : 1;
+        if (ay >= az)             return d.y >= 0f ? 2 : 3;
+        return d.z >= 0f ? 4 : 5;
+    }
+    public static Vector3 FaceDir(int bit)
+    {
+        switch (bit)
+        {
+            case 0: return Vector3.right;   case 1: return Vector3.left;
+            case 2: return Vector3.up;      case 3: return Vector3.down;
+            case 4: return Vector3.forward; default: return Vector3.back;
+        }
+    }
     /// <summary>Set by LoadSnapshot when the file carries a format stamp this
     /// build does not know; Validate() turns it into a refusal.</summary>
     public string UnknownStamp { get; private set; }
@@ -5398,7 +5473,7 @@ public class BuilderManager : MonoBehaviour
               .Append(p.wheelAxis.y.ToString("F2", inv)).Append(',')
               .Append(p.wheelAxis.z.ToString("F2", inv)).Append('|')
               .Append(p.MatName());                // v2: trailing material field
-            if (p.reinforced) sb.Append("|G");     // fmt4: gusset flag
+            if (p.gussetFaces != 0) sb.Append("|G:").Append(p.gussetFaces & 63);   // fmt4: per-joint gusset mask
             sb.Append('\n');
         }
         return sb.ToString();
@@ -5644,13 +5719,17 @@ public class BuilderManager : MonoBehaviour
             PlacedPart attach = null;
             foreach (var q in placed) if (Touching(probe, q)) { attach = q; break; }
             var added = AddPart(def, pos, yaw, axis, attach, mat);
-            // fmt4: "|G" = this part's joints are gusseted. Never the core —
-            // the frame has no parent joint, and ApplyGusset refuses it too.
-            if (added != null && f.Length >= 6 && f[5].Trim() == "G"
-                && placed.Count > 1 && added != placed[0])
+            // fmt4: "|G:mask" = per-joint gussets; bare legacy "|G" (v1, one
+            // evening old, no durable saves) loads as all six faces. Never
+            // the core — the frame refuses in ApplyGusset too.
+            if (added != null && f.Length >= 6 && placed.Count > 1 && added != placed[0])
             {
-                added.reinforced = true;
-                RefreshGussetBand(added);
+                string gf = f[5].Trim();
+                int mask = 0;
+                if (gf == "G") mask = 63;
+                else if (gf.StartsWith("G:") && int.TryParse(gf.Substring(2), out mask)) mask &= 63;
+                else mask = 0;
+                if (mask != 0) { added.gussetFaces = mask; RefreshGussetFaces(added); }
             }
         }
         // Round-5 fix 8: the material panel used to keep describing whatever
@@ -6493,7 +6572,7 @@ public class BuilderManager : MonoBehaviour
             GUILayout.Label(string.Format("▸ {0}  ·  {1}  ·  {2} kg  ·  cost {3}  ·  seam {4}{5}",
                 hoverPart.def.label, hm.name, Mathf.RoundToInt(hoverPart.Mass()),
                 hoverPart.Cost(), Mathf.RoundToInt(hm.strengthRel * CompoundRobot.BREAK_K),
-                hoverPart.reinforced ? "  ·  GUSSETED ×1.5" : ""), bodyStyle);
+                hoverPart.reinforced ? "  ·  GUSSETED ×1.5 (" + hoverPart.GussetCount() + " joint" + (hoverPart.GussetCount() == 1 ? "" : "s") + ")" : ""), bodyStyle);
             // The cascade says its price BEFORE you pay it, not after.
             if (hoverPart == placed[0])
                 GUILayout.Label("right-click: the core cannot be removed", descStyle);

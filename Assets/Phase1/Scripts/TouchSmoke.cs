@@ -230,7 +230,11 @@ public class TouchSmoke : MonoBehaviour
         yield return null; yield return null;
         Check(giBeam > 0 && bm.placed[giBeam].reinforced, "the tap reinforces the beam (free build: unlimited, like every part)");
         Check(bm.BuildMassInt == massBefore + 10, "…and the machine weighs +10 kg (" + massBefore + " -> " + bm.BuildMassInt + ")");
-        Check(giBeam > 0 && bm.placed[giBeam].go.transform.Find("gussetband") != null, "…and the gold band is visible on the part");
+        bool gPlate = false;
+        if (giBeam > 0)
+            for (int gi2 = 0; gi2 < bm.placed[giBeam].go.transform.childCount; gi2++)
+                if (bm.placed[giBeam].go.transform.GetChild(gi2).name.StartsWith("gussetface")) gPlate = true;
+        Check(gPlate, "…and the gold face plate is visible on the joint");
 
         Phase0Input.debugPointer = true;
         Phase0Input.debugMousePos = gBeamPos;
@@ -242,8 +246,8 @@ public class TouchSmoke : MonoBehaviour
         Check(bm.BuildMassInt == massBefore + 10, "…and no second mass was added");
 
         string gSnap = bm.SnapshotString();
-        Check(gSnap.Contains(BuilderManager.SNAP_STAMP4) && gSnap.Contains("|G"),
-              "the save carries the fmt4 stamp and the |G flag");
+        Check(gSnap.Contains(BuilderManager.SNAP_STAMP4) && gSnap.Contains("|G:"),
+              "the save carries the fmt4 stamp and the |G:mask field");
         Tap("UNDO"); yield return null; yield return null;
         bool anyReinforced = false;
         foreach (var pp in bm.placed) if (pp.reinforced) anyReinforced = true;
@@ -253,7 +257,11 @@ public class TouchSmoke : MonoBehaviour
         int reinCount = 0; BuilderManager.PlacedPart gPart = null;
         foreach (var pp in bm.placed) if (pp.reinforced) { reinCount++; gPart = pp; }
         Check(reinCount == 1, "the gusset survives a snapshot round-trip");
-        Check(gPart != null && gPart.go.transform.Find("gussetband") != null, "…band included");
+        bool gPlate2 = false;
+        if (gPart != null)
+            for (int gi3 = 0; gi3 < gPart.go.transform.childCount; gi3++)
+                if (gPart.go.transform.GetChild(gi3).name.StartsWith("gussetface")) gPlate2 = true;
+        Check(gPlate2, "…face plate included");
 
         string held = bm.SnapshotString();
         bm.LoadSnapshot(BuilderManager.SNAP_STAMP + "\n#fmt9-future\ncore|0,0.7,0|0|0,0,0\n");
