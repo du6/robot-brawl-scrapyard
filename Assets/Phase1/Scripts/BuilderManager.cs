@@ -3523,8 +3523,17 @@ public class BuilderManager : MonoBehaviour
         }
         mixedRoll = anyRollX && anyRollZ;
 
-        bool hasPoly = grounded >= 2 && (maxX - minX) > 0.01f;
-        foreach (var e in polyEdges) e.gameObject.SetActive(hasPoly);
+        // 2026-08-12: a CareerBench 3x run died HERE — polyEdges indexed at
+        // [0..3] with fewer than 4 entries, killing the bench coroutine on
+        // its first LoadSnapshot. The overlay is COSMETIC; a missing support
+        // polygon must never take LoadSnapshot down with it. Guarded rather
+        // than papered: the log names the state so the cause (which init
+        // path left the list short) can be found instead of hidden.
+        bool hasPoly = grounded >= 2 && (maxX - minX) > 0.01f && polyEdges.Count >= 4;
+        if (grounded >= 2 && (maxX - minX) > 0.01f && polyEdges.Count < 4)
+            CompoundRobot.Log("RefreshOverlay: polyEdges.Count=" + polyEdges.Count
+                            + " (want 4) — support polygon not drawn; BuildRoom init incomplete?");
+        foreach (var e in polyEdges) if (e != null) e.gameObject.SetActive(hasPoly);
 
         float margin = -1f;
         if (hasPoly)
@@ -4370,7 +4379,7 @@ public class BuilderManager : MonoBehaviour
         }
         if (c.entryFee > 0) Career.Txn(-c.entryFee, "entry fee " + c.id);
         Career.fightBuildValue = BuildValueCareer();
-        var recipe = EnemyRoster.Recipe(c.oppId, palette, c.armourMat);
+        var recipe = EnemyRoster.Recipe(c.oppId, palette, c.armourMat, c.hardened);
         int ov = 0;
         foreach (var p2 in recipe) ov += CareerDB.PartPrice(p2.def.id, p2.MatName());
         Career.fightOppValue = ov;
@@ -4429,7 +4438,7 @@ public class BuilderManager : MonoBehaviour
         scoutSaveYaw = orbitYaw; scoutSavePitch = orbitPitch; scoutSaveDist = orbitDist;
         orbitYaw = 35f; orbitPitch = 16f; orbitDist = 2.6f;
         var entry = EnemyRoster.Find(c.oppId);
-        var recipe = EnemyRoster.Recipe(c.oppId, palette, c.armourMat);
+        var recipe = EnemyRoster.Recipe(c.oppId, palette, c.armourMat, c.hardened);
         float smass = 0f; int sval = 0; string weapon = "none";
         foreach (var p2 in recipe)
         {

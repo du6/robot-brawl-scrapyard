@@ -38,6 +38,7 @@ The records, most recent first:
 
 | doc | what |
 |---|---|
+| `docs/Flagship_Hardening_2026-08-12.md` | CEILING L4 92%→50% in two measured steps; the L5 reversal; the FLOOR needle at 61%; where the rest of the gap lives |
 | `docs/Gusset_Shipped_2026-08-12.md` | the seam-reinforcement part: fmt4 snapshots, the LOCKSTEP worker rule, what is measured and what is owed |
 | `docs/League_Purse_Halving_2026-08-12.md` | the league pays HALF (owen) — what moved, what deliberately did not, and the dpi-sensitive legibility check |
 | `docs/Catalog_Cuts_2026-08-12.md` | the saw and the bracket are GONE (hard deletes); the spike was reprieved — read before resurrecting a part id |

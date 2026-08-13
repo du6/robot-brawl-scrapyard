@@ -39,6 +39,16 @@ public static class CareerDB
     {
         public string id; public string oppId; public AiTier tier;
         public int purse; public int entryFee;
+        /// <summary>HARDENED (owen, 2026-08-12: "make higher level league
+        /// robots harder to beat"). The opponent spawns with every part
+        /// except core and wheels GUSSETED (seams ×1.5) — the same measured
+        /// lever players got this evening. Set SURGICALLY: CareerBench's
+        /// 3x-sample verdicts say the CEILING fails at the FLAGSHIPS (a
+        /// two-below robot beat L4's BASTION 22/24 by SHEDDING its parts —
+        /// structFrac counts pieces) while STRETCH already fails LOW at the
+        /// cheapest contests — so hardening those would deepen a different
+        /// failure. Flagships only.</summary>
+        public bool hardened;
         /// <summary>OWEN 2026-08-03: the material the opponent's STRUCTURE and
         /// ARMOUR is rebuilt in for this contest. null = the recipe's own.
         ///
@@ -55,8 +65,8 @@ public static class CareerDB
         /// which wants density; armour wants strength per kilogram. They are
         /// different jobs and they take different metals.</summary>
         public string armourMat;
-        public Contest(string i, string o, AiTier t, int p, int f, string armour = null)
-        { id = i; oppId = o; tier = t; purse = p; entryFee = f; armourMat = armour; }
+        public Contest(string i, string o, AiTier t, int p, int f, string armour = null, bool hard = false)
+        { id = i; oppId = o; tier = t; purse = p; entryFee = f; armourMat = armour; hardened = hard; }
     }
 
     public class League
@@ -106,8 +116,12 @@ public static class CareerDB
             new Contest("L4C1", "widowmaker", AiTier.Veteran,  600, 100, "Titanium"),
             new Contest("L4C2", "bulwark",    AiTier.Champion, 700, 100, "Titanium"),
             new Contest("L4C3", "ripper",     AiTier.Champion, 800, 100, "Titanium"),
-            new Contest("L4C4", "bastion",    AiTier.Champion, 900, 100, "Titanium") }),
+            new Contest("L4C4", "bastion",    AiTier.Champion, 900, 100, "Titanium", hard: true) }),
         new League("L5", "World Championship", "The Crucible", "crucible", 5500f, new[] {
+            // L5C1 hardening MEASURED AND REVERTED same evening: CEILING L5 went
+            // 1/24 -> 6/24 WORSE with it — WIDOWMAKER is a hunter, and ~+100 kg
+            // of gussets blunted the chase more than the seams helped. The
+            // flagship whose loss mode IS shedding keeps the flag (L4C4).
             new Contest("L5C1", "widowmaker", AiTier.Champion, 1500, 200, "Titanium") }),
     };
 

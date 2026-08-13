@@ -297,17 +297,31 @@ public static class EnemyRoster
     ///
     /// One implementation, called by the fight spawn AND the scout preview, so
     /// SCOUT cannot show you a machine other than the one you will fight.</summary>
-    public static List<BuilderManager.PlacedPart> Recipe(string id, P1PartDef[] pal, string armourMat)
+    public static List<BuilderManager.PlacedPart> Recipe(string id, P1PartDef[] pal, string armourMat, bool hardened = false)
     {
         var L = Recipe(id, pal);
-        if (string.IsNullOrEmpty(armourMat)) return L;
-        foreach (var p in L)
-        {
-            if (p.def == null || !p.def.materialChoice) continue;   // pinned stays pinned
-            if (p.def.category == P1Category.Weapon) continue;
-            if (p.def.category == P1Category.Mobility) continue;
-            p.matName = p.def.EffectiveMat(armourMat);
-        }
+        if (!string.IsNullOrEmpty(armourMat))
+            foreach (var p in L)
+            {
+                if (p.def == null || !p.def.materialChoice) continue;   // pinned stays pinned
+                if (p.def.category == P1Category.Weapon) continue;
+                if (p.def.category == P1Category.Mobility) continue;
+                p.matName = p.def.EffectiveMat(armourMat);
+            }
+        // HARDENED (Contest.hardened, 2026-08-12): gusset everything except
+        // the core (no parent joint) and the wheels (raycast anchors, no
+        // seams). This is the disarm sweep's measured x1.5 row applied to ONE
+        // opponent — the CEILING loss mode is a two-below robot SHEDDING the
+        // flagship's parts until "decided on structure destroyed", and
+        // structFrac counts PIECES. Same pass as the armour reskin, so the
+        // scout preview shows the machine you will actually fight.
+        if (hardened)
+            foreach (var p in L)
+            {
+                if (p.def == null || p.def.id == "core") continue;
+                if (p.def.category == P1Category.Mobility) continue;
+                p.reinforced = true;
+            }
         return L;
     }
 
@@ -473,7 +487,18 @@ public static class EnemyRoster
             B.Add(P(battery, 0f, 0.975f, 0f,    "Aluminum"));
             B.Add(P(engine,  0f, 0.70f, -0.875f, "Titanium"));
             B.Add(P(gyro,    0f, 1.03f,  0.40f, "Aluminum"));      // on the front roof plate
-            B.Add(new BuilderManager.PlacedPart { def = spike, pos = new Vector3(0f, 0.70f, 0.80f),
+            // STAGE B (2026-08-12): the PASSIVE spike is now a POWERED LANCE.
+            // Measured first: gussets alone took CEILING L4 only 92% -> 79%,
+            // because the two-below chip build mostly wins on the DAMAGE
+            // criterion, which seam strength cannot touch — BASTION's "still
+            // standing is enough" premise loses to the verdict cascade when
+            // its weapon never lands. A ram-driven tungsten spike keeps the
+            // identity (never wins a damage RACE) but punches back hard
+            // enough that 90 s of free chipping is no longer free.
+            var ramA = D(pal, "ram");
+            B.Add(new BuilderManager.PlacedPart { def = ramA, pos = new Vector3(0f, 0.70f, 0.80f),
+                                                  wheelAxis = Vector3.forward, matName = "Aluminum" });
+            B.Add(new BuilderManager.PlacedPart { def = spike, pos = new Vector3(0f, 0.70f, 1.10f),
                                                   wheelAxis = Vector3.forward, matName = "Tungsten" });
             return B;
         }
