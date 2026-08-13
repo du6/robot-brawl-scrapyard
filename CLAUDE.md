@@ -38,6 +38,7 @@ The records, most recent first:
 
 | doc | what |
 |---|---|
+| `docs/Catalog_Cuts_2026-08-12.md` | the saw and the bracket are GONE (hard deletes); the spike was reprieved — read before resurrecting a part id |
 | `docs/Seasons_Live_2026-08-12.md` | seasons wired end-to-end; the board double-listing the first rollover would have detonated; deploy is TWO commands IN ORDER, owen's go |
 | `docs/LAUNCH_CHECKLIST_2026-08-10.md` | **START HERE before shipping** — what is ready, what needs a phone, what needs owen |
 | `docs/CareerBench_Sample_Size_2026-08-10.md` | three of eleven balance verdicts were coin flips |
