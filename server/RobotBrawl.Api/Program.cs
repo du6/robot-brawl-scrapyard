@@ -407,6 +407,30 @@ app.MapPost("/v1/auth/login", async (LoginReq req) =>
     return Results.Ok(new { token = tokens.Issue(id, email), userId = id, displayName });
 }).RequireRateLimiting("auth");
 
+// OPERATOR password reset (2026-08-13). The login gate made a forgotten
+// password a soft-brick — no account, no game — and there is no mail
+// infrastructure on this budget, so self-serve email reset would be theater.
+// The honest v1: the player emails support (the gate says so), the operator
+// resets here. Worker-key gated like every operator action; enumeration is a
+// non-issue for the operator. Replace with a real email flow before scale.
+app.MapPost("/v1/admin/reset-password", async (HttpContext ctx, ResetPwReq req) =>
+{
+    if (!WorkerAuthed(ctx)) return Results.Unauthorized();
+    if ((req.NewPassword ?? "").Length < 10) return Bad("password must be at least 10 characters");
+    await using var c = await db.OpenAsync();
+    await using var cmd = new NpgsqlCommand(
+        "UPDATE users SET pw_hash = $1 WHERE email_lower = lower($2) RETURNING id;", c);
+    cmd.Parameters.AddWithValue(Passwords.Hash(req.NewPassword!));
+    cmd.Parameters.AddWithValue(req.Email ?? "");
+    var got = await cmd.ExecuteScalarAsync();
+    if (got is null) return Results.NotFound(new { error = "no account with that email" });
+    return Results.Ok(new { reset = true });
+    // No player rate bucket: this is worker-key-gated OPERATOR traffic, like
+    // every other /v1/admin/* route — parking it in the shared "auth" bucket
+    // starved real logins of their 10/min (measured: the bench's own login
+    // checks 429'd).
+});
+
 // ---------------------------------------------------------------- robots
 app.MapPost("/v1/robots", async (RobotReq req, ClaimsPrincipal user) =>
 {
@@ -2306,6 +2330,7 @@ public record EconClaimReq(string? Kind, string? ContestId, double Dealt, double
 public record PurchaseReq(string? Op, string? PartId, string? Mat, string? IdemKey);
 public record EquipReq(string? PlateId, string? TitleId);
 public record DeleteReq(string? Confirm);
+public record ResetPwReq(string? Email, string? NewPassword);
 public record FightResult(Guid MatchId, string? WorkerId, string? Verdict,
                           string[]? ReplayUrls, string[]? Bouts);
 public record ValidateResult(

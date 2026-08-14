@@ -1424,6 +1424,20 @@ is "…and the pinned row carries the flat price" \
 c=$(req GET /v1/wallet "" "$EAUTH")
 is "the wallet's inventory shows what is owned (cube/Titanium ×1)" "$(jget inventory.0.partId)" "cube"
 
+# --- operator password reset (the gate's soft-brick escape hatch) ---
+c=$(req POST /v1/admin/reset-password "{\"email\":\"$EEMAIL\",\"newPassword\":\"resetbytheoperator\"}")
+expect "a reset without the worker key is refused" "$c" 401
+c=$(req POST /v1/admin/reset-password "{\"email\":\"$EEMAIL\",\"newPassword\":\"short\"}" "X-Worker-Key: $WKEY")
+expect "a too-short replacement password is refused" "$c" 400
+c=$(req POST /v1/admin/reset-password "{\"email\":\"$EEMAIL\",\"newPassword\":\"resetbytheoperator\"}" "X-Worker-Key: $WKEY")
+expect "the operator resets a password" "$c" 200
+c=$(req POST /v1/auth/login "{\"email\":\"$EEMAIL\",\"password\":\"$PW\"}")
+expect "…the OLD password stops working" "$c" 401
+c=$(req POST /v1/auth/login "{\"email\":\"$EEMAIL\",\"password\":\"resetbytheoperator\"}")
+expect "…and the new one signs in" "$c" 200
+c=$(req POST /v1/admin/reset-password '{"email":"nobody@example.com","newPassword":"resetbytheoperator"}' "X-Worker-Key: $WKEY")
+expect "an unknown email is a 404, not a silent success" "$c" 404
+
 # --- iap: reserved, never fake ---
 c=$(req POST /v1/iap/verify '{"transaction":"x"}' "$EAUTH")
 expect "IAP verification answers 501 until the Apple keys exist — never a fake 200" "$c" 501

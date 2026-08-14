@@ -674,6 +674,31 @@ namespace RobotBrawl.Phase0
         /// call: the JWT is stateless, it simply stops being sent.</summary>
         public static void Logout() { Token = ""; ClearSession(); }
 
+        /// <summary>Permanently delete the signed-in account (App Store
+        /// 5.1.1(v) — mandatory once accounts gate the app). The server
+        /// tombstones: robots retire, snapshots stand down, the email is
+        /// redacted; ledger and match history stay, anonymous. On success the
+        /// local session is cleared too — a deleted account that stays signed
+        /// in is a ghost.</summary>
+        public static IEnumerator DeleteAccount(Action<string> done)
+        {
+            var req = new UnityWebRequest(BaseUrl + "/v1/account", "DELETE");
+            byte[] body = System.Text.Encoding.UTF8.GetBytes("{\"confirm\":\"DELETE MY ACCOUNT\"}");
+            req.uploadHandler = new UploadHandlerRaw(body);
+            req.downloadHandler = new DownloadHandlerBuffer();
+            req.SetRequestHeader("Content-Type", "application/json");
+            if (!string.IsNullOrEmpty(Token)) req.SetRequestHeader("Authorization", "Bearer " + Token);
+            using (req)
+            {
+                yield return req.SendWebRequest();
+                string text = req.downloadHandler != null ? req.downloadHandler.text : "";
+                if (req.result != UnityWebRequest.Result.Success)
+                { done(RobotWorker.Field(text, "error") ?? req.error); yield break; }
+                Logout();
+                done(null);
+            }
+        }
+
         // ---- economy (client B, docs/Server_Economy_Design_2026-08-13.md) ----
 
         /// <summary>done(balance, err). The server's wallet balance — the

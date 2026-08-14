@@ -175,6 +175,15 @@ public class LoginGate : MonoBehaviour
 
         status = Label("status", card.transform, LadderClient.IsProduction ? "" : "[dev] " + LadderClient.BaseUrl, 12, TextAnchor.MiddleCenter);
         status.color = new Color(0.75f, 0.77f, 0.82f, 1f);
+
+        // The soft-brick escape hatch: with the gate in front of the game, a
+        // forgotten password locks a player out of EVERYTHING, and there is
+        // no self-serve email reset yet (no mail infrastructure on this
+        // budget). Support resets it operator-side (the admin endpoint) —
+        // this line is how the player learns that path exists.
+        var help = Label("resethelp", card.transform,
+            "Forgot your password? Email support and we'll reset it.", 11, TextAnchor.MiddleCenter);
+        help.color = new Color(0.55f, 0.57f, 0.62f, 1f);
     }
 
     static GameObject Panel(string n, Transform parent, Color c)

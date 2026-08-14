@@ -1753,6 +1753,9 @@ public class MobileBuilderUI : MonoBehaviour
     /// rather than matching whichever one I happened to hard-code.</summary>
     float HANDLE_H { get { return TouchRow(); } }
     bool dockOpen = true;
+    /// <summary>Account-deletion two-tap arm (5.1.1(v) button). Any panel
+    /// rebuild resets it, which is the disarm.</summary>
+    bool deleteArmed;
     UnityEngine.UI.Button dockHandle;
     RectTransform handleRt;
 
@@ -3009,6 +3012,39 @@ public class MobileBuilderUI : MonoBehaviour
         var sole = so.gameObject.AddComponent<LayoutElement>();
         sole.flexibleHeight = 0f; sole.minHeight = TouchRow(); sole.preferredHeight = TouchRow();
         so.GetComponent<Image>().color = new Color(0.16f,0.17f,0.21f,1f);
+
+        // ACCOUNT DELETION (App Store 5.1.1(v) — mandatory once accounts gate
+        // the app; the endpoint existed, the button did not, and a missing
+        // button here is a guaranteed review rejection). Two taps, and the
+        // FIRST changes the label so the second is informed consent — a
+        // single red button labelled DELETE next to SIGN OUT is a fat-finger
+        // trap. Rebuilding the panel (any Refresh) disarms it.
+        deleteArmed = false;
+        Button delBtn = null;
+        delBtn = MkButton("accdelete", arenaAccountContent, "DELETE ACCOUNT…", 13, () =>
+        {
+            var lbl = delBtn != null ? delBtn.GetComponentInChildren<Text>() : null;
+            if (!deleteArmed)
+            {
+                deleteArmed = true;
+                if (lbl != null) lbl.text = "TAP AGAIN — DELETES YOUR ACCOUNT FOREVER";
+                return;
+            }
+            if (lbl != null) lbl.text = "deleting…";
+            StartCoroutine(RobotBrawl.Phase0.LadderClient.DeleteAccount(err =>
+            {
+                deleteArmed = false;
+                if (err != null)
+                { if (lbl != null) lbl.text = "delete failed — " + err; return; }
+                // DeleteAccount already cleared the session; SignOut tidies
+                // the panel state and the gate returns on next launch.
+                if (arenaScreen != null) { arenaScreen.SignOut(); arenaAccountStamp = ""; }
+                if (lbl != null) lbl.text = "ACCOUNT DELETED — signed out";
+            }));
+        });
+        var dle = delBtn.gameObject.AddComponent<LayoutElement>();
+        dle.flexibleHeight = 0f; dle.minHeight = TouchRow(); dle.preferredHeight = TouchRow();
+        delBtn.GetComponent<Image>().color = new Color(0.42f, 0.15f, 0.14f, 1f);
     }
 
     /// <summary>MY FIGHTS, and the launcher that plays one back.
