@@ -1333,7 +1333,11 @@ public class MobileBuilderUI : MonoBehaviour
                 {
                     if (MatDB.Canon(m) == cur) continue;
                     int other = bm.CareerRemainingMat(i, m);
-                    if (other > 0) { t += " · " + other + " in " + MatDB.Get(m).name; break; }
+                    // The SHORT key ("ABS"), not the display name ("ABS
+                    // Plastic") — owen's iPad screenshot, 2026-08-13: the long
+                    // name wrapped the badge to a third line that overlapped
+                    // the tile below. The hint names a material, not a brochure.
+                    if (other > 0) { t += " · " + other + " in " + m; break; }
                 }
             }
         }
@@ -2131,8 +2135,18 @@ public class MobileBuilderUI : MonoBehaviour
                 var cw0 = canvas.GetComponent<RectTransform>();
                 if (cw0 != null) vw = cw0.rect.width - 12f;
             }
-            int cols = Mathf.Max(1, Mathf.CeilToInt((bm != null ? bm.PaletteCount : 19)
-                                                    / (float)partGrid.constraintCount));
+            // Count the tiles the grid will actually LAY OUT — GridLayoutGroup
+            // skips inactive children, and the rosterOnly retirements (chassis,
+            // gyro) are hidden tiles that still sat in PaletteCount. Measured
+            // on owen's iPad (2026-08-13): 25 counted, 23 active → 7 columns
+            // budgeted, 6 drawn, and the phantom column left a dead band under
+            // PROGRAM. The count and the layout must agree about hidden tiles
+            // (the tab-renumbering lesson, wearing a grid hat).
+            int visible = 0;
+            for (int ci = 0; ci < partGrid.transform.childCount; ci++)
+                if (partGrid.transform.GetChild(ci).gameObject.activeSelf) visible++;
+            if (visible == 0) visible = bm != null ? bm.PaletteCount : 19;
+            int cols = Mathf.Max(1, Mathf.CeilToInt(visible / (float)partGrid.constraintCount));
             float cellW = vw > 50f ? (vw - 8f - (cols - 1) * 6f) / cols : 112f;
             partGrid.cellSize = new Vector2(Mathf.Max(84f, cellW), R);
 
