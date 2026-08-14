@@ -64,5 +64,5 @@ collect data from them.
 ## Changes and contact
 
 Material changes to this policy will be noted in the app's release notes.
-Questions, data requests, and password resets: contact support at the
-email address listed on the App Store page.
+Questions, data requests, and password resets: contact support at
+admin@cyberduck.club.

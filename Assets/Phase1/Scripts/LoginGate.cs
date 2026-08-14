@@ -182,7 +182,7 @@ public class LoginGate : MonoBehaviour
         // budget). Support resets it operator-side (the admin endpoint) —
         // this line is how the player learns that path exists.
         var help = Label("resethelp", card.transform,
-            "Forgot your password? Email support and we'll reset it.", 11, TextAnchor.MiddleCenter);
+            "Forgot your password? Email admin@cyberduck.club and we'll reset it.", 11, TextAnchor.MiddleCenter);
         help.color = new Color(0.55f, 0.57f, 0.62f, 1f);
     }
 
