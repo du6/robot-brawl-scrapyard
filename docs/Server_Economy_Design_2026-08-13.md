@@ -29,11 +29,19 @@ runs into a constraint no client-side scheme escapes:
 
 ## The design
 
-1. **Everyone gets a server identity, silently.** On first online launch the
-   client auto-creates an anonymous account keyed to a device-generated id —
-   no sign-up screen; guests keep playing exactly as today. Signing in later
-   merges the anonymous account into the real one. This dissolves the guest
-   problem: there is no walleted player without a server row.
+1. **Login/signup gates the game.** (Owen's call, same day, replacing the
+   first draft's anonymous device-id accounts — **considered and rejected**
+   because a device-keyed identity fights the multi-device player: the same
+   person on a phone and an iPad would mint two strangers.) The existing
+   ladder account system (`LadderClient` register/login) moves to boot: no
+   account, no game. One account works from any device, which is exactly
+   what a real-money wallet needs. The session persists on device, so after
+   first login the career still plays offline — the gate is at first run
+   and at commerce, not in front of every fight.
+   Compliance this drags onto the critical path, named now: **account
+   deletion in-app** (App Store 5.1.1(v), mandatory once accounts gate the
+   app), password reset, and **Sign in with Apple** becomes mandatory the
+   moment any third-party login (Google etc.) is offered beside email.
 
 2. **Wallet and part ownership live in Postgres.** Balance, owned parts, and
    every earn/spend is a server-validated transaction. The server already
@@ -84,7 +92,8 @@ POST /v1/economy/purchase           shop buy/sell at server prices
 POST /v1/iap/verify                 signed StoreKit transaction
 ```
 
-Client: anonymous-account bootstrap in `LadderClient`; the SHOP tab gates on
+Client: boot-time login/signup screen in front of ModeSelect (reusing the
+ARENA sign-in flows and `LadderClient` sessions); the SHOP tab gates on
 connectivity with honest copy; `Career` ownership/scrap reads become cache
 reads with a server-wins reconcile on sync.
 
@@ -129,3 +138,10 @@ server validates build legality only.
 3. Scrap pack pricing, and whether any parts become IAP-exclusive.
 4. Whether commercialization gates the TestFlight launch or follows it —
    decides whether this design is on the critical path.
+5. **Career roaming.** The login gate makes multi-device play the promise,
+   and wallet + inventory keep it (they live with the account). Robot
+   designs, programs and league progress do NOT — they live in the local
+   save. A player on a second device finds their scrap and parts but not
+   their robots. Cloud career sync is a separate, larger decision; until it
+   is made, the honest statement is "your wallet roams, your workshop does
+   not."
