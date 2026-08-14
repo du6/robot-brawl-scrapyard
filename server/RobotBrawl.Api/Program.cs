@@ -119,6 +119,18 @@ builder.Services.AddRateLimiter(o =>
     o.AddPolicy("wallet", ctx => RateLimitPartition.GetFixedWindowLimiter(
         ctx.User.FindFirstValue("sub") ?? ctx.Connection.RemoteIpAddress?.ToString() ?? "anon",
         _ => new FixedWindowRateLimiterOptions { PermitLimit = 20, Window = TimeSpan.FromMinutes(1) }));
+    // Economy traffic is BURSTY BY DESIGN and the numbers come from real
+    // flows, not from a bench: settling one fight posts up to 2 claims
+    // (entry + purse/consolation), and a shop teardown-and-rebuild session
+    // legitimately sells and re-buys a dozen parts inside a minute of taps.
+    // 20/min (the wallet bucket, sized for deposits) throttles that player
+    // out of their own shop. 60/min is one op per second sustained — far
+    // above any human tap rate's steady state, and the rate limit is DoS
+    // protection here, NOT the economic defense: idempotency keys and the
+    // first-win uniqueness are what guard the money.
+    o.AddPolicy("economy", ctx => RateLimitPartition.GetFixedWindowLimiter(
+        ctx.User.FindFirstValue("sub") ?? ctx.Connection.RemoteIpAddress?.ToString() ?? "anon",
+        _ => new FixedWindowRateLimiterOptions { PermitLimit = 60, Window = TimeSpan.FromMinutes(1) }));
 });
 
 var app = builder.Build();
@@ -1433,7 +1445,20 @@ app.MapGet("/v1/wallet", async (ClaimsPrincipal user) =>
                 at = r.GetDateTime(3),
             });
     }
-    return Results.Ok(new { balance, recent = rows });
+    // The client's cache refill (docs/Server_Economy_Design_2026-08-13.md):
+    // ownership is server-truth and the local save is a cache, so the wallet
+    // answers with everything the cache needs in one round trip. Additive
+    // field — pre-economy clients read balance/recent and ignore it.
+    var inv = new List<object>();
+    await using (var iq = new NpgsqlCommand(
+        "SELECT part_id, mat, count FROM inventory WHERE user_id=$1 AND count > 0 ORDER BY part_id, mat;", c))
+    {
+        iq.Parameters.AddWithValue(me);
+        await using var r = await iq.ExecuteReaderAsync();
+        while (await r.ReadAsync())
+            inv.Add(new { partId = r.GetString(0), mat = r.GetString(1), count = r.GetInt32(2) });
+    }
+    return Results.Ok(new { balance, recent = rows, inventory = inv });
 }).RequireAuthorization();
 
 // §2.3's one-way valve: wallet scrap may move INTO the local career save and
@@ -1500,6 +1525,309 @@ app.MapPost("/v1/wallet/deposit", async (DepositReq req, ClaimsPrincipal user) =
 
     return Results.Ok(new { deposited = req.Amount, balance = balance - req.Amount });
 }).RequireAuthorization().RequireRateLimiting("wallet");
+
+// ================================================================= economy
+// docs/Server_Economy_Design_2026-08-13.md: scrap will eventually be sold for
+// real money, and you cannot sell for money what the client can mint for
+// free. The career's earn/spend paths become ledger rows here. Two rules
+// carry everything:
+//
+//   * A LEAGUE PURSE PAYS ON THE FIRST WIN ONLY (owen). The idem_key is
+//     SERVER-constructed from (user, contest), so the database refuses a
+//     second payment — total league credit per account is hard-capped at
+//     the purse-table ceiling (13,850; see the design doc's arithmetic).
+//   * Every amount is computed HERE from server-known tables and clamped
+//     constants. The client reports inputs (damage dealt, the underdog
+//     ratio); it never names its own price.
+//
+// The constants mirror Career.cs and must move with it — the client remains
+// the DISPLAY copy of this arithmetic, this is what pays. api_smoke pins the
+// ceiling arithmetic so drift fails a bench instead of paying wrong money.
+const double ECON_UNDERDOG_CAP = 1.6;   // Career.UNDERDOG_CAP
+const double ECON_WIN_DMG_K   = 0.25;   // Career.WIN_DMG_K
+const double ECON_WIN_DMG_CAP = 400;    // Career.WIN_DMG_CAP
+const int    ECON_FIRST_WIN_BONUS = 75; // Career.FIRST_WIN_BONUS
+const int    ECON_LOSS_BASE   = 40;     // Career.LOSS_BASE
+const double ECON_LOSS_DMG_K  = 0.3;    // Career.LOSS_DMG_K
+const double ECON_LOSS_DMG_CAP = 300;   // Career.LOSS_DMG_CAP
+const int    ECON_LOSS_MAX    = 150;    // Career.LOSS_MAX
+// DEFAULT pending owen's call (design doc register #6). Consolation exists to
+// soften early failure, not to be an income; without SOME bound the first-win
+// ceiling leaks through the loss path.
+const int    ECON_CONSOLATION_MAX = 3;
+
+app.MapPost("/v1/economy/claims", async (EconClaimReq req, ClaimsPrincipal user) =>
+{
+    var me = UserId(user);
+    var kind = (req.Kind ?? "").Trim().ToLowerInvariant();
+    var contest = (req.ContestId ?? "").Trim();
+    if (contest.Length is < 1 or > 16) return Bad("a contestId is required");
+
+    await using var c = await db.OpenAsync();
+    await using var tx = await c.BeginTransactionAsync();
+
+    int purse, entryFee;
+    await using (var q = new NpgsqlCommand(
+        "SELECT purse, entry_fee FROM league_contests WHERE id = $1;", c, tx))
+    {
+        q.Parameters.AddWithValue(contest);
+        await using var r = await q.ExecuteReaderAsync();
+        if (!await r.ReadAsync()) return Results.NotFound(new { error = "no such contest" });
+        purse = r.GetInt32(0); entryFee = r.GetInt32(1);
+    }
+
+    // One writer per (user, contest) at a time: the consolation bound and the
+    // won-already checks below are COUNT/EXISTS reads, and two concurrent
+    // claims must not both pass them. A transaction-scoped advisory lock
+    // serializes exactly this pair and nothing else.
+    await using (var l = new NpgsqlCommand(
+        "SELECT pg_advisory_xact_lock(hashtextextended($1, 0));", c, tx))
+    {
+        l.Parameters.AddWithValue(me.ToString() + ":" + contest);
+        await l.ExecuteNonQueryAsync();
+    }
+
+    bool won;
+    await using (var w = new NpgsqlCommand(
+        "SELECT EXISTS(SELECT 1 FROM ledger WHERE user_id=$1 AND reason='LEAGUE_PURSE' AND ref=$2);", c, tx))
+    {
+        w.Parameters.AddWithValue(me); w.Parameters.AddWithValue(contest);
+        won = (bool)(await w.ExecuteScalarAsync())!;
+    }
+
+    if (kind == "purse")
+    {
+        if (won)
+        {
+            // The first-win rule, told straight: re-entry is practice.
+            await using var prev = new NpgsqlCommand(
+                "SELECT delta, created_at FROM ledger WHERE user_id=$1 AND reason='LEAGUE_PURSE' AND ref=$2;", c, tx);
+            prev.Parameters.AddWithValue(me); prev.Parameters.AddWithValue(contest);
+            await using var pr = await prev.ExecuteReaderAsync();
+            object? already = await pr.ReadAsync()
+                ? new { paid = pr.GetInt32(0), at = pr.GetDateTime(1) } : null;
+            return Results.Conflict(new
+            {
+                error = "this contest already paid its first win — re-entry is a practice bout",
+                alreadyPaid = already,
+            });
+        }
+        // The client reports inputs; the server names the price. mult is the
+        // underdog ratio the client observed, clamped to Career's cap; dealt
+        // is damage, clamped to Career's cap. Worst case per contest is
+        // purse*1.6 + 100 + 75 by construction.
+        var mult = Math.Clamp(double.IsFinite(req.Mult) ? req.Mult : 1.0, 1.0, ECON_UNDERDOG_CAP);
+        var dealt = Math.Clamp(double.IsFinite(req.Dealt) ? req.Dealt : 0.0, 0.0, ECON_WIN_DMG_CAP);
+        int pay = (int)Math.Round(purse * mult + dealt * ECON_WIN_DMG_K) + ECON_FIRST_WIN_BONUS;
+
+        await using var ins = new NpgsqlCommand(
+            "INSERT INTO ledger (user_id, delta, reason, ref, idem_key) VALUES ($1,$2,'LEAGUE_PURSE',$3,$4);", c, tx);
+        ins.Parameters.AddWithValue(me);
+        ins.Parameters.AddWithValue(pay);
+        ins.Parameters.AddWithValue(contest);
+        ins.Parameters.AddWithValue("lpurse:" + me + ":" + contest);
+        await ins.ExecuteNonQueryAsync();
+        await tx.CommitAsync();
+        return Results.Ok(new { kind = "purse", contest, paid = pay, firstWin = true });
+    }
+
+    if (kind == "consolation")
+    {
+        if (string.IsNullOrWhiteSpace(req.AttemptId))
+            return Bad("an attemptId is required — without one a dropped response cannot be retried safely");
+        if (won) return Bad("this contest is already won — a practice bout pays nothing");
+
+        // The replay answer comes BEFORE the exhaustion answer, deliberately:
+        // an honest client retrying a dropped response must hear "already
+        // paid" (reconcilable), not "exhausted" (which reads as a lost
+        // payment). Found by the bench: the fourth attempt and a replay of
+        // the third used to get the same 400.
+        var idem = "lconsol:" + me + ":" + contest + ":" + req.AttemptId!.Trim();
+        await using (var dup = new NpgsqlCommand(
+            "SELECT EXISTS(SELECT 1 FROM ledger WHERE idem_key = $1);", c, tx))
+        {
+            dup.Parameters.AddWithValue(idem);
+            if ((bool)(await dup.ExecuteScalarAsync())!)
+                return Results.Conflict(new { error = "this consolation was already paid — the attemptId has been used" });
+        }
+
+        long used;
+        await using (var n = new NpgsqlCommand(
+            "SELECT COUNT(*) FROM ledger WHERE user_id=$1 AND reason='LEAGUE_CONSOLATION' AND ref=$2;", c, tx))
+        {
+            n.Parameters.AddWithValue(me); n.Parameters.AddWithValue(contest);
+            used = Convert.ToInt64(await n.ExecuteScalarAsync());
+        }
+        if (used >= ECON_CONSOLATION_MAX)
+            return Bad($"consolation for this contest is exhausted ({ECON_CONSOLATION_MAX} of {ECON_CONSOLATION_MAX}) — win it or walk away");
+
+        var dealt = Math.Clamp(double.IsFinite(req.Dealt) ? req.Dealt : 0.0, 0.0, ECON_LOSS_DMG_CAP);
+        int pay = Math.Min(ECON_LOSS_MAX, (int)Math.Round(ECON_LOSS_BASE + ECON_LOSS_DMG_K * dealt));
+
+        try
+        {
+            await using var ins = new NpgsqlCommand(
+                "INSERT INTO ledger (user_id, delta, reason, ref, idem_key) VALUES ($1,$2,'LEAGUE_CONSOLATION',$3,$4);", c, tx);
+            ins.Parameters.AddWithValue(me);
+            ins.Parameters.AddWithValue(pay);
+            ins.Parameters.AddWithValue(contest);
+            ins.Parameters.AddWithValue(idem);
+            await ins.ExecuteNonQueryAsync();
+            await tx.CommitAsync();
+        }
+        catch (PostgresException ex) when (ex.SqlState == "23505")
+        {
+            return Results.Conflict(new { error = "this consolation was already paid — the attemptId has been used" });
+        }
+        return Results.Ok(new { kind = "consolation", contest, paid = pay, remaining = ECON_CONSOLATION_MAX - used - 1 });
+    }
+
+    if (kind == "entry")
+    {
+        if (string.IsNullOrWhiteSpace(req.AttemptId))
+            return Bad("an attemptId is required — without one a dropped response cannot be retried safely");
+        if (entryFee <= 0) return Bad("this contest has no entry fee");
+        // The other half of the first-win rule: once won, re-entry is FREE.
+        // Accepting a fee here would charge players for practice.
+        if (won) return Bad("this contest is already won — practice is free, there is nothing to charge");
+
+        long balance;
+        await using (var b = new NpgsqlCommand(
+            "SELECT COALESCE(SUM(delta),0) FROM ledger WHERE user_id = $1;", c, tx))
+        {
+            b.Parameters.AddWithValue(me);
+            balance = Convert.ToInt64(await b.ExecuteScalarAsync());
+        }
+        if (balance < entryFee)
+            return Bad($"the entry fee is {entryFee} scrap and your wallet holds {balance}");
+
+        try
+        {
+            await using var ins = new NpgsqlCommand(
+                "INSERT INTO ledger (user_id, delta, reason, ref, idem_key) VALUES ($1,$2,'LEAGUE_ENTRY',$3,$4);", c, tx);
+            ins.Parameters.AddWithValue(me);
+            ins.Parameters.AddWithValue(-entryFee);
+            ins.Parameters.AddWithValue(contest);
+            ins.Parameters.AddWithValue("lentry:" + me + ":" + contest + ":" + req.AttemptId!.Trim());
+            await ins.ExecuteNonQueryAsync();
+            await tx.CommitAsync();
+        }
+        catch (PostgresException ex) when (ex.SqlState == "23505")
+        {
+            return Results.Conflict(new { error = "this entry was already charged — the attemptId has been used" });
+        }
+        return Results.Ok(new { kind = "entry", contest, charged = entryFee, balance = balance - entryFee });
+    }
+
+    return Bad("kind must be purse, consolation or entry");
+}).RequireAuthorization().RequireRateLimiting("economy");
+
+app.MapPost("/v1/economy/purchase", async (PurchaseReq req, ClaimsPrincipal user) =>
+{
+    var me = UserId(user);
+    var op = (req.Op ?? "").Trim().ToLowerInvariant();
+    var partId = (req.PartId ?? "").Trim();
+    var mat = (req.Mat ?? "").Trim();
+    if (partId.Length is < 1 or > 32 || mat.Length is < 1 or > 32) return Bad("partId and mat are required");
+    if (string.IsNullOrWhiteSpace(req.IdemKey))
+        return Bad("an idempotency key is required — without one a dropped response cannot be retried safely");
+    if (op != "buy" && op != "sell") return Bad("op must be buy or sell");
+
+    await using var c = await db.OpenAsync();
+    await using var tx = await c.BeginTransactionAsync();
+
+    // The price comes from the GENERATED seed (011) — the server's copy of the
+    // editor's real defs. An id/mat pair the shop never sold is a 404, which
+    // is also what retires a part: delete its rows and the server stops
+    // selling it even if a stale client still shows a tile.
+    int price;
+    await using (var p = new NpgsqlCommand(
+        "SELECT price FROM part_prices WHERE part_id = $1 AND mat = $2;", c, tx))
+    {
+        p.Parameters.AddWithValue(partId); p.Parameters.AddWithValue(mat);
+        var got = await p.ExecuteScalarAsync();
+        if (got is null) return Results.NotFound(new { error = "the shop does not sell that part/material" });
+        price = (int)got;
+    }
+    var refv = partId + ":" + mat;
+
+    if (op == "buy")
+    {
+        long balance;
+        await using (var b = new NpgsqlCommand(
+            "SELECT COALESCE(SUM(delta),0) FROM ledger WHERE user_id = $1;", c, tx))
+        {
+            b.Parameters.AddWithValue(me);
+            balance = Convert.ToInt64(await b.ExecuteScalarAsync());
+        }
+        if (balance < price) return Bad($"that part is {price} scrap and your wallet holds {balance}");
+
+        try
+        {
+            await using var l = new NpgsqlCommand(
+                "INSERT INTO ledger (user_id, delta, reason, ref, idem_key) VALUES ($1,$2,'SHOP_BUY',$3,$4);", c, tx);
+            l.Parameters.AddWithValue(me);
+            l.Parameters.AddWithValue(-price);
+            l.Parameters.AddWithValue(refv);
+            l.Parameters.AddWithValue("shop:" + me + ":" + req.IdemKey!.Trim());
+            await l.ExecuteNonQueryAsync();
+        }
+        catch (PostgresException ex) when (ex.SqlState == "23505")
+        {
+            return Results.Conflict(new { error = "this purchase was already applied — the idempotency key has been used" });
+        }
+        await using (var inv = new NpgsqlCommand(@"
+            INSERT INTO inventory (user_id, part_id, mat, count) VALUES ($1,$2,$3,1)
+            ON CONFLICT (user_id, part_id, mat)
+            DO UPDATE SET count = inventory.count + 1, updated_at = now();", c, tx))
+        {
+            inv.Parameters.AddWithValue(me); inv.Parameters.AddWithValue(partId); inv.Parameters.AddWithValue(mat);
+            await inv.ExecuteNonQueryAsync();
+        }
+        await tx.CommitAsync();
+        return Results.Ok(new { op, partId, mat, paid = price, balance = balance - price });
+    }
+
+    // sell — half back, floor enforced by the ledger's credit guard. The
+    // decrement's WHERE count > 0 is the ownership check; the CHECK
+    // constraint is the backstop, not the mechanism.
+    int refund = (int)Math.Round(price * 0.5);
+    await using (var dec = new NpgsqlCommand(@"
+        UPDATE inventory SET count = count - 1, updated_at = now()
+         WHERE user_id = $1 AND part_id = $2 AND mat = $3 AND count > 0;", c, tx))
+    {
+        dec.Parameters.AddWithValue(me); dec.Parameters.AddWithValue(partId); dec.Parameters.AddWithValue(mat);
+        if (await dec.ExecuteNonQueryAsync() == 0)
+            return Bad("you do not own that part in that material");
+    }
+    try
+    {
+        await using var l = new NpgsqlCommand(
+            "INSERT INTO ledger (user_id, delta, reason, ref, idem_key) VALUES ($1,$2,'SHOP_SELL',$3,$4);", c, tx);
+        l.Parameters.AddWithValue(me);
+        l.Parameters.AddWithValue(refund);
+        l.Parameters.AddWithValue(refv);
+        l.Parameters.AddWithValue("shop:" + me + ":" + req.IdemKey!.Trim());
+        await l.ExecuteNonQueryAsync();
+    }
+    catch (PostgresException ex) when (ex.SqlState == "23505")
+    {
+        return Results.Conflict(new { error = "this sale was already applied — the idempotency key has been used" });
+    }
+    await tx.CommitAsync();
+    return Results.Ok(new { op, partId, mat, refunded = refund });
+}).RequireAuthorization().RequireRateLimiting("economy");
+
+// Reserved so the client can ship against a stable path. Returning 501 --
+// not a fake 200 -- is deliberate: crediting scrap on an UNVERIFIED receipt
+// would be the exact free-scrap faucet this design exists to close, and a
+// verification stub that "works" in dev is how that ships by accident.
+app.MapPost("/v1/iap/verify", (ClaimsPrincipal user) =>
+    Results.Json(new
+    {
+        error = "IAP verification is not configured on this deployment — the App Store Server API keys do not exist yet",
+    }, statusCode: 501)
+).RequireAuthorization().RequireRateLimiting("economy");
 
 // ========================================================= league nights
 // §M3: "Scheduled league nights (server-initiated round-robin among top 8 per
@@ -2058,6 +2386,8 @@ public record ClaimReq(string? WorkerId, string? Kind);
 public record ChallengeReq(Guid ChallengerSnapshotId, Guid DefenderSnapshotId);
 public record ReplayReq(string? Replay);
 public record DepositReq(int Amount, string? IdemKey);
+public record EconClaimReq(string? Kind, string? ContestId, double Dealt, double Mult, string? AttemptId);
+public record PurchaseReq(string? Op, string? PartId, string? Mat, string? IdemKey);
 public record EquipReq(string? PlateId, string? TitleId);
 public record DeleteReq(string? Confirm);
 public record FightResult(Guid MatchId, string? WorkerId, string? Verdict,
