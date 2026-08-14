@@ -36,10 +36,22 @@ public class EconomySync : MonoBehaviour
     /// buy only when the server has answered us this session.</summary>
     public static bool SessionOnline { get { return lastServerBalance >= 0; } }
 
+    /// <summary>Probes and benches that WANT the editor to sync set this
+    /// deliberately. It exists because of a measured incident, 2026-08-13:
+    /// owen signed into the gate in the EDITOR with a fresh dev account, and
+    /// server-wins adoption did exactly what it says — flattened his real
+    /// career's 6,513 scrap to the account's 500 (the −6013 is in his ledger).
+    /// A BUILD can never hit this: the gate forces sign-in before the career
+    /// exists, so a device save never has a pre-wallet balance. The editor
+    /// career is OWNER STATE and predates the wallet, so in the editor the
+    /// sync only runs when a probe asks for it.</summary>
+    public static bool editorOptIn;
+
     /// <summary>Fire a sync if signed in and none is running. Called after
     /// the login gate boots the career; safe to call from anywhere.</summary>
     public static void Kick()
     {
+        if (Application.isEditor && !editorOptIn) return;
         if (!LadderClient.SignedIn || running != null) return;
         var go = new GameObject("EconomySync");
         DontDestroyOnLoad(go);

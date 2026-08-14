@@ -111,6 +111,16 @@ public class CareerSmoke : MonoBehaviour
             LoginGate.inst.OnDevSkip();
             yield return null; yield return null;
         }
+        // SIGN OUT IN MEMORY for the whole run — found 2026-08-13, five shop
+        // legs red: owen's editor carried a PERSISTED session (he signed in
+        // through the gate while testing), so the bench booted signed in and
+        // the shop's offline gate — working exactly as designed — refused
+        // every bench purchase ("buying needs a connection"). This bench
+        // asserts the SIGNED-OUT local shop, so it must run signed out. The
+        // token is stashed and restored in Finish, NOT Logout()ed — clearing
+        // owen's persisted session would be the bench mutating owner state.
+        stashedToken = LadderClient.Token;
+        LadderClient.Token = "";
         var bm = Object.FindFirstObjectByType<BuilderManager>();
         var ui = MobileBuilderUI.inst;
         if (bm == null || ui == null)
@@ -1484,8 +1494,13 @@ public class CareerSmoke : MonoBehaviour
     public static int lastPassed, lastFailed;
     public static string notes = "";
 
+    string stashedToken;
+
     void Finish()
     {
+        // Hand owen's in-memory session back exactly as found (see the stash
+        // at the top of Start — the bench runs signed out on purpose).
+        if (!string.IsNullOrEmpty(stashedToken)) LadderClient.Token = stashedToken;
         failLines = "";
         lastPassed = passed; lastFailed = failed;
         notes = "";

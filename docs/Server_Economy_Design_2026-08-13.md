@@ -180,6 +180,15 @@ server validates build legality only.
   (signature mismatch, unknown ledger line) locks a paying customer out of
   their career — tonight's own restore-from-backup would have tripped it.
   Reconciles flag and overwrite the cache; they never brick the save.
+- ⚠ **And the adoption bit its author the same night.** Owen signed into the
+  gate in the EDITOR with a fresh dev account, and server-wins did exactly
+  what this doc specifies: adopted 500 over his real career's 6,513 (−6013,
+  in his ledger). A BUILD can never hit this — the gate forces sign-in
+  before a career exists, so no device save carries a pre-wallet balance —
+  but the editor career predates the wallet and is owner state. The fix:
+  `EconomySync` in the editor runs only when a probe opts in
+  (`editorOptIn`); the balance was repaired with an audited compensating
+  transaction, adoption rows kept as history.
 - Rate caps are a lever with a false-positive edge (a legitimate binge
   player); start generous, measure, tighten with numbers — never the
   reverse (house rule 3). Under the first-win rule they guard nothing in
