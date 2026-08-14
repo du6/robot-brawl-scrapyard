@@ -60,16 +60,30 @@ runs into a constraint no client-side scheme escapes:
    Notifications drive refunds with a clawback. "I bought it" from the
    client is never sufficient.
 
-5. **The league-purse leak is bounded, not denied.** League fights run on
-   the device, so "I won L3C2, pay me" is inherently a client claim — the
-   server cannot referee an offline fight. Bound it with the server-known
-   purse table plus rate caps (no more purses per contest per day than a
-   legitimate player could earn). A determined cheater can grind-claim at
-   the legitimate rate and **cannot exceed it**, so purchased scrap stays
-   strictly faster than any exploit. Arena payouts have no such leak — the
-   cloud worker already referees those fights, so they are server-truth
+5. **The league-purse leak is bounded, not denied — and owen's first-win
+   rule (same day) collapses it to a one-shot.** League fights run on the
+   device, so "I won L3C2, pay me" is inherently a client claim — the
+   server cannot referee an offline fight. **The rule: a contest pays on
+   the FIRST win only.** Re-entering an already-won contest charges no
+   entry fee and pays nothing — purse, first-win bonus, damage bonus, all
+   of it — it is a practice bout, and the row should say so. Server
+   enforcement is then a uniqueness constraint, not a heuristic:
+   `ledger.ref_id = "purse:<contest_id>"` per account, so a duplicate claim
+   is a no-op by construction and **total league scrap per account has a
+   hard ceiling — the sum of the purse table** — independent of grinding
+   or cheating rate. A save-editor can at worst claim wins they didn't
+   earn, once each, capped at what one honest completionist earns anyway.
+   Rate caps are no longer load-bearing for purses; they remain only if a
+   repeatable league reward is ever added. Arena payouts have no leak at
+   all — the cloud worker referees those fights, so they are server-truth
    natively. (This subsumes the earlier "grant claim" sketch for arena
    rewards: an arena payout is just a server ledger entry like any other.)
+   ⚠ Player-facing consequence to ship with it: today's game CHARGES a
+   re-entry fee (the "✓ … 50 scrap (re-entry)" rows) and pays again.
+   Both sides of that change — free entry, zero payout — land together or
+   the economy is asymmetric; the LEAGUE row copy changes from
+   "(re-entry)" to a practice label; `CareerSmoke`'s contest-row checks
+   will need the same update when this is implemented.
 
 ## Sketches (to guide, not to prescribe)
 
@@ -126,7 +140,9 @@ server validates build legality only.
   Reconciles flag and overwrite the cache; they never brick the save.
 - Rate caps are a lever with a false-positive edge (a legitimate binge
   player); start generous, measure, tighten with numbers — never the
-  reverse (house rule 3).
+  reverse (house rule 3). Under the first-win rule they guard nothing in
+  the league today — keep them out of v1 rather than shipping an untested
+  lever, and add them only when a repeatable reward exists to bound.
 
 ## Open for owen (the register)
 
