@@ -95,3 +95,20 @@ never do. Two coherent paths:
 
 Either way the program-leak (4) is an independent server fix worth doing
 now.
+
+## RESOLVED — Path A shipped (2026-08-14, later)
+
+All three blockers and the server leak are fixed and measured:
+- **Wall cap**: scaled by speed. Preview smoke — 6/6 full-distance fights
+  reached a REAL verdict (LOST), zero `match wall timeout` draws.
+- **Progression isolation**: `Progression.suppressSettle`; ReplayBench 60/60
+  ("career object handed back untouched", timeScale 1, builder restored).
+- **Determinism**: removed as a dependency — the preview is now an
+  EXHIBITION (opponent on AI), copy never asserts the official result.
+- **Program leak**: the envelope feed returns the opponent's BUILD only;
+  api_smoke 257/257 asserts the program never appears.
+
+The preview-vs-referee probe now shows expected disagreement (AI opponent
+≠ real program) — that is the design, not a defect. Findings 5–8 fixed in
+the same commit. Remaining minor items (9 AI absolute-time, 10 verdict
+wording) are moot under the exhibition model.

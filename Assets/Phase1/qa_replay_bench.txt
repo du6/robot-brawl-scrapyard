@@ -31,28 +31,28 @@ PASS  best-of-3 ran 3 bouts
 PASS  match has a verdict: Draw (by inside the draw band)
       record A 0 / B 0 / draw 3
 PASS  different seeds produce different bouts
-      bout 0 seed 11 -> Draw (Draw, Called early — both machines disarmed, no damage possible for 12 s · Judges' decision — damage 76 vs 76 (0.0% margin level) · pieces 18/19 vs 18/19 · aggression 15% vs 15% · on its back 0% vs 0% — both machines disarmed with nothing left to settle it, scored a draw) 26.61s  dealt A 75.90 B 75.94
-PASS  bout 0 actually simulated (26.61s)
+      bout 0 seed 11 -> Draw (Draw, Called early — both machines disarmed, no damage possible for 12 s · Judges' decision — damage 76 vs 76 (0.0% margin level) · pieces 18/19 vs 18/19 · aggression 26% vs 26% · on its back 0% vs 0% — both machines disarmed with nothing left to settle it, scored a draw) 26.87s  dealt A 75.90 B 75.94
+PASS  bout 0 actually simulated (26.87s)
 PASS  bout 0 had contact (10 damage exchanges)
-      bout 0 dead air after the last hit: 12.16s of 26.61s
+      bout 0 dead air after the last hit: 12.03s of 26.87s
 PASS  bout 0 wrote a replay file
-      bout 1 seed 22 -> Draw (Draw, Called early — both machines disarmed, no damage possible for 12 s · Judges' decision — damage 76 vs 76 (0.3% margin level) · pieces 18/19 vs 18/19 · aggression 24% vs 23% · on its back 0% vs 0% — both machines disarmed with nothing left to settle it, scored a draw) 28.09s  dealt A 75.69 B 75.94
-PASS  bout 1 actually simulated (28.09s)
+      bout 1 seed 22 -> Draw (Draw, Called early — both machines disarmed, no damage possible for 12 s · Judges' decision — damage 76 vs 76 (0.3% margin level) · pieces 18/19 vs 18/19 · aggression 19% vs 17% · on its back 0% vs 0% — both machines disarmed with nothing left to settle it, scored a draw) 27.83s  dealt A 75.69 B 75.94
+PASS  bout 1 actually simulated (27.83s)
 PASS  bout 1 had contact (10 damage exchanges)
-      bout 1 dead air after the last hit: 12.18s of 28.09s
+      bout 1 dead air after the last hit: 12.19s of 27.83s
 PASS  bout 1 wrote a replay file
-      bout 2 seed 33 -> Draw (Draw, Called early — both machines disarmed, no damage possible for 12 s · Judges' decision — damage 76 vs 76 (0.0% margin level) · pieces 18/19 vs 18/19 · aggression 16% vs 22% · on its back 0% vs 0% — both machines disarmed with nothing left to settle it, scored a draw) 28.00s  dealt A 75.94 B 75.93
-PASS  bout 2 actually simulated (28.00s)
+      bout 2 seed 33 -> Draw (Draw, Called early — both machines disarmed, no damage possible for 12 s · Judges' decision — damage 76 vs 76 (0.0% margin level) · pieces 18/19 vs 18/19 · aggression 21% vs 19% · on its back 0% vs 0% — both machines disarmed with nothing left to settle it, scored a draw) 28.14s  dealt A 75.94 B 75.93
+PASS  bout 2 actually simulated (28.14s)
 PASS  bout 2 had contact (10 damage exchanges)
-      bout 2 dead air after the last hit: 12.18s of 28.00s
+      bout 2 dead air after the last hit: 12.19s of 28.14s
 PASS  bout 2 wrote a replay file
-      replay size 94661 B for 26.61s
+      replay size 93131 B for 26.87s
 PASS  replay reads back: ok
 PASS  replay header carries its seed
 PASS  replay carries side A's build verbatim
 PASS  replay names both sides' parts
 PASS  replay verdict matches the match result (Draw vs Draw)
-PASS  recording covers the bout at 10 Hz (268 samples, expected ~266.10)
+PASS  recording covers the bout at 10 Hz (270 samples, expected ~268.70)
 PASS  both sides are sampled on every frame
 PASS  every side-A frame is root + 7 floats per part
 PASS  replay decompresses
@@ -61,7 +61,7 @@ PASS  side B's program does not appear in the replay
 PASS  no program structure leaks into the replay at all
 PASS  playback ran to the end
 PASS  playback clean: ok
-PASS  playback applied 267 frames, coverage 99.96% (band 95-105%)
+PASS  playback applied 269 frames, coverage 99.74% (band 95-105%)
 PASS  playback hid every part the recording says was destroyed (2/2)
       playback events: 11, destroys 2
 PASS  the match handed the career object back untouched
