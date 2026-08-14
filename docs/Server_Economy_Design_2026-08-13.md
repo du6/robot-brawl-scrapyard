@@ -101,26 +101,47 @@ runs into a constraint no client-side scheme escapes:
    "(re-entry)" to a practice label; `CareerSmoke`'s contest-row checks
    will need the same update when this is implemented.
 
-## Sketches (to guide, not to prescribe)
+## Sketches — superseded by AS BUILT, same day
 
-Schema:
-```
-wallets    (account_id PK, balance, updated_at)
-ledger     (id, account_id, delta, cause, ref_id UNIQUE, created_at)
-iap        (transaction_id UNIQUE, account_id, product, scrap, status)
-inventory  (account_id, part_id, mat, count)
-```
-`ref_id` carries the idempotency key (purse claim id, purchase id, IAP
-transaction id) — replays are no-ops by construction, the same discipline
-the match/claim contract already uses.
+The first draft sketched a `wallets` table before reading the server: the
+ladder ALREADY had the right spine (001's `ledger` — balance = SUM(delta),
+append-only via triggers, `idem_key` UNIQUE enforced by Postgres, and a
+one-way DEPOSIT_TO_CAREER valve). **"The server has no scrap column
+anywhere" in the context section above was WRONG** — the wallet existed;
+what was missing was the career's paths into it. Corrected here rather
+than silently rewritten: check the artifact, not the note about the
+artifact.
 
-API:
+**AS BUILT (2026-08-13, migrations 010+011, api_smoke 255/255):**
 ```
-GET  /v1/wallet                     balance + inventory (the cache refill)
-POST /v1/economy/claims             batch of league purse claims (capped)
-POST /v1/economy/purchase           shop buy/sell at server prices
-POST /v1/iap/verify                 signed StoreKit transaction
+ledger      widened: LEAGUE_PURSE/LEAGUE_CONSOLATION/LEAGUE_ENTRY/
+            SHOP_BUY/SHOP_SELL/IAP/IAP_REFUND, each with a direction
+            CHECK; new ref column (contest id / "part:mat")
+inventory   (user_id, part_id, mat, count>=0) — count>=0 IS the
+            ownership rule
+part_prices GENERATED from the editor's live defs (84 rows, 22 parts;
+            pinned mats emit only what they Accept; rosterOnly absent)
+league_contests  hand-ported purse table (14 rows, sum 7125 — pinned
+            by a bench)
+iap_receipts (transaction_id PK — Apple's id, so double-credit is
+            refused by the database)
+
+GET  /v1/wallet              balance + recent + inventory (cache refill)
+POST /v1/economy/claims      kind purse|consolation|entry; purse idem_key
+                             is SERVER-constructed (user,contest) so the
+                             first-win ceiling is a uniqueness constraint;
+                             consolation pre-first-win only, ≤3/contest
+                             (register #6 default) under an advisory lock;
+                             entry fees only pre-win
+POST /v1/economy/purchase    buy/sell at server prices, transactional,
+                             idempotent
+POST /v1/iap/verify          501 until App Store keys exist — reserved,
+                             never fake
 ```
+The client's first-win half shipped the same day (`7cb5738`): practice
+bouts pay nothing in either direction, charge nothing, and say so on
+every surface. Client wallet integration (the boot gate + cache) is the
+remaining piece and is tracked with its hazards on the board.
 
 Client: boot-time login/signup screen in front of ModeSelect (reusing the
 ARENA sign-in flows and `LadderClient` sessions); the SHOP tab gates on

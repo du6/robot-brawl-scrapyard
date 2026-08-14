@@ -38,7 +38,7 @@ The records, most recent first:
 
 | doc | what |
 |---|---|
-| `docs/Server_Economy_Design_2026-08-13.md` | scrap goes ON SALE eventually (owen) — so wallet+inventory move server-side; the design, the league-claim leak and its bound, and why pre-TestFlight is the cheap moment. NOT BUILT |
+| `docs/Server_Economy_Design_2026-08-13.md` | scrap goes ON SALE eventually (owen) — wallet+inventory server-side. SERVER HALF BUILT + DEPLOYED same day (010/011, claims/purchase/wallet, 255/255) and the client's first-win rule with it; the boot gate + client cache is the remaining piece, tracked with hazards |
 | `docs/Flagship_Hardening_2026-08-12.md` | CEILING L4 92%→50% in two measured steps; the L5 reversal; the FLOOR needle at 61%; where the rest of the gap lives |
 | `docs/Gusset_Shipped_2026-08-12.md` | the seam-reinforcement part: fmt4 snapshots, the LOCKSTEP worker rule, what is measured and what is owed |
 | `docs/League_Purse_Halving_2026-08-12.md` | the league pays HALF (owen) — what moved, what deliberately did not, and the dpi-sensitive legibility check |
