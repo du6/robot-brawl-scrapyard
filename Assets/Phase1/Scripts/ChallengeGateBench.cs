@@ -136,6 +136,16 @@ namespace RobotBrawl.Phase0
                 Check(ui.StakeForPick(Card("MIDDLE")) == 150, "two classes up stakes 150");
                 Check(ui.StakeForPick(Card("SUPER")) == 250, "four classes up stakes 250");
 
+                // ---- the purse ladder ------------------------------------
+                // (1 + 0.5*gap)^2 x 100, mirroring §2.3 exactly — the reward
+                // half of "punch up". Two classes up pays 4x; the card must
+                // SAY so, and this is the number it says.
+                Check(ui.PurseForPick(Card("FEATHER")) == 100, "same class pays 100");
+                Check(ui.PurseForPick(Card("LIGHT")) == 225, "one class up pays 225");
+                Check(ui.PurseForPick(Card("MIDDLE")) == 400, "two classes up pays 400");
+                Check(ui.PurseForPick(Card("SUPER")) == 900, "four classes up pays 900");
+                Check(ui.GapForPick(Card("MIDDLE")) == 2, "gap reads 2 for two classes up");
+
                 // ---- confirm cannot fire through a closed gate ------------
                 // The board reloads while the card is open, so a pick that was
                 // legal a second ago may not be. ConfirmChallenge re-asks.

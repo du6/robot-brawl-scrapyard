@@ -3273,10 +3273,13 @@ public class MobileBuilderUI : MonoBehaviour
                 if (pt != null) pt.color = on ? Color.white : new Color(0.72f,0.78f,0.88f);
             }
 
+            int gapUp = arenaScreen.GapForPick(card);
+            int purse = arenaScreen.PurseForPick(card);
             if (!arenaScreen.Pending)
             {
                 var cb = MkButton("cardchallenge", arenaCardContent,
-                                  "CHALLENGE FOR " + stake + " SCRAP", 14,
+                                  "CHALLENGE FOR " + stake + " SCRAP · WIN PAYS " + purse
+                                  + (gapUp > 0 ? " · FIGHTING " + gapUp + " UP" : ""), 14,
                                   () => { if (arenaScreen != null) { arenaScreen.ArmChallenge(); arenaCardStamp = ""; } });
                 var cle2 = cb.gameObject.AddComponent<LayoutElement>();
                 cle2.flexibleHeight = 0f; cle2.minHeight = TouchRow(); cle2.preferredHeight = TouchRow();
@@ -3290,7 +3293,9 @@ public class MobileBuilderUI : MonoBehaviour
                 var warn = MkText("cardstake", arenaCardContent,
                     "stake " + stake + " scrap"
                     + (arenaScreen.Balance >= 0 ? " of your " + arenaScreen.Balance : "")
-                    + " — returned if you win or draw, lost if you do not.",
+                    + " — returned if you win or draw, lost if you do not."
+                    + " a win pays " + purse + " scrap"
+                    + (gapUp > 0 ? " (fighting " + gapUp + " class" + (gapUp > 1 ? "es" : "") + " up)." : "."),
                     13, TextAnchor.UpperLeft);
                 warn.color = new Color(1f, 0.87f, 0.55f);
                 warn.gameObject.AddComponent<LayoutElement>().minHeight = 34f;

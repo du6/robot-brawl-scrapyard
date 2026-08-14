@@ -573,6 +573,33 @@ namespace RobotBrawl.Phase0
             return StakeFor(el[Mathf.Clamp(myPick, 0, el.Count - 1)], c);
         }
 
+        /// <summary>How many classes UP the picked robot would be fighting.
+        /// 0 = same class.</summary>
+        public int GapForPick(ScoutCard c)
+        {
+            var el = EligibleFor(c);
+            if (el.Count == 0) return 0;
+            var m = el[Mathf.Clamp(myPick, 0, el.Count - 1)];
+            int a = System.Array.IndexOf(Order, m.category);
+            int b = System.Array.IndexOf(Order, c.category);
+            return Mathf.Max(0, b - a);
+        }
+
+        /// <summary>The purse a WIN pays, computed as the server does it:
+        /// win_purse_base(100) × (1 + 0.5·gap)² — §2.3, same mirror idiom as
+        /// StakeFor above. Punching up two classes pays 4×. Shown beside the
+        /// stake because the stake alone tells a player what fighting up
+        /// COSTS and never what it PAYS — and the paying half is the reason
+        /// the rule exists (owen: a good design may beat higher weights, and
+        /// should win more for it).</summary>
+        public int PurseForPick(ScoutCard c)
+        {
+            var el = EligibleFor(c);
+            if (el.Count == 0) return 0;
+            double gap = GapForPick(c);
+            return (int)System.Math.Round(100 * System.Math.Pow(1 + 0.5 * gap, 2));
+        }
+
         // ---- surface 3: the inbox and the replay launcher -----------------
         /// <summary>Which list the ARENA is showing. The weight-class filters
         /// belong to the BOARD only — they mean nothing against your own
@@ -912,15 +939,19 @@ namespace RobotBrawl.Phase0
                 GUILayout.EndHorizontal();
 
                 int stake = StakeForPick(card);
+                int gapUp = GapForPick(card);
+                int purse = PurseForPick(card);
                 if (!pending)
                 {
-                    if (GUILayout.Button("challenge for " + stake + " scrap") && !busy) ArmChallenge();
+                    if (GUILayout.Button("challenge for " + stake + " scrap · win pays " + purse
+                                         + (gapUp > 0 ? " · fighting " + gapUp + " up" : "")) && !busy) ArmChallenge();
                 }
                 else
                 {
                     GUILayout.Label("stake " + stake + " scrap"
                                     + (balance >= 0 ? " of your " + balance : "")
-                                    + " — returned if you win or draw, lost if you do not.");
+                                    + " — returned if you win or draw, lost if you do not."
+                                    + " a win pays " + purse + " scrap.");
                     GUILayout.BeginHorizontal();
                     if (GUILayout.Button("confirm") && !busy) ConfirmChallenge();
                     if (GUILayout.Button("cancel")) CancelChallenge();
