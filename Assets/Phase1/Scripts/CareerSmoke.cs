@@ -101,6 +101,16 @@ public class CareerSmoke : MonoBehaviour
     IEnumerator Start()
     {
         yield return null;
+        // This bench rides the REAL auto-boot on purpose (it asserts the boot
+        // rules further down), so unlike the self-booting benches it meets
+        // the LOGIN GATE when no session is stored. Walk through the gate's
+        // editor-only dev door — which also makes this bench the cover for
+        // that door: if DEV SKIP stops resuming the boot, this fails here.
+        if (LoginGate.inst != null)
+        {
+            LoginGate.inst.OnDevSkip();
+            yield return null; yield return null;
+        }
         var bm = Object.FindFirstObjectByType<BuilderManager>();
         var ui = MobileBuilderUI.inst;
         if (bm == null || ui == null)
