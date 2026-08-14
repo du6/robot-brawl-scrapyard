@@ -131,3 +131,4 @@ _relay/
 # server/scripts/build_worker.zsh, packaged by server/Dockerfile.worker.
 # Never in git: it is a build artefact and it is enormous.
 build/
+.house_account.local
