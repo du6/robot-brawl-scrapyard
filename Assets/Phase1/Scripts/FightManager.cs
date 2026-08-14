@@ -898,9 +898,12 @@ public class FightManager : MonoBehaviour
                 cIsContest = true;
                 cLeague = clg.name.ToUpper();
                 cArena = clg.arenaName.ToUpper();
-                cEntry = ccon.entryFee;
+                // First-win rule (owen, 2026-08-13): a beaten contest shows
+                // purse 0 and fee 0 — the results screen tells the same story
+                // the settlement pays.
                 bool re = Career.Data.doneContests.Contains(ccon.id);
-                cPurse = Mathf.RoundToInt(ccon.purse * (re ? CareerDB.REENTRY_FRAC : 1f));
+                cEntry = re ? 0 : ccon.entryFee;
+                cPurse = re ? 0 : ccon.purse;
             }
         }
         Career.lastSettled = false;
@@ -1362,9 +1365,12 @@ public class FightManager : MonoBehaviour
         var c = Career.FindContest(lg, Career.activeContest);
         if (lg == null || c == null) return null;
         bool re = Career.Data.doneContests.Contains(c.id);
-        int purse = Mathf.RoundToInt(c.purse * (re ? CareerDB.REENTRY_FRAC : 1f));
+        // First-win rule (owen, 2026-08-13): re-entry is practice, and the
+        // HUD must not promise a purse the settlement will not pay.
+        if (re) return lg.name.ToUpper() + "   ·   " + lg.arenaName.ToUpper()
+                     + "   ·   PRACTICE — PURSE ALREADY WON   ·   FREE ENTRY";
         return lg.name.ToUpper() + "   ·   " + lg.arenaName.ToUpper()
-             + "   ·   PURSE " + purse + (re ? " (re-entry)" : "")
+             + "   ·   PURSE " + c.purse
              + (c.entryFee > 0 ? "   ·   ENTRY " + c.entryFee : "   ·   FREE ENTRY");
     }
 }

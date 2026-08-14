@@ -1669,12 +1669,17 @@ public class MobileBuilderUI : MonoBehaviour
                 var rle = row.AddComponent<LayoutElement>(); rle.minHeight = TouchRow(); rle.preferredHeight = TouchRow();
                 var rh = row.AddComponent<HorizontalLayoutGroup>(); rh.spacing = 4f; rh.childForceExpandHeight = true; rh.childForceExpandWidth = false; rh.padding = new RectOffset(6,4,2,2);
                 if (autoDone) AutoMark(row.transform, c.id);
+                // First-win rule (owen, 2026-08-13): a beaten contest is a
+                // practice bout \u2014 the row says so instead of quoting a purse
+                // that will not be paid, and shows no fee because none is
+                // charged.
                 var lbl = MkText("lbl", row.transform,
-                    string.Format("{0}{1} ({2}) \u00b7 {3} scrap{4}{5}",
-                        done ? "\u2713 " : "", EnemyRoster.Find(c.oppId).label, c.tier,
-                        done ? Mathf.RoundToInt(c.purse * 0.4f) : c.purse,
-                        done ? " (re-entry)" : "",
-                        c.entryFee > 0 ? " \u00b7 fee " + c.entryFee + " scrap" : ""),
+                    done
+                        ? string.Format("\u2713 {0} ({1}) \u00b7 practice \u2014 no purse, free entry",
+                            EnemyRoster.Find(c.oppId).label, c.tier)
+                        : string.Format("{0} ({1}) \u00b7 {2} scrap{3}",
+                            EnemyRoster.Find(c.oppId).label, c.tier, c.purse,
+                            c.entryFee > 0 ? " \u00b7 fee " + c.entryFee + " scrap" : ""),
                     14, TextAnchor.MiddleLeft);
                 lbl.gameObject.AddComponent<LayoutElement>().flexibleWidth = 1f;
                 // R5 (critic finding 8): the header says "SCOUT shows the

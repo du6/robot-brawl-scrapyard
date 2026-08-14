@@ -3345,9 +3345,12 @@ public class BuilderManager : MonoBehaviour
         }
 
         // THE GATE - exactly the checks StartCareerFight runs, in its order.
+        // A beaten contest charges no fee (first-win rule, 2026-08-13), so a
+        // broke player can always practice what they already won.
+        bool bcFree = Career.Data.doneContests.Contains(bc.id);
         string err = Validate();
         if (err == null) err = CareerValidate(blg);
-        if (err == null && Career.Data.scrap < bc.entryFee)
+        if (err == null && !bcFree && Career.Data.scrap < bc.entryFee)
             err = "Entry fee is " + bc.entryFee + " scrap \u2014 you hold " + Career.Data.scrap + ".";
         if (err == null) return null;
 
@@ -3358,7 +3361,7 @@ public class BuilderManager : MonoBehaviour
         if (lack.Count > 0) shortTag = "needs " + string.Join(", ", lack.ToArray());
         else if (BuildMassInt > blg.weightCap)
             shortTag = (BuildMassInt - Mathf.RoundToInt(blg.weightCap)) + " kg over cap";
-        else if (Career.Data.scrap < bc.entryFee)
+        else if (!bcFree && Career.Data.scrap < bc.entryFee)
             shortTag = "needs " + bc.entryFee + " scrap entry fee";
         else shortTag = err;
         return err;
@@ -4454,7 +4457,11 @@ public class BuilderManager : MonoBehaviour
             if (aWhy != null) { message = aWhy; SfxSynth.Deny(); return; }
             autoProg = RobotProgram.FromJson(Career.Data.stable[Career.Data.activeRobot].program);
         }
-        if (c.entryFee > 0) Career.Txn(-c.entryFee, "entry fee " + c.id);
+        // First-win rule (owen, 2026-08-13): a beaten contest is free practice
+        // — no fee in, no payment out. Captured once so the refund below can
+        // never disagree with the charge about whether money moved.
+        bool feeCharged = c.entryFee > 0 && !Career.Data.doneContests.Contains(c.id);
+        if (feeCharged) Career.Txn(-c.entryFee, "entry fee " + c.id);
         Career.fightBuildValue = BuildValueCareer();
         var recipe = EnemyRoster.Recipe(c.oppId, palette, c.armourMat, c.hardened);
         int ov = 0;
@@ -4472,7 +4479,7 @@ public class BuilderManager : MonoBehaviour
         // hand the fee back and clear the contest context.
         if (mode != Mode.Fight && Career.activeContest != null)
         {
-            if (c.entryFee > 0) Career.Txn(c.entryFee, "entry fee refund " + c.id);
+            if (feeCharged) Career.Txn(c.entryFee, "entry fee refund " + c.id);
             Career.activeLeague = null; Career.activeContest = null;
             return;
         }
@@ -6346,12 +6353,15 @@ public class BuilderManager : MonoBehaviour
                     // too \u2014 desktop IMGUI and mobile uGUI are two code paths
                     // and this project's signature bug is the one-side fix.
                     bool cAuto = Career.Data.autoDoneContests.Contains(cc.id);
-                    if (GatedButton(string.Format("{0}{1} {2} ({3}) \u00b7 {4} scrap{5}{6}{7}",
-                        cdone ? "\u2713" : "\u25b8", cAuto ? "[AUTO]" : "", EnemyRoster.Find(cc.oppId).label, cc.tier,
-                        cdone ? Mathf.RoundToInt(cc.purse * 0.4f) : cc.purse,
-                        cdone ? " (re-entry)" : "",
-                        cc.entryFee > 0 ? " \u00b7 fee " + cc.entryFee + " scrap" : "",
-                        cBlocked ? "   \u2014   " + cTag : ""), matStyle, cWhy))
+                    if (GatedButton(cdone
+                        ? string.Format("\u2713{0} {1} ({2}) \u00b7 practice \u2014 no purse, free entry{3}",
+                            cAuto ? "[AUTO]" : "", EnemyRoster.Find(cc.oppId).label, cc.tier,
+                            cBlocked ? "   \u2014   " + cTag : "")
+                        : string.Format("\u25b8{0} {1} ({2}) \u00b7 {3} scrap{4}{5}",
+                            cAuto ? "[AUTO]" : "", EnemyRoster.Find(cc.oppId).label, cc.tier,
+                            cc.purse,
+                            cc.entryFee > 0 ? " \u00b7 fee " + cc.entryFee + " scrap" : "",
+                            cBlocked ? "   \u2014   " + cTag : ""), matStyle, cWhy))
                         StartCareerFight(li, ci3);
                     string dTag; string dWhy = AutonomyBlocker(out dTag);
                     if (dWhy == null) dWhy = cWhy;   // manual blockers gate autonomy too

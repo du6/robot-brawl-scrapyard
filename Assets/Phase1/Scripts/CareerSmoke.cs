@@ -289,17 +289,30 @@ public class CareerSmoke : MonoBehaviour
               "first win pays WinPay to the credit (underdog mult + first-win bonus)");
         bm.BackToBuild(); yield return null; yield return null; yield return null;
 
-        // re-entry pays the 40% purse
+        // FIRST-WIN RULE (owen, 2026-08-13): re-entry is a practice bout.
+        // Zero pay on a WIN, zero consolation on a LOSS, and the scrap total
+        // is checked for byte-equality — "less than before" would also pass
+        // an accidental partial payment, and a partial payment is the bug.
         sBefore = Career.Data.scrap;
         bm.StartCareerFight(0, 0);
         yield return null; yield return null;
         fm = Object.FindFirstObjectByType<FightManager>();
-        float d1 = fm != null ? fm.player.dealt : 0f;
         if (fm != null) fm.End(FightManager.Outcome.PlayerWin, "harness re-entry win");
         yield return null; yield return null;
-        int expPay2 = CareerDB.WinPay(L1C1, d1, bv, ov2, true, false);
-        Check(Career.Data.scrap == sBefore + expPay2 && expPay2 < expPay,
-              "re-entry win pays the 40% purse, no first-win bonus");
+        Check(Career.Data.scrap == sBefore,
+              "a re-entry WIN pays nothing — practice, the purse was won already");
+        Check(Career.lastResultLine != null && Career.lastResultLine.Contains("practice"),
+              "…and the result line says practice, not a purse");
+        bm.BackToBuild(); yield return null; yield return null; yield return null;
+
+        sBefore = Career.Data.scrap;
+        bm.StartCareerFight(0, 0);
+        yield return null; yield return null;
+        fm = Object.FindFirstObjectByType<FightManager>();
+        if (fm != null) fm.End(FightManager.Outcome.PlayerLoss, "harness re-entry loss");
+        yield return null; yield return null;
+        Check(Career.Data.scrap == sBefore,
+              "a re-entry LOSS pays no consolation — or losing practice would out-earn winning it");
         bm.BackToBuild(); yield return null; yield return null; yield return null;
 
         // loss pays the consolation formula
@@ -332,6 +345,29 @@ public class CareerSmoke : MonoBehaviour
         yield return null; yield return null;
         bm.BackToBuild(); yield return null; yield return null; yield return null;
         Check(Career.TxnSum() == Career.Data.scrap, "c3 ledger audits after fees + settlements");
+
+        // The fee half of the first-win rule: win the fee contest, then
+        // re-enter — enrollment must charge NOTHING, and the fee gate must
+        // not block a broke player from practicing what they already won.
+        bm.StartCareerFight(2, 0);
+        yield return null; yield return null;
+        fm = Object.FindFirstObjectByType<FightManager>();
+        if (fm != null) fm.End(FightManager.Outcome.PlayerWin, "harness fee-contest win");
+        yield return null; yield return null;
+        Check(Career.Data.doneContests.Contains(CareerDB.Leagues[2].contests[0].id),
+              "the fee contest is beaten (setup for the free-practice check)");
+        bm.BackToBuild(); yield return null; yield return null; yield return null;
+        sBefore = Career.Data.scrap;
+        bm.StartCareerFight(2, 0);
+        yield return null; yield return null;
+        fm = Object.FindFirstObjectByType<FightManager>();
+        Check(fm != null && Career.Data.scrap == sBefore,
+              "re-entering a beaten fee contest charges no entry fee");
+        if (fm != null) fm.End(FightManager.Outcome.PlayerLoss, "harness practice loss");
+        yield return null; yield return null;
+        Check(Career.Data.scrap == sBefore, "…and the practice loss pays nothing either");
+        bm.BackToBuild(); yield return null; yield return null; yield return null;
+        Check(Career.TxnSum() == Career.Data.scrap, "the ledger still audits after free practice");
 
         // scouting renders every roster bot on the turntable
         var seenOpp = new List<string>();

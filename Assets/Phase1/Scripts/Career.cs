@@ -15,7 +15,12 @@ public static class CareerDB
     // ---- reward math (doc section 5) ----
     public const float UNDERDOG_K = 0.6f;      // bonus slope vs value gap
     public const float UNDERDOG_CAP = 1.6f;    // never above 1.6x (owen, resolved)
-    public const float REENTRY_FRAC = 0.4f;    // re-entering a beaten contest
+    // REENTRY_FRAC (0.4) lived here until 2026-08-13 and is GONE, deliberately:
+    // owen's first-win rule (docs/Server_Economy_Design_2026-08-13.md §5) —
+    // a contest pays on the FIRST win only. Re-entering a beaten contest is a
+    // PRACTICE BOUT: no entry fee, no purse, no damage bonus, no consolation.
+    // This is what hard-caps the league economy at the purse-table ceiling
+    // once scrap is sellable; do not resurrect a repeatable payment here.
     // ---- THE HALVING, 2026-08-12 (owen). CareerBench's surviving verdicts
     // say the league is too easy at the top (CEILING L4 92%, STRETCH failing
     // L3/L4/L5 the same way) and owen has low confidence in tuning the AI
@@ -218,14 +223,18 @@ public static class CareerDB
         return total;
     }
 
-    /// <summary>Win settlement (doc section 5). buildValue/oppValue are the
-    /// robots' summed part prices; reEntry = contest already beaten.</summary>
+    /// <summary>Win settlement (doc section 5, amended by the first-win rule
+    /// 2026-08-13). buildValue/oppValue are the robots' summed part prices;
+    /// reEntry = contest already beaten, which now means PRACTICE: zero pay,
+    /// every component. The server's /v1/economy/claims mirrors this
+    /// arithmetic and is what actually pays once the wallet is server-side —
+    /// keep the two in step.</summary>
     public static int WinPay(Contest c, float dealt, int buildValue, int oppValue, bool reEntry, bool firstWin)
     {
+        if (reEntry) return 0;   // practice bout — the purse was won already
         float mult = 1f + UNDERDOG_K * Mathf.Clamp01((float)oppValue / Mathf.Max(1, buildValue) - 1f);
         mult = Mathf.Min(mult, UNDERDOG_CAP);
-        float purse = c.purse * (reEntry ? REENTRY_FRAC : 1f);
-        int pay = Mathf.RoundToInt(purse * mult + Mathf.Min(dealt, WIN_DMG_CAP) * WIN_DMG_K);
+        int pay = Mathf.RoundToInt(c.purse * mult + Mathf.Min(dealt, WIN_DMG_CAP) * WIN_DMG_K);
         if (firstWin) pay += FIRST_WIN_BONUS;
         return pay;
     }
@@ -870,8 +879,12 @@ public static class Career
         activeLeague = null; activeContest = null;
         if (c == null) return false;
         bool reEntry = Data.doneContests.Contains(c.id);
+        // The first-win rule (owen, 2026-08-13): a beaten contest is practice
+        // in BOTH directions — a re-entry win pays nothing (WinPay returns 0)
+        // and a re-entry loss pays no consolation either, or losing practice
+        // on purpose would out-earn winning it.
         int pay = win ? CareerDB.WinPay(c, dealt, fightBuildValue, fightOppValue, reEntry, !reEntry)
-                      : CareerDB.LossPay(dealt);
+                      : (reEntry ? 0 : CareerDB.LossPay(dealt));
         lastSettled = true; lastPay = pay; lastMedal = null;   // round-3: see the field comment
         Txn(pay, (win ? "win " : "loss ") + c.id);
         Data.fights++;
@@ -913,10 +926,13 @@ public static class Career
             lastMedal = AwardLeagueMedal(li);
         }
         if (Data.tutorialStep < 3) Data.tutorialStep = 3;
-        string tag = win ? (reEntry ? "re-entry win \u00b7 40% purse" : "contest win") : "loss consolation";
+        string tag = reEntry ? "practice bout \u2014 purse already won"
+                   : win     ? "contest win" : "loss consolation";
         if (fightAutonomous) tag += " \u00b7 autonomous";
         fightAutonomous = false;   // one fight, one mark \u2014 never carries over
-        lastResultLine = string.Format("+{0} scrap ({1}) \u00b7 career scrap {2}", pay, tag, Data.scrap);
+        lastResultLine = reEntry
+            ? string.Format("{0} \u00b7 career scrap {1}", tag, Data.scrap)
+            : string.Format("+{0} scrap ({1}) \u00b7 career scrap {2}", pay, tag, Data.scrap);
         Progression.lastRewardLine = lastResultLine;
         if (autosave) Save();
         return true;
