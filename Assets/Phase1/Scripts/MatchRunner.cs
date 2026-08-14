@@ -333,6 +333,25 @@ namespace RobotBrawl.Phase0
             RobotVisuals.Install(botA, true);
             RobotVisuals.Install(botB, false);
 
+            // LIVE MODE: someone is watching, so the chase camera rides along
+            // — the same FightCamera StartFight attaches, framing both robots
+            // from the side and cutting to the end overview at the bell
+            // (owen, first live fight on device: "the camera doesn't follow
+            // the robot and hence I cannot see the real fight"). Headless
+            // runs skip it: benches and the cloud referee have no eyes, and
+            // Teardown already destroys whatever camera rig exists.
+            if (liveHold && Camera.main != null)
+            {
+                var liveCam = Camera.main.GetComponent<FightCamera>();
+                if (liveCam == null) liveCam = Camera.main.gameObject.AddComponent<FightCamera>();
+                liveCam.a = botA.transform;
+                liveCam.b = botB.transform;
+                liveCam.sideDir = Vector3.Cross(Vector3.up, axisA).normalized;
+                liveCam.clampHalf = arenaHalf - 0.8f;
+                liveCam.overview = false;
+                liveCam.SnapNow();
+            }
+
             // Control routing. SpawnBot has already added the SensorBus, which
             // ProgramRunner.Init picks up — order matters and this is the right
             // side of it.
