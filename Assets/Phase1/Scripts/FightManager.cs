@@ -1187,8 +1187,7 @@ public class FightManager : MonoBehaviour
             string line1 = outcome == Outcome.PlayerWin
                 ? string.Format("PURSE {0}      BONUS {1}{2}",
                                 cPurse, cPay - cPurse < 0 ? "−" : "+", Mathf.Abs(cPay - cPurse))
-                : string.Format("PURSE {0} NOT WON      CONSOLATION +{1}",
-                                cPurse, cPay);
+                : string.Format("PURSE {0} NOT WON — the league pays wins only", cPurse);
             moneySmall.normal.textColor = new Color(0.72f, 0.74f, 0.80f);
             GUI.Label(new Rect(0, my, W, 26), line1, moneySmall);
             moneyStyle.normal.textColor = net >= 0 ? new Color(0.40f, 1f, 0.50f)

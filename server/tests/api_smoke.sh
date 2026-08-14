@@ -1384,30 +1384,19 @@ is "…but CLAMPED: 150×1.6 + 400×0.25 + 75 = 415, not what the client asked" 
 c=$(req POST /v1/economy/claims '{"kind":"purse","contestId":"L9C9","dealt":0,"mult":1}' "$EAUTH")
 expect "a contest the table does not know is a 404, not a payout" "$c" 404
 
-# --- the consolation bound (design doc register #6, default N=3) ---
-c=$(req POST /v1/economy/claims '{"kind":"consolation","contestId":"L1C1","dealt":0,"attemptId":"c-w1"}' "$EAUTH")
-expect "consolation on a WON contest is refused — practice pays nothing" "$c" 400
+# --- loss payments are GONE (owen 2026-08-13): the loss path pays zero ---
 c=$(req POST /v1/economy/claims '{"kind":"consolation","contestId":"L2C1","dealt":0,"attemptId":"c-a1"}' "$EAUTH")
-expect "a consolation pays on an unwon contest" "$c" 200
-is "…the floor, 40, at zero damage" "$(jget paid)" 40
-c=$(req POST /v1/economy/claims '{"kind":"consolation","contestId":"L2C1","dealt":0,"attemptId":"c-a2"}' "$EAUTH")
-expect "a second consolation pays" "$c" 200
-c=$(req POST /v1/economy/claims '{"kind":"consolation","contestId":"L2C1","dealt":0,"attemptId":"c-a3"}' "$EAUTH")
-expect "a third consolation pays" "$c" 200
-is "…and says none remain" "$(jget remaining)" 0
-c=$(req POST /v1/economy/claims '{"kind":"consolation","contestId":"L2C1","dealt":0,"attemptId":"c-a4"}' "$EAUTH")
-expect "the FOURTH is refused — the loss path is bounded" "$c" 400
-c=$(req POST /v1/economy/claims '{"kind":"consolation","contestId":"L2C1","dealt":0,"attemptId":"c-a3"}' "$EAUTH")
-expect "replaying a paid consolation attempt is refused" "$c" 409
+expect "the consolation kind no longer exists — losses pay nothing" "$c" 400
+is "…and the refusal names the only kind left" "$(jget error)" "kind must be purse"
 
 # --- a fee contest (as was) pays its purse like any other now ---
 c=$(req POST /v1/economy/claims '{"kind":"purse","contestId":"L3C1","dealt":0,"mult":1.0}' "$EAUTH")
 expect "L3C1's first win pays (350 + 75 = 425)" "$c" 200
 
-# Balance so far: 500 + 250 + 415 + 40×3 + 425 = 1710 — and nothing was
-# ever debited, because no fee exists to debit.
+# Balance so far: 500 + 250 + 415 + 425 = 1590 — wins only, nothing ever
+# debited (no fees exist) and nothing paid for losing.
 c=$(req GET /v1/wallet "" "$EAUTH")
-is "the running balance is exactly the ledger's story (1710, no debits)" "$(jget balance)" 1710
+is "the running balance is exactly the ledger's story (1590, wins only)" "$(jget balance)" 1590
 
 # --- the shop ---
 c=$(req POST /v1/economy/purchase '{"op":"buy","partId":"cube","mat":"ABS","idemKey":"p-1"}' "$EAUTH")
@@ -1417,10 +1406,10 @@ c=$(req POST /v1/economy/purchase '{"op":"buy","partId":"cube","mat":"ABS","idem
 expect "replaying the same purchase is refused, not double-charged" "$c" 409
 is "…and the inventory holds ONE cube, not two" \
    "$(dbq "SELECT count FROM inventory WHERE user_id='$ECON_UID' AND part_id='cube' AND mat='ABS';")" 1
-c=$(req POST /v1/economy/purchase '{"op":"buy","partId":"cube","mat":"Tungsten","idemKey":"p-2"}' "$EAUTH")
-expect "an expensive part buys while affordable (1601)" "$c" 200
+c=$(req POST /v1/economy/purchase '{"op":"buy","partId":"cube","mat":"Titanium","idemKey":"p-2"}' "$EAUTH")
+expect "an expensive part buys while affordable (187)" "$c" 200
 c=$(req POST /v1/economy/purchase '{"op":"buy","partId":"cube","mat":"Tungsten","idemKey":"p-3"}' "$EAUTH")
-expect "…and is refused once the wallet cannot cover it" "$c" 400
+expect "…and one beyond the wallet (1601 > 1396) is refused" "$c" 400
 c=$(req POST /v1/economy/purchase '{"op":"sell","partId":"cube","mat":"ABS","idemKey":"p-4"}' "$EAUTH")
 expect "a sale credits half back" "$c" 200
 is "…7 → 4 (round-half-to-even, same as the client)" "$(jget refunded)" 4
@@ -1433,7 +1422,7 @@ expect "a mat-pinned part refuses other materials (gusset is Steel)" "$c" 404
 is "…and the pinned row carries the flat price" \
    "$(dbq "SELECT price FROM part_prices WHERE part_id='gusset' AND mat='Steel';")" 200
 c=$(req GET /v1/wallet "" "$EAUTH")
-is "the wallet's inventory shows what is owned (cube/Tungsten ×1)" "$(jget inventory.0.partId)" "cube"
+is "the wallet's inventory shows what is owned (cube/Titanium ×1)" "$(jget inventory.0.partId)" "cube"
 
 # --- iap: reserved, never fake ---
 c=$(req POST /v1/iap/verify '{"transaction":"x"}' "$EAUTH")
@@ -1452,7 +1441,7 @@ guard_refused "a negative LEAGUE_PURSE is refused by the constraint, not by code
 guard_refused "a negative SHOP_SELL is refused the same way" \
    "INSERT INTO ledger (user_id, delta, reason, ref) VALUES ('$ECON_UID', -5, 'SHOP_SELL', 'cube:ABS') RETURNING id;"
 guard_refused "an overdrawing inventory decrement is refused by its CHECK" \
-   "UPDATE inventory SET count = count - 5 WHERE user_id='$ECON_UID' AND part_id='cube' AND mat='Tungsten' RETURNING count;"
+   "UPDATE inventory SET count = count - 5 WHERE user_id='$ECON_UID' AND part_id='cube' AND mat='Titanium' RETURNING count;"
 
 # --------------------------------------------------------------- section W
 # The claim's kind filter. A specialised worker must be able to ask only for

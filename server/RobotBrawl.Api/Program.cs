@@ -1547,14 +1547,11 @@ const double ECON_UNDERDOG_CAP = 1.6;   // Career.UNDERDOG_CAP
 const double ECON_WIN_DMG_K   = 0.25;   // Career.WIN_DMG_K
 const double ECON_WIN_DMG_CAP = 400;    // Career.WIN_DMG_CAP
 const int    ECON_FIRST_WIN_BONUS = 75; // Career.FIRST_WIN_BONUS
-const int    ECON_LOSS_BASE   = 40;     // Career.LOSS_BASE
-const double ECON_LOSS_DMG_K  = 0.3;    // Career.LOSS_DMG_K
-const double ECON_LOSS_DMG_CAP = 300;   // Career.LOSS_DMG_CAP
-const int    ECON_LOSS_MAX    = 150;    // Career.LOSS_MAX
-// DEFAULT pending owen's call (design doc register #6). Consolation exists to
-// soften early failure, not to be an income; without SOME bound the first-win
-// ceiling leaks through the loss path.
-const int    ECON_CONSOLATION_MAX = 3;
+// The ECON_LOSS_* constants and ECON_CONSOLATION_MAX lived here for a few
+// hours on 2026-08-13 and are GONE (owen: "remove loss payment in leagues" —
+// register #6 resolved by deletion). With fees also gone, a repeatable loss
+// payment was the league's last unbounded faucet. The league pays WINS ONLY,
+// once each; the whole exposure is the purse-table ceiling.
 
 app.MapPost("/v1/economy/claims", async (EconClaimReq req, ClaimsPrincipal user) =>
 {
@@ -1631,63 +1628,14 @@ app.MapPost("/v1/economy/claims", async (EconClaimReq req, ClaimsPrincipal user)
         return Results.Ok(new { kind = "purse", contest, paid = pay, firstWin = true });
     }
 
-    if (kind == "consolation")
-    {
-        if (string.IsNullOrWhiteSpace(req.AttemptId))
-            return Bad("an attemptId is required — without one a dropped response cannot be retried safely");
-        if (won) return Bad("this contest is already won — a practice bout pays nothing");
-
-        // The replay answer comes BEFORE the exhaustion answer, deliberately:
-        // an honest client retrying a dropped response must hear "already
-        // paid" (reconcilable), not "exhausted" (which reads as a lost
-        // payment). Found by the bench: the fourth attempt and a replay of
-        // the third used to get the same 400.
-        var idem = "lconsol:" + me + ":" + contest + ":" + req.AttemptId!.Trim();
-        await using (var dup = new NpgsqlCommand(
-            "SELECT EXISTS(SELECT 1 FROM ledger WHERE idem_key = $1);", c, tx))
-        {
-            dup.Parameters.AddWithValue(idem);
-            if ((bool)(await dup.ExecuteScalarAsync())!)
-                return Results.Conflict(new { error = "this consolation was already paid — the attemptId has been used" });
-        }
-
-        long used;
-        await using (var n = new NpgsqlCommand(
-            "SELECT COUNT(*) FROM ledger WHERE user_id=$1 AND reason='LEAGUE_CONSOLATION' AND ref=$2;", c, tx))
-        {
-            n.Parameters.AddWithValue(me); n.Parameters.AddWithValue(contest);
-            used = Convert.ToInt64(await n.ExecuteScalarAsync());
-        }
-        if (used >= ECON_CONSOLATION_MAX)
-            return Bad($"consolation for this contest is exhausted ({ECON_CONSOLATION_MAX} of {ECON_CONSOLATION_MAX}) — win it or walk away");
-
-        var dealt = Math.Clamp(double.IsFinite(req.Dealt) ? req.Dealt : 0.0, 0.0, ECON_LOSS_DMG_CAP);
-        int pay = Math.Min(ECON_LOSS_MAX, (int)Math.Round(ECON_LOSS_BASE + ECON_LOSS_DMG_K * dealt));
-
-        try
-        {
-            await using var ins = new NpgsqlCommand(
-                "INSERT INTO ledger (user_id, delta, reason, ref, idem_key) VALUES ($1,$2,'LEAGUE_CONSOLATION',$3,$4);", c, tx);
-            ins.Parameters.AddWithValue(me);
-            ins.Parameters.AddWithValue(pay);
-            ins.Parameters.AddWithValue(contest);
-            ins.Parameters.AddWithValue(idem);
-            await ins.ExecuteNonQueryAsync();
-            await tx.CommitAsync();
-        }
-        catch (PostgresException ex) when (ex.SqlState == "23505")
-        {
-            return Results.Conflict(new { error = "this consolation was already paid — the attemptId has been used" });
-        }
-        return Results.Ok(new { kind = "consolation", contest, paid = pay, remaining = ECON_CONSOLATION_MAX - used - 1 });
-    }
-
-    // The "entry" kind lived here for a few hours on 2026-08-13 and is GONE
-    // with the fees themselves (owen: "remove League's entry fee
-    // completely"; migration 012 dropped the column). LEAGUE_ENTRY stays a
-    // legal ledger reason — the ledger is append-only and history is not an
-    // error — but nothing can write another row of it.
-    return Bad("kind must be purse or consolation");
+    // The "consolation" and "entry" kinds each lived here for a few hours on
+    // 2026-08-13 and are GONE (owen, same day: "remove League's entry fee
+    // completely", then "remove loss payment in leagues" — with fees gone, a
+    // repeatable loss payment was the last unbounded faucet). Their ledger
+    // reasons stay legal — the ledger is append-only and history is not an
+    // error — but nothing can write another row of either. The league pays
+    // WINS ONLY, once each.
+    return Bad("kind must be purse");
 }).RequireAuthorization().RequireRateLimiting("economy");
 
 app.MapPost("/v1/economy/purchase", async (PurchaseReq req, ClaimsPrincipal user) =>

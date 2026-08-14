@@ -506,8 +506,7 @@ public class CareerBench : MonoBehaviour
                     float attempts = 1f / pr;
                     int ov = OppValue(c.oppId);
                     int win = CareerDB.WinPay(c, 150f, ov, ov, false, true);
-                    int loss = CareerDB.LossPay(150f);
-                    scrap += (attempts - 1f) * loss + win;   // fees gone (owen 2026-08-13)
+                    scrap += win;   // fees AND loss consolation gone (owen 2026-08-13): wins only
                     fights += Mathf.CeilToInt(attempts);
                     if (firstBuyFight < 0 && scrap >= 65f) firstBuyFight = fights;
                     if (scrap < 0f) stall = true;

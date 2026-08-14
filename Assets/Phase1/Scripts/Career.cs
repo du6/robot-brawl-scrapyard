@@ -35,10 +35,14 @@ public static class CareerDB
     public const int FIRST_WIN_BONUS = 75;     // one-time, per contest (was 150)
     public const float WIN_DMG_K = 0.25f;      // + min(dealt,400) * this on wins (was 0.5)
     public const float WIN_DMG_CAP = 400f;
-    public const int LOSS_BASE = 40;           // consolation floor
-    public const float LOSS_DMG_K = 0.3f;
-    public const float LOSS_DMG_CAP = 300f;
-    public const int LOSS_MAX = 150;
+    // LOSS CONSOLATION (LOSS_BASE/LOSS_DMG_K/LOSS_DMG_CAP/LOSS_MAX and
+    // LossPay) lived here until 2026-08-13 and is GONE (owen: "remove loss
+    // payment in leagues"). With entry fees also gone, a repeatable loss
+    // payment was the last unbounded faucet in the league: lose on purpose,
+    // collect 40-150, forever. The league now pays WINS ONLY, once each,
+    // and the entire league exposure is the win-path ceiling (13,850 per
+    // account — docs/Server_Economy_Design_2026-08-13.md §5). Do not
+    // resurrect a payment on the loss path.
 
     public class Contest
     {
@@ -243,8 +247,6 @@ public static class CareerDB
         return pay;
     }
 
-    public static int LossPay(float dealt)
-    { return Mathf.Min(LOSS_MAX, Mathf.RoundToInt(LOSS_BASE + LOSS_DMG_K * Mathf.Min(dealt, LOSS_DMG_CAP))); }
 }
 
 [System.Serializable] public class CareerItem { public string partId; public string mat; public int count; }
@@ -872,7 +874,7 @@ public static class Career
     }
 
     /// <summary>Settle a career contest fight (win purse with underdog
-    /// multiplier / re-entry 40% / first-win bonus, or loss consolation).
+    /// multiplier + first-win bonus; wins only — losses and practice pay 0).
     /// Returns false when no contest is live - exhibitions fall through to
     /// the sandbox settlement.</summary>
     public static bool SettleFight(bool win, float dealt)
@@ -883,12 +885,11 @@ public static class Career
         activeLeague = null; activeContest = null;
         if (c == null) return false;
         bool reEntry = Data.doneContests.Contains(c.id);
-        // The first-win rule (owen, 2026-08-13): a beaten contest is practice
-        // in BOTH directions — a re-entry win pays nothing (WinPay returns 0)
-        // and a re-entry loss pays no consolation either, or losing practice
-        // on purpose would out-earn winning it.
-        int pay = win ? CareerDB.WinPay(c, dealt, fightBuildValue, fightOppValue, reEntry, !reEntry)
-                      : (reEntry ? 0 : CareerDB.LossPay(dealt));
+        // The league pays WINS ONLY, once each (owen, 2026-08-13, both rules
+        // the same day): a re-entry win pays nothing (WinPay returns 0) and
+        // a LOSS pays nothing ever — consolation was the last unbounded
+        // faucet once fees were gone.
+        int pay = win ? CareerDB.WinPay(c, dealt, fightBuildValue, fightOppValue, reEntry, !reEntry) : 0;
         lastSettled = true; lastPay = pay; lastMedal = null;   // round-3: see the field comment
         Txn(pay, (win ? "win " : "loss ") + c.id);
         Data.fights++;
@@ -931,10 +932,10 @@ public static class Career
         }
         if (Data.tutorialStep < 3) Data.tutorialStep = 3;
         string tag = reEntry ? "practice bout \u2014 purse already won"
-                   : win     ? "contest win" : "loss consolation";
+                   : win     ? "contest win" : "loss \u2014 the league pays wins only";
         if (fightAutonomous) tag += " \u00b7 autonomous";
         fightAutonomous = false;   // one fight, one mark \u2014 never carries over
-        lastResultLine = reEntry
+        lastResultLine = (reEntry || !win)
             ? string.Format("{0} \u00b7 career scrap {1}", tag, Data.scrap)
             : string.Format("+{0} scrap ({1}) \u00b7 career scrap {2}", pay, tag, Data.scrap);
         Progression.lastRewardLine = lastResultLine;

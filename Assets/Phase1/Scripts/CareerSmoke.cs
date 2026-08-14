@@ -315,16 +315,19 @@ public class CareerSmoke : MonoBehaviour
               "a re-entry LOSS pays no consolation — or losing practice would out-earn winning it");
         bm.BackToBuild(); yield return null; yield return null; yield return null;
 
-        // loss pays the consolation formula
+        // LOSSES PAY NOTHING (owen, 2026-08-13: consolation removed — the
+        // last unbounded faucet once fees were gone). The league pays wins
+        // only, and a loss leaves the contest unbeaten so its purse remains.
         sBefore = Career.Data.scrap;
         bm.StartCareerFight(0, 1);
         yield return null; yield return null;
         fm = Object.FindFirstObjectByType<FightManager>();
-        float d2 = fm != null ? fm.player.dealt : 0f;
         if (fm != null) fm.End(FightManager.Outcome.PlayerLoss, "harness loss");
         yield return null; yield return null;
-        Check(Career.Data.scrap == sBefore + CareerDB.LossPay(d2) && !Career.Data.doneContests.Contains("L1C2"),
-              "loss pays consolation; the contest stays unbeaten");
+        Check(Career.Data.scrap == sBefore && !Career.Data.doneContests.Contains("L1C2"),
+              "a loss pays NOTHING and the contest stays unbeaten (its purse remains winnable)");
+        Check(Career.lastResultLine != null && Career.lastResultLine.Contains("wins only"),
+              "…and the result line says the league pays wins only");
         bm.BackToBuild(); yield return null; yield return null; yield return null;
 
         // ENTRY FEES ARE GONE (owen, 2026-08-13). The old checks here proved
