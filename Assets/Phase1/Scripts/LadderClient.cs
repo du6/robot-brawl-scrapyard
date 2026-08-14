@@ -618,9 +618,52 @@ namespace RobotBrawl.Phase0
             }
         }
 
-        /// <summary>Sign out. Clears the token; there is no server call
-        /// because the JWT is stateless — it simply stops being sent.</summary>
-        public static void Logout() { Token = ""; }
+        // ---- session persistence (client B, docs/Server_Economy_Design_2026-08-13.md) ----
+        // The login GATE calls SaveSession after a human signs in; nothing
+        // else does, ON PURPOSE: LadderClient.Auth itself must not persist,
+        // or every BENCH login (EnlistLiveBench, ReturningPlayerBench) would
+        // write a bench account's token into the editor's PlayerPrefs and the
+        // next human play session would silently restore it. PlayerPrefs
+        // (NSUserDefaults on iOS) is the prototype store; moving the token to
+        // the Keychain is a named pre-launch hardening item, not a surprise.
+        const string PREF_TOK = "rb_session_token";
+        const string PREF_NAME = "rb_session_name";
+
+        /// <summary>Persist the CURRENT session (call only from the login
+        /// gate, after a human signed in).</summary>
+        public static void SaveSession(string displayName)
+        {
+            if (string.IsNullOrEmpty(Token)) return;
+            PlayerPrefs.SetString(PREF_TOK, Token);
+            PlayerPrefs.SetString(PREF_NAME, displayName ?? "");
+            PlayerPrefs.Save();
+        }
+
+        /// <summary>Restore a persisted session at boot. True when a token
+        /// was found — the gate skips itself and the career plays offline,
+        /// which is the whole point of persisting. The token may have
+        /// expired server-side; that surfaces as a 401 on the first online
+        /// call, which signs the player out rather than failing silently.</summary>
+        public static bool RestoreSession(out string displayName)
+        {
+            displayName = PlayerPrefs.GetString(PREF_NAME, "");
+            var tok = PlayerPrefs.GetString(PREF_TOK, "");
+            if (string.IsNullOrEmpty(tok)) return false;
+            Token = tok;
+            return true;
+        }
+
+        static void ClearSession()
+        {
+            PlayerPrefs.DeleteKey(PREF_TOK);
+            PlayerPrefs.DeleteKey(PREF_NAME);
+            PlayerPrefs.Save();
+        }
+
+        /// <summary>Sign out. Clears the token AND the persisted session —
+        /// a sign-out that survives a restart is not a sign-out. No server
+        /// call: the JWT is stateless, it simply stops being sent.</summary>
+        public static void Logout() { Token = ""; ClearSession(); }
 
         public static bool SignedIn { get { return !string.IsNullOrEmpty(Token); } }
 
