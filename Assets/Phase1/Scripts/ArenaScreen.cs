@@ -47,6 +47,9 @@ namespace RobotBrawl.Phase0
         bool busy;
         List<LadderEntry> board = new List<LadderEntry>();
         List<InboxEntry> inbox = new List<InboxEntry>();
+        /// <summary>Match ids already seen settled — the "kick the wallet
+        /// sync exactly once per settlement" memory.</summary>
+        readonly HashSet<string> settledSeen = new HashSet<string>();
         Vector2 scroll, inboxScroll;
         ReplayPlayer player;
         bool showInbox;
@@ -141,6 +144,20 @@ namespace RobotBrawl.Phase0
                 yield return LadderClient.Inbox((rows, err) => { if (err == null) inbox = rows; });
                 yield return LadderClient.MyRobots((rows, err) => { if (err == null) mine = rows; });
                 yield return LadderClient.Wallet((b, err) => { if (err == null) balance = b; });
+
+                // A NEWLY SETTLED fight means the ledger moved (stake back,
+                // purse in) — so the LOCAL wallet must re-sync or the player
+                // stares at winnings that exist server-side and nowhere on
+                // screen. Found by owen on the first real-device session,
+                // 2026-08-14: won in the arena, "didn't receive any scrap" —
+                // the sync kicked only at boot and after purchases, so the
+                // purse was invisible until the next app launch. Keyed on
+                // match ids seen settled, so a quiet refresh kicks nothing.
+                bool newlySettled = false;
+                foreach (var e in inbox)
+                    if (e.outcome != null && e.outcome.Length > 0 && settledSeen.Add(e.matchId))
+                        newlySettled = true;
+                if (newlySettled) EconomySync.Kick();
             }
             busy = false;
         }
