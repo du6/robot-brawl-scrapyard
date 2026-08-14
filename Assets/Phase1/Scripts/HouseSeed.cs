@@ -32,7 +32,18 @@ namespace RobotBrawl.Phase0
         public static bool allowProduction;
 
         const string EMAIL = "house@robotbrawl-ladder.com";
+        /// <summary>DEAD ON PRODUCTION — rotated via the operator reset the
+        /// moment seeding finished (2026-08-14), precisely because it is
+        /// committed here. Runs against production must set passwordOverride
+        /// from .house_account.local (gitignored) first.</summary>
         const string PASS  = "house-of-the-yard-2026";
+        public static string passwordOverride;
+        static string Pass { get { return string.IsNullOrEmpty(passwordOverride) ? PASS : passwordOverride; } }
+
+        /// <summary>Skip the by-name idempotency check and re-enlist anyway —
+        /// harmless by the server's replace-by-name rule, and how a worker
+        /// latency probe manufactures real validate jobs on demand.</summary>
+        public static bool forceReenlist;
 
         // Two names per class, HOUSE-prefixed so nobody mistakes the house
         // for a person.
@@ -129,11 +140,11 @@ namespace RobotBrawl.Phase0
             // House account: login first (idempotent), register on a miss.
             string savedToken = LadderClient.Token;
             string err = null;
-            yield return LadderClient.Login(EMAIL, PASS, (who, e) => err = e);
+            yield return LadderClient.Login(EMAIL, Pass, (who, e) => err = e);
             if (!string.IsNullOrEmpty(err))
             {
                 err = null;
-                yield return LadderClient.Register(EMAIL, PASS, "The Yard", (who, e) => err = e);
+                yield return LadderClient.Register(EMAIL, Pass, "The Yard", (who, e) => err = e);
                 if (!string.IsNullOrEmpty(err))
                 { say("FAIL: house register: " + err); LadderClient.Token = savedToken; Finish(log); yield break; }
                 say("house account created (The Yard)");
@@ -152,7 +163,7 @@ namespace RobotBrawl.Phase0
                 for (int v = 0; v < 2; v++)
                 {
                     string name = NAMES[c, v];
-                    if (have.Contains(name)) { say(cat + ": '" + name + "' already on the board"); present++; continue; }
+                    if (!forceReenlist && have.Contains(name)) { say(cat + ": '" + name + "' already on the board"); present++; continue; }
                     if (!chosen.ContainsKey(cat) || chosen[cat].Count <= v)
                     { say("FAIL " + cat + ": no material mix reaches this class"); failed++; continue; }
                     var mix = chosen[cat][v];

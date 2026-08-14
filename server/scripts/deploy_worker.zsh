@@ -6,6 +6,12 @@
 #
 # Idempotent: re-running updates the job and the schedule in place.
 #
+# ⚠ SUPERSEDED AS THE PRIMARY WORKER, 2026-08-14. Owen raised the budget and
+# the ladder now runs on an ALWAYS-ON Cloud Run worker pool — see
+# deploy_worker_live.zsh, which reuses this script's image. This job and its
+# scheduler tick remain deployed as the FALLBACK (the tick is paused; resume
+# it to fall back). The cost reasoning below was true when written.
+#
 # ---------------------------------------------------------------------------
 # WHY A CLOUD RUN *JOB* AND NOT A SERVICE, since that is the first question.
 #
