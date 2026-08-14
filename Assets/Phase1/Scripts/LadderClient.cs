@@ -665,6 +665,48 @@ namespace RobotBrawl.Phase0
         /// call: the JWT is stateless, it simply stops being sent.</summary>
         public static void Logout() { Token = ""; ClearSession(); }
 
+        // ---- economy (client B, docs/Server_Economy_Design_2026-08-13.md) ----
+
+        /// <summary>done(balance, err). The server's wallet balance — the
+        /// number the career ADOPTS on sync, because the wallet is
+        /// server-truth and the local save is a cache.</summary>
+        public static IEnumerator GetWallet(Action<long, string> done)
+        {
+            using (var req = UnityWebRequest.Get(BaseUrl + "/v1/wallet"))
+            {
+                if (!string.IsNullOrEmpty(Token)) req.SetRequestHeader("Authorization", "Bearer " + Token);
+                yield return req.SendWebRequest();
+                string text = req.downloadHandler != null ? req.downloadHandler.text : "";
+                if (req.result != UnityWebRequest.Result.Success)
+                { done(0, RobotWorker.Field(text, "error") ?? req.error); yield break; }
+                long bal;
+                if (!long.TryParse(RobotWorker.Field(text, "balance") ?? "", out bal))
+                { done(0, "the wallet answered without a balance"); yield break; }
+                done(bal, null);
+            }
+        }
+
+        /// <summary>Post a first-win purse claim. done(paid, alreadyPaid, err):
+        /// a 200 pays, a 409 means the server already paid this contest —
+        /// which is SUCCESS for the flusher (the claim is settled either
+        /// way); anything else is a real error and the claim stays queued.</summary>
+        public static IEnumerator ClaimPurse(CareerClaim cl, Action<int, bool, string> done)
+        {
+            string body = "{\"kind\":\"purse\",\"contestId\":" + RobotWorker.Str(cl.contestId)
+                        + ",\"dealt\":" + cl.dealt.ToString(System.Globalization.CultureInfo.InvariantCulture)
+                        + ",\"mult\":" + cl.mult.ToString(System.Globalization.CultureInfo.InvariantCulture) + "}";
+            using (var req = PostJson("/v1/economy/claims", body))
+            {
+                yield return req.SendWebRequest();
+                string text = req.downloadHandler != null ? req.downloadHandler.text : "";
+                if (req.responseCode == 409) { done(0, true, null); yield break; }
+                if (req.result != UnityWebRequest.Result.Success)
+                { done(0, false, RobotWorker.Field(text, "error") ?? req.error); yield break; }
+                int paid; int.TryParse(RobotWorker.Field(text, "paid") ?? "0", out paid);
+                done(paid, false, null);
+            }
+        }
+
         public static bool SignedIn { get { return !string.IsNullOrEmpty(Token); } }
 
         /// <summary>§2.3's one-way valve: ladder scrap into the career wallet.

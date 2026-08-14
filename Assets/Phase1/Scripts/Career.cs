@@ -293,6 +293,15 @@ public static class CareerDB
 }
 [System.Serializable] public class CareerTxn { public string when; public int delta; public string cause; }
 
+/// <summary>Client B (docs/Server_Economy_Design_2026-08-13.md): a first-win
+/// purse the SERVER has not paid yet. Queued at settle when signed in,
+/// flushed by EconomySync when online; the attempt id makes the flush
+/// retry-safe (the server answers a replay 409 and the claim is dropped
+/// either way). JsonUtility hands every older save an empty list, which IS
+/// the migration (the medals precedent).</summary>
+[System.Serializable] public class CareerClaim
+{ public string contestId; public float dealt; public float mult; public string attempt; }
+
 [System.Serializable] public class CareerData
 {
     public int scrap;
@@ -307,6 +316,10 @@ public static class CareerDB
     /// the migration (the medals precedent).</summary>
     public List<string> autoDoneContests = new List<string>();
     public List<CareerTxn> txns = new List<CareerTxn>();
+    /// <summary>Client B: purse claims the server has not confirmed yet.
+    /// Empty on every signed-out career by construction — SettleFight only
+    /// enqueues when a session exists.</summary>
+    public List<CareerClaim> pendingClaims = new List<CareerClaim>();
     /// <summary>Medals (2026-08-02). Empty on every pre-existing save by
     /// construction - see CareerMedal.</summary>
     public List<CareerMedal> medals = new List<CareerMedal>();
@@ -900,6 +913,23 @@ public static class Career
         {
             Data.fightWins++;
             if (!reEntry) Data.doneContests.Add(c.id);
+            // Client B: a signed-in first win is also a SERVER claim — queued
+            // here, flushed by EconomySync when online. The mult is computed
+            // exactly as WinPay computed it, because the server recomputes
+            // and clamps the same formula and ITS number is the one that
+            // stands (server wins). Signed-out careers (benches, the editor
+            // dev door) never enqueue, so their saves never carry claims.
+            if (!reEntry && LadderClient.SignedIn)
+            {
+                float cm = 1f + CareerDB.UNDERDOG_K *
+                    Mathf.Clamp01((float)fightOppValue / Mathf.Max(1, fightBuildValue) - 1f);
+                Data.pendingClaims.Add(new CareerClaim
+                {
+                    contestId = c.id, dealt = dealt,
+                    mult = Mathf.Min(cm, CareerDB.UNDERDOG_CAP),
+                    attempt = System.Guid.NewGuid().ToString("N"),
+                });
+            }
             // P4: the autonomy mark — "ever won this contest with the
             // autopilot driving". Deliberately includes re-entry wins: the
             // mark records the FEAT, not the first-win purse.

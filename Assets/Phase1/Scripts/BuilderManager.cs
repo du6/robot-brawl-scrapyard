@@ -7271,6 +7271,10 @@ public class ModeSelect : MonoBehaviour
         Career.Load();
         MobileBuilderUI.forceMobileUI = touch;
         new GameObject("BuilderManager").AddComponent<BuilderManager>();
+        // Client B: signed in, the wallet syncs right after boot — queued
+        // claims flush and the server balance is adopted. Signed out
+        // (benches, dev door) this is a no-op by its own guard.
+        RobotBrawl.Phase0.EconomySync.Kick();
     }
 
     void OnGUI()
