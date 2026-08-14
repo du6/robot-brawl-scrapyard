@@ -2671,6 +2671,16 @@ public class MobileBuilderUI : MonoBehaviour
                 }
                 arenaScreen.ShowInbox = true; arenaScreen.ShowEnlistPanel = false;
                 arenaScreen.CloseCard(); arenaInboxStamp = "";
+                // RE-ASK THE SERVER. Opening MY FIGHTS rendered the CACHED
+                // inbox — fetched when the ARENA tab loaded — so a fight
+                // challenged and settled SINCE then simply was not in the
+                // list. Owen hit it on the first real-device session
+                // (2026-08-14): challenged HOUSE Girder, won twice, and MY
+                // FIGHTS showed neither match. The quick-flick-stays-quiet
+                // rule is right for the BOARD; the moment a player opens
+                // MY FIGHTS they are asking "what happened", and a cached
+                // answer to that question is a wrong answer.
+                arenaScreen.RefreshNow();
             });
         arenaSecAccount = MkButton("arenasec_account", secRow.transform, "ENLIST", 14,
             () => { if (arenaScreen != null) { arenaScreen.ShowEnlistPanel = true; arenaScreen.ShowInbox = false; arenaScreen.CloseCard(); arenaAccountStamp = ""; } });
@@ -3409,6 +3419,9 @@ public class MobileBuilderUI : MonoBehaviour
         }
         if (onInbox)
         {
+            // A pending fight re-asks the server every 10s (throttled inside)
+            // so a settled match appears without the player doing anything.
+            arenaScreen.PollPendingFights();
             RefreshArenaInbox();
             if (arenaStatus != null)
             {

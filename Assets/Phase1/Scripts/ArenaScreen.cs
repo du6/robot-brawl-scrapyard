@@ -477,6 +477,27 @@ namespace RobotBrawl.Phase0
         }
 
         public void RefreshNow() { if (!busy) StartCoroutine(Refresh()); }
+
+        /// <summary>Poll while a fight is in flight. A challenge takes ~5s to
+        /// be claimed and minutes to SIMULATE, and until now the only way to
+        /// learn it finished was to re-open MY FIGHTS by hand — owen, first
+        /// device session: "latency is too high", where most of the felt
+        /// latency was a done fight nobody re-asked about. While any inbox
+        /// entry is PENDING and the inbox is showing, re-ask every 10s; goes
+        /// quiet the moment nothing is pending. Driven from the dock's
+        /// per-frame hook, throttled here, so it needs no coroutine owner.</summary>
+        float nextPollAt;
+        public void PollPendingFights()
+        {
+            if (busy || !showInbox || Time.unscaledTime < nextPollAt) return;
+            bool anyPending = false;
+            foreach (var e in inbox)
+                if (e.outcome == null || e.outcome.Length == 0 || e.outcome == "PENDING")
+                { anyPending = true; break; }
+            if (!anyPending) return;
+            nextPollAt = Time.unscaledTime + 10f;
+            StartCoroutine(Refresh());
+        }
         public void ScoutNow(LadderEntry e) { if (!busy) StartCoroutine(Scout(e)); }
 
         /// <summary>Start a replay. RETURNS WHETHER IT STARTED, and the caller
