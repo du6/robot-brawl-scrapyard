@@ -156,7 +156,13 @@ public class LoginGate : MonoBehaviour
 
         title = Label("title", card.transform, "ROBOT BRAWL", 26, TextAnchor.MiddleCenter);
         title.fontStyle = FontStyle.Bold;
-        Label("sub", card.transform, "Sign in to build, fight and earn — your scrap and parts live on your account.", 13, TextAnchor.MiddleCenter);
+        // FOUND ON THE FIRST DEVICE BUILD (2026-08-13, iPhone 17 Pro AND iPad
+        // Pro 11 sims): this sentence wraps at both widths and the one-line
+        // label CLIPPED its last word — players read "your scrap and parts
+        // live on your". Two lines of height, measured against the shots in
+        // docs/shots/uxval/.
+        var sub = Label("sub", card.transform, "Sign in to build, fight and earn — your scrap and parts live on your account.", 13, TextAnchor.MiddleCenter);
+        sub.gameObject.GetComponent<LayoutElement>().minHeight = 44f;
 
         email       = Input("email", card.transform, "email", InputField.ContentType.EmailAddress);
         password    = Input("password", card.transform, "password (10+ characters)", InputField.ContentType.Password);
