@@ -302,6 +302,14 @@ public static class CareerDB
 [System.Serializable] public class CareerClaim
 { public string contestId; public float dealt; public float mult; public string attempt; }
 
+/// <summary>Client B: a shop purchase the server has not confirmed yet.
+/// Applied optimistically at the till, flushed by EconomySync; a refusal
+/// REVERSES the local purchase (compensation), so local inventory can never
+/// drift from what the server actually charged. Same additive-list
+/// migration as everything else.</summary>
+[System.Serializable] public class CareerPurchase
+{ public string op; public string partId; public string mat; public string idemKey; }
+
 [System.Serializable] public class CareerData
 {
     public int scrap;
@@ -320,6 +328,9 @@ public static class CareerDB
     /// Empty on every signed-out career by construction — SettleFight only
     /// enqueues when a session exists.</summary>
     public List<CareerClaim> pendingClaims = new List<CareerClaim>();
+    /// <summary>Client B: shop purchases the server has not confirmed yet.
+    /// Empty on every signed-out career by construction.</summary>
+    public List<CareerPurchase> pendingPurchases = new List<CareerPurchase>();
     /// <summary>Medals (2026-08-02). Empty on every pre-existing save by
     /// construction - see CareerMedal.</summary>
     public List<CareerMedal> medals = new List<CareerMedal>();
@@ -630,15 +641,40 @@ public static class Career
     /// SettleFight reads it to stamp the autonomy mark.</summary>
     public static bool fightAutonomous;
 
+    /// <summary>Client B: signed in, the shop needs the server (owen's
+    /// offline-shop decision \u2014 browse, no buying). "Online" means this
+    /// session has reached the wallet at least once; a purchase then applies
+    /// OPTIMISTICALLY and queues for the flusher, which reverses it if the
+    /// server refuses. Signed out (benches, dev door, a career that never
+    /// signed in) the shop is pure local, exactly as it always was.</summary>
+    static bool ShopOffline(out string msg)
+    {
+        msg = null;
+        if (!LadderClient.SignedIn) return false;
+        if (EconomySync.SessionOnline) return false;
+        msg = "OFFLINE \u2014 buying needs a connection. Your parts and scrap are safe.";
+        return true;
+    }
+
+    static void QueuePurchase(string op, string partId, string mat)
+    {
+        if (!LadderClient.SignedIn) return;
+        Data.pendingPurchases.Add(new CareerPurchase
+        { op = op, partId = partId, mat = mat, idemKey = System.Guid.NewGuid().ToString("N") });
+        EconomySync.Kick();
+    }
+
     public static bool TryBuy(string partId, string mat)
     {
         shopMsg = "";
         if (partId == "core") { shopMsg = "The core is not for sale."; return false; }
+        string off; if (ShopOffline(out off)) { shopMsg = off; return false; }
         int price = CareerDB.PartPrice(partId, mat);
         if (Data.scrap < price)
         { shopMsg = "Not enough scrap \u2014 " + price + " needed, " + Data.scrap + " held."; return false; }
         AddItem(partId, mat, 1);
         Txn(-price, "buy " + partId + " " + mat);
+        QueuePurchase("buy", partId, mat);
         if (autosave) Save();
         return true;
     }
@@ -647,10 +683,30 @@ public static class Career
     {
         shopMsg = "";
         if (partId == "core") { shopMsg = "The core cannot be sold."; return false; }
+        string off; if (ShopOffline(out off)) { shopMsg = off; return false; }
         if (!TryConsume(partId, mat, 1)) { shopMsg = "None owned to sell."; return false; }
         Txn(CareerDB.SellPrice(partId, mat), "sell " + partId + " " + mat);
+        QueuePurchase("sell", partId, mat);
         if (autosave) Save();
         return true;
+    }
+
+    /// <summary>Compensation (EconomySync): the server REFUSED a purchase the
+    /// till applied optimistically \u2014 undo it and say so. This is what keeps
+    /// local inventory from drifting from what the server actually charged.</summary>
+    public static void ReversePurchase(CareerPurchase p, string why)
+    {
+        if (p.op == "buy")
+        {
+            TryConsume(p.partId, p.mat, 1);
+            Txn(CareerDB.PartPrice(p.partId, p.mat), "buy reversed (" + why + ") " + p.partId);
+        }
+        else
+        {
+            AddItem(p.partId, p.mat, 1);
+            Txn(-CareerDB.SellPrice(p.partId, p.mat), "sell reversed (" + why + ") " + p.partId);
+        }
+        shopMsg = "The shop could not complete a " + p.op + " \u2014 " + why;
     }
 
     // SwapCost / TrySwap ("REWORK") lived here and are gone (owen, 2026-08-05:

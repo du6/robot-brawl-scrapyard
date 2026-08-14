@@ -28,8 +28,13 @@ public class EconomySync : MonoBehaviour
 
     /// <summary>Bench-readable outcome of the last sync.</summary>
     public static string lastResult = "";
-    public static int lastFlushed, lastSettled;
+    public static int lastFlushed, lastSettled, lastReversed;
     public static long lastServerBalance = -1;
+
+    /// <summary>Has THIS session reached the wallet at least once? The shop's
+    /// signed-in gate (owen's offline decision) reads this: browse always,
+    /// buy only when the server has answered us this session.</summary>
+    public static bool SessionOnline { get { return lastServerBalance >= 0; } }
 
     /// <summary>Fire a sync if signed in and none is running. Called after
     /// the login gate boots the career; safe to call from anywhere.</summary>
@@ -45,7 +50,7 @@ public class EconomySync : MonoBehaviour
 
     IEnumerator Sync()
     {
-        lastFlushed = 0; lastSettled = 0; lastResult = "";
+        lastFlushed = 0; lastSettled = 0; lastReversed = 0; lastResult = "";
         // Flush oldest-first; stop on the first real error so order is kept
         // and nothing is skipped past a transient failure.
         while (Career.Data.pendingClaims.Count > 0)
@@ -57,6 +62,20 @@ public class EconomySync : MonoBehaviour
             Career.Data.pendingClaims.RemoveAt(0);
             lastSettled++;
             if (!already) lastFlushed++;
+        }
+
+        // Purchases after claims (money in before money out), oldest-first.
+        // A refusal COMPENSATES — the till's optimistic apply is reversed —
+        // and the purchase is dropped; a transient error keeps it queued.
+        while (Career.Data.pendingPurchases.Count > 0)
+        {
+            var p = Career.Data.pendingPurchases[0];
+            bool settled = false; string refused = null, perr = null;
+            yield return LadderClient.Purchase(p, (s, r, e) => { settled = s; refused = r; perr = e; });
+            if (perr != null) { lastResult = "purchase " + p.partId + ": " + perr; break; }
+            Career.Data.pendingPurchases.RemoveAt(0);
+            if (settled) { lastSettled++; }
+            else { Career.ReversePurchase(p, refused); lastReversed++; }
         }
 
         long bal = -1; string werr = null;

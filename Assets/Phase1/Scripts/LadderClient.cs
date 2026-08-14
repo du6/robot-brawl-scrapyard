@@ -707,6 +707,27 @@ namespace RobotBrawl.Phase0
             }
         }
 
+        /// <summary>Post a shop purchase. done(settled, refused, err): 200 and
+        /// 409 (replay) are both SETTLED; a 400/404 is a REFUSAL the caller
+        /// must compensate for; anything else (network) is a transient error
+        /// and the purchase stays queued.</summary>
+        public static IEnumerator Purchase(CareerPurchase p, Action<bool, string, string> done)
+        {
+            string body = "{\"op\":" + RobotWorker.Str(p.op)
+                        + ",\"partId\":" + RobotWorker.Str(p.partId)
+                        + ",\"mat\":" + RobotWorker.Str(p.mat)
+                        + ",\"idemKey\":" + RobotWorker.Str(p.idemKey) + "}";
+            using (var req = PostJson("/v1/economy/purchase", body))
+            {
+                yield return req.SendWebRequest();
+                string text = req.downloadHandler != null ? req.downloadHandler.text : "";
+                if (req.responseCode == 200 || req.responseCode == 409) { done(true, null, null); yield break; }
+                if (req.responseCode == 400 || req.responseCode == 404)
+                { done(false, RobotWorker.Field(text, "error") ?? ("HTTP " + req.responseCode), null); yield break; }
+                done(false, null, RobotWorker.Field(text, "error") ?? req.error);
+            }
+        }
+
         public static bool SignedIn { get { return !string.IsNullOrEmpty(Token); } }
 
         /// <summary>§2.3's one-way valve: ladder scrap into the career wallet.
