@@ -397,17 +397,58 @@ namespace RobotBrawl.Phase0
         IEnumerator DoChallenge(MyRobot m, ScoutCard c)
         {
             busy = true; Say("challenging " + c.robotName + "…", SC_CARD);
-            yield return LadderClient.Challenge(m.activeSnapshotId, c.snapshotId, (matchId, stake, err) =>
+            string liveId = null; int[] liveSeeds = null;
+            yield return LadderClient.Challenge(m.activeSnapshotId, c.snapshotId, (matchId, stake, seeds, err) =>
             {
                 // The API's own words. It distinguishes punching down, an
                 // empty wallet and a spent daily ticket, and a client that
                 // flattens those into "failed" throws that away.
                 Say(err != null ? err
-                    : "challenge accepted — " + stake + " scrap staked, match queued", SC_CARD);
-                if (err == null) { pending = false; card = null; }
+                    : "challenge accepted — " + stake + " scrap staked", SC_CARD);
+                if (err == null) { pending = false; card = null; liveId = matchId; liveSeeds = seeds; }
             });
             yield return LadderClient.Wallet((b, e) => { if (e == null) balance = b; });
             busy = false;
+            // THE FIGHT PLAYS HERE (owen, 2026-08-14): same seed the cloud
+            // referee uses, so this is the same fight — the referee's verdict
+            // settles rating and purse either way, and an honest client shows
+            // the same ending it later confirms.
+            if (liveId != null && liveSeeds != null && liveSeeds.Length > 0)
+                yield return LiveFight(liveId, liveSeeds);
+        }
+
+        /// <summary>Play the challenge live with the league fight UI. Every
+        /// failure downgrades to the old behaviour — the match is already
+        /// queued server-side, so a client that cannot show the fight has
+        /// lost nothing but the spectacle.</summary>
+        IEnumerator LiveFight(string matchId, int[] seeds)
+        {
+            busy = true; Say("loading the match…", SC_CARD);
+            SnapshotEnvelope ch = null, df = null; string ferr = null;
+            yield return LadderClient.MatchEnvelopes(matchId, (a, b, e) => { ch = a; df = b; ferr = e; });
+            busy = false;
+            if (ferr != null)
+            { Say("the fight runs in the cloud — " + ferr, SC_INBOX); yield break; }
+
+            // The WATCH discipline: dock closed before the arena is used,
+            // and every exit reopens it (RestoreDock below is unconditional).
+            if (MobileBuilderUI.inst != null) MobileBuilderUI.inst.SetDockOpen(false);
+            bool done = false; MatchRunner.MatchResult res = null;
+            var mr = MatchRunner.Run(ch, df, seeds, matchId, 1f, false,
+                                     r => { res = r; done = true; });
+            mr.liveHold = true;
+            while (!done) yield return null;
+
+            RestoreDock();
+            showInbox = true; showEnlist = false;
+            Say(res == null || !string.IsNullOrEmpty(res.error)
+                    ? "the fight could not run here — the cloud referee will settle it"
+                : res.aWins > res.bWins
+                    ? "VICTORY — the referee is confirming; the purse is on its way"
+                : res.bWins > res.aWins
+                    ? "defeat — the stake goes when the referee confirms"
+                    : "a draw — the stake comes back when the referee confirms", SC_INBOX);
+            RefreshNow();
         }
 
         // The first screenshot of this screen was taken at 2532x1170 and the

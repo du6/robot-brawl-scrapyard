@@ -85,6 +85,12 @@ namespace RobotBrawl.Phase0
         public int[] seeds = { 1, 2, 3 };
         public float speed = 10f;
         public bool record = true;
+
+        /// <summary>LIVE mode (owen, 2026-08-14): a player is watching this
+        /// fight on their own screen. The results page holds until dismissed,
+        /// and FightManager gets its arenaLive manners. Set on the instance
+        /// Run() returns, before the first frame runs it.</summary>
+        public bool liveHold;
         public bool stopWhenDecided = true;
         public float arenaHalf = 7f;
         public float wallClockCapPerBout = 90f;
@@ -333,6 +339,7 @@ namespace RobotBrawl.Phase0
             var fgo = new GameObject("match_fight_manager");
             var fm = fgo.AddComponent<FightManager>();
             fm.enemyName = NameOf(pb, "B");
+            fm.arenaLive = liveHold;   // live mode: the results page signals, we tear down
 
             AIController aiB = null;
             fm.playerSource = Arm(botA, dA, progA, null) ? ControlSource.Program : ControlSource.AI;
@@ -403,6 +410,17 @@ namespace RobotBrawl.Phase0
                 rec.Verdict(bout.winner, bout.cause);
                 bout.replayPath = rec.Finish(ReplayRecorder.PathFor(matchId, bout.bout)) ?? "";
                 Destroy(rec);
+            }
+
+            // LIVE MODE (owen, 2026-08-14): a spectator is watching, so the
+            // results page stays up until they dismiss it. Without this the
+            // runner tears the arena down the same frame the fight ends and
+            // VICTORY is a subliminal cut. Timescale drops to 1 first so the
+            // page is not held at bench speed.
+            if (liveHold && fm != null)
+            {
+                Time.timeScale = 1f;
+                while (fm != null && !fm.resultsDismissed) yield return null;
             }
 
             Time.timeScale = 1f;

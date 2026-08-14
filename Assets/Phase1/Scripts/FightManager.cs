@@ -156,6 +156,14 @@ public class FightManager : MonoBehaviour
     public Side enemy = new Side();
     /// <summary>§8: set by StartFight from the chosen roster entry.</summary>
     public string enemyName = "";
+
+    /// <summary>A LIVE LADDER MATCH under MatchRunner (owen, 2026-08-14):
+    /// the results page loses REMATCH (the seed is spent, the cloud referee
+    /// is settling), QUIT concedes locally instead of tearing down the arena
+    /// MatchRunner owns, and dismissal is signalled through
+    /// resultsDismissed rather than BackToBuild.</summary>
+    public bool arenaLive;
+    public bool resultsDismissed;
     /// <summary>Seconds remaining. Public so tests can shorten the match.</summary>
     public float timer;
     public float elapsed;
@@ -959,7 +967,15 @@ public class FightManager : MonoBehaviour
         // Critic round 1 (mobile): no touch way to leave a running fight
         // (B is a keyboard key). Small corner button, far from the pads.
         if (MobileBuilderUI.Active && bm != null)
-            if (GUI.Button(new Rect(10f, 8f, 88f, 36f), "QUIT")) { bm.BackToBuild(); return; }
+            if (GUI.Button(new Rect(10f, 8f, 88f, 36f), "QUIT"))
+            {
+                // A LIVE LADDER MATCH cannot be torn down under MatchRunner's
+                // feet — and quitting one is conceding it locally. The REAL
+                // verdict is the cloud referee's either way; this only
+                // decides what the local results page says.
+                if (arenaLive) { End(Outcome.PlayerLoss, "quit"); return; }
+                bm.BackToBuild(); return;
+            }
         // ROUND-3 FIX (critic MAJOR 4): 620 was too narrow for the side
         // lines, which clipped mid-string - the player's row ended on an
         // orphan separator and the opponent's lost the word "wheels".
@@ -1247,6 +1263,17 @@ public class FightManager : MonoBehaviour
         float bw = 264f, bh = 54f, by = H * 0.705f + medalDrop;
         float cx = W * 0.5f;
         GUI.backgroundColor = new Color(0.30f, 0.62f, 0.88f);
+        // A LIVE LADDER MATCH gets one centered button and no REMATCH — the
+        // seed was spent, the cloud referee is settling it, and "again" is a
+        // new challenge with a new stake, made from the ARENA screen.
+        if (arenaLive)
+        {
+            bool ldone = GUI.Button(new Rect(cx - bw * 0.5f, by, bw, bh),
+                                    "BACK TO THE ARENA", btnStyle);
+            GUI.backgroundColor = Color.white;
+            if (ldone) resultsDismissed = true;   // MatchRunner owns teardown
+            return;
+        }
         bool back = GUI.Button(new Rect(cx - bw - 10f, by, bw, bh),
                                touch ? "BACK TO WORKSHOP" : "BACK TO WORKSHOP  (B)", btnStyle);
         GUI.backgroundColor = Color.white;

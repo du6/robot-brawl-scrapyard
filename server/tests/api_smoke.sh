@@ -546,6 +546,17 @@ else
     MATCH=$(jget matchId); STAKE=$(jget stake)
     is "…priced at the base stake for a same-category fight" "$STAKE" 50
     is "…and the match is QUEUED" "$(jget status)" QUEUED
+    # ONE seed since 2026-08-14: the client plays the fight live and a
+    # spectator sits through every bout, so a challenge is one decisive
+    # fight. The seed count is the contract the live-fight client relies on.
+    is "…with exactly ONE server-chosen seed (live fights are single-bout)" \
+       "$("$PY" -c "import json;print(len(json.load(open('$BODY'))['seeds']))")" 1
+
+    # --- the live-fight feed: participants get both envelopes -------------
+    S=$(req GET "/v1/matches/$MATCH/envelopes" "" "$AUTH")
+    expect "a participant fetches the match envelopes" "$S" 200
+    is "…and the defender's envelope carries the defender's build" \
+       "$("$PY" -c "import json;d=json.load(open('$BODY'));print('Defiant' in d['defender'])")" True
 
     if [ -z "$MATCH" ]; then
       skip "the rest of the lifecycle (9 checks)" "the challenge returned no matchId"
@@ -1342,6 +1353,15 @@ c=$(req POST /v1/auth/register "{\"email\":\"$EEMAIL\",\"password\":\"$PW\",\"di
 expect "an economy account registers" "$c" 200
 ETOK=$(jget token); ECON_UID=$(jget userId)
 EAUTH="Authorization: Bearer $ETOK"
+
+# The econ account is NOT a participant in section F's match — which makes it
+# the free non-participant probe for the live-fight envelope feed (checked
+# here rather than in F because registering a throwaway there blew the
+# 10/min auth budget the reset-password section counts on).
+if [ -n "$MATCH" ]; then
+  S=$(req GET "/v1/matches/$MATCH/envelopes" "" "$EAUTH")
+  expect "a NON-participant asking for match envelopes is told nothing" "$S" 404
+fi
 # Every db-side check below keys on ECON_UID; a broken capture would make them
 # all pass VACUOUSLY (an invalid uuid errors, dbq eats the error, empty
 # output reads as "refused"). So the capture itself is a check.

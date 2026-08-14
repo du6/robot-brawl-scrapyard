@@ -871,11 +871,13 @@ app.MapPost("/v1/challenges", async (ChallengeReq req, ClaimsPrincipal user) =>
     if (balance < stake)
         return Bad($"this challenge stakes {stake} scrap and your wallet holds {balance}");
 
-    // Best-of-3 (§1.4). Seeds are server-chosen: a client-chosen seed is a
-    // client choosing its own fight.
-    var seeds = new[] { Random.Shared.Next(1, int.MaxValue),
-                        Random.Shared.Next(1, int.MaxValue),
-                        Random.Shared.Next(1, int.MaxValue) };
+    // ONE bout (owen, 2026-08-14 — best-of-3 retired for challenges: the
+    // client now plays the fight LIVE and a spectator sits through every
+    // bout, so the match is one decisive fight). The seed is still
+    // server-chosen — a client-chosen seed is a client choosing its own
+    // fight — and it is the SAME seed the worker referees with, which is
+    // what makes the on-device fight and the settlement fight one fight.
+    var seeds = new[] { Random.Shared.Next(1, int.MaxValue) };
 
     await using var tx = await c.BeginTransactionAsync();
 
@@ -931,8 +933,56 @@ app.MapPost("/v1/challenges", async (ChallengeReq req, ClaimsPrincipal user) =>
     }
     await tx.CommitAsync();
 
-    return Results.Ok(new { matchId, status = "QUEUED", stake, gap, category = df.Category });
+    return Results.Ok(new { matchId, status = "QUEUED", stake, gap, category = df.Category, seeds });
 }).RequireAuthorization().RequireRateLimiting("upload");
+
+// The LIVE-FIGHT feed (owen, 2026-08-14): a challenge plays out ON the
+// challenger's device with the same seed the worker referees with, so the
+// client needs both snapshot envelopes. Participant-gated — snapshot blobs
+// are otherwise worker-only, and this endpoint is exactly as wide as "your
+// own match": build AND program of both sides go to a participant's device,
+// which is inherent to simulating the fight locally and to nobody else.
+app.MapGet("/v1/matches/{matchId:guid}/envelopes", async (Guid matchId, ClaimsPrincipal user, IBlobStore blobs) =>
+{
+    var me = UserId(user);
+    await using var c = await db.OpenAsync();
+    string? chUri = null, dfUri = null;
+    await using (var cmd = new NpgsqlCommand(@"
+        SELECT sc.storage_url, sd.storage_url
+          FROM matches m
+          JOIN snapshots sc ON sc.id = m.challenger_snapshot_id JOIN robots rc ON rc.id = sc.robot_id
+          JOIN snapshots sd ON sd.id = m.defender_snapshot_id   JOIN robots rd ON rd.id = sd.robot_id
+         WHERE m.id = $1 AND (rc.user_id = $2 OR rd.user_id = $2);", c))
+    {
+        cmd.Parameters.AddWithValue(matchId);
+        cmd.Parameters.AddWithValue(me);
+        await using var r = await cmd.ExecuteReaderAsync();
+        if (!await r.ReadAsync()) return Results.NotFound(new { error = "no such match, or it is not yours" });
+        chUri = r.GetString(0); dfUri = r.GetString(1);
+    }
+    // Same duality the worker lives with: s3:// resolves through the blob
+    // store, file:// predates object storage and is only reachable on a
+    // single-machine deployment — which is exactly where it still works.
+    async Task<byte[]?> ReadSnapshot(string? uri)
+    {
+        if (BlobUri.IsObjectStore(uri)) return await blobs.GetAsync(BlobUri.KeyOf(uri)!);
+        if (uri != null && uri.StartsWith("file://", StringComparison.Ordinal))
+        {
+            var path = new Uri(uri).LocalPath;
+            return File.Exists(path) ? await File.ReadAllBytesAsync(path) : null;
+        }
+        return uri == null ? null : await blobs.GetAsync(uri);
+    }
+    var chBytes = await ReadSnapshot(chUri);
+    var dfBytes = await ReadSnapshot(dfUri);
+    if (chBytes is null || dfBytes is null)
+        return Results.NotFound(new { error = "a snapshot blob is missing" });
+    return Results.Ok(new
+    {
+        challenger = System.Text.Encoding.UTF8.GetString(chBytes),
+        defender   = System.Text.Encoding.UTF8.GetString(dfBytes),
+    });
+}).RequireAuthorization();
 
 // §5.3 step 2's upload half. The replay is a RECORDING of the worker's run
 // (§5.4), so it is opaque bytes to the API exactly like a snapshot payload.
