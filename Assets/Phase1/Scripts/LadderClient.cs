@@ -201,6 +201,14 @@ namespace RobotBrawl.Phase0
         // is the shape of this bug — so there is only one.
         public const string PRODUCTION = "https://rb-api-902243335343.us-central1.run.app";
         public const string LOCAL_DEV  = "http://localhost:5099";
+        /// <summary>The CLOUD dev environment (2026-08-14, owen: "connect all
+        /// builds to the dev server"): rb-api-dev on Cloud Run, its own
+        /// database (rb_dev), blob bucket (-dev) and worker-key/JWT secrets —
+        /// prod data is unreachable from it by construction. Exists because a
+        /// REAL DEVICE cannot reach the Mac's localhost, and end-to-end device
+        /// testing needs a server that is not production. Fights are refereed
+        /// by rb-worker-dev on a 5-minute tick (run it by hand for instant).</summary>
+        public const string CLOUD_DEV  = "https://rb-api-dev-902243335343.us-central1.run.app";
 
         static string _baseUrl;
         public static string BaseUrl
@@ -216,16 +224,20 @@ namespace RobotBrawl.Phase0
             get
             {
 #if UNITY_EDITOR
-                return LOCAL_DEV;
+                // CLOUD_DEV since 2026-08-14 (owen's call) — the editor, the
+                // sims and real devices all exercise ONE shared dev ladder.
+                // Benches that need the Mac-local API set BaseUrl = LOCAL_DEV
+                // themselves (run_local.sh still serves 5099).
+                return CLOUD_DEV;
 #elif RB_DEV_SERVER
                 // A DEV-POINTED PLAYER (BuildIOSSim.BuildDevPointed): a real
-                // il2cpp build that talks to the Mac's local API — the only
-                // way to validate PAST the login gate on a simulator without
-                // touching production. The define is set by that build entry
-                // alone and restored in its finally; a TestFlight build can
-                // never carry it silently because the gate's status line
-                // prints the URL whenever it is not production.
-                return LOCAL_DEV;
+                // il2cpp build that talks to the cloud dev ladder — how a
+                // simulator OR a real device tests past the login gate
+                // without touching production. The define is set by that
+                // build entry alone and restored in its finally; a TestFlight
+                // build can never carry it silently because the gate's status
+                // line prints the URL whenever it is not production.
+                return CLOUD_DEV;
 #else
                 return PRODUCTION;
 #endif

@@ -39,9 +39,28 @@ namespace RobotBrawl.Editor
     {
         const string OUT_DIR = "build/ios";
 
-        public static void Build()
+        /// <summary>DEVICE build pointed at the CLOUD DEV ladder (owen,
+        /// 2026-08-14: end-to-end testing from real devices). Same define
+        /// discipline as BuildIOSSim.BuildDevPointed — set before the try,
+        /// restored in the finally, own output dir so it can never be
+        /// mistaken for the TestFlight artifact, and the gate prints the dev
+        /// URL on screen. Sign and install with the development team; never
+        /// upload this one.</summary>
+        public static void BuildDevPointed()
         {
-            string outDir = Arg("-rbOutDir") ?? OUT_DIR;
+            string prior = PlayerSettings.GetScriptingDefineSymbols(NamedBuildTarget.iOS);
+            if (!prior.Contains("RB_DEV_SERVER"))
+                PlayerSettings.SetScriptingDefineSymbols(NamedBuildTarget.iOS,
+                    string.IsNullOrEmpty(prior) ? "RB_DEV_SERVER" : prior + ";RB_DEV_SERVER");
+            try { BuildTo("build/ios-devptd"); }
+            finally { PlayerSettings.SetScriptingDefineSymbols(NamedBuildTarget.iOS, prior); }
+        }
+
+        public static void Build() { BuildTo(null); }
+
+        static void BuildTo(string forcedOutDir)
+        {
+            string outDir = forcedOutDir ?? Arg("-rbOutDir") ?? OUT_DIR;
 
             if (!BuildPipeline.IsBuildTargetSupported(BuildTargetGroup.iOS, BuildTarget.iOS))
             { Fail("the iOS module is not installed in this Unity"); return; }

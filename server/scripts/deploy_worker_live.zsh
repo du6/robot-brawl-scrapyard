@@ -18,9 +18,10 @@
 # (WorkerHost's documented default) — always-on is a deployment shape, not
 # a code change.
 #
-# Cost, stated plainly: 2 vCPU + 2 GiB always-allocated is roughly
-# $100-110/mo at list price — the dominant line on the bill. The dial down
-# is --cpu=1 --memory=1Gi (~half), at the price of slower fight physics.
+# Cost: owen took the dial down to 1 vCPU + 1 GiB on deploy day
+# (~$50-55/mo list) after 2/2 was quoted at ~$100-110/mo. Validate latency
+# re-measured identical at the smaller size; fight wall-time roughly
+# doubles vs 2 vCPU, which an async ladder does not feel.
 #
 # The old job + scheduler stay deployed as the fallback: rb-worker-tick is
 # PAUSED, not deleted. Concurrent workers are safe (the claim contract is
@@ -40,7 +41,7 @@ echo "deploying worker pool rb-worker-live from $IMAGE"
 gcloud run worker-pools deploy rb-worker-live \
   --project "$PROJECT_ID" --region "$REGION" \
   --image "$IMAGE" \
-  --cpu=2 --memory=2Gi --instances=1 \
+  --cpu=1 --memory=1Gi --instances=1 \
   --set-env-vars="RB_API_URL=${API_URL},RB_WORKER_KINDS=BOTH,RB_IDLE_SECONDS=5,RB_MAX_IDLE=0,RB_WORKER_ID=cloud-worker-live" \
   --set-secrets=RB_WORKER_KEY=rb-worker-key:latest
 
