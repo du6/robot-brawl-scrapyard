@@ -170,9 +170,9 @@ PlayerSettings:
   androidMaxAspectRatio: 2.4
   androidMinAspectRatio: 1
   applicationIdentifier:
-    Android: com.owen.robotbrawl
+    Android: club.cyberduck.robotbrawl
     Standalone: com.unity.template.get-started
-    iPhone: com.owen.robotbrawl
+    iPhone: club.cyberduck.robotbrawl
   buildNumber:
     Standalone: 0
     VisionOS: 0
@@ -838,7 +838,7 @@ PlayerSettings:
   webEnableSubmoduleStrippingCompatibility: 0
   scriptingDefineSymbols:
     Standalone: SENTIS_ANALYTICS_ENABLED;APP_UI_EDITOR_ONLY
-    iPhone: SENTIS_ANALYTICS_ENABLED;APP_UI_EDITOR_ONLY
+    iPhone: SENTIS_ANALYTICS_ENABLED;APP_UI_EDITOR_ONLY;RB_DEV_SERVER
   additionalCompilerArguments: {}
   platformArchitecture: {}
   scriptingBackend:
