@@ -68,9 +68,21 @@ namespace RobotBrawl.Editor
         /// </summary>
         public static void BuildRelease() { ReleaseMode = true; Build(); }
 
+        /// <summary>DEV-POINTED release player (2026-08-13, UX validation
+        /// phase two): identical to BuildRelease except the RB_DEV_SERVER
+        /// define makes LadderClient target LOCAL_DEV — the Mac's own API,
+        /// which the simulator reaches as localhost. This is the ONLY way to
+        /// validate past the login gate on a simulator without registering
+        /// production accounts. The define is set for this build alone and
+        /// restored in the finally below; output goes to its own directory so
+        /// it can never be mistaken for the TestFlight-shaped artifact.</summary>
+        public static bool DevServer = false;
+        public static void BuildDevPointed() { ReleaseMode = true; DevServer = true; Build(); }
+
         public static void Build()
         {
-            string outDir = ReleaseMode ? "build/ios-sim-rel" : OUT_DIR;
+            string outDir = DevServer ? "build/ios-sim-devptd"
+                          : ReleaseMode ? "build/ios-sim-rel" : OUT_DIR;
             if (!BuildPipeline.IsBuildTargetSupported(BuildTargetGroup.iOS, BuildTarget.iOS))
             { Debug.LogError("[BuildIOSSim] the iOS module is not installed"); return; }
 
@@ -99,6 +111,16 @@ namespace RobotBrawl.Editor
             if (scenes.Count == 0) { Debug.LogError("[BuildIOSSim] no enabled scenes"); return; }
 
             var priorSdk = PlayerSettings.iOS.sdkVersion;
+            // The dev-server define follows the sdkVersion discipline exactly:
+            // set before the try, restored in the finally, because a failed
+            // build must never leave the project silently dev-pointed.
+            string priorDefines = PlayerSettings.GetScriptingDefineSymbols(
+                UnityEditor.Build.NamedBuildTarget.iOS);
+            if (DevServer && !priorDefines.Contains("RB_DEV_SERVER"))
+                PlayerSettings.SetScriptingDefineSymbols(
+                    UnityEditor.Build.NamedBuildTarget.iOS,
+                    string.IsNullOrEmpty(priorDefines) ? "RB_DEV_SERVER"
+                                                       : priorDefines + ";RB_DEV_SERVER");
             int priorSimArch = -1;
             Debug.Log("[BuildIOSSim] sdkVersion was " + priorSdk);
 
@@ -177,9 +199,11 @@ namespace RobotBrawl.Editor
                     var p = so.FindProperty("iOSSimulatorArchitecture");
                     if (p != null) { p.intValue = priorSimArch; so.ApplyModifiedProperties(); }
                 }
+                PlayerSettings.SetScriptingDefineSymbols(
+                    UnityEditor.Build.NamedBuildTarget.iOS, priorDefines);
                 AssetDatabase.SaveAssets();
                 Debug.Log("[BuildIOSSim] restored sdkVersion=" + priorSdk + " simArch=" + priorSimArch
-                          + " — verify ProjectSettings.asset with git diff");
+                          + " defines='" + priorDefines + "' — verify ProjectSettings.asset with git diff");
             }
         }
     }

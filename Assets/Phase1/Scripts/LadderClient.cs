@@ -217,6 +217,15 @@ namespace RobotBrawl.Phase0
             {
 #if UNITY_EDITOR
                 return LOCAL_DEV;
+#elif RB_DEV_SERVER
+                // A DEV-POINTED PLAYER (BuildIOSSim.BuildDevPointed): a real
+                // il2cpp build that talks to the Mac's local API — the only
+                // way to validate PAST the login gate on a simulator without
+                // touching production. The define is set by that build entry
+                // alone and restored in its finally; a TestFlight build can
+                // never carry it silently because the gate's status line
+                // prints the URL whenever it is not production.
+                return LOCAL_DEV;
 #else
                 return PRODUCTION;
 #endif
