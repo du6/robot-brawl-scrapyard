@@ -78,6 +78,22 @@ runs into a constraint no client-side scheme escapes:
    all — the cloud worker referees those fights, so they are server-truth
    natively. (This subsumes the earlier "grant claim" sketch for arena
    rewards: an arena payout is just a server ledger entry like any other.)
+
+   **The ceiling, measured against `Career.cs` as of `5181573`** (14
+   contests, purse sum 125+150+…+1500 = **7,125**): worst case per account
+   = 7,125 × 1.6 underdog cap + 14 × 100 damage-bonus cap + 14 × 75
+   first-win bonus = **13,850 scrap, ever, per account** — roughly two
+   honest completionist runs' worth. That is the whole exposure.
+
+   ⚠ **One repeatable payment survives the first-win rule and must not:
+   loss consolation.** `LossPay()` pays 40–150 per LOSS (`LOSS_BASE` +
+   damage, capped), gated by nothing — under a server wallet, "I lost, pay
+   me 150" would be an infinitely repeatable claim and the ceiling above
+   would be false. The rule needs a companion: consolation claims are
+   accepted only for contests not yet first-won, and at most N per contest
+   (N small — it exists to soften early failure, not to be an income). The
+   exact N is owen's (register #6); without SOME bound the whole
+   first-win construction leaks through the loss path.
    ⚠ Player-facing consequence to ship with it: today's game CHARGES a
    re-entry fee (the "✓ … 50 scrap (re-entry)" rows) and pays again.
    Both sides of that change — free entry, zero payout — land together or
@@ -161,3 +177,8 @@ server validates build legality only.
    their robots. Cloud career sync is a separate, larger decision; until it
    is made, the honest statement is "your wallet roams, your workshop does
    not."
+6. **The consolation bound.** First-win-only purses cap the win path at
+   13,850 per account, but `LossPay()` is repeatable and would leak
+   unbounded through the loss path. How many consolation payments per
+   contest (and whether they stop once the contest is won) is owen's call —
+   the design only requires that SOME bound exist.
