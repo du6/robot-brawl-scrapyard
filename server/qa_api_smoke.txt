@@ -15,7 +15,7 @@ PASS  a wrong password and an unknown account are indistinguishable (both 401)
 
 == D. robots ==
 PASS  a robot is created
-      robot cd6ccd97-f775-4223-bd67-89db4134d676
+      robot 774a51b9-7ba2-4a39-a8a4-1cc97a3d44a7
 PASS  …but not without a token
 
 == E. snapshot upload stays opaque (§5.2) ==
@@ -30,7 +30,7 @@ PASS  …and a wrong key is refused too
 PASS  a keyed worker claims a job
 PASS  …and the job is the VALIDATE the upload enqueued
 PASS  …pointing at the snapshot just uploaded
-PASS  …and carries a payload location the worker can resolve (file:///tmp/rb-blobs/snapshots/cd6ccd97-f775-4223-bd67-89db4134d676/cdbe5424a0f4431781f1f9f92a8808da.json)
+PASS  …and carries a payload location the worker can resolve (file:///tmp/rb-blobs/snapshots/774a51b9-7ba2-4a39-a8a4-1cc97a3d44a7/bbedcab724d246c992c61c3ffa3b3011.json)
 PASS  …and the payload sha256 rides along, so the worker can verify storage
 PASS  another worker cannot heartbeat a job it does not hold
 PASS  …the holder can
@@ -79,6 +79,9 @@ PASS  a defender snapshot is ACTIVE and ready to be challenged
 PASS  a challenge is accepted
 PASS  …priced at the base stake for a same-category fight
 PASS  …and the match is QUEUED
+PASS  …with exactly ONE server-chosen seed (live fights are single-bout)
+PASS  a participant fetches the match envelopes
+PASS  …and the defender's envelope carries the defender's build
 PASS  …and the stake left the wallet into escrow
 PASS  …recorded as a STAKE row against this match
 PASS  a worker claims the FIGHT job the challenge enqueued
@@ -226,6 +229,52 @@ PASS  a drawn match never paid a purse
 PASS  no wallet is overdrawn
       ledger: 27 rows, net 3390 scrap across 3 wallets
 
+--- E. the career economy ---
+PASS  an economy account registers
+PASS  a NON-participant asking for match envelopes is told nothing
+PASS  …and the account id came back (d2a9aaa6-6a27-4a43-89e8-a5670953062d)
+PASS  the wallet answers
+PASS  a fresh wallet holds exactly the signing bonus
+PASS  …and owns nothing
+PASS  the purse table carries all 14 contests
+PASS  …and their purses sum to 7125 (the design doc ceiling's base)
+PASS  the entry kind no longer exists — fees were removed league-wide
+PASS  …and the entry_fee column is dropped, not zeroed
+PASS  the first win pays
+PASS  …purse 125 + damage 50 + first-win 75 = 250
+PASS  the SECOND purse claim is refused — re-entry is practice
+PASS  …and the refusal names what was already paid
+PASS  a claim with absurd inputs still pays
+PASS  …but CLAMPED: 150×1.6 + 400×0.25 + 75 = 415, not what the client asked
+PASS  a contest the table does not know is a 404, not a payout
+PASS  the consolation kind no longer exists — losses pay nothing
+PASS  …and the refusal names the only kind left
+PASS  L3C1's first win pays (350 + 75 = 425)
+PASS  the running balance is exactly the ledger's story (1590, wins only)
+PASS  a part buys at the seeded price
+PASS  …cube/ABS is 7
+PASS  replaying the same purchase is refused, not double-charged
+PASS  …and the inventory holds ONE cube, not two
+PASS  an expensive part buys while affordable (187)
+PASS  …and one beyond the wallet (1601 > 1396) is refused
+PASS  a sale credits half back
+PASS  …7 → 4 (round-half-to-even, same as the client)
+PASS  selling a part you no longer own is refused
+PASS  a rosterOnly part is not for sale (retirement holds server-side)
+PASS  a mat-pinned part refuses other materials (gusset is Steel)
+PASS  …and the pinned row carries the flat price
+PASS  the wallet's inventory shows what is owned (cube/Titanium ×1)
+PASS  a reset without the worker key is refused
+PASS  a too-short replacement password is refused
+PASS  the operator resets a password
+PASS  …the OLD password stops working
+PASS  …and the new one signs in
+PASS  an unknown email is a 404, not a silent success
+PASS  IAP verification answers 501 until the Apple keys exist — never a fake 200
+PASS  a negative LEAGUE_PURSE is refused by the constraint, not by code
+PASS  a negative SHOP_SELL is refused the same way
+PASS  an overdrawing inventory decrement is refused by its CHECK
+
 --- W. the claim kind filter ---
 PASS  a nonsense kind is refused, not silently ignored
 PASS  a lowercase kind is accepted and returns that kind
@@ -243,7 +292,7 @@ PASS  metrics carry pendingSnapshots
 PASS  pendingSnapshots agrees with the database
 PASS  failed agrees with the database
 PASS  the rbmetrics log line keeps its shape
-      rbmetrics ready=0 claimed=0 failed=4 done=15 oldest_ready_s=0 oldest_heartbeat_s=0 pending_snapshots=3 oldest_pending_s=3
+      rbmetrics ready=0 claimed=1 failed=4 done=11 oldest_ready_s=0 oldest_heartbeat_s=0 pending_snapshots=3 oldest_pending_s=2
 PASS  …and reports real counts, not a row of zeros
 
 --- B. season badges ---
@@ -262,4 +311,4 @@ SKIP  blob URLs are built with the forwarded scheme -- no object store configure
   blob URLs are built with the forwarded scheme -- no object store configured (BLOB_S3_BUCKET unset); file:// rows are passed through verbatim
 ----- a skip is not a pass; each line above is cover this run did not provide -----
 
-===== passed 209  failed 0  skipped 1 =====
+===== passed 256  failed 0  skipped 1 =====

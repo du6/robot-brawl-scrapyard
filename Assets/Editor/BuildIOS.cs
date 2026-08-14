@@ -53,7 +53,16 @@ namespace RobotBrawl.Editor
                 PlayerSettings.SetScriptingDefineSymbols(NamedBuildTarget.iOS,
                     string.IsNullOrEmpty(prior) ? "RB_DEV_SERVER" : prior + ";RB_DEV_SERVER");
             try { BuildTo("build/ios-devptd"); }
-            finally { PlayerSettings.SetScriptingDefineSymbols(NamedBuildTarget.iOS, prior); }
+            finally
+            {
+                PlayerSettings.SetScriptingDefineSymbols(NamedBuildTarget.iOS, prior);
+                // ⚠ SAVE, or the restore never reaches disk: batchmode -quit
+                // exits without flushing assets, and the leaked define then
+                // dev-points the NEXT "production" build silently. Found
+                // 2026-08-14 as an RB_DEV_SERVER diff sitting in
+                // ProjectSettings.asset moments before a prod build.
+                AssetDatabase.SaveAssets();
+            }
         }
 
         public static void Build() { BuildTo(null); }
