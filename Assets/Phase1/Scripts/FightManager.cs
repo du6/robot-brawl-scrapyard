@@ -1167,6 +1167,20 @@ public class FightManager : MonoBehaviour
                      : outcome == Outcome.PlayerLoss ? "DEFEAT" : "DRAW";
         bigStyle.normal.textColor = accent;
         GUI.Label(new Rect(0, H * 0.15f, W, 90), title, bigStyle);
+        // ⚠ A LIVE LADDER MATCH IS NOT OURS TO CALL — launch audit 2026-08-14.
+        // The cloud referee owns the official result and the purse; this
+        // screen shows what happened HERE. Cross-platform physics can still
+        // diverge, so the outcome above is labelled provisional and the player
+        // is pointed at MY FIGHTS, where the referee's confirmation lands. The
+        // old copy ("the purse is on its way") asserted a payout the server
+        // had not yet ruled, which is the one thing this design must never do.
+        if (arenaLive)
+        {
+            var prov = new GUIStyle(medStyle);
+            prov.normal.textColor = new Color(0.82f, 0.86f, 0.94f);
+            GUI.Label(new Rect(0, H * 0.15f + 84f, W, 40),
+                      "unofficial — the referee is confirming this in MY FIGHTS", prov);
+        }
         // (2a) medStyle is SHARED with BigLine's mid-fight toasts, which write
         // it and used not to restore it - so the colour of the line explaining
         // how the match ended was decided by whichever warning fired last.

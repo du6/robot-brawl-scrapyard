@@ -424,30 +424,50 @@ namespace RobotBrawl.Phase0
         IEnumerator LiveFight(string matchId, int[] seeds)
         {
             busy = true; Say("loading the match…", SC_CARD);
-            SnapshotEnvelope ch = null, df = null; string ferr = null;
-            yield return LadderClient.MatchEnvelopes(matchId, (a, b, e) => { ch = a; df = b; ferr = e; });
+            SnapshotEnvelope you = null; string oppName = null, oppBuild = null, ferr = null;
+            yield return LadderClient.MatchEnvelopes(matchId, (mine, on, ob, e) =>
+                { you = mine; oppName = on; oppBuild = ob; ferr = e; });
             busy = false;
             if (ferr != null)
-            { Say("the fight runs in the cloud — " + ferr, SC_INBOX); yield break; }
+            {
+                // The match is already queued server-side, so a failed preview
+                // costs only the spectacle. Show it where the player can SEE
+                // it — showInbox first, or the board renderer eats the line.
+                showInbox = true; showEnlist = false;
+                Say("the fight is being refereed in the cloud — watch MY FIGHTS for the result", SC_INBOX);
+                yield break;
+            }
+
+            // The opponent is BUILD-ONLY (its program is secret). Wrap it in a
+            // program-less envelope; MatchRunner sees no program and drives it
+            // with generic AI — an honest exhibition preview, not the real
+            // fight the referee runs.
+            var oppEnv = RobotSnapshot.ExportRaw(oppName, oppBuild, "");
 
             // The WATCH discipline: dock closed before the arena is used,
             // and every exit reopens it (RestoreDock below is unconditional).
             if (MobileBuilderUI.inst != null) MobileBuilderUI.inst.SetDockOpen(false);
             bool done = false; MatchRunner.MatchResult res = null;
-            var mr = MatchRunner.Run(ch, df, seeds, matchId, 1f, false,
+            var mr = MatchRunner.Run(you, oppEnv, seeds, matchId, 1f, false,
                                      r => { res = r; done = true; });
             mr.liveHold = true;
             while (!done) yield return null;
 
             RestoreDock();
             showInbox = true; showEnlist = false;
+            // NEVER ASSERT THE OFFICIAL RESULT — the cloud referee owns it, and
+            // the on-device fight is a preview that can diverge (launch audit
+            // 2026-08-14). Report what was WATCHED, not what was won, and send
+            // the player to MY FIGHTS where the referee's verdict and purse
+            // arrive. showInbox is set so this message is actually visible
+            // (the board renderer would have swallowed an SC_INBOX line).
             Say(res == null || !string.IsNullOrEmpty(res.error)
-                    ? "the fight could not run here — the cloud referee will settle it"
+                    ? "the fight is being refereed in the cloud — watch MY FIGHTS for the result"
                 : res.aWins > res.bWins
-                    ? "VICTORY — the referee is confirming; the purse is on its way"
+                    ? "your robot won the preview — the referee is confirming the official result in MY FIGHTS"
                 : res.bWins > res.aWins
-                    ? "defeat — the stake goes when the referee confirms"
-                    : "a draw — the stake comes back when the referee confirms", SC_INBOX);
+                    ? "your robot lost the preview — the referee is confirming the official result in MY FIGHTS"
+                    : "the preview was a draw — the referee is confirming the official result in MY FIGHTS", SC_INBOX);
             RefreshNow();
         }
 
@@ -773,6 +793,11 @@ namespace RobotBrawl.Phase0
         public void ConfirmChallenge()
         {
             if (busy || card == null) return;
+            // ⚠ A replay is using the arena — starting a live fight now would
+            // spawn it into the replay's scene, and BackToBuild would land the
+            // player mid-fight (launch audit 2026-08-14, two owners of
+            // BuildArena). Stop the replay first; the fight starts clean.
+            if (Playing) { StopReplay(); return; }
             if (ChallengeBlocker(card) != null) { pending = false; return; }
             var el = EligibleFor(card);
             StartCoroutine(DoChallenge(el[Mathf.Clamp(myPick, 0, el.Count - 1)], card));

@@ -120,13 +120,21 @@ namespace RobotBrawl.Phase0
                     (id, stake, sds, e) => { matchId = id; seeds = sds; err = e; });
                 if (matchId == null) { say("fight " + i + ": challenge refused: " + err + " — stopping here"); break; }
 
-                SnapshotEnvelope ch = null, df = null;
-                yield return LadderClient.MatchEnvelopes(matchId, (a, b, e) => { ch = a; df = b; err = e; });
-                if (ch == null) { say("fight " + i + ": envelopes: " + err); break; }
+                SnapshotEnvelope you = null; string oppName = null, oppBuild = null;
+                yield return LadderClient.MatchEnvelopes(matchId, (mine, on, ob, e) =>
+                    { you = mine; oppName = on; oppBuild = ob; err = e; });
+                if (you == null) { say("fight " + i + ": envelopes: " + err); break; }
+                var df = RobotSnapshot.ExportRaw(oppName, oppBuild, "");
 
-                // DEVICE-FAITHFUL: speed 1, exactly what an iPad runs.
+                // DEVICE-FAITHFUL: speed 1, exactly what an iPad runs. NOTE: as
+                // of the launch-audit fix the preview runs the opponent on AI
+                // (its program is secret), so this is no longer a determinism
+                // test of the SAME fight — it is a preview-runs-and-settles
+                // smoke. The wall-cap fix is what it now really exercises: a
+                // full-distance preview must reach a real verdict, not a
+                // timeout draw.
                 bool done = false; MatchRunner.MatchResult res = null;
-                var mr = MatchRunner.Run(ch, df, seeds, matchId, 1f, false, r => { res = r; done = true; });
+                var mr = MatchRunner.Run(you, df, seeds, matchId, 1f, false, r => { res = r; done = true; });
                 float t0 = Time.realtimeSinceStartup;
                 while (!done && Time.realtimeSinceStartup - t0 < 240f) yield return null;
                 string local = res == null || !string.IsNullOrEmpty(res.error) ? "ERROR"

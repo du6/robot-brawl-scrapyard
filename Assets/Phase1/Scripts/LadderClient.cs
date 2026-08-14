@@ -470,24 +470,27 @@ namespace RobotBrawl.Phase0
             }
         }
 
-        /// <summary>Both snapshot envelopes for a match this account is a
-        /// participant in — the live-fight feed. The server hands out build
-        /// AND program of both sides, to participants only; that exposure is
-        /// inherent to simulating the fight on the device.</summary>
+        /// <summary>The live-fight preview feed. Returns the CALLER'S own
+        /// snapshot envelope (build + program — their own robot) and the
+        /// OPPONENT'S BUILD ONLY. The opponent's program is secret IP and never
+        /// leaves the server (launch audit 2026-08-14); the on-device fight is
+        /// an exhibition preview with the opponent on generic AI, while the
+        /// cloud referee settles the real match with the real programs.</summary>
         public static IEnumerator MatchEnvelopes(string matchId,
-            Action<SnapshotEnvelope, SnapshotEnvelope, string> done)
+            Action<SnapshotEnvelope, string, string, string> done)
         {
             using (var req = Get("/v1/matches/" + matchId + "/envelopes"))
             {
                 yield return req.SendWebRequest();
                 string text = req.downloadHandler != null ? req.downloadHandler.text : "";
                 if (req.result != UnityWebRequest.Result.Success)
-                { done(null, null, RobotWorker.Field(text, "error") ?? req.error); yield break; }
-                var ch = SnapshotEnvelope.FromJson(RobotWorker.Field(text, "challenger"));
-                var df = SnapshotEnvelope.FromJson(RobotWorker.Field(text, "defender"));
-                if (ch == null || df == null)
-                { done(null, null, "an envelope did not parse"); yield break; }
-                done(ch, df, null);
+                { done(null, null, null, RobotWorker.Field(text, "error") ?? req.error); yield break; }
+                var you = SnapshotEnvelope.FromJson(RobotWorker.Field(text, "you"));
+                string oppName = RobotWorker.Field(text, "opponentName");
+                string oppBuild = RobotWorker.Field(text, "opponentBuild");
+                if (you == null || string.IsNullOrEmpty(oppBuild))
+                { done(null, null, null, "the match feed did not parse"); yield break; }
+                done(you, oppName, oppBuild, null);
             }
         }
 

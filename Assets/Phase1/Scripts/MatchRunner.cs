@@ -223,6 +223,8 @@ namespace RobotBrawl.Phase0
             bool savedActive = Career.active, savedAuto = Career.autosave, savedAuton = Career.fightAutonomous;
             string savedLeague = Career.activeLeague, savedContest = Career.activeContest;
             int savedRung = Progression.activeRungIndex;
+            int savedChallengeIdx = Progression.activeChallengeIdx;
+            bool savedSuppress = Progression.suppressSettle;
             float savedScale = Time.timeScale;
 
             Career.Data = new CareerData();
@@ -232,6 +234,15 @@ namespace RobotBrawl.Phase0
             Career.activeContest = null;
             Career.fightAutonomous = false;
             Progression.activeRungIndex = -1;
+            // ⚠ Launch audit 2026-08-14: the profile (Progression.Data) is a
+            // SEPARATE persisted file MatchRunner never isolated, so a live
+            // fight minted real exhibition scrap and — with a stale
+            // activeChallengeIdx from an earlier session fight — completed the
+            // wrong P4c challenge and paid its purse. Both are now neutralised:
+            // settlement is suppressed (the SERVER settles a ladder match) and
+            // the challenge index is cleared so nothing rides on a stale one.
+            Progression.activeChallengeIdx = -1;
+            Progression.suppressSettle = true;
 
             try
             {
@@ -259,6 +270,8 @@ namespace RobotBrawl.Phase0
                 Career.activeLeague = savedLeague;
                 Career.activeContest = savedContest;
                 Progression.activeRungIndex = savedRung;
+                Progression.activeChallengeIdx = savedChallengeIdx;
+                Progression.suppressSettle = savedSuppress;
                 bm.BackToBuild();
                 if (!string.IsNullOrEmpty(ownerBuild)) bm.LoadSnapshot(ownerBuild);
             }
@@ -388,8 +401,19 @@ namespace RobotBrawl.Phase0
             // part of the fight and FightManager zeroes damage at the bell.
             float t0 = Time.realtimeSinceStartup;
             Time.timeScale = speed;
+            // ⚠ THE CAP IS REAL TIME BUT THE FIGHT IS SIM TIME — launch audit,
+            // 2026-08-14. The 90 s default was sized for headless speed 10 (90
+            // sim seconds = 9 real). At the LIVE speed of 1 a full-distance
+            // bout needs ~90 real seconds + settle, so the flat 90 s cap fired
+            // BEFORE the bell and forced every distance fight to a "match wall
+            // timeout" DRAW — while the worker (speed 10) reached the judges'
+            // decision and ruled a winner. That single bug produced the one
+            // determinism disagreement the probe caught (local DRAW vs referee
+            // WON). The cap now scales with speed and never truncates the fight.
+            float wallCap = Mathf.Max(wallClockCapPerBout,
+                                      (FightManager.DEFAULT_MATCH_TIME + 5f) / Mathf.Max(0.01f, speed) + 5f);
             while (fm.state == FightManager.State.Settling &&
-                   Time.realtimeSinceStartup - t0 < wallClockCapPerBout)
+                   Time.realtimeSinceStartup - t0 < wallCap)
                 yield return null;
 
             BeginContact();
@@ -402,7 +426,7 @@ namespace RobotBrawl.Phase0
             }
 
             while (fm.state != FightManager.State.Ended &&
-                   Time.realtimeSinceStartup - t0 < wallClockCapPerBout)
+                   Time.realtimeSinceStartup - t0 < wallCap)
                 yield return null;
 
             if (fm.state != FightManager.State.Ended)

@@ -103,6 +103,16 @@ public static class Progression
     public static int activeRungIndex = -1;   // -1 = exhibition
     public static bool rewarded = false;      // one settlement per fight; StartFight resets
     public static int activeChallengeIdx = -1;  // P4c: -1 = not a challenge fight
+
+    /// <summary>⚠ SETTLEMENT IS SOMEONE ELSE'S JOB — set true around a fight
+    /// the SERVER settles (live arena challenges via MatchRunner). Launch
+    /// audit, 2026-08-14: MatchRunner isolates Career.Data but Progression.Data
+    /// is a SEPARATE persisted profile it never touched, so every live ladder
+    /// fight was minting real single-player exhibition scrap into the shipped
+    /// economy AND completing stale P4c challenges against the wrong opponent.
+    /// When set, OnMatchEnd records nothing and writes nothing. MatchRunner
+    /// owns this flag in a finally, same discipline as its Career.Data hold.</summary>
+    public static bool suppressSettle = false;
     public static string lastRewardLine = "";
 
     static ProfileData data;
@@ -218,6 +228,9 @@ public static class Progression
     {
         if (rewarded) return;
         rewarded = true;
+        // The server-settled fight pays nothing here and, crucially, saves
+        // nothing to the profile. See suppressSettle.
+        if (suppressSettle) { lastRewardLine = ""; return; }
         // C3: a career contest settles on the CAREER ledger, not this profile.
         if (Career.active && Career.SettleFight(win, dealt)) return;
         int ri = activeRungIndex;

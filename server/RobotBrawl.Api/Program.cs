@@ -946,9 +946,9 @@ app.MapGet("/v1/matches/{matchId:guid}/envelopes", async (Guid matchId, ClaimsPr
 {
     var me = UserId(user);
     await using var c = await db.OpenAsync();
-    string? chUri = null, dfUri = null;
+    string? chUri = null, dfUri = null; Guid chOwner = Guid.Empty, dfOwner = Guid.Empty;
     await using (var cmd = new NpgsqlCommand(@"
-        SELECT sc.storage_url, sd.storage_url
+        SELECT sc.storage_url, sd.storage_url, rc.user_id, rd.user_id
           FROM matches m
           JOIN snapshots sc ON sc.id = m.challenger_snapshot_id JOIN robots rc ON rc.id = sc.robot_id
           JOIN snapshots sd ON sd.id = m.defender_snapshot_id   JOIN robots rd ON rd.id = sd.robot_id
@@ -958,11 +958,8 @@ app.MapGet("/v1/matches/{matchId:guid}/envelopes", async (Guid matchId, ClaimsPr
         cmd.Parameters.AddWithValue(me);
         await using var r = await cmd.ExecuteReaderAsync();
         if (!await r.ReadAsync()) return Results.NotFound(new { error = "no such match, or it is not yours" });
-        chUri = r.GetString(0); dfUri = r.GetString(1);
+        chUri = r.GetString(0); dfUri = r.GetString(1); chOwner = r.GetGuid(2); dfOwner = r.GetGuid(3);
     }
-    // Same duality the worker lives with: s3:// resolves through the blob
-    // store, file:// predates object storage and is only reachable on a
-    // single-machine deployment — which is exactly where it still works.
     async Task<byte[]?> ReadSnapshot(string? uri)
     {
         if (BlobUri.IsObjectStore(uri)) return await blobs.GetAsync(BlobUri.KeyOf(uri)!);
@@ -977,10 +974,37 @@ app.MapGet("/v1/matches/{matchId:guid}/envelopes", async (Guid matchId, ClaimsPr
     var dfBytes = await ReadSnapshot(dfUri);
     if (chBytes is null || dfBytes is null)
         return Results.NotFound(new { error = "a snapshot blob is missing" });
+
+    // ⚠ SECURITY (launch audit 2026-08-14): a program is secret IP, and
+    // "participant" is self-service — anyone can challenge anyone. So this
+    // endpoint returns the caller's OWN side in full (their program is not a
+    // secret to them) and only the OPPONENT'S BUILD — never the opponent's
+    // program. The on-device fight is an EXHIBITION preview: it renders the
+    // real opponent chassis under generic AI while the cloud referee settles
+    // the real match with the real programs. Extract name+build from the
+    // opponent payload; the API otherwise treats payloads as opaque, and this
+    // is the one place it must read two fields, so it reads exactly two.
+    string mineEnvelope = System.Text.Encoding.UTF8.GetString(me == chOwner ? chBytes : dfBytes);
+    byte[] oppBytes = me == chOwner ? dfBytes : chBytes;
+    string oppName = "", oppBuild = "";
+    try
+    {
+        using var oppDoc = JsonDocument.Parse(System.Text.Encoding.UTF8.GetString(oppBytes));
+        var payloadStr = oppDoc.RootElement.GetProperty("payload").GetString() ?? "";
+        using var payDoc = JsonDocument.Parse(payloadStr);
+        if (payDoc.RootElement.TryGetProperty("robotName", out var n)) oppName = n.GetString() ?? "";
+        if (payDoc.RootElement.TryGetProperty("build", out var b)) oppBuild = b.GetString() ?? "";
+    }
+    catch { return Results.Problem("opponent snapshot is unreadable"); }
+
     return Results.Ok(new
     {
-        challenger = System.Text.Encoding.UTF8.GetString(chBytes),
-        defender   = System.Text.Encoding.UTF8.GetString(dfBytes),
+        // "you" carries the caller's full envelope (build + program); the
+        // opponent is build-only. The live client always calls this as the
+        // challenger, but keying on ownership keeps it correct either way.
+        you = mineEnvelope,
+        opponentName = oppName,
+        opponentBuild = oppBuild,
     });
 }).RequireAuthorization();
 

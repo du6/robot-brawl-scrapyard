@@ -88,7 +88,8 @@ envelope() { # <name> [break-the-hash]
 import json,hashlib,sys
 name, broken = sys.argv[1], sys.argv[2]
 payload = json.dumps({"payloadVersion":1,"robotName":name,
-                      "parts":[{"id":"chassis_a","x":0,"z":0}],"program":""},
+                      "build":"core|0,0,0|0|0,0,0|Aluminum","program":"",
+                      "parts":[{"id":"chassis_a","x":0,"z":0}]},
                      separators=(',',':'))
 sha = hashlib.sha256(payload.encode('utf-8')).hexdigest()
 if broken: sha = ('0'*63) + ('1' if sha[-1] != '1' else '2')
@@ -552,11 +553,16 @@ else
     is "…with exactly ONE server-chosen seed (live fights are single-bout)" \
        "$("$PY" -c "import json;print(len(json.load(open('$BODY'))['seeds']))")" 1
 
-    # --- the live-fight feed: participants get both envelopes -------------
+    # --- the live-fight feed: caller's own envelope + opponent BUILD only ---
     S=$(req GET "/v1/matches/$MATCH/envelopes" "" "$AUTH")
-    expect "a participant fetches the match envelopes" "$S" 200
-    is "…and the defender's envelope carries the defender's build" \
-       "$("$PY" -c "import json;d=json.load(open('$BODY'));print('Defiant' in d['defender'])")" True
+    expect "a participant fetches the match feed" "$S" 200
+    is "…and it carries the opponent's build (to render the chassis)" \
+       "$("$PY" -c "import json;d=json.load(open('$BODY'));print(len(d.get('opponentBuild',''))>0)")" True
+    # ⚠ THE SECURITY INVARIANT: the opponent's PROGRAM must never appear. The
+    # challenger uploaded FirstSteps (program non-empty), so the defender here
+    # carries a program server-side; the feed must expose only its build.
+    is "…and NEVER the opponent's program (secret IP)" \
+       "$("$PY" -c "import json;d=json.load(open('$BODY'));print('opponentProgram' not in d and 'defender' not in d)")" True
 
     if [ -z "$MATCH" ]; then
       skip "the rest of the lifecycle (9 checks)" "the challenge returned no matchId"
