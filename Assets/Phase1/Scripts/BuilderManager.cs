@@ -7227,9 +7227,34 @@ public class ModeSelect : MonoBehaviour
         return MobileBuilderUI.DeviceWantsTouch();
     }
 
+    // The login gate holds boot while it is on screen (client B, owen:
+    // "make the user login/signup page the gate of the game"). It lives on
+    // THIS GameObject so every bench's ModeSelect destroy bypasses it.
+    bool gateActive;
+
     void Start()
     {
-        if (!ShouldAutoBoot()) return;
+        string savedName;
+        if (!RobotBrawl.Phase0.LadderClient.RestoreSession(out savedName))
+        {
+            gateActive = true;
+            gameObject.AddComponent<RobotBrawl.Phase0.LoginGate>();
+            return;   // GateDone() resumes the boot below
+        }
+        BootPastGate();
+    }
+
+    /// <summary>Called by LoginGate after a successful sign-in (or the
+    /// editor-only dev skip). Resumes exactly the boot the gate held.</summary>
+    public void GateDone()
+    {
+        gateActive = false;
+        BootPastGate();
+    }
+
+    void BootPastGate()
+    {
+        if (!ShouldAutoBoot()) return;   // editor desktop: the chooser draws
         StartCareer(MobileBuilderUI.DeviceWantsTouch());
         Destroy(gameObject);
     }
@@ -7254,7 +7279,9 @@ public class ModeSelect : MonoBehaviour
         // has already booted past it. Destroy is deferred to the end of the
         // frame and OnGUI runs before that, so without this guard the chooser
         // would flash over the game for one frame on the way through.
-        if (ShouldAutoBoot()) return;
+        // The login gate holds the chooser too: IMGUI under a uGUI gate would
+        // both draw through it and (on desktop) steal its clicks.
+        if (gateActive || ShouldAutoBoot()) return;
         // Critic round 1 (mobile): raw pixels made these buttons thumbnail
         // sized on a 264-dpi iPad. Same DPI scale as the rest of the HUD.
         float s = BuilderManager.GuiScale;   // R4 finding 3: one rule, one place
