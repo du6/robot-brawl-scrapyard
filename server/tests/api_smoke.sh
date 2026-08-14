@@ -1365,14 +1365,11 @@ is "the purse table carries all 14 contests" \
 is "…and their purses sum to 7125 (the design doc ceiling's base)" \
    "$(dbq 'SELECT SUM(purse) FROM league_contests;')" 7125
 
-# --- entry fees ---
+# --- entry fees are GONE (owen 2026-08-13, migration 012) ---
 c=$(req POST /v1/economy/claims '{"kind":"entry","contestId":"L3C1","attemptId":"e-a1"}' "$EAUTH")
-expect "an L3 entry fee is charged" "$c" 200
-is "…50 scrap, per the table" "$(jget charged)" 50
-c=$(req POST /v1/economy/claims '{"kind":"entry","contestId":"L3C1","attemptId":"e-a1"}' "$EAUTH")
-expect "replaying the same entry attempt is refused, not double-charged" "$c" 409
-c=$(req POST /v1/economy/claims '{"kind":"entry","contestId":"L1C1","attemptId":"e-a2"}' "$EAUTH")
-expect "an entry claim against a no-fee contest is refused" "$c" 400
+expect "the entry kind no longer exists — fees were removed league-wide" "$c" 400
+guard_col="$(dbq "SELECT column_name FROM information_schema.columns WHERE table_name='league_contests' AND column_name='entry_fee';")"
+if [ -z "$guard_col" ]; then ok "…and the entry_fee column is dropped, not zeroed"; else no "…and the entry_fee column is dropped, not zeroed -- still present"; fi
 
 # --- the first-win rule ---
 c=$(req POST /v1/economy/claims '{"kind":"purse","contestId":"L1C1","dealt":200,"mult":1.0}' "$EAUTH")
@@ -1403,15 +1400,14 @@ expect "the FOURTH is refused — the loss path is bounded" "$c" 400
 c=$(req POST /v1/economy/claims '{"kind":"consolation","contestId":"L2C1","dealt":0,"attemptId":"c-a3"}' "$EAUTH")
 expect "replaying a paid consolation attempt is refused" "$c" 409
 
-# --- won ⇒ free practice, the fee side ---
+# --- a fee contest (as was) pays its purse like any other now ---
 c=$(req POST /v1/economy/claims '{"kind":"purse","contestId":"L3C1","dealt":0,"mult":1.0}' "$EAUTH")
 expect "L3C1's first win pays (350 + 75 = 425)" "$c" 200
-c=$(req POST /v1/economy/claims '{"kind":"entry","contestId":"L3C1","attemptId":"e-a3"}' "$EAUTH")
-expect "an entry fee on a WON contest is refused — practice is free" "$c" 400
 
-# Balance so far: 500 - 50 + 250 + 415 + 40×3 + 425 = 1660.
+# Balance so far: 500 + 250 + 415 + 40×3 + 425 = 1710 — and nothing was
+# ever debited, because no fee exists to debit.
 c=$(req GET /v1/wallet "" "$EAUTH")
-is "the running balance is exactly the ledger's story (1660)" "$(jget balance)" 1660
+is "the running balance is exactly the ledger's story (1710, no debits)" "$(jget balance)" 1710
 
 # --- the shop ---
 c=$(req POST /v1/economy/purchase '{"op":"buy","partId":"cube","mat":"ABS","idemKey":"p-1"}' "$EAUTH")

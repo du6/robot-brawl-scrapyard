@@ -127,12 +127,17 @@ iap_receipts (transaction_id PK — Apple's id, so double-credit is
             refused by the database)
 
 GET  /v1/wallet              balance + recent + inventory (cache refill)
-POST /v1/economy/claims      kind purse|consolation|entry; purse idem_key
-                             is SERVER-constructed (user,contest) so the
+POST /v1/economy/claims      kind purse|consolation; purse idem_key is
+                             SERVER-constructed (user,contest) so the
                              first-win ceiling is a uniqueness constraint;
                              consolation pre-first-win only, ≤3/contest
-                             (register #6 default) under an advisory lock;
-                             entry fees only pre-win
+                             (register #6 default) under an advisory lock.
+                             The "entry" kind existed for a few hours and
+                             is GONE: owen removed league entry fees
+                             completely the same day (migration 012 drops
+                             the column; the client's fee field, gate,
+                             charge/refund pair and every fee string are
+                             hard-deleted, CareerSmoke 138/138)
 POST /v1/economy/purchase    buy/sell at server prices, transactional,
                              idempotent
 POST /v1/iap/verify          501 until App Store keys exist — reserved,

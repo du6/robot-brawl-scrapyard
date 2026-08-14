@@ -327,47 +327,39 @@ public class CareerSmoke : MonoBehaviour
               "loss pays consolation; the contest stays unbeaten");
         bm.BackToBuild(); yield return null; yield return null; yield return null;
 
-        // entry fee: refused broke, debited when funded
+        // ENTRY FEES ARE GONE (owen, 2026-08-13). The old checks here proved
+        // fees were charged and refused correctly; the new contract is the
+        // opposite and is proven from both sides: a BROKE player enrolls
+        // anywhere, and no enrollment ever moves scrap.
         foreach (var lgx in new[] { CareerDB.Leagues[0], CareerDB.Leagues[1] })
             foreach (var cx in lgx.contests)
                 if (!Career.Data.doneContests.Contains(cx.id)) Career.Data.doneContests.Add(cx.id);
         Career.Txn(-(Career.Data.scrap - 10), "c3 drain");
-        bm.StartCareerFight(2, 0); yield return null;
-        Check(bm.mode == BuilderManager.Mode.Build && bm.LastMessage != null && bm.LastMessage.Contains("Entry fee"),
-              "entry fee refused when broke, fight never starts");
-        Career.Txn(100, "c3 fee grant");
         bm.StartCareerFight(2, 0);
         yield return null; yield return null;
         fm = Object.FindFirstObjectByType<FightManager>();
-        Check(fm != null && Career.Data.scrap == 60,
-              "entry fee 50 debited on enrollment (110 - 50 = 60)");
-        if (fm != null) fm.End(FightManager.Outcome.PlayerLoss, "harness fee loss");
+        Check(fm != null && Career.activeContest == "L3C1",
+              "a player with 10 scrap enrolls in L3 — no fee can block an enrollment");
+        Check(Career.Data.scrap == 10, "…and enrollment moved no scrap");
+        if (fm != null) fm.End(FightManager.Outcome.PlayerWin, "harness L3C1 win");
         yield return null; yield return null;
+        Check(Career.Data.doneContests.Contains("L3C1") && Career.Data.scrap > 10,
+              "the broke player's first win still pays the purse");
         bm.BackToBuild(); yield return null; yield return null; yield return null;
-        Check(Career.TxnSum() == Career.Data.scrap, "c3 ledger audits after fees + settlements");
 
-        // The fee half of the first-win rule: win the fee contest, then
-        // re-enter — enrollment must charge NOTHING, and the fee gate must
-        // not block a broke player from practicing what they already won.
-        bm.StartCareerFight(2, 0);
-        yield return null; yield return null;
-        fm = Object.FindFirstObjectByType<FightManager>();
-        if (fm != null) fm.End(FightManager.Outcome.PlayerWin, "harness fee-contest win");
-        yield return null; yield return null;
-        Check(Career.Data.doneContests.Contains(CareerDB.Leagues[2].contests[0].id),
-              "the fee contest is beaten (setup for the free-practice check)");
-        bm.BackToBuild(); yield return null; yield return null; yield return null;
+        // …and the practice half survives the fee removal: re-entry moves
+        // nothing at enrollment AND nothing at settlement, either outcome.
         sBefore = Career.Data.scrap;
         bm.StartCareerFight(2, 0);
         yield return null; yield return null;
         fm = Object.FindFirstObjectByType<FightManager>();
         Check(fm != null && Career.Data.scrap == sBefore,
-              "re-entering a beaten fee contest charges no entry fee");
+              "re-entering a beaten contest moves no scrap at enrollment");
         if (fm != null) fm.End(FightManager.Outcome.PlayerLoss, "harness practice loss");
         yield return null; yield return null;
-        Check(Career.Data.scrap == sBefore, "…and the practice loss pays nothing either");
+        Check(Career.Data.scrap == sBefore, "…and the practice loss pays nothing");
         bm.BackToBuild(); yield return null; yield return null; yield return null;
-        Check(Career.TxnSum() == Career.Data.scrap, "the ledger still audits after free practice");
+        Check(Career.TxnSum() == Career.Data.scrap, "the ledger audits with fees gone");
 
         // scouting renders every roster bot on the turntable
         var seenOpp = new List<string>();

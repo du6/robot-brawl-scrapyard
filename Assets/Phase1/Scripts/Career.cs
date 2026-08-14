@@ -43,7 +43,11 @@ public static class CareerDB
     public class Contest
     {
         public string id; public string oppId; public AiTier tier;
-        public int purse; public int entryFee;
+        // entryFee lived here until 2026-08-13 and is GONE (owen: "remove
+        // League's entry fee completely"). The league is free to enter at
+        // every level; the purse and the first-win rule are the whole
+        // economy. Server side matches: migration 012 dropped the column.
+        public int purse;
         /// <summary>HARDENED (owen, 2026-08-12: "make higher level league
         /// robots harder to beat"). The opponent spawns with every part
         /// except core and wheels GUSSETED (seams ×1.5) — the same measured
@@ -70,8 +74,8 @@ public static class CareerDB
         /// which wants density; armour wants strength per kilogram. They are
         /// different jobs and they take different metals.</summary>
         public string armourMat;
-        public Contest(string i, string o, AiTier t, int p, int f, string armour = null, bool hard = false)
-        { id = i; oppId = o; tier = t; purse = p; entryFee = f; armourMat = armour; hardened = hard; }
+        public Contest(string i, string o, AiTier t, int p, string armour = null, bool hard = false)
+        { id = i; oppId = o; tier = t; purse = p; armourMat = armour; hardened = hard; }
     }
 
     public class League
@@ -103,31 +107,31 @@ public static class CareerDB
         // ~1.3 t under a 4 t cap it is not. This progression is +133% HP from
         // L2 to L4 on every structural part.
         new League("L1", "Scrapyard Open", "The Yard", "yard", 1500f, new[] {
-            new Contest("L1C1", "scout",  AiTier.Rookie, 125, 0),
-            new Contest("L1C2", "tipper", AiTier.Rookie, 150, 0) }),
+            new Contest("L1C1", "scout",  AiTier.Rookie, 125),
+            new Contest("L1C2", "tipper", AiTier.Rookie, 150) }),
         new League("L2", "Garage League", "The Loading Dock", "dock", 2000f, new[] {
-            new Contest("L2C1", "mauler", AiTier.Rookie,  200, 0),
-            new Contest("L2C2", "scout",  AiTier.Veteran, 225, 0, "Aluminum"),
-            new Contest("L2C3", "tipper", AiTier.Veteran, 250, 0, "Aluminum") }),
+            new Contest("L2C1", "mauler", AiTier.Rookie,  200),
+            new Contest("L2C2", "scout",  AiTier.Veteran, 225, "Aluminum"),
+            new Contest("L2C3", "tipper", AiTier.Veteran, 250, "Aluminum") }),
         new League("L3", "Regional Circuit", "The Sawmill", "sawmill", 2800f, new[] {
-            new Contest("L3C1", "bulwark", AiTier.Veteran, 350, 50, "Steel"),
-            new Contest("L3C2", "mauler",  AiTier.Veteran, 400, 50, "Steel"),
-            new Contest("L3C3", "ripper",  AiTier.Veteran, 450, 50, "Steel"),
+            new Contest("L3C1", "bulwark", AiTier.Veteran, 350, "Steel"),
+            new Contest("L3C2", "mauler",  AiTier.Veteran, 400, "Steel"),
+            new Contest("L3C3", "ripper",  AiTier.Veteran, 450, "Steel"),
             // The first disc a player ever meets. Before this the roster had
             // none until L4, which is exactly why one spinner cleared three
             // leagues unopposed.
-            new Contest("L3C4", "millstone", AiTier.Veteran, 475, 50, "Steel") }),
+            new Contest("L3C4", "millstone", AiTier.Veteran, 475, "Steel") }),
         new League("L4", "National Series", "The Press", "press", 4000f, new[] {
-            new Contest("L4C1", "widowmaker", AiTier.Veteran,  600, 100, "Titanium"),
-            new Contest("L4C2", "bulwark",    AiTier.Champion, 700, 100, "Titanium"),
-            new Contest("L4C3", "ripper",     AiTier.Champion, 800, 100, "Titanium"),
-            new Contest("L4C4", "bastion",    AiTier.Champion, 900, 100, "Titanium", hard: true) }),
+            new Contest("L4C1", "widowmaker", AiTier.Veteran,  600, "Titanium"),
+            new Contest("L4C2", "bulwark",    AiTier.Champion, 700, "Titanium"),
+            new Contest("L4C3", "ripper",     AiTier.Champion, 800, "Titanium"),
+            new Contest("L4C4", "bastion",    AiTier.Champion, 900, "Titanium", hard: true) }),
         new League("L5", "World Championship", "The Crucible", "crucible", 5500f, new[] {
             // L5C1 hardening MEASURED AND REVERTED same evening: CEILING L5 went
             // 1/24 -> 6/24 WORSE with it — WIDOWMAKER is a hunter, and ~+100 kg
             // of gussets blunted the chase more than the seams helped. The
             // flagship whose loss mode IS shedding keeps the flag (L4C4).
-            new Contest("L5C1", "widowmaker", AiTier.Champion, 1500, 200, "Titanium") }),
+            new Contest("L5C1", "widowmaker", AiTier.Champion, 1500, "Titanium") }),
     };
 
     public class KitItem { public string partId; public string mat; public int count;

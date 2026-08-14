@@ -175,7 +175,7 @@ public class FightManager : MonoBehaviour
     // ROUND-3 (critic CRITICAL 2c): the contest identity and its money, cached
     // in End() because Career.SettleFight() nulls activeLeague/activeContest
     // before DrawResults() ever runs. Read nowhere else.
-    bool cIsContest; string cLeague = "", cArena = ""; int cPurse, cEntry, cPay;
+    bool cIsContest; string cLeague = "", cArena = ""; int cPurse, cPay;
     /// <summary>MEDALS (2026-08-02): the championship line, cached in End()
     /// from Career.lastMedal for the same reason every other field here is -
     /// SettleFight clears its own handoff state, so reading it from
@@ -888,7 +888,7 @@ public class FightManager : MonoBehaviour
         // Career.SettleFight() nulls activeLeague/activeContest as its third
         // statement, long before DrawResults() draws, so reading them from the
         // results screen yields two empty strings and an unnamed title fight.
-        cIsContest = false; cLeague = ""; cArena = ""; cPurse = 0; cEntry = 0; cPay = 0;
+        cIsContest = false; cLeague = ""; cArena = ""; cPurse = 0; cPay = 0;
         if (Career.active && !string.IsNullOrEmpty(Career.activeContest))
         {
             var clg = Career.FindLeague(Career.activeLeague);
@@ -899,10 +899,9 @@ public class FightManager : MonoBehaviour
                 cLeague = clg.name.ToUpper();
                 cArena = clg.arenaName.ToUpper();
                 // First-win rule (owen, 2026-08-13): a beaten contest shows
-                // purse 0 and fee 0 — the results screen tells the same story
-                // the settlement pays.
+                // purse 0 — the results screen tells the same story the
+                // settlement pays. (Entry fees are gone league-wide.)
                 bool re = Career.Data.doneContests.Contains(ccon.id);
-                cEntry = re ? 0 : ccon.entryFee;
                 cPurse = re ? 0 : ccon.purse;
             }
         }
@@ -1181,12 +1180,15 @@ public class FightManager : MonoBehaviour
         float my = H * 0.585f;
         if (cIsContest)
         {
-            int net = cPay - cEntry;
+            // Entry fees are gone (owen, 2026-08-13): the arithmetic line is
+            // purse + bonus = net, nothing subtracted, and net can no longer
+            // go negative on a win.
+            int net = cPay;
             string line1 = outcome == Outcome.PlayerWin
-                ? string.Format("PURSE {0}      BONUS {1}{2}      ENTRY FEE −{3}",
-                                cPurse, cPay - cPurse < 0 ? "−" : "+", Mathf.Abs(cPay - cPurse), cEntry)
-                : string.Format("PURSE {0} NOT WON      CONSOLATION +{1}      ENTRY FEE −{2}",
-                                cPurse, cPay, cEntry);
+                ? string.Format("PURSE {0}      BONUS {1}{2}",
+                                cPurse, cPay - cPurse < 0 ? "−" : "+", Mathf.Abs(cPay - cPurse))
+                : string.Format("PURSE {0} NOT WON      CONSOLATION +{1}",
+                                cPurse, cPay);
             moneySmall.normal.textColor = new Color(0.72f, 0.74f, 0.80f);
             GUI.Label(new Rect(0, my, W, 26), line1, moneySmall);
             moneyStyle.normal.textColor = net >= 0 ? new Color(0.40f, 1f, 0.50f)
@@ -1366,12 +1368,13 @@ public class FightManager : MonoBehaviour
         if (lg == null || c == null) return null;
         bool re = Career.Data.doneContests.Contains(c.id);
         // First-win rule (owen, 2026-08-13): re-entry is practice, and the
-        // HUD must not promise a purse the settlement will not pay.
+        // HUD must not promise a purse the settlement will not pay. Entry
+        // fees no longer exist (owen, same day), so the line says nothing
+        // about them.
         if (re) return lg.name.ToUpper() + "   ·   " + lg.arenaName.ToUpper()
-                     + "   ·   PRACTICE — PURSE ALREADY WON   ·   FREE ENTRY";
+                     + "   ·   PRACTICE — PURSE ALREADY WON";
         return lg.name.ToUpper() + "   ·   " + lg.arenaName.ToUpper()
-             + "   ·   PURSE " + c.purse
-             + (c.entryFee > 0 ? "   ·   ENTRY " + c.entryFee : "   ·   FREE ENTRY");
+             + "   ·   PURSE " + c.purse;
     }
 }
 

@@ -1566,14 +1566,14 @@ app.MapPost("/v1/economy/claims", async (EconClaimReq req, ClaimsPrincipal user)
     await using var c = await db.OpenAsync();
     await using var tx = await c.BeginTransactionAsync();
 
-    int purse, entryFee;
+    int purse;
     await using (var q = new NpgsqlCommand(
-        "SELECT purse, entry_fee FROM league_contests WHERE id = $1;", c, tx))
+        "SELECT purse FROM league_contests WHERE id = $1;", c, tx))
     {
         q.Parameters.AddWithValue(contest);
-        await using var r = await q.ExecuteReaderAsync();
-        if (!await r.ReadAsync()) return Results.NotFound(new { error = "no such contest" });
-        purse = r.GetInt32(0); entryFee = r.GetInt32(1);
+        var got = await q.ExecuteScalarAsync();
+        if (got is null) return Results.NotFound(new { error = "no such contest" });
+        purse = (int)got;
     }
 
     // One writer per (user, contest) at a time: the consolation bound and the
@@ -1682,44 +1682,12 @@ app.MapPost("/v1/economy/claims", async (EconClaimReq req, ClaimsPrincipal user)
         return Results.Ok(new { kind = "consolation", contest, paid = pay, remaining = ECON_CONSOLATION_MAX - used - 1 });
     }
 
-    if (kind == "entry")
-    {
-        if (string.IsNullOrWhiteSpace(req.AttemptId))
-            return Bad("an attemptId is required — without one a dropped response cannot be retried safely");
-        if (entryFee <= 0) return Bad("this contest has no entry fee");
-        // The other half of the first-win rule: once won, re-entry is FREE.
-        // Accepting a fee here would charge players for practice.
-        if (won) return Bad("this contest is already won — practice is free, there is nothing to charge");
-
-        long balance;
-        await using (var b = new NpgsqlCommand(
-            "SELECT COALESCE(SUM(delta),0) FROM ledger WHERE user_id = $1;", c, tx))
-        {
-            b.Parameters.AddWithValue(me);
-            balance = Convert.ToInt64(await b.ExecuteScalarAsync());
-        }
-        if (balance < entryFee)
-            return Bad($"the entry fee is {entryFee} scrap and your wallet holds {balance}");
-
-        try
-        {
-            await using var ins = new NpgsqlCommand(
-                "INSERT INTO ledger (user_id, delta, reason, ref, idem_key) VALUES ($1,$2,'LEAGUE_ENTRY',$3,$4);", c, tx);
-            ins.Parameters.AddWithValue(me);
-            ins.Parameters.AddWithValue(-entryFee);
-            ins.Parameters.AddWithValue(contest);
-            ins.Parameters.AddWithValue("lentry:" + me + ":" + contest + ":" + req.AttemptId!.Trim());
-            await ins.ExecuteNonQueryAsync();
-            await tx.CommitAsync();
-        }
-        catch (PostgresException ex) when (ex.SqlState == "23505")
-        {
-            return Results.Conflict(new { error = "this entry was already charged — the attemptId has been used" });
-        }
-        return Results.Ok(new { kind = "entry", contest, charged = entryFee, balance = balance - entryFee });
-    }
-
-    return Bad("kind must be purse, consolation or entry");
+    // The "entry" kind lived here for a few hours on 2026-08-13 and is GONE
+    // with the fees themselves (owen: "remove League's entry fee
+    // completely"; migration 012 dropped the column). LEAGUE_ENTRY stays a
+    // legal ledger reason — the ledger is append-only and history is not an
+    // error — but nothing can write another row of it.
+    return Bad("kind must be purse or consolation");
 }).RequireAuthorization().RequireRateLimiting("economy");
 
 app.MapPost("/v1/economy/purchase", async (PurchaseReq req, ClaimsPrincipal user) =>

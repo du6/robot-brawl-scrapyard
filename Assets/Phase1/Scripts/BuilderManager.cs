@@ -3345,13 +3345,10 @@ public class BuilderManager : MonoBehaviour
         }
 
         // THE GATE - exactly the checks StartCareerFight runs, in its order.
-        // A beaten contest charges no fee (first-win rule, 2026-08-13), so a
-        // broke player can always practice what they already won.
-        bool bcFree = Career.Data.doneContests.Contains(bc.id);
+        // (The entry-fee check that lived here is gone with the fees, owen
+        // 2026-08-13 \u2014 scrap can no longer block an enrollment.)
         string err = Validate();
         if (err == null) err = CareerValidate(blg);
-        if (err == null && !bcFree && Career.Data.scrap < bc.entryFee)
-            err = "Entry fee is " + bc.entryFee + " scrap \u2014 you hold " + Career.Data.scrap + ".";
         if (err == null) return null;
 
         // Row-sized restatement of the SAME failure. Falls back to the long
@@ -3361,8 +3358,6 @@ public class BuilderManager : MonoBehaviour
         if (lack.Count > 0) shortTag = "needs " + string.Join(", ", lack.ToArray());
         else if (BuildMassInt > blg.weightCap)
             shortTag = (BuildMassInt - Mathf.RoundToInt(blg.weightCap)) + " kg over cap";
-        else if (!bcFree && Career.Data.scrap < bc.entryFee)
-            shortTag = "needs " + bc.entryFee + " scrap entry fee";
         else shortTag = err;
         return err;
     }
@@ -4457,11 +4452,9 @@ public class BuilderManager : MonoBehaviour
             if (aWhy != null) { message = aWhy; SfxSynth.Deny(); return; }
             autoProg = RobotProgram.FromJson(Career.Data.stable[Career.Data.activeRobot].program);
         }
-        // First-win rule (owen, 2026-08-13): a beaten contest is free practice
-        // — no fee in, no payment out. Captured once so the refund below can
-        // never disagree with the charge about whether money moved.
-        bool feeCharged = c.entryFee > 0 && !Career.Data.doneContests.Contains(c.id);
-        if (feeCharged) Career.Txn(-c.entryFee, "entry fee " + c.id);
+        // Entry fees are GONE league-wide (owen, 2026-08-13, same day as the
+        // first-win rule): the league is free to enter at every level. The
+        // charge/refund pair that lived here is deleted, not disarmed.
         Career.fightBuildValue = BuildValueCareer();
         var recipe = EnemyRoster.Recipe(c.oppId, palette, c.armourMat, c.hardened);
         int ov = 0;
@@ -4479,7 +4472,6 @@ public class BuilderManager : MonoBehaviour
         // hand the fee back and clear the contest context.
         if (mode != Mode.Fight && Career.activeContest != null)
         {
-            if (feeCharged) Career.Txn(c.entryFee, "entry fee refund " + c.id);
             Career.activeLeague = null; Career.activeContest = null;
             return;
         }
@@ -4540,8 +4532,8 @@ public class BuilderManager : MonoBehaviour
         buildRoot.SetActive(false);
         scoutTitle = string.Format("SCOUTING \u2014 {0} ({1}) \u00b7 {2} \u00b7 {3} \u00b7 hazards: {4}",
             entry.label, c.tier, lg.name, lg.arenaName, ArenaHazards.Summary(lg.arenaId));
-        scoutStats = string.Format("mass {0} kg \u00b7 value {1} scrap \u00b7 weapon: {2} \u00b7 purse {3} scrap \u00b7 entry fee {4} scrap",
-            Mathf.RoundToInt(smass), sval, weapon, c.purse, c.entryFee);
+        scoutStats = string.Format("mass {0} kg \u00b7 value {1} scrap \u00b7 weapon: {2} \u00b7 purse {3} scrap",
+            Mathf.RoundToInt(smass), sval, weapon, c.purse);
         // P1 (design doc \u00a74.2): the opponent's sensor loadout is scoutable \u2014
         // what its program CAN know is the counter-design read.
         string sensLine = SensorBus.LoadoutLine(recipe);
@@ -6354,13 +6346,12 @@ public class BuilderManager : MonoBehaviour
                     // and this project's signature bug is the one-side fix.
                     bool cAuto = Career.Data.autoDoneContests.Contains(cc.id);
                     if (GatedButton(cdone
-                        ? string.Format("\u2713{0} {1} ({2}) \u00b7 practice \u2014 no purse, free entry{3}",
+                        ? string.Format("\u2713{0} {1} ({2}) \u00b7 practice \u2014 no purse{3}",
                             cAuto ? "[AUTO]" : "", EnemyRoster.Find(cc.oppId).label, cc.tier,
                             cBlocked ? "   \u2014   " + cTag : "")
-                        : string.Format("\u25b8{0} {1} ({2}) \u00b7 {3} scrap{4}{5}",
+                        : string.Format("\u25b8{0} {1} ({2}) \u00b7 {3} scrap{4}",
                             cAuto ? "[AUTO]" : "", EnemyRoster.Find(cc.oppId).label, cc.tier,
                             cc.purse,
-                            cc.entryFee > 0 ? " \u00b7 fee " + cc.entryFee + " scrap" : "",
                             cBlocked ? "   \u2014   " + cTag : ""), matStyle, cWhy))
                         StartCareerFight(li, ci3);
                     string dTag; string dWhy = AutonomyBlocker(out dTag);

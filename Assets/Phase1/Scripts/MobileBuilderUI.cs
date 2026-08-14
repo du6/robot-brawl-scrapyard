@@ -1671,15 +1671,14 @@ public class MobileBuilderUI : MonoBehaviour
                 if (autoDone) AutoMark(row.transform, c.id);
                 // First-win rule (owen, 2026-08-13): a beaten contest is a
                 // practice bout \u2014 the row says so instead of quoting a purse
-                // that will not be paid, and shows no fee because none is
-                // charged.
+                // that will not be paid. Entry fees no longer exist anywhere
+                // (owen, same day), so no row mentions one.
                 var lbl = MkText("lbl", row.transform,
                     done
-                        ? string.Format("\u2713 {0} ({1}) \u00b7 practice \u2014 no purse, free entry",
+                        ? string.Format("\u2713 {0} ({1}) \u00b7 practice \u2014 no purse",
                             EnemyRoster.Find(c.oppId).label, c.tier)
-                        : string.Format("{0} ({1}) \u00b7 {2} scrap{3}",
-                            EnemyRoster.Find(c.oppId).label, c.tier, c.purse,
-                            c.entryFee > 0 ? " \u00b7 fee " + c.entryFee + " scrap" : ""),
+                        : string.Format("{0} ({1}) \u00b7 {2} scrap",
+                            EnemyRoster.Find(c.oppId).label, c.tier, c.purse),
                     14, TextAnchor.MiddleLeft);
                 lbl.gameObject.AddComponent<LayoutElement>().flexibleWidth = 1f;
                 // R5 (critic finding 8): the header says "SCOUT shows the
