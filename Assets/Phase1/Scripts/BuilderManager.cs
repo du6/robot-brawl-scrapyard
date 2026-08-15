@@ -1643,24 +1643,44 @@ public class BuilderManager : MonoBehaviour
             return "Blocked by another part.";
         }
 
-        // Rotor sweep: if p is (or now clears/blocks) a spinner arc, honour the
-        // same rule placement does. Probe at the candidate spot.
-        var probe = new PlacedPart { def = p.def, pos = newPos, yaw = p.yaw,
-                                     wheelAxis = p.wheelAxis, matName = p.matName };
-        string swWhy = RotorSweepRefusal(probe);
-        if (swWhy != null) return swWhy;
+        // Rotor sweep baseline, computed with p WHERE IT IS NOW.
+        // ⚠ This used to hand RotorSweepRefusal a fresh `probe` object at newPos
+        // while p still sat at oldPos in `placed`. RotorSweepRefusal matches
+        // fouls by REFERENCE IDENTITY, so a part already (legally) inside a
+        // spinner's arc — baselined as (spinner, p) — never matched the probe
+        // (spinner, probe), and EVERY in-arc move was reported as a brand-new
+        // foul and refused. That broke MOVE for exactly the spinner-arm builds
+        // it is meant for. Fix (review, 2026-08-15): move p ITSELF and diff the
+        // foul set; p keeps its identity, so an arc it was already in matches
+        // the baseline and only a genuinely NEW foul refuses the move.
+        var beforeFouls = new List<RotorFoul>();
+        CollectRotorFouls(beforeFouls);
 
-        // Connectivity: tentatively occupy the new spot and require the whole
-        // build to still flood from the core. This catches both "the part
-        // floated free" and "it was holding something up".
+        // Tentatively occupy the new spot for BOTH the sweep diff and connectivity.
         p.pos = newPos;
-        bool ok = AllConnected(placed);
-        if (!ok) { p.pos = oldPos; return "Would break the build apart."; }
+
+        var afterFouls = new List<RotorFoul>();
+        CollectRotorFouls(afterFouls);
+        for (int i = 0; i < afterFouls.Count; i++)
+        {
+            if (HasFoul(beforeFouls, afterFouls[i])) continue;   // p was already in this arc — not new
+            var f = afterFouls[i];
+            p.pos = oldPos;
+            return f.hit == p
+                 ? "That sits inside the " + f.act.def.label + "'s swept circle"
+                 : "Rotor would sweep through " + f.hit.def.label
+                   + " — clear its circle, or turn the " + f.act.def.label;
+        }
+
+        // Connectivity: the whole build must still flood from the core. This
+        // catches both "the part floated free" and "it was holding something up".
+        if (!AllConnected(placed)) { p.pos = oldPos; return "Would break the build apart."; }
 
         // Commit: move the root (and its collider) and redraw the seam.
         p.go.transform.position = newPos;
         RebuildPartVisual(p);
         doomDirty = true;
+        foulDirty = true;   // the geometry changed — the cached sweep baseline is stale
         RefreshOverlay();
         return null;
     }
