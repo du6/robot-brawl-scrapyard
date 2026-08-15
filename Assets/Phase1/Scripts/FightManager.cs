@@ -1174,31 +1174,48 @@ public class FightManager : MonoBehaviour
         // is pointed at MY FIGHTS, where the referee's confirmation lands. The
         // old copy ("the purse is on its way") asserted a payout the server
         // had not yet ruled, which is the one thing this design must never do.
-        if (arenaLive)
-        {
-            var prov = new GUIStyle(medStyle);
-            prov.normal.textColor = new Color(0.82f, 0.86f, 0.94f);
-            GUI.Label(new Rect(0, H * 0.15f + 84f, W, 40),
-                      "unofficial — the referee is confirming this in MY FIGHTS", prov);
-        }
         // (2a) medStyle is SHARED with BigLine's mid-fight toasts, which write
         // it and used not to restore it - so the colour of the line explaining
         // how the match ended was decided by whichever warning fired last.
         // Set it explicitly here AND restore it in BigLine; either alone is a
         // fix, both together mean nothing can leak in future.
         medStyle.normal.textColor = accent;
-        GUI.Label(new Rect(0, H * 0.29f, W, 40), causeLine, medStyle);
+        // LANDSCAPE FIX (device, 2026-08-15): on an arena screen the verdict
+        // (causeLine) used a FRACTION (H*0.29) while the "unofficial" note was
+        // anchored to the title with a FIXED offset (H*0.15+84) — on a short
+        // landscape H the fraction rode UP into the note and the two overlapped
+        // into an unreadable smear. Stack both under the title with fixed
+        // offsets, and push the stats below the note via Max(): an arena fight
+        // has no money/medal block, so the lower half is free. The non-arena
+        // (career/contest) path is left byte-identical.
+        float statsTop;
+        if (arenaLive)
+        {
+            GUI.Label(new Rect(0, H * 0.15f + 78f, W, 32), causeLine, medStyle);
+            var prov = new GUIStyle(smallStyle);
+            prov.normal.textColor = new Color(0.82f, 0.86f, 0.94f);
+            GUI.Label(new Rect(0, H * 0.15f + 110f, W, 24),
+                      "unofficial — the referee is confirming this in MY FIGHTS", prov);
+            statsTop = Mathf.Max(H * 0.375f, H * 0.15f + 140f);
+        }
+        else
+        {
+            GUI.Label(new Rect(0, H * 0.29f, W, 40), causeLine, medStyle);
+            statsTop = H * 0.375f;
+        }
 
         int tsec = Mathf.RoundToInt(elapsed);
         // Round-3 fix 5: attribute the result to build decisions. The sim
         // already computes every one of these numbers — a Titanium build losing
         // 0 parts where the Aluminium twin lost 3 was invisible to the player
         // because both matches printed the same one-line verdict.
-        GUI.Label(new Rect(0, H * 0.375f, W, 30), SideLine("YOU", player), smallStyle);
-        GUI.Label(new Rect(0, H * 0.415f, W, 30), SideDetail(player), smallStyle);
-        GUI.Label(new Rect(0, H * 0.465f, W, 30), SideLine(enemy.label, enemy), smallStyle);
-        GUI.Label(new Rect(0, H * 0.505f, W, 30), SideDetail(enemy), smallStyle);
-        GUI.Label(new Rect(0, H * 0.555f, W, 30),
+        // Stat rows hang off statsTop (0.375H for career/contest — identical to
+        // before — pushed down on a cramped arena screen). Gaps unchanged.
+        GUI.Label(new Rect(0, statsTop,           W, 30), SideLine("YOU", player), smallStyle);
+        GUI.Label(new Rect(0, statsTop + H*0.04f, W, 30), SideDetail(player), smallStyle);
+        GUI.Label(new Rect(0, statsTop + H*0.09f, W, 30), SideLine(enemy.label, enemy), smallStyle);
+        GUI.Label(new Rect(0, statsTop + H*0.13f, W, 30), SideDetail(enemy), smallStyle);
+        GUI.Label(new Rect(0, statsTop + H*0.18f, W, 30),
             string.Format("Match time {0}:{1:00}", tsec / 60, tsec % 60), smallStyle);
         // ---------------------------------------------------------- MONEY
         // ROUND-3 FIX (critic CRITICAL 2b) - this was a TRUST bug, not a
@@ -1207,7 +1224,7 @@ public class FightManager : MonoBehaviour
         // cost the player 160 scrap net was reported to them as "+40". Show
         // the arithmetic: purse, bonus, fee, net. A player must never be told
         // they gained money in a match where they lost money.
-        float my = H * 0.585f;
+        float my = statsTop + H * 0.21f;   // = 0.585H when statsTop is 0.375H (career/contest unchanged)
         if (cIsContest)
         {
             // Entry fees are gone (owen, 2026-08-13): the arithmetic line is
@@ -1274,7 +1291,13 @@ public class FightManager : MonoBehaviour
         // input path. BACK is first and coloured: after a contest the play is
         // to go spend the purse or rebuild, never to rematch.
         bool touch = MobileBuilderUI.Active;
-        float bw = 264f, bh = 54f, by = H * 0.705f + medalDrop;
+        float bw = 264f, bh = 54f;
+        // The arena button follows the stats DOWN on a cramped landscape screen
+        // (where statsTop was pushed below 0.375H): a bare 0.705H fraction sat
+        // ABOVE the pushed-down match-time line and overlapped it. Non-arena
+        // keeps the exact 0.705H + medalDrop it always had.
+        float by = arenaLive ? Mathf.Max(H * 0.705f, statsTop + H * 0.18f + 46f)
+                             : H * 0.705f + medalDrop;
         float cx = W * 0.5f;
         GUI.backgroundColor = new Color(0.30f, 0.62f, 0.88f);
         // A LIVE LADDER MATCH gets one centered button and no REMATCH — the
