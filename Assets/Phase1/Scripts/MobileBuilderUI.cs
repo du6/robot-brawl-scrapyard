@@ -68,6 +68,16 @@ public class FieldScrollRelay : MonoBehaviour, IBeginDragHandler, IDragHandler, 
 public class MobileBuilderUI : MonoBehaviour
 {
     public static bool forceMobileUI;
+
+    /// <summary>Picking a part HIDES THE PANEL so the robot is reachable for
+    /// the placement tap (owen, 2026-08-14 — "the menu should fold", i.e. the
+    /// same thing the HIDE PANEL button does). On by default in the product;
+    /// the QA harnesses that drive palette tiles AND then tap other dock
+    /// buttons set it false, because hiding the panel deactivates those
+    /// buttons (ShowTab deactivates everything when closed) and they are not
+    /// testing panel chrome. TouchSmoke keeps it on and covers the behaviour
+    /// directly.</summary>
+    public static bool autoHidePanelOnPick = true;
     public static MobileBuilderUI inst;
     static Font font;
 
@@ -264,6 +274,12 @@ public class MobileBuilderUI : MonoBehaviour
     ScrollRect partScroll; GameObject partEdge;   // palette overflow affordance
     bool removeArmed; int clickHold; Button removeBtn;
     bool dragging; Vector2 lastP, downP; float moved; float pinchPrev = -1f;
+
+    /// <summary>Finger travel (device px) past which a one-finger gesture while
+    /// holding a part is a SWIPE-TO-ORBIT, not a place. A physical ~0.09" so a
+    /// resting-hand wobble still taps to place but a deliberate drag turns the
+    /// robot (owen 2026-08-14). Falls back to 24 px when dpi is unknown.</summary>
+    float SwipeVsTapPx { get { return Mathf.Max(24f, Screen.dpi > 1f ? Screen.dpi * 0.09f : 24f); } }
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
     static void Boot()
@@ -974,7 +990,18 @@ public class MobileBuilderUI : MonoBehaviour
         {
             int idx = i;
             string lab = PartTileText(i);
-            var pb = MkButton("part_"+i, content.transform, lab, 13, () => { bm.SelectPart(idx); RefreshHighlight(); });
+            // Picking a part HIDES THE PANEL so the robot is reachable for the
+            // placement tap (owen, 2026-08-14 — "the menu should fold"; same as
+            // the HIDE PANEL button). SelectPart is a toggle, so hide only when
+            // this tap actually SELECTED the part — deselecting it (tapping the
+            // armed tile again) leaves the panel as it is. Same idiom as
+            // REMOVE, whose onClick collapses the dock (behaviour lives in the
+            // onClick; the seam below it never sees this).
+            var pb = MkButton("part_"+i, content.transform, lab, 13, () => {
+                bm.SelectPart(idx);
+                if (autoHidePanelOnPick && bm.SelectedPart == idx && dockOpen) SetDockOpen(false);
+                RefreshHighlight();
+            });
             // ROSTER-ONLY retirement: the tile is CREATED (partButtons is
             // index-parallel to the palette — the tab-renumbering trap) and
             // then hidden, so no player path reaches the part while every
@@ -4675,10 +4702,26 @@ public class MobileBuilderUI : MonoBehaviour
             if (overUI) { dragging = false; Phase0Input.debugPointer = bm.HasSelection || removeArmed || clickHold > 0; return; }
             if (bm.HasSelection || removeArmed)
             {
-                Phase0Input.debugPointer = true;
-                Phase0Input.debugMousePos = new Vector3(p.x, p.y, 0f);
                 if (!dragging) { dragging = true; downP = p; moved = 0f; lastP = p; }
-                else { moved += (p - lastP).magnitude; lastP = p; }
+                else
+                {
+                    Vector2 d = p - lastP; moved += d.magnitude; lastP = p;
+                    // owen 2026-08-14: a SWIPE while holding a part ORBITS the
+                    // robot (turn it to aim the placement) instead of dragging
+                    // the ghost; a TAP still places. Past the threshold the
+                    // finger is an orbit — feed the camera and stop feeding the
+                    // placement pointer, and the release edge below will not
+                    // place (it now gates on `moved`). Two-finger orbit still
+                    // works too; this just makes one finger work as well.
+                    if (moved > SwipeVsTapPx)
+                    {
+                        bm.TestOrbitYaw += d.x * 0.3f;
+                        bm.TestOrbitPitch = Mathf.Clamp(bm.TestOrbitPitch - d.y * 0.3f, -70f, 80f);
+                    }
+                }
+                bool stillTap = moved <= SwipeVsTapPx;
+                Phase0Input.debugPointer = stillTap;
+                if (stillTap) Phase0Input.debugMousePos = new Vector3(p.x, p.y, 0f);
             }
             else
             {
@@ -4690,7 +4733,11 @@ public class MobileBuilderUI : MonoBehaviour
             return;
         }
         // no pointers — release edge
-        if (dragging && !OverUI(lastP))
+        // A gesture that became a SWIPE was an orbit, not a place — so it must
+        // NOT drop the part or fire REMOVE on release (owen 2026-08-14). Only a
+        // TAP (moved within the threshold) commits; the held part/armed REMOVE
+        // survives an orbit so the player can turn, then tap.
+        if (dragging && !OverUI(lastP) && moved <= SwipeVsTapPx)
         {
             if (removeArmed)
             {

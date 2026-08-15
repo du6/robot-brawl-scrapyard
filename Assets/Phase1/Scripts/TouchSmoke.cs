@@ -136,7 +136,23 @@ public class TouchSmoke : MonoBehaviour
         Check(bm.ActiveMatKey == "ABS", "tapping ABS switches back");
         if (ui != null && ui.MatSheetOpen && discl != null) { discl.onClick.Invoke(); yield return null; }   // leave it as found
 
+        // PANEL AUTO-HIDE ON PICK (owen 2026-08-14): with the panel open,
+        // picking a part HIDES it so the robot is reachable for the placement
+        // tap — the same effect as the HIDE PANEL button. Verified through the
+        // tile's onClick (Tap), the layer the behaviour lives in; the seam
+        // (bm.SelectPart) never hides, which is why the rest of this suite —
+        // and every bench that drives the seam — is unaffected. Turned OFF
+        // right after so the remaining flow can keep tapping dock buttons after
+        // a pick without the panel closing under it.
         Check(Btn("Beam") != null, "Beam part button present");
+        MobileBuilderUI.autoHidePanelOnPick = true;
+        if (!ui.DockOpen) { ui.SetDockOpen(true); yield return null; }
+        Tap("Beam"); yield return null;
+        Check(bm.HasSelection && !ui.DockOpen, "picking a part hides the panel");
+        MobileBuilderUI.autoHidePanelOnPick = false;
+        bm.SelectPart(bm.SelectedPart); yield return null;   // deselect via the seam (no re-hide)
+        ui.SetDockOpen(true); yield return null;
+
         Tap("Beam"); yield return null;
         Check(bm.HasSelection, "tapping a part button selects it");
 
@@ -450,6 +466,12 @@ public class TouchSmoke : MonoBehaviour
                   : "a scroller clips content across a fixed axis: " + string.Join(" | ", bad));
         }
 
+
+        // Restore the product default — this bench turned it off mid-flow so
+        // it could keep driving dock buttons after a pick. A static left false
+        // would silently disable panel auto-hide for the rest of this editor
+        // play session.
+        MobileBuilderUI.autoHidePanelOnPick = true;
 
         foreach (var l in log) Debug.Log("[TouchSmoke] " + l);
         Debug.Log(string.Format("[TouchSmoke] RESULT: {0} pass, {1} fail{2}",
