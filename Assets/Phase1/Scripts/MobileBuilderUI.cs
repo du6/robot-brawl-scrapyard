@@ -260,6 +260,8 @@ public class MobileBuilderUI : MonoBehaviour
     int retireArmM = -1;
     int bpDelArmM = -1;   // OWEN: blueprint armed for deletion
     readonly List<Button> partButtons = new List<Button>();
+    Button shopHintTile;          // owned-only palette: "MORE IN SHOP" cell (career)
+    bool paletteSeenShowAll = true;   // re-arrange the palette when this flips
     readonly List<Button> matButtons = new List<Button>();
     readonly List<string> matKeys = new List<string>();
     int tab;
@@ -1040,7 +1042,27 @@ public class MobileBuilderUI : MonoBehaviour
             }
             partButtons.Add(pb);
         }
+        // SHOP hint (owen, 2026-08-15): the career palette shows only parts you
+        // OWN, so a distinct amber cell points at the full catalogue in SHOP. It
+        // is NOT in partButtons, so the refresh/highlight loops never touch it;
+        // ArrangePalette parks it last and shows it only when the palette is
+        // filtered (career, non-draft).
+        shopHintTile = MkButton("part_shophint", content.transform, "MORE\nIN SHOP ▸", 12, () => ShowTab(3));
+        {
+            var hi = shopHintTile.GetComponent<Image>(); if (hi != null) hi.color = new Color(0.30f, 0.24f, 0.10f, 0.96f);
+            var ht = shopHintTile.GetComponentInChildren<Text>();
+            if (ht != null)
+            {
+                ht.horizontalOverflow = HorizontalWrapMode.Wrap;
+                ht.resizeTextForBestFit = true; ht.resizeTextMinSize = 8; ht.resizeTextMaxSize = 12;
+                ht.color = new Color(1f, 0.85f, 0.45f);
+                ht.rectTransform.offsetMin = new Vector2(4f, 2f);
+                ht.rectTransform.offsetMax = new Vector2(-4f, -2f);
+            }
+            shopHintTile.gameObject.SetActive(false);
+        }
         RefreshMats(); RefreshPartLabels();
+        ArrangePalette();
     }
 
     GameObject matSheetGO;
@@ -1329,6 +1351,69 @@ public class MobileBuilderUI : MonoBehaviour
             case "Power":    return new Color(0.26f, 0.22f, 0.12f, 0.96f);
             case "Control":  return new Color(0.17f, 0.16f, 0.28f, 0.96f);
             default:         return new Color(0.16f, 0.18f, 0.22f, 0.96f);
+        }
+    }
+
+    /// <summary>owen, 2026-08-15: the BUILD palette shows only the parts you OWN
+    /// in career, sorted into three groups — STRUCTURE (structure, wheels,
+    /// power), WEAPONS, SENSORS — because the SHOP tab is the full catalogue.
+    /// Free-build and DRAFT mode show EVERYTHING (both let you place parts you do
+    /// not own). This only reorders tile SIBLINGS and toggles them active; the
+    /// grid skips inactive children, so the tuned grid layout, the index-parallel
+    /// partButtons list and the refresh loops are all left exactly as they were.</summary>
+    int PaletteGroup(int i)
+    {
+        if (bm.PartId(i) == "core") return 0;              // the seed, kept first
+        switch (bm.PartCategory(i))
+        {
+            case "Weapon":  return 2;
+            case "Control": return 3;                      // sensors + gyro
+            default:        return 1;                      // Structural/Mobility/Power → "Structure"
+        }
+    }
+
+    /// <summary>Owns at least one of this part in ANY material — so switching the
+    /// material chip never makes an owned tile vanish, and a part currently bolted
+    /// to the build still counts (inventory is not spent by placement).</summary>
+    bool PlayerOwnsAny(int i)
+    {
+        // ⚠ Over the part's OWN legal materials, not MatDB.Order — a wheel is
+        // pinned to Rubber, which is NOT in Order, so an owned wheel read as
+        // unowned and vanished from the shelf (caught by the palette probe,
+        // 2026-08-15). PartLegalMats returns the pinned material for pinned parts.
+        string id = bm.PartId(i);
+        foreach (var m in bm.PartLegalMats(i)) if (Career.CountOf(id, m) > 0) return true;
+        return false;
+    }
+
+    void ArrangePalette()
+    {
+        if (bm == null || partButtons.Count == 0) return;
+        bool showAll = !Career.active || Career.FreeParts;   // free-build & DRAFT: full palette
+        paletteSeenShowAll = showAll;
+        // Visibility: owned-only in career; roster-retired stays hidden; the core
+        // is always shown (it is the controller, not a purchase).
+        for (int i = 0; i < partButtons.Count && i < bm.PaletteCount; i++)
+        {
+            if (partButtons[i] == null) continue;
+            bool show = !bm.PartRosterOnly(i)
+                        && (showAll || bm.PartId(i) == "core" || PlayerOwnsAny(i));
+            if (partButtons[i].gameObject.activeSelf != show)
+                partButtons[i].gameObject.SetActive(show);
+        }
+        // Order: group first, then original palette index (a stable, deterministic
+        // sort), applied through sibling index so the grid reflows.
+        var order = new List<int>();
+        for (int i = 0; i < partButtons.Count && i < bm.PaletteCount; i++) order.Add(i);
+        order.Sort((a, b) => { int ga = PaletteGroup(a), gb = PaletteGroup(b); return ga != gb ? ga - gb : a - b; });
+        int sib = 0;
+        foreach (int i in order) if (partButtons[i] != null) partButtons[i].transform.SetSiblingIndex(sib++);
+        // The SHOP hint sits last, and only when the palette is actually filtered.
+        if (shopHintTile != null)
+        {
+            bool wantHint = !showAll;
+            if (shopHintTile.gameObject.activeSelf != wantHint) shopHintTile.gameObject.SetActive(wantHint);
+            shopHintTile.transform.SetAsLastSibling();
         }
     }
 
@@ -3844,6 +3929,7 @@ public class MobileBuilderUI : MonoBehaviour
         shopNote = msg; shopNoteBad = bad;
         if (bad) SfxSynth.Deny(); else SfxSynth.Place();
         RefreshShop(); RefreshPartLabels(); RefreshHighlight();
+        ArrangePalette();   // buying a new part TYPE makes its tile appear; selling the last hides it
     }
 
     /// <summary>One catalog. Prices no longer ride the BUILD tab's chips: each
@@ -4598,6 +4684,11 @@ public class MobileBuilderUI : MonoBehaviour
         if (wasFighting) { wasFighting = false; RefreshFightInfo(); if (Career.active) RefreshCareerBoard(); }
         // C1: stock badges follow the build, the material chip and the career
         // switch live; refresh only when one of them changed.
+        // Owned-only palette (owen, 2026-08-15): re-arrange when the filter turns
+        // on or off — career on/off AND the DRAFT-mode toggle, which flips
+        // FreeParts while Career.active stays true (the careerSeen block below
+        // tracks active, not FreeParts, so it would miss draft entirely).
+        if ((!Career.active || Career.FreeParts) != paletteSeenShowAll) ArrangePalette();
         if (Career.active != careerSeenActive
             || (Career.active && (careerSeenPlaced != bm.PlacedCount || careerSeenMat != bm.ActiveMatKey)))
         {
@@ -4606,6 +4697,7 @@ public class MobileBuilderUI : MonoBehaviour
             careerSeenPlaced = bm.PlacedCount;
             careerSeenMat = bm.ActiveMatKey;
             RefreshPartLabels(); RefreshHighlight();
+            ArrangePalette();   // a draft commit / grant can shift ownership with the placed count
             LayoutTabs();
             RefreshFightTab();
             RefreshFightInfo();
