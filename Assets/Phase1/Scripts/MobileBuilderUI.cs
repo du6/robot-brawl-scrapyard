@@ -4597,6 +4597,7 @@ public class MobileBuilderUI : MonoBehaviour
         if (Career.active != careerSeenActive
             || (Career.active && (careerSeenPlaced != bm.PlacedCount || careerSeenMat != bm.ActiveMatKey)))
         {
+            bool placedMore = Career.active && careerSeenPlaced >= 0 && bm.PlacedCount > careerSeenPlaced;
             careerSeenActive = Career.active;
             careerSeenPlaced = bm.PlacedCount;
             careerSeenMat = bm.ActiveMatKey;
@@ -4606,6 +4607,18 @@ public class MobileBuilderUI : MonoBehaviour
             RefreshFightInfo();
             if (Career.active) RefreshShop();
             ShowTab(tab);   // C4: re-evaluate which panel tab 2+ shows
+            // owen 2026-08-14: placing the LAST owned unit of the held part
+            // auto-finishes — same as tapping DONE — so the player is never left
+            // holding a part they can no longer place. Only on a PLACEMENT (a
+            // REMOVE or a material flip are legitimate reasons to keep holding),
+            // and CareerRemaining is -1 in dev free-build and DRAFT mode, so
+            // neither auto-dones. Mirrors the DONE button (SelectPart toggles off).
+            if (placedMore && bm.HasSelection && bm.CareerRemaining(bm.SelectedPart) == 0)
+            {
+                bm.SelectPart(bm.SelectedPart);
+                Phase0Input.debugPointer = false;
+                RefreshHighlight();
+            }
         }
         if (statsText != null)
         {

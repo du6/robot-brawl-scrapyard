@@ -275,6 +275,44 @@ public class CareerSmoke : MonoBehaviour
         Phase0Input.debugPointer = false;
         Check(placedAll && bm.Validate() == null, "c3 setup: wheel + battery make the build fight-legal");
 
+        // ---- auto-DONE: placing the LAST owned unit hands the part back ----
+        // owen 2026-08-14: when the held part runs out, the dock switches to
+        // DONE mode by itself so the player isn't left holding nothing. Grant
+        // exactly one more beam (owned 1, none placed of this grant), place it,
+        // and the selection must clear WITHOUT anyone tapping DONE.
+        {
+            int be = -1;
+            for (int i = 1; i < bm.PaletteCount; i++) if (bm.PartId(i) == "beam") { be = i; break; }
+            int have = Career.CountOf("beam", bm.PartMatKey(be));
+            Career.AddItem("beam", bm.PartMatKey(be), 1);   // now exactly one spare to place
+            bm.SelectPart(be); yield return null;
+            Check(bm.HasSelection && bm.CareerRemaining(be) == 1,
+                  "auto-done setup: one beam left, held");
+            Phase0Input.debugPointer = true;
+            yield return new WaitForSeconds(0.5f);
+            bool okA = false;
+            for (int attempt = 0; attempt < 24 && !okA; attempt++)
+            {
+                Vector3 cand = attempt % 2 == 0 ? PartOnScreen(true) : PartOnScreen(false);
+                if (cand == Vector3.zero) { yield return null; continue; }
+                cand.x += (attempt / 4) * 9f * (attempt % 4 < 2 ? 1f : -1f);
+                cand.y += (attempt / 8) * 7f;
+                Phase0Input.debugMousePos = cand;
+                yield return null; yield return null;
+                okA = bm.TestGhostValid;
+            }
+            int npA = bm.PlacedCount;
+            Phase0Input.DebugClick(0);
+            // give the dock's per-frame update a few frames to notice the stock hit 0
+            for (int f = 0; f < 6; f++) yield return null;
+            Check(bm.PlacedCount == npA + 1 && bm.CareerRemaining(be) == 0 && !bm.HasSelection,
+                  "auto-done: placing the last owned beam clears the selection on its own");
+            Phase0Input.debugPointer = false;
+            // leave the build as C3 expects: undo the extra beam we just placed
+            if (bm.PlacedCount == npA + 1) { bm.Undo(); yield return null; }
+            Career.AddItem("beam", bm.PartMatKey(be), have - Career.CountOf("beam", bm.PartMatKey(be)));
+        }
+
         // over-cap + size-box refusals, message wording included
         var fakeCap = new CareerDB.League("LX", "Test League", "X", "x", 10f, new CareerDB.Contest[0]);
         string capMsg = bm.CareerValidate(fakeCap);
