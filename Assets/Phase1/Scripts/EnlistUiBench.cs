@@ -246,6 +246,15 @@ namespace RobotBrawl.Phase0
                     Check(st.IndexOf("worker", StringComparison.OrdinalIgnoreCase) >= 0
                        || st.IndexOf("checks", StringComparison.OrdinalIgnoreCase) >= 0,
                           "…and says a worker still has to check it -- got: " + st);
+                    // ⚠ AND THE DOCK ACTUALLY SHOWS IT. TestStatus is the raw
+                    // ArenaScreen.status field; the DOCK only renders it while the
+                    // scope is SC_ACCOUNT (MobileBuilderUI ~:3523). This bench read
+                    // the field and passed 17/17 while a device build showed the
+                    // ENLIST result as an invisible no-op (2026-08-15). Assert the
+                    // scope, which is what the seam-below-the-render layer misses.
+                    Check(ui.StatusScope == ArenaScreen.SC_ACCOUNT,
+                          "…and the result is scoped to the ENLIST panel so the DOCK shows it, "
+                          + "not left on the board where pressing ENLIST looks dead -- scope " + ui.StatusScope);
 
                     // ---- the no-program warning ------------------------------
                     // program "" is AI-DRIVEN to the worker, not missing, so a

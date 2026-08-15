@@ -271,16 +271,25 @@ namespace RobotBrawl.Phase0
         /// the build and never defaulted.</summary>
         IEnumerator DoEnlist()
         {
+            // ⚠ EVERY status here goes through Say(.., SC_ACCOUNT), NOT a raw
+            // `status =`. The dock only surfaces arenaScreen.Status while the
+            // scope IS SC_ACCOUNT (MobileBuilderUI ~:3523); a bare assignment
+            // left the scope at whatever the last board/inbox load set, so the
+            // ENLIST panel kept reading the generic "signed in" and pressing
+            // ENLIST looked DEAD — the upload happened, its result was invisible.
+            // Reported on a device build, 2026-08-15. Refresh() below re-scopes
+            // to the board, which is exactly why the SUCCESS line must Say() it
+            // back to SC_ACCOUNT after, not before.
             if (!Career.active || Career.Data == null)
-            { status = "enlisting sends your SAVED career robot — start a career first"; yield break; }
+            { Say("enlisting sends your SAVED career robot — start a career first", SC_ACCOUNT); yield break; }
             int ari = Career.Data.activeRobot;
             var ar = (ari >= 0 && ari < Career.Data.stable.Count) ? Career.Data.stable[ari] : null;
             if (ar == null || string.IsNullOrEmpty(ar.snapshot))
-            { status = "no saved robot — SAVE the build first, then enlist it"; yield break; }
+            { Say("no saved robot — SAVE the build first, then enlist it", SC_ACCOUNT); yield break; }
 
             string name = (enlistName ?? "").Trim();
             if (name.Length == 0) name = (ar.name ?? "").Trim();
-            if (name.Length == 0) { status = "give your robot a name first"; yield break; }
+            if (name.Length == 0) { Say("give your robot a name first", SC_ACCOUNT); yield break; }
 
             // ---- LOCAL PRE-FLIGHT, and read the gate before touching it -----
             //
@@ -320,16 +329,16 @@ namespace RobotBrawl.Phase0
                 var pre = RobotSnapshot.Describe(bmPre, new SnapshotPayload { program = ar.program });
                 if (pre != null && !pre.legal && pre.failReasons.Count > 0)
                 {
-                    status = "not accepted — " + pre.failReasons[0];
+                    Say("not accepted — " + pre.failReasons[0], SC_ACCOUNT);
                     yield break;                       // nothing uploaded
                 }
             }
 
-            busy = true; status = "enlisting " + name + "…";
+            busy = true; Say("enlisting " + name + "…", SC_ACCOUNT);
 
             SnapshotEnvelope env = null;
             try { env = RobotSnapshot.ExportRaw(name, ar.snapshot, ar.program); }
-            catch (Exception e) { env = null; status = "export: " + e.Message; }
+            catch (Exception e) { env = null; Say("export: " + e.Message, SC_ACCOUNT); }
             if (env == null) { busy = false; yield break; }
 
             // Carried to the SUCCESS line rather than set here — a status
@@ -344,7 +353,7 @@ namespace RobotBrawl.Phase0
 
             if (err != null || string.IsNullOrEmpty(snapId))
             {
-                status = "enlist: " + (err ?? "the server stored no snapshot");
+                Say("enlist: " + (err ?? "the server stored no snapshot"), SC_ACCOUNT);
                 busy = false; yield break;
             }
 
@@ -366,8 +375,8 @@ namespace RobotBrawl.Phase0
             // trip through the queue — up to one scheduler period in the
             // cloud. Claiming "you are on the ladder" here would be a lie the
             // player discovers by finding themselves nowhere on the board.
-            status = name + " uploaded — a match worker checks it is legal and "
-                   + "sets its weight class before it appears on the board." + note;
+            Say(name + " uploaded — a match worker checks it is legal and "
+                + "sets its weight class before it appears on the board." + note, SC_ACCOUNT);
             busy = false;
         }
 
