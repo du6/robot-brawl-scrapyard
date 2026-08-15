@@ -256,6 +256,32 @@ namespace RobotBrawl.Phase0
 
         public static string LastError = "";
 
+        /// <summary>Set true when a token-bearing request comes back 401 — the
+        /// stored session expired or was revoked server-side. RestoreSession has
+        /// promised since it was written that a dead token "surfaces as a 401 on
+        /// the first online call, which signs the player out" — Send() below is
+        /// the code that finally keeps that promise, and this is the flag the UI
+        /// reads to say WHY the sign-in form is back instead of MY FIGHTS. It is
+        /// the bug a player reported as "the app update wiped my fights": the
+        /// records were safe server-side, but the expired session left the dock
+        /// looking signed in over an empty board with no way to know to re-auth.
+        /// Cleared on a fresh sign-in (Auth) and on any Logout.</summary>
+        public static bool SessionExpired = false;
+
+        /// <summary>The single send point for EVERY request. When a call we made
+        /// WITH a token comes back 401, the token is dead: retire the session
+        /// (so it is never reused) and raise SessionExpired. One choke point
+        /// turns "the server rejected our token" into "sign in again" across all
+        /// nineteen call sites, instead of each one failing to an empty screen.
+        /// A 401 with no token is just an anonymous call hitting an authed route
+        /// and must NOT sign anyone out — hence the Token guard.</summary>
+        static IEnumerator Send(UnityWebRequest req)
+        {
+            yield return req.SendWebRequest();
+            if (req != null && req.responseCode == 401 && !string.IsNullOrEmpty(Token))
+            { Logout(); SessionExpired = true; }
+        }
+
         static UnityWebRequest Get(string path)
         {
             var req = UnityWebRequest.Get(BaseUrl.TrimEnd('/') + path);
@@ -301,7 +327,7 @@ namespace RobotBrawl.Phase0
             string path = "/v1/leaderboard" + (string.IsNullOrEmpty(category) ? "" : "/" + category);
             using (var req = Get(path))
             {
-                yield return req.SendWebRequest();
+                yield return Send(req);
                 if (req.result != UnityWebRequest.Result.Success)
                 { LastError = req.error; done(null, req.error); yield break; }
 
@@ -339,7 +365,7 @@ namespace RobotBrawl.Phase0
         {
             using (var req = Get("/v1/inbox"))
             {
-                yield return req.SendWebRequest();
+                yield return Send(req);
                 if (req.result != UnityWebRequest.Result.Success)
                 { LastError = req.error; done(null, req.error); yield break; }
 
@@ -369,7 +395,7 @@ namespace RobotBrawl.Phase0
         {
             using (var req = Get("/v1/snapshots/" + snapshotId))
             {
-                yield return req.SendWebRequest();
+                yield return Send(req);
                 if (req.result != UnityWebRequest.Result.Success)
                 { LastError = req.error; done(null, req.error); yield break; }
                 string j = req.downloadHandler.text;
@@ -408,7 +434,7 @@ namespace RobotBrawl.Phase0
         {
             using (var req = Get("/v1/robots"))
             {
-                yield return req.SendWebRequest();
+                yield return Send(req);
                 if (req.result != UnityWebRequest.Result.Success)
                 { LastError = req.error; done(null, req.error); yield break; }
                 var rows = new List<MyRobot>();
@@ -454,7 +480,7 @@ namespace RobotBrawl.Phase0
             if (!string.IsNullOrEmpty(Token)) req.SetRequestHeader("Authorization", "Bearer " + Token);
             using (req)
             {
-                yield return req.SendWebRequest();
+                yield return Send(req);
                 string text = req.downloadHandler != null ? req.downloadHandler.text : "";
                 if (req.result != UnityWebRequest.Result.Success)
                 {
@@ -481,7 +507,7 @@ namespace RobotBrawl.Phase0
         {
             using (var req = Get("/v1/matches/" + matchId + "/envelopes"))
             {
-                yield return req.SendWebRequest();
+                yield return Send(req);
                 string text = req.downloadHandler != null ? req.downloadHandler.text : "";
                 if (req.result != UnityWebRequest.Result.Success)
                 { done(null, null, null, RobotWorker.Field(text, "error") ?? req.error); yield break; }
@@ -525,7 +551,7 @@ namespace RobotBrawl.Phase0
         {
             using (var req = PostJson("/v1/robots", "{\"name\":" + RobotWorker.Str(name) + "}"))
             {
-                yield return req.SendWebRequest();
+                yield return Send(req);
                 string text = req.downloadHandler != null ? req.downloadHandler.text : "";
                 if (req.result != UnityWebRequest.Result.Success)
                 {
@@ -550,7 +576,7 @@ namespace RobotBrawl.Phase0
                         + ",\"envelope\":" + RobotWorker.Str(envelopeJson) + "}";
             using (var req = PostJson("/v1/snapshots", body))
             {
-                yield return req.SendWebRequest();
+                yield return Send(req);
                 string text = req.downloadHandler != null ? req.downloadHandler.text : "";
                 if (req.result != UnityWebRequest.Result.Success)
                 {
@@ -646,9 +672,15 @@ namespace RobotBrawl.Phase0
 
         static IEnumerator Auth(string path, string body, Action<string, string> done)
         {
+            // Re-authenticating: never carry a stale bearer into the login call,
+            // and this attempt is a sign-in, not an expiry — so a wrong-password
+            // 401 here is the server's "email or password is wrong" (surfaced by
+            // done below), NOT the Send() expiry path. Clearing Token first keeps
+            // that 401 out of Send's Token-guarded branch.
+            Token = ""; SessionExpired = false;
             using (var req = PostJson(path, body))
             {
-                yield return req.SendWebRequest();
+                yield return Send(req);
                 string text = req.downloadHandler != null ? req.downloadHandler.text : "";
                 if (req.result != UnityWebRequest.Result.Success)
                 {
@@ -717,7 +749,7 @@ namespace RobotBrawl.Phase0
         /// <summary>Sign out. Clears the token AND the persisted session —
         /// a sign-out that survives a restart is not a sign-out. No server
         /// call: the JWT is stateless, it simply stops being sent.</summary>
-        public static void Logout() { Token = ""; ClearSession(); }
+        public static void Logout() { Token = ""; SessionExpired = false; ClearSession(); }
 
         /// <summary>Permanently delete the signed-in account (App Store
         /// 5.1.1(v) — mandatory once accounts gate the app). The server
@@ -735,7 +767,7 @@ namespace RobotBrawl.Phase0
             if (!string.IsNullOrEmpty(Token)) req.SetRequestHeader("Authorization", "Bearer " + Token);
             using (req)
             {
-                yield return req.SendWebRequest();
+                yield return Send(req);
                 string text = req.downloadHandler != null ? req.downloadHandler.text : "";
                 if (req.result != UnityWebRequest.Result.Success)
                 { done(RobotWorker.Field(text, "error") ?? req.error); yield break; }
@@ -754,7 +786,7 @@ namespace RobotBrawl.Phase0
             using (var req = UnityWebRequest.Get(BaseUrl + "/v1/wallet"))
             {
                 if (!string.IsNullOrEmpty(Token)) req.SetRequestHeader("Authorization", "Bearer " + Token);
-                yield return req.SendWebRequest();
+                yield return Send(req);
                 string text = req.downloadHandler != null ? req.downloadHandler.text : "";
                 if (req.result != UnityWebRequest.Result.Success)
                 { done(0, RobotWorker.Field(text, "error") ?? req.error); yield break; }
@@ -776,7 +808,7 @@ namespace RobotBrawl.Phase0
                         + ",\"mult\":" + cl.mult.ToString(System.Globalization.CultureInfo.InvariantCulture) + "}";
             using (var req = PostJson("/v1/economy/claims", body))
             {
-                yield return req.SendWebRequest();
+                yield return Send(req);
                 string text = req.downloadHandler != null ? req.downloadHandler.text : "";
                 if (req.responseCode == 409) { done(0, true, null); yield break; }
                 if (req.result != UnityWebRequest.Result.Success)
@@ -798,7 +830,7 @@ namespace RobotBrawl.Phase0
                         + ",\"idemKey\":" + RobotWorker.Str(p.idemKey) + "}";
             using (var req = PostJson("/v1/economy/purchase", body))
             {
-                yield return req.SendWebRequest();
+                yield return Send(req);
                 string text = req.downloadHandler != null ? req.downloadHandler.text : "";
                 if (req.responseCode == 200 || req.responseCode == 409) { done(true, null, null); yield break; }
                 if (req.responseCode == 400 || req.responseCode == 404)
@@ -819,7 +851,7 @@ namespace RobotBrawl.Phase0
             using (var req = PostJson("/v1/wallet/deposit",
                        "{\"amount\":" + amount + ",\"idemKey\":" + RobotWorker.Str(idemKey) + "}"))
             {
-                yield return req.SendWebRequest();
+                yield return Send(req);
                 string text = req.downloadHandler != null ? req.downloadHandler.text : "";
                 if (req.result != UnityWebRequest.Result.Success)
                 {
@@ -837,7 +869,7 @@ namespace RobotBrawl.Phase0
         {
             using (var req = Get("/v1/cosmetics"))
             {
-                yield return req.SendWebRequest();
+                yield return Send(req);
                 if (req.result != UnityWebRequest.Result.Success)
                 { LastError = req.error; done(new List<Cosmetic>(), req.error); yield break; }
                 done(ParseCosmetics(req.downloadHandler.text), null);
@@ -848,7 +880,7 @@ namespace RobotBrawl.Phase0
         {
             using (var req = PostJson("/v1/cosmetics/" + UnityWebRequest.EscapeURL(id) + "/buy", "{}"))
             {
-                yield return req.SendWebRequest();
+                yield return Send(req);
                 string text = req.downloadHandler != null ? req.downloadHandler.text : "";
                 if (req.result != UnityWebRequest.Result.Success)
                 { string why = RobotWorker.Field(text, "error") ?? req.error;
@@ -868,7 +900,7 @@ namespace RobotBrawl.Phase0
                         + ",\"titleId\":" + (titleId == null ? "null" : RobotWorker.Str(titleId)) + "}";
             using (var req = PostJson("/v1/robots/" + robotId + "/equip", body))
             {
-                yield return req.SendWebRequest();
+                yield return Send(req);
                 string text = req.downloadHandler != null ? req.downloadHandler.text : "";
                 if (req.result != UnityWebRequest.Result.Success)
                 { string why = RobotWorker.Field(text, "error") ?? req.error;
@@ -881,7 +913,7 @@ namespace RobotBrawl.Phase0
         {
             using (var req = Get("/v1/wallet"))
             {
-                yield return req.SendWebRequest();
+                yield return Send(req);
                 if (req.result != UnityWebRequest.Result.Success)
                 { LastError = req.error; done(0, req.error); yield break; }
                 long bal; long.TryParse(RobotWorker.Field(req.downloadHandler.text, "balance"), out bal);
@@ -898,7 +930,7 @@ namespace RobotBrawl.Phase0
             if (string.IsNullOrEmpty(url)) { done(null, "no replay url"); yield break; }
             using (var req = UnityWebRequest.Get(url))
             {
-                yield return req.SendWebRequest();
+                yield return Send(req);
                 if (req.result != UnityWebRequest.Result.Success)
                 { LastError = req.error; done(null, req.error); yield break; }
                 byte[] bytes = req.downloadHandler.data;

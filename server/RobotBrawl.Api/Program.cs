@@ -52,7 +52,15 @@ var sqlDir = Path.Combine(AppContext.BaseDirectory, "Sql");
 var migrationsDir = Path.Combine(AppContext.BaseDirectory, "Migrations");
 
 var db = new Db(connString);
-var tokens = new Tokens(jwtSecret, TimeSpan.FromHours(cfg.GetValue("Jwt:Hours", 12)));
+// 30 days, was 12 hours. A 12h token expired between almost every play
+// session, and the client TRUSTED a stored-but-expired token at boot —
+// so a returning player saw an empty board over a signed-in-looking dock
+// and read it as "the app update wiped my fights" (records were safe
+// server-side; the session was just dead). The client now retires a
+// 401'd token and re-prompts (LadderClient.Send/SessionExpired); this
+// makes the common case — come back a day later — not need a re-auth at
+// all. Overridable by Jwt:Hours config for a shorter-lived deployment.
+var tokens = new Tokens(jwtSecret, TimeSpan.FromHours(cfg.GetValue("Jwt:Hours", 720)));
 
 builder.Services.AddSingleton(db);
 builder.Services.AddSingleton(tokens);

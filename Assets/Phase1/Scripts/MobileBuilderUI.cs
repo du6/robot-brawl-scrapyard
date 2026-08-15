@@ -3006,6 +3006,20 @@ public class MobileBuilderUI : MonoBehaviour
             head.color = new Color(0.90f, 0.94f, 1f);
             head.gameObject.AddComponent<LayoutElement>().minHeight = 26f;
 
+            // WHY the form is back. A dead session used to drop the player here
+            // with no explanation over an empty board — read as "the update
+            // wiped my fights" when the fights were safe server-side all along.
+            // LadderClient.Send raised this flag; a plain re-sign-in restores
+            // everything. Not registering: an expiry is a sign-IN, not a signup.
+            if (LadderClient.SessionExpired && !arenaScreen.Registering)
+            {
+                var exp = MkText("accexpired", arenaAccountContent,
+                    "your session expired — sign in again to see your fights and scrap. "
+                  + "nothing was lost; your account lives on the server.", 12, TextAnchor.MiddleLeft);
+                exp.color = new Color(1f, 0.82f, 0.42f);
+                exp.gameObject.AddComponent<LayoutElement>().minHeight = 40f;
+            }
+
             ArenaField(arenaAccountContent, "email", arenaScreen.Email, false,
                        "you@example.com",
                        s => { if (arenaScreen != null) arenaScreen.Email = s; });

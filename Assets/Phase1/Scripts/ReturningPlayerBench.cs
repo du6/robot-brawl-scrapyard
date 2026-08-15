@@ -305,6 +305,32 @@ namespace RobotBrawl.Phase0
                 if (mine != null) foreach (var m in mine) if (m.name == nameR && m.CanFight) ownsIt = true;
                 Check(ownsIt, "the returning session still owns the robot the first session enlisted");
 
+                // ------------------------------------------------------------
+                // B2. a DEAD token retires the session — the "app update wiped
+                // my fights" bug. The records are safe server-side; an expired
+                // session used to leave the dock looking signed IN over an empty
+                // board, with no token that works and no prompt to re-auth.
+                // Tamper the token so the server 401s, make one authed call, and
+                // the client must sign us OUT and raise SessionExpired so the
+                // dock can say why — not fail silently to a blank MY FIGHTS.
+                // ------------------------------------------------------------
+                LadderClient.SessionExpired = false;
+                string tampered = LadderClient.Token + "-tampered";   // invalid signature -> 401
+                LadderClient.Token = tampered;
+                List<InboxEntry> deadInbox = null; string deadErr = null;
+                yield return LadderClient.Inbox((rows, e) => { deadInbox = rows; deadErr = e; });
+                Check(!LadderClient.SignedIn,
+                      "a 401 on a token-bearing call RETIRES the dead session "
+                      + "(no silent empty screen over a signed-in-looking dock)");
+                Check(LadderClient.SessionExpired,
+                      "…and raises SessionExpired so the dock shows WHY the sign-in form is back");
+
+                // coming back the honest way clears the flag and restores state
+                yield return LadderClient.Login(emailR, PW, (w, e) => { err = e; });
+                Check(LadderClient.SignedIn && !LadderClient.SessionExpired,
+                      "signing back in clears the expiry and restores the session"
+                      + (err != null ? " -- " + err : ""));
+
                 // ============================================================
                 // C. the DOCK, which is where the blocker actually lived
                 // ============================================================
