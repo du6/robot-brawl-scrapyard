@@ -773,7 +773,8 @@ public class BuilderManager : MonoBehaviour
         string snap = undoStack[undoStack.Count - 1];
         undoStack.RemoveAt(undoStack.Count - 1);
         // LoadSnapshot writes `message`, so say our piece after it, not before.
-        int n = LoadSnapshot(snap);
+        // followMaterial:false — undo restores geometry, not your material pick.
+        int n = LoadSnapshot(snap, false);
         Deselect();
         hoverPart = null;
         doomDirty = true;
@@ -5802,7 +5803,15 @@ public class BuilderManager : MonoBehaviour
         return true;
     }
 
-    public int LoadSnapshot(string text)
+    /// <summary>followMaterial: adopt the loaded build's most-used material as
+    /// the active one. TRUE when a human OPENS a different saved build (the
+    /// panel should describe what it just loaded — Round-5 fix 8). FALSE for
+    /// UNDO, which restores the geometry of the build you are ALREADY editing:
+    /// hijacking the material you deliberately selected is a surprise
+    /// (reported on device 2026-08-15 — picked Carbon Fiber, undid a couple of
+    /// parts, the material jumped to Aluminum, the build's dominant material).</summary>
+    public int LoadSnapshot(string text) { return LoadSnapshot(text, true); }
+    public int LoadSnapshot(string text, bool followMaterial)
     {
         // Refuse rather than throw. Loading into a half-constructed builder
         // (Start not yet run, or a domain reload that left the component alive
@@ -5927,7 +5936,8 @@ public class BuilderManager : MonoBehaviour
         // Round-5 fix 8: the material panel used to keep describing whatever
         // was selected before the load, so a Tungsten build read "Aluminum —
         // the all-rounder". Follow the build: select its most-used material.
-        if (placed.Count > 0)
+        // followMaterial is FALSE on undo — see the LoadSnapshot doc comment.
+        if (followMaterial && placed.Count > 0)
         {
             string modal = null; int best = 0;
             foreach (string key in MatDB.Order)
