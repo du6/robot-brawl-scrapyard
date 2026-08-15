@@ -1641,10 +1641,10 @@ app.MapPost("/v1/wallet/deposit", async (DepositReq req, ClaimsPrincipal user) =
 // The constants mirror Career.cs and must move with it — the client remains
 // the DISPLAY copy of this arithmetic, this is what pays. api_smoke pins the
 // ceiling arithmetic so drift fails a bench instead of paying wrong money.
-const double ECON_UNDERDOG_CAP = 1.6;   // Career.UNDERDOG_CAP
-const double ECON_WIN_DMG_K   = 0.25;   // Career.WIN_DMG_K
-const double ECON_WIN_DMG_CAP = 400;    // Career.WIN_DMG_CAP
-const int    ECON_FIRST_WIN_BONUS = 75; // Career.FIRST_WIN_BONUS
+const double ECON_UNDERDOG_CAP = 1.6;      // Career.UNDERDOG_CAP
+const double ECON_WIN_DMG_K   = 0.1667;    // Career.WIN_DMG_K (one-third cut, 2026-08-15)
+const double ECON_WIN_DMG_CAP = 400;       // Career.WIN_DMG_CAP
+const int    ECON_FIRST_WIN_BONUS = 50;    // Career.FIRST_WIN_BONUS (one-third cut, 2026-08-15)
 // The ECON_LOSS_* constants and ECON_CONSOLATION_MAX lived here for a few
 // hours on 2026-08-13 and are GONE (owen: "remove loss payment in leagues" —
 // register #6 resolved by deletion). With fees also gone, a repeatable loss

@@ -15,7 +15,7 @@ PASS  a wrong password and an unknown account are indistinguishable (both 401)
 
 == D. robots ==
 PASS  a robot is created
-      robot 6edb3fcb-e548-43fd-86a6-2d6315e82b6c
+      robot 8f0b66b0-c7e2-4e14-93c1-4ff2e941dbb5
 PASS  …but not without a token
 
 == E. snapshot upload stays opaque (§5.2) ==
@@ -30,7 +30,7 @@ PASS  …and a wrong key is refused too
 PASS  a keyed worker claims a job
 PASS  …and the job is the VALIDATE the upload enqueued
 PASS  …pointing at the snapshot just uploaded
-PASS  …and carries a payload location the worker can resolve (file:///tmp/rb-blobs/snapshots/6edb3fcb-e548-43fd-86a6-2d6315e82b6c/2a3eed7fae1c4221a5276601c180420b.json)
+PASS  …and carries a payload location the worker can resolve (file:///tmp/rb-blobs/snapshots/8f0b66b0-c7e2-4e14-93c1-4ff2e941dbb5/f2a3c29fd4f24a4d99b81c2c9af3a950.json)
 PASS  …and the payload sha256 rides along, so the worker can verify storage
 PASS  another worker cannot heartbeat a job it does not hold
 PASS  …the holder can
@@ -233,31 +233,31 @@ PASS  no wallet is overdrawn
 --- E. the career economy ---
 PASS  an economy account registers
 PASS  a NON-participant asking for match envelopes is told nothing
-PASS  …and the account id came back (e333a4e0-fb4d-4dd0-a399-b1c970129a14)
+PASS  …and the account id came back (cac86654-7452-45f8-9ab7-075d8bf05f5d)
 PASS  the wallet answers
 PASS  a fresh wallet holds exactly the signing bonus
 PASS  …and owns nothing
 PASS  the purse table carries all 14 contests
-PASS  …and their purses sum to 7125 (the design doc ceiling's base)
+PASS  …and their purses sum to 4750 (7125 cut by one third, migration 013)
 PASS  the entry kind no longer exists — fees were removed league-wide
 PASS  …and the entry_fee column is dropped, not zeroed
 PASS  the first win pays
-PASS  …purse 125 + damage 50 + first-win 75 = 250
+PASS  …purse 83 + damage 33 + first-win 50 = 166 (one-third cut)
 PASS  the SECOND purse claim is refused — re-entry is practice
 PASS  …and the refusal names what was already paid
 PASS  a claim with absurd inputs still pays
-PASS  …but CLAMPED: 150×1.6 + 400×0.25 + 75 = 415, not what the client asked
+PASS  …but CLAMPED: 100×1.6 + 400×0.1667 + 50 = 277, not what the client asked
 PASS  a contest the table does not know is a 404, not a payout
 PASS  the consolation kind no longer exists — losses pay nothing
 PASS  …and the refusal names the only kind left
-PASS  L3C1's first win pays (350 + 75 = 425)
-PASS  the running balance is exactly the ledger's story (1590, wins only)
+PASS  L3C1's first win pays (233 + 50 = 283)
+PASS  the running balance is exactly the ledger's story (1226, wins only)
 PASS  a part buys at the seeded price
 PASS  …cube/ABS is 7
 PASS  replaying the same purchase is refused, not double-charged
 PASS  …and the inventory holds ONE cube, not two
 PASS  an expensive part buys while affordable (187)
-PASS  …and one beyond the wallet (1601 > 1396) is refused
+PASS  …and one beyond the wallet (1601 > 1032) is refused
 PASS  a sale credits half back
 PASS  …7 → 4 (round-half-to-even, same as the client)
 PASS  selling a part you no longer own is refused
@@ -293,7 +293,7 @@ PASS  metrics carry pendingSnapshots
 PASS  pendingSnapshots agrees with the database
 PASS  failed agrees with the database
 PASS  the rbmetrics log line keeps its shape
-      rbmetrics ready=0 claimed=0 failed=4 done=13 oldest_ready_s=0 oldest_heartbeat_s=0 pending_snapshots=3 oldest_pending_s=2
+      rbmetrics ready=1 claimed=0 failed=4 done=16 oldest_ready_s=2 oldest_heartbeat_s=0 pending_snapshots=3 oldest_pending_s=7
 PASS  …and reports real counts, not a row of zeros
 
 --- B. season badges ---

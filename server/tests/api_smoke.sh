@@ -1388,8 +1388,8 @@ if [ "$EINV" = "[]" ]; then ok "…and owns nothing"; else no "…and owns nothi
 # arithmetic depends on these two numbers, so they are pinned here.
 is "the purse table carries all 14 contests" \
    "$(dbq 'SELECT count(*) FROM league_contests;')" 14
-is "…and their purses sum to 7125 (the design doc ceiling's base)" \
-   "$(dbq 'SELECT SUM(purse) FROM league_contests;')" 7125
+is "…and their purses sum to 4750 (7125 cut by one third, migration 013)" \
+   "$(dbq 'SELECT SUM(purse) FROM league_contests;')" 4750
 
 # --- entry fees are GONE (owen 2026-08-13, migration 012) ---
 c=$(req POST /v1/economy/claims '{"kind":"entry","contestId":"L3C1","attemptId":"e-a1"}' "$EAUTH")
@@ -1400,13 +1400,13 @@ if [ -z "$guard_col" ]; then ok "…and the entry_fee column is dropped, not zer
 # --- the first-win rule ---
 c=$(req POST /v1/economy/claims '{"kind":"purse","contestId":"L1C1","dealt":200,"mult":1.0}' "$EAUTH")
 expect "the first win pays" "$c" 200
-is "…purse 125 + damage 50 + first-win 75 = 250" "$(jget paid)" 250
+is "…purse 83 + damage 33 + first-win 50 = 166 (one-third cut)" "$(jget paid)" 166
 c=$(req POST /v1/economy/claims '{"kind":"purse","contestId":"L1C1","dealt":200,"mult":1.0}' "$EAUTH")
 expect "the SECOND purse claim is refused — re-entry is practice" "$c" 409
-is "…and the refusal names what was already paid" "$(jget alreadyPaid.paid)" 250
+is "…and the refusal names what was already paid" "$(jget alreadyPaid.paid)" 166
 c=$(req POST /v1/economy/claims '{"kind":"purse","contestId":"L1C2","dealt":99999,"mult":99}' "$EAUTH")
 expect "a claim with absurd inputs still pays" "$c" 200
-is "…but CLAMPED: 150×1.6 + 400×0.25 + 75 = 415, not what the client asked" "$(jget paid)" 415
+is "…but CLAMPED: 100×1.6 + 400×0.1667 + 50 = 277, not what the client asked" "$(jget paid)" 277
 c=$(req POST /v1/economy/claims '{"kind":"purse","contestId":"L9C9","dealt":0,"mult":1}' "$EAUTH")
 expect "a contest the table does not know is a 404, not a payout" "$c" 404
 
@@ -1417,12 +1417,12 @@ is "…and the refusal names the only kind left" "$(jget error)" "kind must be p
 
 # --- a fee contest (as was) pays its purse like any other now ---
 c=$(req POST /v1/economy/claims '{"kind":"purse","contestId":"L3C1","dealt":0,"mult":1.0}' "$EAUTH")
-expect "L3C1's first win pays (350 + 75 = 425)" "$c" 200
+expect "L3C1's first win pays (233 + 50 = 283)" "$c" 200
 
-# Balance so far: 500 + 250 + 415 + 425 = 1590 — wins only, nothing ever
+# Balance so far: 500 + 166 + 277 + 283 = 1226 — wins only, nothing ever
 # debited (no fees exist) and nothing paid for losing.
 c=$(req GET /v1/wallet "" "$EAUTH")
-is "the running balance is exactly the ledger's story (1590, wins only)" "$(jget balance)" 1590
+is "the running balance is exactly the ledger's story (1226, wins only)" "$(jget balance)" 1226
 
 # --- the shop ---
 c=$(req POST /v1/economy/purchase '{"op":"buy","partId":"cube","mat":"ABS","idemKey":"p-1"}' "$EAUTH")
@@ -1435,7 +1435,7 @@ is "…and the inventory holds ONE cube, not two" \
 c=$(req POST /v1/economy/purchase '{"op":"buy","partId":"cube","mat":"Titanium","idemKey":"p-2"}' "$EAUTH")
 expect "an expensive part buys while affordable (187)" "$c" 200
 c=$(req POST /v1/economy/purchase '{"op":"buy","partId":"cube","mat":"Tungsten","idemKey":"p-3"}' "$EAUTH")
-expect "…and one beyond the wallet (1601 > 1396) is refused" "$c" 400
+expect "…and one beyond the wallet (1601 > 1032) is refused" "$c" 400
 c=$(req POST /v1/economy/purchase '{"op":"sell","partId":"cube","mat":"ABS","idemKey":"p-4"}' "$EAUTH")
 expect "a sale credits half back" "$c" 200
 is "…7 → 4 (round-half-to-even, same as the client)" "$(jget refunded)" 4
