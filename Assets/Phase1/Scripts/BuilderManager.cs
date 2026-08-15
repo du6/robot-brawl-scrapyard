@@ -1480,6 +1480,20 @@ public class BuilderManager : MonoBehaviour
                 + Mathf.RoundToInt(GUSSET_KG) + " kg";
         RefreshOverlay();
         SfxSynth.Place();
+
+        // A momentary weld flash at the face just welded (owen, 2026-08-15). The
+        // gold plate above is the permanent mark; this is the spark of the weld
+        // happening. Same face geometry RefreshGussetFaces uses, in WORLD space.
+        if (hit.go != null)
+        {
+            Vector3 dir = FaceDir(bit);
+            Vector3 hHalf = hit.Half();
+            Vector3 local = dir * (Mathf.Abs(Vector3.Dot(dir, hHalf)) + 0.007f);
+            int axis = bit / 2;
+            float e0 = axis == 0 ? hHalf.y : hHalf.x;
+            float e1 = axis == 2 ? hHalf.y : hHalf.z;
+            GussetWeldFx.Spawn(hit.go.transform.TransformPoint(local), 2f * Mathf.Max(e0, e1));
+        }
     }
 
     /// <summary>REMOVE's gusset layer (owen v3 rule 3): with REMOVE armed, a
