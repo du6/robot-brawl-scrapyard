@@ -392,6 +392,13 @@ public class TouchSmoke : MonoBehaviour
             yield return null; yield return null;
         }
         bool placedOne = bm.PlacedCount == nc + 1;
+        // AUTO-DONE (owen, 2026-08-14): placing the LAST owned unit now hands the
+        // part back on its own, so the beam is no longer held. Re-select it
+        // before probing the 0-stock refusal, which only speaks on a HELD,
+        // empty-shelf part. Via the SEAM, not Tap("Beam"): the tile's onClick
+        // would fire panel auto-hide and collapse the dock the 0-free badge check
+        // below reads (a collapsed dock deactivates its buttons).
+        if (!bm.HasSelection) { bm.SelectPart(bi); yield return null; }
         // The stock gate only speaks on a PLACEABLE spot - an invalid ghost
         // is the ordinary deny (no message). Hunt a valid ghost first: the
         // core face, the placed beam, then small x-offsets around each.
