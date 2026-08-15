@@ -273,6 +273,8 @@ public class MobileBuilderUI : MonoBehaviour
     Button saveDlgOk;
     ScrollRect partScroll; GameObject partEdge;   // palette overflow affordance
     bool removeArmed; int clickHold; Button removeBtn;
+    bool moveArmed; Button moveBtn; bool moveGrabbing;   // MOVE-after-attach (owen 2026-08-14)
+    public bool MoveArmed { get { return moveArmed; } }
     bool dragging; Vector2 lastP, downP; float moved; float pinchPrev = -1f;
 
     /// <summary>Finger travel (device px) past which a one-finger gesture while
@@ -850,8 +852,15 @@ public class MobileBuilderUI : MonoBehaviour
         // dock, exactly like WATCH does (the onClick owns dock state — see the
         // inboxwatch_* precedent). Disarm is unaffected: a miss-tap already
         // disarms, and SHOW PANEL -> REMOVE re-toggles.
-        removeBtn = MkButton("del", actRow.transform, "REMOVE", 17, () => { removeArmed = !removeArmed; if (removeArmed && bm != null && bm.HasSelection) bm.SelectPart(bm.SelectedPart); if (removeArmed && dockOpen) SetDockOpen(false); RefreshRemoveBtn(); });
-        MkButton("desel", actRow.transform, "DONE", 17, () => { if (bm != null && bm.HasSelection) bm.SelectPart(bm.SelectedPart); Phase0Input.debugPointer = false; RefreshHighlight(); });
+        removeBtn = MkButton("del", actRow.transform, "REMOVE", 17, () => { removeArmed = !removeArmed; if (removeArmed) { moveArmed = false; RefreshMoveBtn(); } if (removeArmed && bm != null && bm.HasSelection) bm.SelectPart(bm.SelectedPart); if (removeArmed && dockOpen) SetDockOpen(false); RefreshRemoveBtn(); });
+        // MOVE (owen, 2026-08-14: "difficult to attach one end of a long beam to
+        // a spindle"). Arm MOVE, then DRAG a placed part along its length and it
+        // slides stud-by-stud (BuilderManager.MoveGrab/MoveDrag re-validate every
+        // step). Like REMOVE it collapses the dock so the whole robot is tappable,
+        // and it drops any held part and disarms REMOVE — the three verbs are
+        // mutually exclusive modes.
+        moveBtn = MkButton("move", actRow.transform, "MOVE", 17, () => { moveArmed = !moveArmed; if (moveArmed) { removeArmed = false; RefreshRemoveBtn(); if (bm != null && bm.HasSelection) bm.SelectPart(bm.SelectedPart); } if (moveArmed && dockOpen) SetDockOpen(false); RefreshMoveBtn(); });
+        MkButton("desel", actRow.transform, "DONE", 17, () => { if (bm != null && bm.HasSelection) bm.SelectPart(bm.SelectedPart); if (moveArmed) { moveArmed = false; RefreshMoveBtn(); } Phase0Input.debugPointer = false; RefreshHighlight(); });
         // OWEN 2026-08-02: SAVE belongs where the work happens. DONE, one slot
         // to the left, only puts down the held part - it was never a commit,
         // and its name invited exactly that reading. The commit now sits beside
@@ -4692,6 +4701,29 @@ public class MobileBuilderUI : MonoBehaviour
             bool overUI = OverUI(p);
             BuilderManager.uiPointerBlocked = overUI;
             if (overUI) { dragging = false; Phase0Input.debugPointer = bm.HasSelection || removeArmed || clickHold > 0; return; }
+            if (moveArmed)
+            {
+                // MOVE drag (owen 2026-08-14). Finger-down over a placed part
+                // GRABS it; the finger then slides it stud-by-stud along its
+                // length (BuilderManager owns the geometry + revalidation). A
+                // finger-down that misses every part orbits instead, so you can
+                // still turn the robot to reach the far side while MOVE is armed.
+                Phase0Input.debugPointer = false;
+                if (!dragging)
+                {
+                    dragging = true; downP = p; lastP = p; moved = 0f;
+                    var grab = bm.PickPlaced(new Vector3(p.x, p.y, 0f));
+                    moveGrabbing = grab != null && bm.MoveGrab(grab);
+                    if (moveGrabbing) Feedback("moving " + bm.MovePartLabel + " — drag to slide it along; lift to drop");
+                }
+                else
+                {
+                    Vector2 d = p - lastP; moved += d.magnitude; lastP = p;
+                    if (moveGrabbing) bm.MoveDrag(new Vector3(p.x - downP.x, p.y - downP.y, 0f));
+                    else { bm.TestOrbitYaw += d.x * 0.3f; bm.TestOrbitPitch = Mathf.Clamp(bm.TestOrbitPitch - d.y * 0.3f, -70f, 80f); }
+                }
+                return;
+            }
             if (bm.HasSelection || removeArmed)
             {
                 if (!dragging) { dragging = true; downP = p; moved = 0f; lastP = p; }
@@ -4725,6 +4757,10 @@ public class MobileBuilderUI : MonoBehaviour
             return;
         }
         // no pointers — release edge
+        // A MOVE drag drops its part here; the slide is already committed
+        // stud-by-stud, so releasing just ends the grab (MOVE stays armed for
+        // the next part).
+        if (moveGrabbing) { bm.MoveRelease(); moveGrabbing = false; dragging = false; return; }
         // A gesture that became a SWIPE was an orbit, not a place — so it must
         // NOT drop the part or fire REMOVE on release (owen 2026-08-14). Only a
         // TAP (moved within the threshold) commits; the held part/armed REMOVE
@@ -4781,6 +4817,14 @@ public class MobileBuilderUI : MonoBehaviour
         if (removeBtn == null) return;
         removeBtn.GetComponent<Image>().color = removeArmed
             ? new Color(0.62f, 0.16f, 0.14f, 0.98f)
+            : new Color(0.16f, 0.18f, 0.22f, 0.96f);
+    }
+
+    void RefreshMoveBtn()
+    {
+        if (moveBtn == null) return;
+        moveBtn.GetComponent<Image>().color = moveArmed
+            ? new Color(0.20f, 0.45f, 0.65f, 1f)
             : new Color(0.16f, 0.18f, 0.22f, 0.96f);
     }
 

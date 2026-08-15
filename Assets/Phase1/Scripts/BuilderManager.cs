@@ -1554,11 +1554,21 @@ public class BuilderManager : MonoBehaviour
 
         p.matName = want;
 
-        // Rebuild the visual CHILDREN in place. Going through RemovePart +
-        // AddPart would be refused for the core and for any interior part
-        // (removing it would orphan the build), so the root GameObject, its
-        // placement collider and the byCollider mapping all stay put and only
-        // the model underneath is regenerated.
+        RebuildPartVisual(p);
+        message = p.def.label + " -> " + MatDB.Get(want).name;
+        RefreshOverlay();
+        return true;
+    }
+
+    /// <summary>Rebuild a placed part's visual CHILDREN in place — after a
+    /// repaint (new material) or a MOVE (new position). Going through
+    /// RemovePart + AddPart would be refused for the core and for any interior
+    /// part (removing it would orphan the build), so the root GameObject, its
+    /// placement collider and the byCollider mapping all stay put and only the
+    /// model underneath is regenerated. The caller owns `p.pos` and
+    /// `p.go.transform.position`; this only redraws.</summary>
+    void RebuildPartVisual(PlacedPart p)
+    {
         var go = p.go;
         var def = p.def;
         for (int i = go.transform.childCount - 1; i >= 0; i--)
@@ -1572,30 +1582,175 @@ public class BuilderManager : MonoBehaviour
             PartVisualFactory.BuildSpike(go.transform, def.size);
         else
         {
-            // ROUND-UP2 FIX A: a repaint regenerates the model from scratch,
-            // so it has to re-state the mount axis or the part would snap back
-            // to the fallback orientation the moment the player recoloured it.
+            // ROUND-UP2 FIX A: a regenerated model has to re-state the mount
+            // axis or the part would snap back to the fallback orientation.
             PartVisualFactory.BuildPart(VisualId(def, p.DriveAxis()), go.transform, p.Half() * 2f,
                 def.category == P1Category.Control, p.Mat().color,
                 p.Mat().metallic, p.Mat().smoothness);
-            // Re-derive the connector collar from whatever it is touching.
+            // Re-derive the connector collar from whatever it is touching NOW —
+            // which is exactly why a MOVE reuses this: slide the beam and the
+            // collar follows to the new seam.
             PlacedPart attach = null;
             foreach (var q in placed) if (q != p && Touching(p, q)) { attach = q; break; }
             if (attach != null)
                 PartVisualFactory.BuildCollar(go.transform, p.pos, p.Half(), attach.pos, attach.Half());
         }
 
-        // The rebuild above destroyed the children the lens had saved; re-apply
-        // it so the recoloured part immediately shows its NEW audit colour.
+        // The rebuild destroyed the children the lens had saved; re-apply it so
+        // the part immediately shows its audit colour.
         if (matView) ApplyMatView();
-        // The child rebuild above ate the gusset band with the old visuals;
-        // give it back. (Repainting does NOT consume or refund a gusset —
-        // the flag rides the placement, not the material.)
+        // The child rebuild ate the gusset band; give it back. (Neither a
+        // repaint nor a move consumes or refunds a gusset — the flag rides the
+        // placement, not the material or the position.)
         if (p.reinforced) RefreshGussetFaces(p);
-        message = def.label + " -> " + MatDB.Get(want).name;
+    }
+
+    /// <summary>Socket pitch — the §5.1 stud grid spacing. Parts snap to studs,
+    /// so a MOVE walks in whole studs (see NearestSnap / the 0.15 m grid in
+    /// ComputeGhost).</summary>
+    public const float STUD = 0.15f;
+
+    /// <summary>MOVE-AFTER-ATTACH (owen, 2026-08-14: "difficult to attach one
+    /// end of a long beam to a spindle"). Slide an already-placed part ONE stud
+    /// along a build axis and re-validate against every gate a fresh placement
+    /// faces — overlap, the floor, the rotor-sweep rule, and connectivity.
+    /// Returns null on success (the part moved), else the reason (nothing
+    /// moved). This is the benchable core; the finger-drag in MobileBuilderUI
+    /// just chooses `axis` and calls this one stud at a time.</summary>
+    public string MovePlacedStep(PlacedPart p, int axis, int steps)
+    {
+        if (p == null) return "Nothing to move.";
+        if (placed.Count > 0 && p == placed[0]) return "The core can't be moved.";
+        if (axis < 0 || axis > 2 || steps == 0) return "No move.";
+
+        Vector3 oldPos = p.pos;
+        Vector3 newPos = oldPos;
+        newPos[axis] += steps * STUD;
+
+        // Floor: a part cannot sink below the build plane (wheels ride lower).
+        bool isWheel = p.def.category == P1Category.Mobility;
+        if (newPos.y - p.Half().y < FloorPlane(isWheel) - 1e-4f)
+            return "Too low — would clip the floor.";
+
+        // Overlap: the shrunk box must clear every OTHER part's collider. p's
+        // own collider still sits at oldPos (we have not moved `go` yet), so it
+        // is skipped by identity, not by geometry.
+        foreach (var c in Physics.OverlapBox(newPos, p.Half() * 0.92f, Quaternion.identity))
+        {
+            PlacedPart hit;
+            if (!byCollider.TryGetValue(c, out hit)) continue;   // floor/arena: not a part
+            if (hit == p) continue;                              // p's own collider (still at oldPos)
+            return "Blocked by another part.";
+        }
+
+        // Rotor sweep: if p is (or now clears/blocks) a spinner arc, honour the
+        // same rule placement does. Probe at the candidate spot.
+        var probe = new PlacedPart { def = p.def, pos = newPos, yaw = p.yaw,
+                                     wheelAxis = p.wheelAxis, matName = p.matName };
+        string swWhy = RotorSweepRefusal(probe);
+        if (swWhy != null) return swWhy;
+
+        // Connectivity: tentatively occupy the new spot and require the whole
+        // build to still flood from the core. This catches both "the part
+        // floated free" and "it was holding something up".
+        p.pos = newPos;
+        bool ok = AllConnected(placed);
+        if (!ok) { p.pos = oldPos; return "Would break the build apart."; }
+
+        // Commit: move the root (and its collider) and redraw the seam.
+        p.go.transform.position = newPos;
+        RebuildPartVisual(p);
+        doomDirty = true;
         RefreshOverlay();
+        return null;
+    }
+
+    // ---- MOVE drag (a placed part follows the finger, snapping to studs) -----
+    PlacedPart moveGrab;
+    Vector3 moveOriginPos;   // p.pos at grab — the stable projection reference
+    int moveAxis = -1;       // locked on the first decisive drag
+    int moveApplied;         // studs committed so far this drag
+    bool moveUndoPushed;     // one undo step per drag, on the first real move
+    public bool MoveGrabbed { get { return moveGrab != null; } }
+    public string MovePartLabel { get { return moveGrab != null ? moveGrab.def.label : ""; } }
+
+    /// <summary>Raycast a screen point to the placed part under it (null if
+    /// none). The touch UI uses this to decide whether a finger-down grabs a
+    /// part to move or should orbit the camera instead.</summary>
+    public PlacedPart PickPlaced(Vector3 screen)
+    {
+        if (cam == null) return null;
+        RaycastHit hit;
+        if (Physics.Raycast(cam.ScreenPointToRay(screen), out hit, 60f)
+            && byCollider.ContainsKey(hit.collider)) return byCollider[hit.collider];
+        return null;
+    }
+
+    /// <summary>Begin a MOVE drag on a placed part. One undo step covers the
+    /// whole drag. Returns false for the core or a null pick.</summary>
+    public bool MoveGrab(PlacedPart p)
+    {
+        if (p == null || (placed.Count > 0 && p == placed[0])) return false;
+        moveGrab = p; moveOriginPos = p.pos; moveAxis = -1; moveApplied = 0;
+        moveUndoPushed = false;   // deferred to the first stud actually moved
         return true;
     }
+
+    /// <summary>Drive the grabbed part from the drag vector (screen pixels from
+    /// the finger-down point). Picks the build axis whose SCREEN projection the
+    /// drag best follows, locks it, and walks the part in whole studs toward
+    /// where the finger is — stopping at the first illegal stud. Returns the
+    /// last refusal reason (for the status line) or null.</summary>
+    public string MoveDrag(Vector3 dragScreenDelta)
+    {
+        if (moveGrab == null || cam == null) return null;
+        Vector2 drag = new Vector2(dragScreenDelta.x, dragScreenDelta.y);
+
+        // Screen direction + pixels-per-stud for a build axis, from the STABLE
+        // grab origin so the mapping does not drift as the part moves.
+        System.Func<int, Vector2> axisScreen = a =>
+        {
+            Vector3 e = a == 0 ? Vector3.right : a == 1 ? Vector3.up : Vector3.forward;
+            Vector3 s0 = cam.WorldToScreenPoint(moveOriginPos);
+            Vector3 s1 = cam.WorldToScreenPoint(moveOriginPos + e * STUD);
+            return new Vector2(s1.x - s0.x, s1.y - s0.y);
+        };
+
+        if (moveAxis < 0)
+        {
+            if (drag.magnitude < 10f) return null;   // wait for a decisive drag
+            int best = -1; float bestDot = 0f;
+            for (int a = 0; a < 3; a++)
+            {
+                Vector2 sd = axisScreen(a);
+                if (sd.magnitude < 6f) continue;     // axis points nearly at the camera
+                float d = Mathf.Abs(Vector2.Dot(drag, sd.normalized));
+                if (d > bestDot) { bestDot = d; best = a; }
+            }
+            if (best < 0) return null;
+            moveAxis = best;
+        }
+
+        Vector2 axDir = axisScreen(moveAxis);
+        float px = axDir.magnitude;
+        if (px < 1e-3f) return null;
+        int desired = Mathf.RoundToInt(Vector2.Dot(drag, axDir.normalized) / px);
+        desired = Mathf.Clamp(desired, -40, 40);
+
+        string reason = null;
+        while (moveApplied != desired)
+        {
+            int step = desired > moveApplied ? 1 : -1;
+            if (!moveUndoPushed) { PushUndo(); moveUndoPushed = true; }
+            string why = MovePlacedStep(moveGrab, moveAxis, step);
+            if (why != null) { reason = why; break; }   // hit a wall — stop here
+            moveApplied += step;
+        }
+        return reason;
+    }
+
+    /// <summary>End the MOVE drag. The part stays where it was walked to.</summary>
+    public void MoveRelease() { moveGrab = null; moveAxis = -1; moveApplied = 0; }
 
     /// <summary>Phase 3 convenience: repaint the whole build (minus parts
     /// pinned to a default material) so a titanium-vs-steel chassis is one
