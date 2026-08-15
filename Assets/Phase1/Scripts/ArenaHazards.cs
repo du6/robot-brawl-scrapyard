@@ -14,6 +14,18 @@ public abstract class HazardBase : MonoBehaviour
     public static readonly List<HazardBase> Active = new List<HazardBase>();
     static readonly Dictionary<CompoundRobot, float> envDmg = new Dictionary<CompoundRobot, float>();
     public float damageScale = 1f;
+    /// <summary>Global trap-damage multiplier (owen, 2026-08-14: harder traps).
+    /// ONE knob over every damaging hazard — saws, hammers, screws — because all
+    /// of them deal damage through HitPart; pillars never call it. Rides ON TOP
+    /// of each hazard's per-instance damageScale, so the authored balance between
+    /// the arenas is preserved, only scaled up.
+    ///
+    /// 1.5, not 2: a straight 2× measured env 1040 in HazardBench's AFK control
+    /// (vs a 300 catastrophic bar, and a 39–150 healthy / 331–341 broken-avoidance
+    /// baseline) — doubled hits break a stopped robot and it keeps getting chewed,
+    /// so cumulative damage more than doubles and hazards start deciding matches.
+    /// 1.5 hits clearly harder while keeping avoidance meaningful; re-measured.</summary>
+    public const float DamageMult = 1.5f;
     /// <summary>AI repulsion radius; also the telegraph footprint.</summary>
     public float avoidRadius = 1.6f;
     /// <summary>True while this hazard can hurt right now (saw up, hammer
@@ -43,7 +55,7 @@ public abstract class HazardBase : MonoBehaviour
         lastStrikeAt = Time.time;
         strikes++;
         float before = bot.damageTaken;
-        DamageResolver.ApplyHit(null, bot, idx, impulse * damageScale, hardness,
+        DamageResolver.ApplyHit(null, bot, idx, impulse * damageScale * DamageMult, hardness,
                                 other.bounds.center, DamageResolver.SRC_RAM);
         float d = bot.damageTaken - before;
         if (d > 0f) { float t; envDmg.TryGetValue(bot, out t); envDmg[bot] = t + d; }

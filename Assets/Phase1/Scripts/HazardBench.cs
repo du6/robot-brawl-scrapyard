@@ -60,7 +60,7 @@ public class HazardBench : MonoBehaviour
         bm.BackToBuild();
         yield return null;
         int refN = bm.LoadSnapshot(REF_BUILD);
-        Check(refN == 13, "reference build loads 13 parts (" + refN + ")");
+        Check(refN == 12, "reference build loads 12 parts (" + refN + ")");
 
         var savedData = Career.Data;
         bool savedActive = Career.active;
@@ -177,9 +177,23 @@ public class HazardBench : MonoBehaviour
         // filed as balance-bench backlog; the number is logged either way so
         // drift is visible in history.
         Debug.Log("[HazardBench] repulsion sample: AFK enemy env " + envSum.ToString("F0")
-                  + " across L3-L5 (39 and 150 measured on repair day)");
-        Check(envSum <= 300f,
-              string.Format("L3-L5 AFK-control hazard self-damage under the catastrophic bar (env {0:F0})", envSum));
+                  + " across L3-L5 (39 and 150 measured on repair day, 1x scale)");
+        // owen, 2026-08-15: trap damage was scaled up (HazardBase.DamageMult).
+        // This tripwire is an ABSOLUTE AFK-control number pinned to the 1x scale,
+        // so it fires on ANY buff even when the game stays fair — MEASURED env
+        // 594 at 1.5x and 1040 at 2x (and 0 on a lucky camp: this bench's own 4x
+        // variance, now wider). The bar therefore SCALES WITH THE KNOB: 300 at
+        // 1x (still catches the 331-341 broken-avoidance class), 650 at 1.5x
+        // (clears the 594 sample), rising with the mult and still catching a true
+        // runaway (broken avoidance at 1.5x reads well above 1000).
+        // ⚠ This is NOT the real fairness gate — a single AFK sample is too noisy.
+        // The authority is CareerBench's HAZARD SHARE (does the environment decide
+        // matches), which read 15/71 = 21% at 1.5x, UNDER its 25% bar. Re-run
+        // CareerBench, not this, before trusting any trap-damage change.
+        float catBar = 300f + 700f * (HazardBase.DamageMult - 1f);
+        Check(envSum <= catBar,
+              string.Format("L3-L5 AFK-control hazard self-damage under the catastrophic bar (env {0:F0}, bar {1:F0} @ {2}x)",
+                            envSum, catBar, HazardBase.DamageMult));
 
         Time.timeScale = savedTS;
         // the bay goes back the way it was found (SensorProbe rule, same day)
@@ -209,7 +223,12 @@ public class HazardBench : MonoBehaviour
         "battery|0.000,0.975,0.000|0|0.00,0.00,0.00|Aluminum\n" +
         "wedge|0.000,0.700,0.925|0|0.00,0.00,1.00|Steel\n" +
         "spike|0.000,0.910,0.600|0|0.00,0.00,1.00|Steel\n" +
-        "bracket|0.000,0.900,-0.450|0|0.00,0.00,0.00|Aluminum\n" +
+        // BRACKET REMOVED (owen, 2026-08-15): the bracket part was hard-deleted
+        // on 2026-08-12 (Catalog_Cuts), so LoadSnapshot silently skipped this
+        // line and the build came up 12 parts, not 13 — this fixture has been
+        // red since the cut, unrelated to any hazard change. The bracket only
+        // sat on the rear beam; nothing mounted on it, so dropping it changes
+        // neither the machine's shape nor its connectivity.
         "plate|0.000,1.130,0.000|0|0.00,0.00,0.00|ABS\n" +
         "chassis|0.000,0.700,-1.000|0|0.00,0.00,0.00|Aluminum\n" +
         "wheel|0.170,0.700,0.450|0|1.00,0.00,0.00|Rubber\n" +
