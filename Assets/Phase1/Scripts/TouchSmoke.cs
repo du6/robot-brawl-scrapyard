@@ -146,9 +146,19 @@ public class TouchSmoke : MonoBehaviour
         // a pick without the panel closing under it.
         Check(Btn("Beam") != null, "Beam part button present");
         MobileBuilderUI.autoHidePanelOnPick = true;
+        // PHONE: a pick folds the panel so the robot is reachable.
+        MobileBuilderUI.autoHideForcePhone = true;
         if (!ui.DockOpen) { ui.SetDockOpen(true); yield return null; }
         Tap("Beam"); yield return null;
-        Check(bm.HasSelection && !ui.DockOpen, "picking a part hides the panel");
+        Check(bm.HasSelection && !ui.DockOpen, "phone: picking a part hides the panel");
+        bm.SelectPart(bm.SelectedPart); yield return null;   // deselect via the seam
+        ui.SetDockOpen(true); yield return null;
+        // iPAD: same pick on a big screen leaves the panel OPEN (owen 2026-08-14:
+        // "iPad has the room and doesn't have the same problem").
+        MobileBuilderUI.autoHideForcePhone = false;
+        Tap("Beam"); yield return null;
+        Check(bm.HasSelection && ui.DockOpen, "ipad: picking a part leaves the panel open");
+        MobileBuilderUI.autoHideForcePhone = null;
         MobileBuilderUI.autoHidePanelOnPick = false;
         bm.SelectPart(bm.SelectedPart); yield return null;   // deselect via the seam (no re-hide)
         ui.SetDockOpen(true); yield return null;
@@ -472,6 +482,7 @@ public class TouchSmoke : MonoBehaviour
         // would silently disable panel auto-hide for the rest of this editor
         // play session.
         MobileBuilderUI.autoHidePanelOnPick = true;
+        MobileBuilderUI.autoHideForcePhone = null;   // back to the real-screen rule
 
         foreach (var l in log) Debug.Log("[TouchSmoke] " + l);
         Debug.Log(string.Format("[TouchSmoke] RESULT: {0} pass, {1} fail{2}",

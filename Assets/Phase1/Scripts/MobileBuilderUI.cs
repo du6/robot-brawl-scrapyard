@@ -78,6 +78,12 @@ public class MobileBuilderUI : MonoBehaviour
     /// testing panel chrome. TouchSmoke keeps it on and covers the behaviour
     /// directly.</summary>
     public static bool autoHidePanelOnPick = true;
+    /// <summary>owen, 2026-08-14: auto-hide is a PHONE affordance — an iPad has
+    /// the room and shouldn't fold on every pick. So it fires only on a
+    /// phone-sized screen, by the same inches rule the dock-open default uses
+    /// (ScreenIsTallEnoughForAnOpenDock). null = read the real screen; a bench
+    /// sets true/false because the editor game-view size is not the device's.</summary>
+    public static bool? autoHideForcePhone = null;
     public static MobileBuilderUI inst;
     static Font font;
 
@@ -1008,7 +1014,7 @@ public class MobileBuilderUI : MonoBehaviour
             // onClick; the seam below it never sees this).
             var pb = MkButton("part_"+i, content.transform, lab, 13, () => {
                 bm.SelectPart(idx);
-                if (autoHidePanelOnPick && bm.SelectedPart == idx && dockOpen) SetDockOpen(false);
+                if (PanelAutoHidesOnPick() && bm.SelectedPart == idx && dockOpen) SetDockOpen(false);
                 RefreshHighlight();
             });
             // ROSTER-ONLY retirement: the tile is CREATED (partButtons is
@@ -1820,6 +1826,16 @@ public class MobileBuilderUI : MonoBehaviour
         float dpi = UnityEngine.Device.Screen.dpi;
         if (dpi < 1f) return true;                       // unknown: behave as before
         return UnityEngine.Device.Screen.height / dpi >= 4f;
+    }
+
+    /// <summary>Should picking a part fold the panel? Only when auto-hide is on
+    /// AND the screen is phone-sized — an iPad has the room, so it stays open
+    /// (owen, 2026-08-14). Same device rule as the dock-open default; a bench
+    /// can force the phone/tablet answer via `autoHideForcePhone`.</summary>
+    static bool PanelAutoHidesOnPick()
+    {
+        if (!autoHidePanelOnPick) return false;
+        return autoHideForcePhone ?? !ScreenIsTallEnoughForAnOpenDock();
     }
 
     /// <summary>Open or close the dock. Public so the smoke suite can pin it
