@@ -2491,35 +2491,11 @@ public class MobileBuilderUI : MonoBehaviour
         shopHeader = MkText("shopheader", shopPanel.transform, "", 15, TextAnchor.MiddleLeft);
         var hle = shopHeader.gameObject.AddComponent<LayoutElement>(); hle.minHeight = 20f; hle.preferredHeight = 20f;
 
-        // The two shelves. A row of two buttons rather than a second tab,
-        // because PARTS and COSMETICS are the same errand — spending — and the
-        // tab bar is full at six.
-        var secRow = MkPanel("shopsections", shopPanel.transform, new Color(0f,0f,0f,0f));
-        var secLE = secRow.AddComponent<LayoutElement>();
-        var secH = secRow.AddComponent<HorizontalLayoutGroup>();
-        secH.spacing = 4f; secH.childForceExpandWidth = true; secH.childForceExpandHeight = true;
-        shopSecParts = MkButton("shopsec_parts", secRow.transform, "PARTS", 14, () => ShowShopSection(0));
-        shopSecCosmetics = MkButton("shopsec_cos", secRow.transform, "COSMETICS", 14, () => ShowShopSection(1));
-        // Sized like every other tap target in this dock, and it has to be:
-        // CareerSmoke measures NAMED build controls, and a control invented
-        // after that list was written is one nothing checks.
-        //
-        // ⚠ flexibleHeight MUST BE 0, and the screenshot is why. A
-        // LayoutElement leaves it at -1 ("unset"), the VerticalLayoutGroup
-        // read that as "take the slack", and the two section buttons came out
-        // roughly THREE TIMES the height of the tab row above them — a third
-        // of the dock spent on a switch. min/preferred alone do not hold a row
-        // down; something has to decline the leftover space.
-        //
-        // Re-applied in ApplyTouchSizes rather than only here, because
-        // TouchRow() depends on the canvas scale factor and this runs before
-        // the canvas has one. Sizing a touch target once, at construction, is
-        // how it ends up right on the machine that built it and wrong on a
-        // phone.
-        shopSecLE = secLE;
-        secLE.flexibleHeight = 0f;
-        secLE.minHeight = TouchRow(); secLE.preferredHeight = TouchRow();
-
+        // COSMETICS REMOVED (owen, 2026-08-14). The SHOP used to carry a
+        // PARTS/COSMETICS switch here; cosmetics are gone from the shop, so the
+        // switch is gone with them and SHOP is the parts shelf, full height. The
+        // network + seam plumbing (LadderClient.Cosmetics, TestShowShopSection)
+        // is left intact but unreachable — ShowShopSection now clamps to PARTS.
         shopPartsRoot = MkPanel("shoppartsroot", shopPanel.transform, new Color(0f,0f,0f,0f));
         var prle = shopPartsRoot.AddComponent<LayoutElement>(); prle.flexibleHeight = 1f; prle.minHeight = 96f;
         var prv = shopPartsRoot.AddComponent<VerticalLayoutGroup>();
@@ -2628,7 +2604,7 @@ public class MobileBuilderUI : MonoBehaviour
                 shopMats.Add(mr);
             }
         }
-        BuildCosmeticsShelf();
+        // BuildCosmeticsShelf() intentionally NOT called — cosmetics removed.
         ShowShopSection(0);
         RefreshShop();
     }
@@ -3595,13 +3571,16 @@ public class MobileBuilderUI : MonoBehaviour
     /// shows an empty list while it fetches reads as "you own nothing".</summary>
     void ShowShopSection(int s)
     {
+        // COSMETICS REMOVED (owen, 2026-08-14): the shop is PARTS only now. The
+        // cosmetics shelf is never built, so clamp here — TestShowShopSection(1)
+        // and any stale caller land on PARTS rather than a blank panel.
+        s = 0;
         shopSection = s;
-        if (shopPartsRoot != null) shopPartsRoot.SetActive(s == 0);
-        if (cosmeticsRoot != null) cosmeticsRoot.SetActive(s == 1);
-        TintSection(shopSecParts, s == 0);
-        TintSection(shopSecCosmetics, s == 1);
-        if (s == 1 && !cosmeticsBusy) StartCoroutine(LoadCosmetics());
-        else RefreshShop();
+        if (shopPartsRoot != null) shopPartsRoot.SetActive(true);
+        if (cosmeticsRoot != null) cosmeticsRoot.SetActive(false);
+        TintSection(shopSecParts, true);
+        TintSection(shopSecCosmetics, false);
+        RefreshShop();
     }
 
     void TintSection(Button b, bool on) { TintSection(b, on, true); }
