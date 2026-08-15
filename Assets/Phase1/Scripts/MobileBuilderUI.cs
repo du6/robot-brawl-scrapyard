@@ -2775,7 +2775,13 @@ public class MobileBuilderUI : MonoBehaviour
                                           ArenaScreen.SC_ACCOUNT);
                     return;
                 }
-                arenaScreen.ShowInbox = false; arenaScreen.CloseCard(); arenaBoardStamp = -1;
+                // MUST clear ShowEnlistPanel too: onAccount = ShowEnlistPanel ||
+                // !SignedIn (see RefreshArena), so leaving it set keeps the
+                // ENLIST surface up and THE BOARD does NOTHING. MY FIGHTS and
+                // ENLIST each clear the other panel's flag; this one forgot.
+                // Reported on device, 2026-08-15.
+                arenaScreen.ShowInbox = false; arenaScreen.ShowEnlistPanel = false;
+                arenaScreen.CloseCard(); arenaBoardStamp = -1;
             });
         arenaSecInbox = MkButton("arenasec_inbox", secRow.transform, "MY FIGHTS", 14,
             () =>
@@ -3609,9 +3615,13 @@ public class MobileBuilderUI : MonoBehaviour
             // One producer for the season text (LadderClient.SeasonLabel), so
             // this header and the OnGUI one cannot disagree.
             string seas = LadderClient.SeasonLabel();
+            // "· offline" when a secondary fetch (inbox/robots/wallet) failed
+            // this refresh — the board rendered but the rest is last-known, and
+            // a stale wallet must not read as current. UX validation, 2026-08-15.
+            string stale = arenaScreen.LastRefreshStale ? " · offline — showing last known" : "";
             SetArenaStatus(ownStatus ? arenaScreen.Status
                 : arenaScreen.CategoryLabel + " · " + arenaScreen.Board.Count + " ranked"
-                  + (seas.Length > 0 ? " · " + seas : ""));
+                  + (seas.Length > 0 ? " · " + seas : "") + stale);
         }
         for (int i = 0; i < arenaCatBtns.Count; i++)
         {
@@ -4666,9 +4676,20 @@ public class MobileBuilderUI : MonoBehaviour
         return p.y < dh * sf || p.y > Screen.height - top * sf;
     }
 
+    int lastShopReversalSeq;
+
     void Update()
     {
         if (bm == null) { bm = Object.FindFirstObjectByType<BuilderManager>(); if (bm == null) return; }
+        // A background purchase reversal (EconomySync flush) has no user gesture
+        // to hang a redraw on — poll the counter and repaint the shop + palette
+        // so the vanished part and its amber reason actually appear. UX
+        // validation round, 2026-08-15.
+        if (Career.shopReversalSeq != lastShopReversalSeq)
+        {
+            lastShopReversalSeq = Career.shopReversalSeq;
+            ShopFeedback(Career.shopMsg, true);
+        }
         // The ARENA board arrives from the network, so it lands mid-frame with
         // nobody to tell. Polled rather than pushed: RefreshArena is a no-op
         // unless the list actually changed, and a callback into a UI that may
@@ -4682,8 +4703,17 @@ public class MobileBuilderUI : MonoBehaviour
         if (canvas != null)
         {
             var crt0 = canvas.GetComponent<RectTransform>();
+            // Include the SAFE AREA. A notched iPhone flipped 180° in landscape
+            // keeps width/height/scaleFactor identical while iOS moves the notch
+            // to the opposite edge — so without this the insets stayed pinned to
+            // the old side and real content slid under the notch. safeArea.x/y
+            // move on that flip; multipliers are distinct so no two deltas
+            // cancel. Found by the UX validation round, 2026-08-15.
+            var sa = Screen.safeArea;
+            float saSig = sa.x * 13f + sa.y * 29f + sa.width * 3f + sa.height * 5f;
             float sig = canvas.scaleFactor * 1000f
-                      + (crt0 != null ? crt0.rect.width + crt0.rect.height * 7f : 0f);
+                      + (crt0 != null ? crt0.rect.width + crt0.rect.height * 7f : 0f)
+                      + saSig;
             if (Mathf.Abs(sig - lastLayoutSig) > 0.5f)
             {
                 lastLayoutSig = sig;

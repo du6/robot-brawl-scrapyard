@@ -130,9 +130,16 @@ namespace RobotBrawl.Phase0
         public int TestRefreshes { get { return refreshes; } }
         int refreshes;
 
+        // True when the last Refresh's inbox/robots/wallet fetch failed while the
+        // board still rendered — so the header can admit the secondary data is
+        // stale rather than showing last-known numbers as current.
+        bool lastRefreshStale;
+        public bool LastRefreshStale { get { return lastRefreshStale; } }
+
         IEnumerator Refresh()
         {
             refreshes++;
+            lastRefreshStale = false;
             busy = true; Say("loading the ladder…", SC_BOARD);
             yield return LadderClient.Leaderboard(Cats[catIndex], (rows, err) =>
             {
@@ -150,9 +157,14 @@ namespace RobotBrawl.Phase0
             });
             if (!string.IsNullOrEmpty(LadderClient.Token))
             {
-                yield return LadderClient.Inbox((rows, err) => { if (err == null) inbox = rows; });
-                yield return LadderClient.MyRobots((rows, err) => { if (err == null) mine = rows; });
-                yield return LadderClient.Wallet((b, err) => { if (err == null) balance = b; });
+                // A failed secondary fetch KEEPS the last value (don't blank the
+                // screen on a blip) but must not present it as current — the
+                // wallet especially, since a stale balance reads as real scrap.
+                // Record it so the board header can say "· offline". UX
+                // validation round, 2026-08-15.
+                yield return LadderClient.Inbox((rows, err) => { if (err == null) inbox = rows; else lastRefreshStale = true; });
+                yield return LadderClient.MyRobots((rows, err) => { if (err == null) mine = rows; else lastRefreshStale = true; });
+                yield return LadderClient.Wallet((b, err) => { if (err == null) balance = b; else lastRefreshStale = true; });
 
                 // A NEWLY SETTLED fight means the ledger moved (stake back,
                 // purse in) — so the LOCAL wallet must re-sync or the player
@@ -426,6 +438,13 @@ namespace RobotBrawl.Phase0
                 if (err == null) { pending = false; card = null; liveId = matchId; liveSeeds = seeds; }
             });
             yield return LadderClient.Wallet((b, e) => { if (e == null) balance = b; });
+            // The stake was charged SERVER-SIDE, but the local career wallet the
+            // SHOP reads is now stale-HIGH by the stake — so the shop would show
+            // phantom-affordable scrap and let a buy through that the server then
+            // refuses (a silent reversal). Kick the sync so Career.Data.scrap
+            // adopts the post-stake balance. Found by the UX validation round,
+            // 2026-08-15.
+            if (liveId != null) EconomySync.Kick();
             busy = false;
             // THE FIGHT PLAYS HERE (owen, 2026-08-14): same seed the cloud
             // referee uses, so this is the same fight — the referee's verdict

@@ -718,7 +718,19 @@ public static class Career
             Txn(-CareerDB.SellPrice(p.partId, p.mat), "sell reversed (" + why + ") " + p.partId);
         }
         shopMsg = "The shop could not complete a " + p.op + " \u2014 " + why;
+        // Bump so the dock REPAINTS: this reversal happens in EconomySync's
+        // background flush, and nothing was re-drawing the shop/palette \u2014 a part
+        // the player saw "bought" (and maybe bolted on) silently vanished and
+        // the amber reason above never showed. The UI polls this counter. Found
+        // by the UX validation round, 2026-08-15.
+        shopReversalSeq++;
     }
+
+    /// <summary>Incremented every time a queued purchase/sale is reversed
+    /// server-side (EconomySync flush). The dock watches it to repaint the shop
+    /// and surface shopMsg \u2014 a background reversal has no user gesture to hang a
+    /// redraw on.</summary>
+    public static int shopReversalSeq;
 
     // SwapCost / TrySwap ("REWORK") lived here and are gone (owen, 2026-08-05:
     // "Let's remove rework"). The shop is BUY and SELL.
