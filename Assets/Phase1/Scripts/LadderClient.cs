@@ -275,8 +275,19 @@ namespace RobotBrawl.Phase0
         /// nineteen call sites, instead of each one failing to an empty screen.
         /// A 401 with no token is just an anonymous call hitting an authed route
         /// and must NOT sign anyone out — hence the Token guard.</summary>
+        // UnityWebRequest defaults to timeout 0 = INFINITE. On mobile a captive
+        // portal or a half-open connection then black-holes the request forever;
+        // every ARENA/gate op sets busy=true before the call and clears it only
+        // after, so the coroutine never resumes, busy latches, and the whole
+        // screen freezes with every button dead until the app is killed. One
+        // ceiling here covers all 19 call sites. A timeout surfaces as a normal
+        // Result != Success, which every caller already turns into an error line.
+        // Found by the UX validation round, 2026-08-15.
+        const int REQ_TIMEOUT_S = 30;
+
         static IEnumerator Send(UnityWebRequest req)
         {
+            if (req != null && req.timeout <= 0) req.timeout = REQ_TIMEOUT_S;
             yield return req.SendWebRequest();
             if (req != null && req.responseCode == 401 && !string.IsNullOrEmpty(Token))
             { Logout(); SessionExpired = true; }

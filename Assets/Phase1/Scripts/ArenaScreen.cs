@@ -101,6 +101,15 @@ namespace RobotBrawl.Phase0
             {
                 if (err != null) { Say(err, SC_ACCOUNT); return; }
                 who = string.IsNullOrEmpty(name) ? email : name;
+                // PERSIST the session — this dock is the ONLY sign-in reachable
+                // after boot (the boot LoginGate is gone once past it), including
+                // the "your session expired — sign in again" form. LoginGate.Done
+                // used to be the sole SaveSession caller, so a re-login here worked
+                // for the session but never reached PlayerPrefs — the next launch
+                // was signed out again, resurrecting the "app update wiped my
+                // fights" symptom one level out. Found by the UX validation round,
+                // 2026-08-15.
+                LadderClient.SaveSession(who);
                 Say("signed in as " + who, SC_ACCOUNT);
             };
             if (registering) yield return LadderClient.Register(email, pw, displayName, done);
@@ -470,6 +479,14 @@ namespace RobotBrawl.Phase0
             // the player to MY FIGHTS where the referee's verdict and purse
             // arrive. showInbox is set so this message is actually visible
             // (the board renderer would have swallowed an SC_INBOX line).
+            // Refresh FIRST, then speak — Refresh() re-scopes the status to the
+            // board (SC_BOARD), so a message set BEFORE it is clobbered to the
+            // generic "N fight(s)" the instant Refresh runs its first line. This
+            // is the exact "speak before Refresh" trap DoEnlist was fixed for;
+            // here the order was still reversed and the preview outcome flashed
+            // and vanished. Found by the UX validation round, 2026-08-15.
+            yield return Refresh();
+            showInbox = true; showEnlist = false;   // Refresh doesn't own these; re-assert
             Say(res == null || !string.IsNullOrEmpty(res.error)
                     ? "the fight is being refereed in the cloud — watch MY FIGHTS for the result"
                 : res.aWins > res.bWins
@@ -477,7 +494,6 @@ namespace RobotBrawl.Phase0
                 : res.bWins > res.aWins
                     ? "your robot lost the preview — the referee is confirming the official result in MY FIGHTS"
                     : "the preview was a draw — the referee is confirming the official result in MY FIGHTS", SC_INBOX);
-            RefreshNow();
         }
 
         // The first screenshot of this screen was taken at 2532x1170 and the

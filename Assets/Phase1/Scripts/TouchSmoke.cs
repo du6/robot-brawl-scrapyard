@@ -220,6 +220,26 @@ public class TouchSmoke : MonoBehaviour
         yield return null;
         Check(!ui.RemoveArmed, "REMOVE disarms");
 
+        // ---- UX validation round 2026-08-15: mode-exit completeness -------
+        // Two arming bugs the seams below the buttons never saw, both fired
+        // through the real onClick / selection path here:
+        //  #7 DONE cleared moveArmed but NOT removeArmed — tap DONE with REMOVE
+        //     armed, then tap a part, and it was DELETED instead of selected.
+        //  #5 picking a part left moveArmed set, and HandleTouch's moveArmed
+        //     branch returns before placement — the held part could never land.
+        Tap("REMOVE"); yield return null;
+        Check(ui.RemoveArmed, "REMOVE re-arms for the DONE-exit test");
+        ui.SetDockOpen(true); yield return null;   // arming collapsed it; DONE lives in the dock
+        Tap("DONE"); yield return null;
+        Check(!ui.RemoveArmed, "DONE disarms REMOVE, not just MOVE (#7)");
+
+        Tap("MOVE"); yield return null;
+        Check(ui.MoveArmed, "MOVE arms on tap");
+        ui.SetDockOpen(true); yield return null;   // arming collapsed it; the part tile lives in the dock
+        Tap("Beam"); yield return null;            // holding a part must drop MOVE so it can be placed
+        Check(!ui.MoveArmed, "selecting a part auto-disarms MOVE, so a held part can be placed (#5)");
+        bm.SelectPart(bm.SelectedPart); yield return null;   // deselect via the seam, leave state clean
+
         // ---- GUSSET (2026-08-12): the applique verb, end to end -----------
         // The whole chain a player walks: no stock refuses with words; stocked
         // applies with mass, band and consumption; a second application is

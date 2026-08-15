@@ -868,7 +868,7 @@ public class MobileBuilderUI : MonoBehaviour
         // and it drops any held part and disarms REMOVE — the three verbs are
         // mutually exclusive modes.
         moveBtn = MkButton("move", actRow.transform, "MOVE", 17, () => { moveArmed = !moveArmed; if (moveArmed) { removeArmed = false; RefreshRemoveBtn(); if (bm != null && bm.HasSelection) bm.SelectPart(bm.SelectedPart); } if (moveArmed && dockOpen) SetDockOpen(false); RefreshMoveBtn(); });
-        MkButton("desel", actRow.transform, "DONE", 17, () => { if (bm != null && bm.HasSelection) bm.SelectPart(bm.SelectedPart); if (moveArmed) { moveArmed = false; RefreshMoveBtn(); } Phase0Input.debugPointer = false; RefreshHighlight(); });
+        MkButton("desel", actRow.transform, "DONE", 17, () => { if (bm != null && bm.HasSelection) bm.SelectPart(bm.SelectedPart); if (moveArmed) { moveArmed = false; RefreshMoveBtn(); } if (removeArmed) { removeArmed = false; RefreshRemoveBtn(); } Phase0Input.debugPointer = false; RefreshHighlight(); });
         // OWEN 2026-08-02: SAVE belongs where the work happens. DONE, one slot
         // to the left, only puts down the held part - it was never a commit,
         // and its name invited exactly that reading. The commit now sits beside
@@ -1016,6 +1016,11 @@ public class MobileBuilderUI : MonoBehaviour
             // onClick; the seam below it never sees this).
             var pb = MkButton("part_"+i, content.transform, lab, 13, () => {
                 bm.SelectPart(idx);
+                // Picking a part is an intent to PLACE, so it must drop MOVE —
+                // otherwise moveArmed lingers and HandleTouch's move branch eats
+                // the placement (UX validation #5, 2026-08-15). The HandleTouch
+                // guard is the backstop; this is the immediate, visible disarm.
+                if (moveArmed && bm.SelectedPart == idx) { moveArmed = false; RefreshMoveBtn(); }
                 if (PanelAutoHidesOnPick() && bm.SelectedPart == idx && dockOpen) SetDockOpen(false);
                 RefreshHighlight();
             });
@@ -2990,8 +2995,16 @@ public class MobileBuilderUI : MonoBehaviour
         if (arenaScreen == null || arenaAccountContent == null) return;
 
         // Deliberately NOT keyed on anything derived from the password.
+        // MUST include each robot's snapshotStatus: keyed on Count alone, a robot
+        // flipping PENDING->ACTIVE/REJECTED (Count unchanged) never repainted, so
+        // the player sat on "waiting to be checked" forever and a REJECTED
+        // robot's reason — shown ONLY here — never appeared. Found by the UX
+        // validation round, 2026-08-15.
+        string statuses = "";
+        foreach (var mr in arenaScreen.MyRobots) statuses += mr.snapshotStatus + ",";
         string stamp = LadderClient.SignedIn + "|" + arenaScreen.Registering
                      + "|" + arenaScreen.MyRobots.Count + "|" + arenaScreen.Who
+                     + "|" + statuses
                      + "|" + (Career.active && Career.Data != null ? Career.Data.activeRobot : -1);
         if (stamp == arenaAccountStamp) return;
         arenaAccountStamp = stamp;
@@ -3528,7 +3541,23 @@ public class MobileBuilderUI : MonoBehaviour
         TintSection(arenaSecInbox, onInbox, secLive);
         TintSection(arenaSecAccount, onAccount, true);
 
-        if (onCard) { RefreshArenaCard(); return; }
+        if (onCard)
+        {
+            RefreshArenaCard();
+            // SC_CARD had NO renderer anywhere in the dock, so a challenge the
+            // server refused (can't afford the stake, daily ticket spent,
+            // punching down) wrote its distinct reason to a scope nothing
+            // painted — the CONFIRM button looked dead, the ENLIST bug's exact
+            // twin. Paint the card's own status here. Found by the UX
+            // validation round, 2026-08-15.
+            if (arenaStatus != null)
+            {
+                bool own = arenaScreen.StatusScope == ArenaScreen.SC_CARD
+                           && !string.IsNullOrEmpty(arenaScreen.Status);
+                SetArenaStatus(own ? arenaScreen.Status : "");
+            }
+            return;
+        }
         if (onAccount)
         {
             RefreshArenaAccount();
@@ -4817,6 +4846,12 @@ public class MobileBuilderUI : MonoBehaviour
         }
         pinchPrev = -1f;
         if (removeArmed && bm.HasSelection) { removeArmed = false; RefreshRemoveBtn(); }
+        // Same guard for MOVE, which lacked it: after using MOVE, picking a new
+        // part left moveArmed set, and the moveArmed branch below returns before
+        // the placement branch — so the held part could never be placed, taps
+        // grabbed/orbited instead, and the only tell (the red MOVE button) was
+        // hidden by auto-hide. Found by the UX validation round, 2026-08-15.
+        if (moveArmed && bm.HasSelection) { moveArmed = false; RefreshMoveBtn(); }
         if (P.Count == 1)
         {
             Vector2 p = P[0];
