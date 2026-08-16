@@ -468,6 +468,10 @@ namespace RobotBrawl.Phase0
 
             Time.timeScale = 1f;
             Teardown(bm, fgo);
+            // A LIVE (arena) fight came FROM the ARENA tab and must return there
+            // on MY FIGHTS — Teardown's BackToBuild otherwise lands the rebuilt
+            // dock on BUILD (device report 2026-08-15).
+            if (liveHold && MobileBuilderUI.inst != null) MobileBuilderUI.inst.ReturnToArena();
             yield return null;
         }
 

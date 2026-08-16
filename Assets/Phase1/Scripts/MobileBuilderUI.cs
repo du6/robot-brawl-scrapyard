@@ -1962,6 +1962,25 @@ public class MobileBuilderUI : MonoBehaviour
         SetDockOpen(true);
     }
 
+    /// <summary>After an ARENA fight tears down, come back to the ARENA tab on
+    /// MY FIGHTS — where the referee's verdict and purse land, and where the
+    /// live-fight copy ("watch MY FIGHTS") already sent the player. MatchRunner's
+    /// teardown runs bm.BackToBuild(), which the rebuilt dock's Awake reopens on
+    /// BUILD; a player who tapped BACK TO THE ARENA then landed in BUILD instead
+    /// (reported on device, 2026-08-15). Arena is tab 4 (ShowTab's own i==4) and
+    /// arena fights only run in career, so this is always valid here.</summary>
+    public void ReturnToArena()
+    {
+        SetDockOpen(true);
+        ShowTab(4);   // builds arenaScreen if the dock was on another tab (it was: BUILD)
+        // Set the MY FIGHTS surface AFTER ShowTab — on any other tab arenaScreen
+        // is null and a pre-ShowTab assignment is dropped, so the arena would
+        // open on its default BOARD surface instead of the inbox the verdict
+        // lands on. RefreshArena (next Update) paints it.
+        if (arenaScreen != null)
+        { arenaScreen.ShowInbox = true; arenaScreen.ShowEnlistPanel = false; arenaScreen.CloseCard(); }
+    }
+
     /// <summary>True when the content panel is showing. Read by the suite.</summary>
     public bool DockOpen { get { return dockOpen; } }
 
