@@ -2281,6 +2281,26 @@ public class MobileBuilderUI : MonoBehaviour
         InsetBar(statsRt);
         InsetBar(msgBar != null ? msgBar.GetComponent<RectTransform>() : null);
         InsetBar(tipBar != null ? tipBar.GetComponent<RectTransform>() : null);
+        // InsetBar moves a bar's TEXT clear of the notch — but the tip strip's
+        // three BUTTONS anchor to the bar's right EDGE, which is the physical
+        // screen edge, so on a notch device in landscape SKIP TIPS sat inside
+        // the rounded-corner inset on every tab (PlaytestBench, 2026-08-15:
+        // 'tipskip' outside the safe area, 7 surfaces). Compose safeR into
+        // their base offsets ABSOLUTELY each pass (-8/-166/-130 are the build-
+        // time constants above) so repeat calls don't ratchet, and grow the
+        // text's 206-unit reservation by the same amount so it still stops
+        // short of the controls instead of running underneath them.
+        if (tipBar != null)
+        {
+            var skiprt = tipBar.transform.Find("tipskip") as RectTransform;
+            var prevrt = tipBar.transform.Find("tipprev") as RectTransform;
+            var nextrt = tipBar.transform.Find("tipnext") as RectTransform;
+            if (skiprt != null) skiprt.anchoredPosition = new Vector2(-(8f + safeR),   skiprt.anchoredPosition.y);
+            if (prevrt != null) prevrt.anchoredPosition = new Vector2(-(166f + safeR), prevrt.anchoredPosition.y);
+            if (nextrt != null) nextrt.anchoredPosition = new Vector2(-(130f + safeR), nextrt.anchoredPosition.y);
+            if (tipText != null)
+                tipText.rectTransform.offsetMax = new Vector2(-(206f + safeR), tipText.rectTransform.offsetMax.y);
+        }
         LayoutTabs();
         if (matRowRt != null) matRowRt.sizeDelta = new Vector2(-12f, R);
         if (actRowRt != null) actRowRt.sizeDelta = new Vector2(0f, R);
