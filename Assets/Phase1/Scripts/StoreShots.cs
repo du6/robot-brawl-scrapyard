@@ -1,3 +1,7 @@
+// Editor/dev-build only, the ArenaShots precedent: this harness leans on
+// UiShot, which compiles away in a release player — an unguarded reference
+// broke the build-8 iOS build (CS0103) while every editor bench stayed green.
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
 using UnityEngine;
 using UnityEngine.UI;
 using System.Collections;
@@ -203,3 +207,4 @@ public class StoreShots : MonoBehaviour
     }
 }
 }
+#endif
