@@ -1969,8 +1969,27 @@ public class MobileBuilderUI : MonoBehaviour
     /// BUILD; a player who tapped BACK TO THE ARENA then landed in BUILD instead
     /// (reported on device, 2026-08-15). Arena is tab 4 (ShowTab's own i==4) and
     /// arena fights only run in career, so this is always valid here.</summary>
+    bool pendingArenaReturn;
+
     public void ReturnToArena()
     {
+        // ⚠ MatchRunner calls this from its per-bout teardown, which runs
+        // INSIDE the career-isolation window: Career.active is still FALSE
+        // (the outer coroutine's finally restores it later), and ShowTab(4)
+        // under !Career.active clamps to BUILD — so the "return to ARENA" fix
+        // silently landed on the BUILD tab. Found by the two-player E2E agents
+        // 2026-08-15 (the unit probe passed because it ran with Career.active
+        // true; only the full fight integration exposes the ordering). If the
+        // isolation is still in force, DEFER: Update consumes the flag on the
+        // first frame the career is back and the fight is gone.
+        if (!Career.active || FightManager.current != null)
+        { pendingArenaReturn = true; return; }
+        DoReturnToArena();
+    }
+
+    void DoReturnToArena()
+    {
+        pendingArenaReturn = false;
         SetDockOpen(true);
         ShowTab(4);   // builds arenaScreen if the dock was on another tab (it was: BUILD)
         // Set the MY FIGHTS surface AFTER ShowTab — on any other tab arenaScreen
@@ -4750,6 +4769,10 @@ public class MobileBuilderUI : MonoBehaviour
     void Update()
     {
         if (bm == null) { bm = Object.FindFirstObjectByType<BuilderManager>(); if (bm == null) return; }
+        // Deferred arena return (see ReturnToArena): fire on the first frame
+        // the career isolation has lifted and the fight is fully gone.
+        if (pendingArenaReturn && Career.active && FightManager.current == null)
+            DoReturnToArena();
         // A background purchase reversal (EconomySync flush) has no user gesture
         // to hang a redraw on — poll the counter and repaint the shop + palette
         // so the vanished part and its amber reason actually appear. UX
