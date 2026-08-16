@@ -38,6 +38,7 @@ The records, most recent first:
 
 | doc | what |
 |---|---|
+| `docs/HANDOVER_iOS_Launch_2026-08-16.md` | **THE LAUNCH OPERATING MANUAL** — 1.0 build 8 submitted; production topology, the four alerts and the regex trap that silences them, the 5-min health check, symptom→subsystem playbook, the build-9 ritual, the in-review build-swap procedure, open items in bite order |
 | `docs/Server_Economy_Design_2026-08-13.md` | scrap goes ON SALE eventually (owen) — wallet+inventory server-side. SERVER HALF BUILT + DEPLOYED same day (010/011, claims/purchase/wallet, 255/255) and the client's first-win rule with it; the boot gate + client cache is the remaining piece, tracked with hazards |
 | `docs/Flagship_Hardening_2026-08-12.md` | CEILING L4 92%→50% in two measured steps; the L5 reversal; the FLOOR needle at 61%; where the rest of the gap lives |
 | `docs/Gusset_Shipped_2026-08-12.md` | the seam-reinforcement part: fmt4 snapshots, the LOCKSTEP worker rule, what is measured and what is owed |
