@@ -1965,6 +1965,56 @@ public class MobileBuilderUI : MonoBehaviour
     /// <summary>True when the content panel is showing. Read by the suite.</summary>
     public bool DockOpen { get { return dockOpen; } }
 
+    // ---- PlaytestBench seams (2026-08-15) --------------------------------
+    // These read the RENDER DECISION (which panel/root is actually active),
+    // not the flags that feed it — so a bench can ask "after this tap, is the
+    // right thing ON SCREEN?", the question THE BOARD's dead-button bug and
+    // the ENLIST no-op both answered wrong while every flag looked fine.
+    public int Tab { get { return tab; } }
+
+    /// <summary>Which TAB's content is actually on screen — the inverse of
+    /// ShowTab's index→panel map, which is NOT the tabPanels array order:
+    /// career ROBOTS is robotsPanel (sandbox is garagePanel), ARENA is
+    /// arenaPanel, PROGRAM is programPanel. Returns the tab index, or -1 if no
+    /// panel is up. This is the oracle PlaytestBench asserts nav against.</summary>
+    public int TestVisibleTab()
+    {
+        if (buildPanel   != null && buildPanel.activeSelf)   return 0;
+        if (fightPanel   != null && fightPanel.activeSelf)   return 1;
+        if ((garagePanel != null && garagePanel.activeSelf) ||
+            (robotsPanel != null && robotsPanel.activeSelf)) return 2;
+        if (shopPanel    != null && shopPanel.activeSelf)    return 3;
+        if (arenaPanel   != null && arenaPanel.activeSelf)   return 4;
+        if (programPanel != null && programPanel.activeSelf) return 5;
+        return -1;
+    }
+
+    /// <summary>How many tab panels are active at once — must be exactly one
+    /// while the dock is open (a stale panel left showing under the new one is
+    /// the fall-through class).</summary>
+    public int TestActivePanelCount()
+    {
+        int n = 0;
+        var ps = new[] { buildPanel, fightPanel, garagePanel, shopPanel, robotsPanel, arenaPanel, programPanel };
+        foreach (var p in ps) if (p != null && p.activeSelf) n++;
+        return n;
+    }
+
+    /// <summary>Which ARENA surface is ACTUALLY on screen — from the panel
+    /// roots' active state, the thing RefreshArena decides, not showEnlist/
+    /// showInbox. "board" only if arenaBoardRoot is genuinely visible.</summary>
+    public string TestArenaSurface
+    {
+        get
+        {
+            if (arenaCardRoot != null && arenaCardRoot.activeInHierarchy) return "card";
+            if (arenaAccountRoot != null && arenaAccountRoot.activeInHierarchy) return "account";
+            if (arenaInboxRoot != null && arenaInboxRoot.activeInHierarchy) return "inbox";
+            if (arenaBoardRoot != null && arenaBoardRoot.activeInHierarchy) return "board";
+            return "none";
+        }
+    }
+
     /// <summary>Test hooks. DockHeightForTest reads the LIVE rect rather than
     /// DockH(tab) - the two disagreeing is the bug worth catching, not a
     /// detail.</summary>
