@@ -102,11 +102,24 @@ public class ProgramRunner : MonoBehaviour
     // V2.2 macro state: TurnBy dead-reckoning accumulator, and the MoveRel
     // SET steering mode (persists like any SET until another wheel write,
     // STOP ALL, or a handover clears it).
-    float yawAcc, lastYaw;
+    float yawAcc, lastYaw, yawRate;
     int relTarget = -1; float relPct;
     const float FACE_TOL = 8f;              // deg — FaceSide "aligned"
     const float STEER_GAIN = 0.022f;        // per deg, macro steering P-gain
     const float TURNBY_MIN = 0.25f, TURNBY_MAX = 0.7f;
+    // TURN BY is OPEN-LOOP: it stops COMMANDING at the target, but ExitStep
+    // deliberately does not angular-brake (that tradeoff was measured for
+    // SIDE TO, which re-aims and self-corrects — TURN BY eats the whole
+    // coast). Measured 2026-08-17 on VerbBench's BODY rig via ProgramPlaytest:
+    // command cut at 89.5° with the body still at ~135°/s coasted to 165° —
+    // TURN BY 90 turned nearly twice what it promised. The fix is predictive:
+    // finish when accumulated + rate×coast-time reaches the target, so the
+    // coast lands ON the number instead of past it. 0.55 s is that run's
+    // measured coast constant (75° ÷ 135°/s); rate-scaling makes it self-
+    // calibrate across rigs (heavier robot → slower rate → later cutoff),
+    // which is why ProgramBench's 55–135° check on its heavier fixture stays
+    // green with margin rather than shifting.
+    const float TURNBY_COAST_S = 0.55f;
 
     float[] wheelState = new float[0];
     float turnGain;
@@ -437,7 +450,7 @@ public class ProgramRunner : MonoBehaviour
         else if (b.op == POp.TurnLR) WriteTurn(b.arg);
         else if (b.op == POp.TurnBy)
         {
-            yawAcc = 0f;
+            yawAcc = 0f; yawRate = 0f;
             lastYaw = self != null ? self.transform.eulerAngles.y : 0f;
         }
         // MoveRel/FaceSide write nothing at enter — StepTick aims them.
@@ -453,8 +466,10 @@ public class ProgramRunner : MonoBehaviour
             case POp.TurnBy:
             {
                 float yaw = self != null ? self.transform.eulerAngles.y : lastYaw;
-                yawAcc += Mathf.DeltaAngle(lastYaw, yaw);
+                float step = Mathf.DeltaAngle(lastYaw, yaw);
+                yawAcc += step;
                 lastYaw = yaw;
+                if (dt > 1e-4f) yawRate = step / dt;   // deg/s, for the coast prediction
                 float remain = Mathf.Abs(b.arg) - Mathf.Abs(yawAcc);
                 float p = Mathf.Clamp(remain * 0.02f, TURNBY_MIN, TURNBY_MAX);
                 WriteTurn(Mathf.Sign(b.arg) * p * 100f);
@@ -538,7 +553,11 @@ public class ProgramRunner : MonoBehaviour
             case POp.TurnLR:
                 return clock - stepT0 + 1e-6f >= b.dur;
             case POp.TurnBy:
-                if (Mathf.Abs(yawAcc) + 0.5f >= Mathf.Abs(b.arg)) return true;
+                // Predictive: the body coasts ~rate×TURNBY_COAST_S after the
+                // command stops, so finish that far EARLY and let the coast
+                // deliver the last degrees. See the constant's header.
+                if (Mathf.Abs(yawAcc) + Mathf.Abs(yawRate) * TURNBY_COAST_S + 0.5f
+                    >= Mathf.Abs(b.arg)) return true;
                 return clock - stepT0 >= RobotProgram.MAX_DUR || Stalled();
             case POp.FaceSide:
             {
