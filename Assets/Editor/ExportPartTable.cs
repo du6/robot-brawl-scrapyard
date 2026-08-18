@@ -122,9 +122,33 @@ namespace RobotBrawl.Editor
             try
             {
                 var mat = MatDB.Get(d.matName);
-                PartVisualFactory.BuildPart(d.id, host.transform, d.size, false, fallback,
-                                            mat != null ? mat.metallic : 0.8f,
-                                            mat != null ? mat.smoothness : 0.6f);
+                // ⚠ BuildPart IS NOT THE ONLY ENTRY POINT, AND ASSUMING IT WAS
+                // SHIPPED SQUARE WHEELS. BuildPart has no Mobility branch at
+                // all — a wheel falls through to its final `else`, which draws
+                // a CUBE — because the builder never asks it for one: it calls
+                // BuildWheel directly (BuilderManager.cs:619) with the radius
+                // and width unpacked from the part size. So the export was a
+                // faithful recording of a path the game does not use for these
+                // parts, and the website drew every wheel as a rubber brick.
+                // Dispatch on CATEGORY exactly as the builder does — matching
+                // on an id prefix is the thing this project bans, and it is
+                // also what would break the moment a wheel is renamed.
+                // There are FOUR of these in BuilderManager.AddPart, not one,
+                // and the other three are just as real as the wheel: a spinner
+                // and a spike each have their own builder entry too. BuildPart
+                // does answer for those two — but with the ARENA variants
+                // (SpinnerArena/SpikeArena), which are a different drawing of
+                // the same part. Mirror the builder's dispatch, in its order.
+                if (d.category == P1Category.Mobility)
+                    PartVisualFactory.BuildWheel(host.transform, d.size.x * 0.5f, d.size.y, -1);
+                else if (d.id.StartsWith("spinner"))
+                    PartVisualFactory.BuildSpinner(host.transform, d.size.x * 0.5f, d.size.y, -1);
+                else if (d.id == "spike")
+                    PartVisualFactory.BuildSpike(host.transform, d.size);
+                else
+                    PartVisualFactory.BuildPart(d.id, host.transform, d.size, false, fallback,
+                                                mat != null ? mat.metallic : 0.8f,
+                                                mat != null ? mat.smoothness : 0.6f);
                 foreach (var r in host.GetComponentsInChildren<Renderer>(true))
                 {
                     var mf = r.GetComponent<MeshFilter>();
