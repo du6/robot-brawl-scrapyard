@@ -56,6 +56,114 @@ namespace RobotBrawl.Editor
                        || d.id.Contains("saw") || d.id.Contains("spindle"));
         }
 
+        /// <summary>CAPTURE THE GAME'S OWN PART VISUAL, not an approximation.
+        ///
+        /// A part in this game is NOT a box. PartVisualFactory.BuildPart
+        /// assembles each one out of several primitives — a body, end caps,
+        /// rows of bolt cylinders, hazard ribs, socket dots, glowing accents —
+        /// across a dozen fixed materials (DarkSteel, HubMetal, SocketDark,
+        /// CoreYellow, AmberGlow, Copper). That layered detail is what makes
+        /// the machines read as machinery instead of as blocks, and the website
+        /// was drawing ONE flat-coloured box per part, throwing all of it away.
+        ///
+        /// Rather than reimplement the recipes in JavaScript — a second source
+        /// of truth that would drift the moment a part is restyled — this RUNS
+        /// BuildPart and records what it produced. Whatever the game draws is
+        /// what the site draws.
+        ///
+        /// ⚠ WHICH SUB-PARTS FOLLOW THE PLAYER'S MATERIAL? The body does; the
+        /// functional accents deliberately do not ("those are what say 'this is
+        /// the sharp end'", BuildPart's own note). Rather than encode that
+        /// judgement here, build each part TWICE under two wildly different
+        /// fallback colours: anything whose colour moved is body-tinted and is
+        /// emitted as "body", anything that stayed is emitted as its literal
+        /// colour. The classification is measured, not guessed.
+        ///
+        /// ⚠ MUST RUN IN PLAY MODE. Deco() calls Object.Destroy on the
+        /// primitive's collider, which is illegal from edit mode.</summary>
+        static string VisRecipe(P1PartDef d)
+        {
+            var a = CaptureVis(d, new Color(1f, 0f, 0f));
+            var b = CaptureVis(d, new Color(0f, 1f, 0f));
+            if (a.Count == 0) return "[]";
+
+            var sb = new StringBuilder("[");
+            for (int i = 0; i < a.Count; i++)
+            {
+                var p = a[i];
+                bool tinted = i < b.Count && b[i].color != p.color;
+                if (i > 0) sb.Append(',');
+                sb.Append("{\"t\":\"").Append(p.prim).Append("\"")
+                  .Append(",\"p\":[").Append(F(p.pos.x)).Append(',').Append(F(p.pos.y)).Append(',').Append(F(p.pos.z)).Append(']')
+                  .Append(",\"r\":[").Append(F(p.euler.x)).Append(',').Append(F(p.euler.y)).Append(',').Append(F(p.euler.z)).Append(']')
+                  .Append(",\"s\":[").Append(F(p.scale.x)).Append(',').Append(F(p.scale.y)).Append(',').Append(F(p.scale.z)).Append(']')
+                  .Append(",\"c\":").Append(tinted ? "\"body\"" : "\"" + Hex(p.color) + "\"")
+                  .Append(",\"me\":").Append(F(p.metallic))
+                  .Append(",\"sm\":").Append(F(p.smoothness));
+                if (p.emissive) sb.Append(",\"glow\":true");
+                sb.Append('}');
+            }
+            return sb.Append(']').ToString();
+        }
+
+        struct VisPiece
+        {
+            public string prim;
+            public Vector3 pos, euler, scale;
+            public Color color;
+            public float metallic, smoothness;
+            public bool emissive;
+        }
+
+        static List<VisPiece> CaptureVis(P1PartDef d, Color fallback)
+        {
+            var list = new List<VisPiece>();
+            var host = new GameObject("vis_probe_" + d.id);
+            try
+            {
+                var mat = MatDB.Get(d.matName);
+                PartVisualFactory.BuildPart(d.id, host.transform, d.size, false, fallback,
+                                            mat != null ? mat.metallic : 0.8f,
+                                            mat != null ? mat.smoothness : 0.6f);
+                foreach (var r in host.GetComponentsInChildren<Renderer>(true))
+                {
+                    var mf = r.GetComponent<MeshFilter>();
+                    string prim = mf != null && mf.sharedMesh != null
+                        ? mf.sharedMesh.name.ToLowerInvariant() : "cube";
+                    if (prim.Contains("cylinder")) prim = "cyl";
+                    else if (prim.Contains("sphere")) prim = "sph";
+                    else if (prim.Contains("capsule")) prim = "cap";
+                    else prim = "cube";
+                    var t = r.transform;
+                    var m = r.sharedMaterial;
+                    // Positions are relative to the PART root, not the piece's
+                    // immediate parent — Beam() nests details under a child to
+                    // handle yaw, and a nested local position is meaningless to
+                    // a renderer that instantiates the list flat.
+                    list.Add(new VisPiece
+                    {
+                        prim = prim,
+                        pos = host.transform.InverseTransformPoint(t.position),
+                        euler = (Quaternion.Inverse(host.transform.rotation) * t.rotation).eulerAngles,
+                        scale = t.lossyScale,
+                        color = m != null ? m.color : fallback,
+                        metallic = m != null && m.HasProperty("_Metallic") ? m.GetFloat("_Metallic") : 0.5f,
+                        smoothness = m != null && m.HasProperty("_Smoothness") ? m.GetFloat("_Smoothness") : 0.5f,
+                        emissive = m != null && m.IsKeywordEnabled("_EMISSION"),
+                    });
+                }
+            }
+            catch (System.Exception e)
+            {
+                Debug.LogWarning("[PartTable] " + d.id + " visual capture failed: " + e.Message);
+            }
+            finally
+            {
+                if (Application.isPlaying) Object.Destroy(host); else Object.DestroyImmediate(host);
+            }
+            return list;
+        }
+
         public static void Export()
         {
             var sb = new StringBuilder();
@@ -74,6 +182,7 @@ namespace RobotBrawl.Editor
                   .Append(",\"disc\":").Append(IsDisc(d) ? "true" : "false")
                   .Append(",\"edge\":").Append(F(d.edgeHardness))
                   .Append(",\"label\":\"").Append(d.label.Replace("\"", "'")).Append("\"")
+                  .Append(",\"vis\":").Append(VisRecipe(d))
                   .Append("}");
                 if (i < defs.Length - 1) sb.Append(',');
                 sb.Append('\n');
