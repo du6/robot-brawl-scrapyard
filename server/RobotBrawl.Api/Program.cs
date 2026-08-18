@@ -1469,6 +1469,66 @@ app.MapGet("/v1/matches/{id:guid}", async (Guid id, HttpContext ctx) =>
     });
 }).AllowAnonymous();
 
+// A ROBOT'S COMPLETED FIGHTS — public, like the board and the match card it
+// is assembled from (2026-08-17, for cyberduck.club's daily showcase: the
+// site needs to find the top robot's best win before it can render it).
+//
+// Public is the right default here and not a loosening: every field below
+// already leaves the building through /v1/matches/{id}, which is anonymous —
+// this endpoint only saves a caller from having to know a match id first.
+// The replay a caller follows to is likewise already public and, by §1.3,
+// carries builds but never programs.
+//
+// ⚠ NOT the inbox. /v1/inbox is per-account and scoped on purpose ("an inbox
+// that shows everyone's fights is a feed, not an inbox", line ~1473); this is
+// per-ROBOT and shows only what a scouting card would.
+app.MapGet("/v1/robots/{robotId:guid}/matches", async (Guid robotId, HttpContext ctx, int? limit) =>
+{
+    int take = Math.Clamp(limit ?? 10, 1, 50);
+    await using var c = await db.OpenAsync();
+    await using var cmd = new NpgsqlCommand(@"
+        SELECT m.id, m.verdict, m.category, m.gap, m.arena, m.replay_urls,
+               m.rating_deltas, m.completed_at, (rc.id = $1) AS was_challenger,
+               rc.name, rd.name, uc.display_name, ud.display_name
+          FROM matches m
+          JOIN snapshots sc ON sc.id = m.challenger_snapshot_id JOIN robots rc ON rc.id = sc.robot_id
+          JOIN snapshots sd ON sd.id = m.defender_snapshot_id   JOIN robots rd ON rd.id = sd.robot_id
+          JOIN users uc ON uc.id = rc.user_id JOIN users ud ON ud.id = rd.user_id
+         WHERE m.status = 'COMPLETE' AND (rc.id = $1 OR rd.id = $1)
+         ORDER BY m.completed_at DESC NULLS LAST
+         LIMIT $2;", c);
+    cmd.Parameters.AddWithValue(robotId);
+    cmd.Parameters.AddWithValue(take);
+    await using var r = await cmd.ExecuteReaderAsync();
+    var rows = new List<object>();
+    while (await r.ReadAsync())
+    {
+        string verdict = r.IsDBNull(1) ? "" : r.GetString(1);
+        bool wasChallenger = r.GetBoolean(8);
+        // Derived HERE from the stored side, never re-inferred downstream:
+        // line ~1501 records what re-deriving "was I the challenger" cost.
+        string outcome = verdict == "DRAW" ? "DRAW"
+                       : (verdict == "CHALLENGER") == wasChallenger ? "WON" : "LOST";
+        rows.Add(new
+        {
+            id = r.GetGuid(0),
+            outcome,
+            verdict,
+            category = r.GetString(2),
+            gap = r.GetInt32(3),
+            arena = r.GetString(4),
+            replayUrls = r.IsDBNull(5) ? Array.Empty<string>()
+                       : Array.ConvertAll(r.GetFieldValue<string[]>(5), u => Fetchable(ctx, u)),
+            ratingDeltas = r.IsDBNull(6) ? null : r.GetFieldValue<string>(6),
+            completedAt = r.IsDBNull(7) ? (DateTime?)null : r.GetDateTime(7),
+            robotName = wasChallenger ? r.GetString(9) : r.GetString(10),
+            opponentName = wasChallenger ? r.GetString(10) : r.GetString(9),
+            opponentOwner = wasChallenger ? r.GetString(12) : r.GetString(11),
+        });
+    }
+    return Results.Ok(new { robotId, count = rows.Count, matches = rows });
+}).AllowAnonymous();
+
 // §5.3 step 4: "Both players' fight inboxes show the result; replay is live."
 // Authenticated, and scoped to matches this account was actually in — an
 // inbox that shows everyone's fights is a feed, not an inbox.

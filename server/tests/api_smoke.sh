@@ -950,6 +950,48 @@ else
   else
     skip "the public match view (3 checks)" "no settled match from section K"
   fi
+
+  # ---- a robot's completed fights, public (the showcase feed) ----------
+  # cyberduck.club's daily job walks board -> this -> replay. Anonymous on
+  # purpose: it assembles only what /v1/matches/{id} already hands out.
+  if [ -n "${CHROBOT:-}" ] && [ -n "${MATCH:-}" ]; then
+    S=$(req GET "/v1/robots/$CHROBOT/matches")
+    expect "a robot's completed fights are publicly listable" "$S" 200
+    # NOT matches.0 — this robot fights several times in a full run and the
+    # list is newest-first, so position is not identity. (Asserting .0 here
+    # failed on the first run against a CORRECT list: the check was wrong.)
+    if grep -q "$MATCH" "$BODY"; then
+      ok "…including the settled match from section K"
+    else
+      no "the robot's fight list omitted its own settled match $MATCH"
+    fi
+    is "…newest first, so a showcase picks up the latest fight" \
+       "$("$PY" -c "import json;m=json.load(open('$BODY'))['matches'];t=[x['completedAt'] or '' for x in m];print(t==sorted(t,reverse=True))")" \
+       True
+    # The challenger WON this one (verdict CHALLENGER above), and the
+    # outcome must be stated, not left to the caller to re-derive.
+    is "…stating the outcome from the robot's own side" "$(jget matches.0.outcome)" WON
+    is "…and naming the opponent, not itself" "$(jget matches.0.opponentName)" "Defiant"
+    if grep -q 'replayUrls' "$BODY" && ! grep -qi 'payloadUrl\|storageUrl' "$BODY"; then
+      ok "…carrying replay urls and NO payload url (§1.3 holds here too)"
+    else
+      no "the robot fight list leaked a payload url, or carried no replay"
+    fi
+    # PENDING matches must not appear: a showcase of unfinished fights is a
+    # showcase of nothing, and the verdict field would be empty.
+    is "…listing COMPLETE matches only" \
+       "$(jget count)" \
+       "$(dbq "SELECT count(*) FROM matches m
+                 JOIN snapshots sc ON sc.id=m.challenger_snapshot_id
+                 JOIN snapshots sd ON sd.id=m.defender_snapshot_id
+                WHERE m.status='COMPLETE'
+                  AND (sc.robot_id='$CHROBOT' OR sd.robot_id='$CHROBOT');")"
+    S=$(req GET "/v1/robots/00000000-0000-0000-0000-000000000000/matches")
+    expect "an unknown robot is an empty list, not a 500" "$S" 200
+    is "…and the list really is empty" "$(jget count)" 0
+  else
+    skip "the public robot fight list (7 checks)" "no settled match from section K"
+  fi
   # The scouting card must not leak a payload either, to anyone, ever.
   S=$(req GET "/v1/snapshots/$CHSNAP")
   if [ "$S" = "200" ] && ! grep -qi 'payloadUrl\|storageUrl\|"payload"' "$BODY"; then

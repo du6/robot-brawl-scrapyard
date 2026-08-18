@@ -15,7 +15,7 @@ PASS  a wrong password and an unknown account are indistinguishable (both 401)
 
 == D. robots ==
 PASS  a robot is created
-      robot 8f0b66b0-c7e2-4e14-93c1-4ff2e941dbb5
+      robot 2deda52c-f6b1-4f54-97da-5feccecc3939
 PASS  …but not without a token
 
 == E. snapshot upload stays opaque (§5.2) ==
@@ -30,7 +30,7 @@ PASS  …and a wrong key is refused too
 PASS  a keyed worker claims a job
 PASS  …and the job is the VALIDATE the upload enqueued
 PASS  …pointing at the snapshot just uploaded
-PASS  …and carries a payload location the worker can resolve (file:///tmp/rb-blobs/snapshots/8f0b66b0-c7e2-4e14-93c1-4ff2e941dbb5/f2a3c29fd4f24a4d99b81c2c9af3a950.json)
+PASS  …and carries a payload location the worker can resolve (file:///tmp/rb-blobs/snapshots/2deda52c-f6b1-4f54-97da-5feccecc3939/16631220eb234b8eb2f1c1a8d4da652c.json)
 PASS  …and the payload sha256 rides along, so the worker can verify storage
 PASS  another worker cannot heartbeat a job it does not hold
 PASS  …the holder can
@@ -141,6 +141,15 @@ PASS  an unknown category is refused rather than returning an empty board
 PASS  a match is publicly viewable, so a scout can watch a fight
 PASS  …showing the verdict
 PASS  …carrying the replay but NO payload url — the program stays private (§1.3)
+PASS  a robot's completed fights are publicly listable
+PASS  …including the settled match from section K
+PASS  …newest first, so a showcase picks up the latest fight
+PASS  …stating the outcome from the robot's own side
+PASS  …and naming the opponent, not itself
+PASS  …carrying replay urls and NO payload url (§1.3 holds here too)
+PASS  …listing COMPLETE matches only
+PASS  an unknown robot is an empty list, not a 500
+PASS  …and the list really is empty
 PASS  an anonymous scouting card carries no payload url
 PASS  the inbox loads for a signed-in player
 PASS  …and carries this account's matches (7)
@@ -233,7 +242,7 @@ PASS  no wallet is overdrawn
 --- E. the career economy ---
 PASS  an economy account registers
 PASS  a NON-participant asking for match envelopes is told nothing
-PASS  …and the account id came back (cac86654-7452-45f8-9ab7-075d8bf05f5d)
+PASS  …and the account id came back (06d6f567-4e21-4113-ba2d-505d20a1ab28)
 PASS  the wallet answers
 PASS  a fresh wallet holds exactly the signing bonus
 PASS  …and owns nothing
@@ -293,7 +302,7 @@ PASS  metrics carry pendingSnapshots
 PASS  pendingSnapshots agrees with the database
 PASS  failed agrees with the database
 PASS  the rbmetrics log line keeps its shape
-      rbmetrics ready=1 claimed=0 failed=4 done=16 oldest_ready_s=2 oldest_heartbeat_s=0 pending_snapshots=3 oldest_pending_s=7
+      rbmetrics ready=0 claimed=0 failed=4 done=15 oldest_ready_s=0 oldest_heartbeat_s=0 pending_snapshots=3 oldest_pending_s=3
 PASS  …and reports real counts, not a row of zeros
 
 --- B. season badges ---
@@ -312,4 +321,4 @@ SKIP  blob URLs are built with the forwarded scheme -- no object store configure
   blob URLs are built with the forwarded scheme -- no object store configured (BLOB_S3_BUCKET unset); file:// rows are passed through verbatim
 ----- a skip is not a pass; each line above is cover this run did not provide -----
 
-===== passed 257  failed 0  skipped 1 =====
+===== passed 266  failed 0  skipped 1 =====

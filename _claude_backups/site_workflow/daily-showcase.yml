@@ -1,0 +1,57 @@
+name: daily champions showcase
+
+# Rebuilds website/data/showcase.json from the live ladder and commits it, so
+# GitHub Pages redeploys with today's champions.
+#
+# WHY CI AND NOT THE BROWSER: the API sends no CORS headers, so a page on
+# cyberduck.club cannot read it directly. Fetching here (server-to-server, no
+# browser, no CORS) keeps the site fully static — it stays up and instant even
+# when the API is cold or down, because the data is already in the repo.
+#
+# Everything it reads is public: /v1/leaderboard, /v1/robots/{id}/matches and
+# the replay blobs are all anonymous, so this workflow needs NO secrets beyond
+# the token GitHub hands it to push.
+
+on:
+  schedule:
+    - cron: "17 9 * * *"     # 09:17 UTC daily — off the hour, where the
+                             # scheduler queue is shorter and runs start on time
+  workflow_dispatch:          # and a manual button, for when a fight is worth showing now
+
+permissions:
+  contents: write
+
+concurrency:
+  group: showcase
+  cancel-in-progress: false
+
+jobs:
+  bake:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Rebuild the showcase
+        run: python3 tools/bake_showcase.py --out data/showcase.json
+
+      - name: Commit only if it actually changed
+        run: |
+          # A no-op commit every day is noise in the history and a pointless
+          # Pages rebuild. `generated` changes on every run by design, so the
+          # comparison deliberately ignores it and looks at the CONTENT.
+          if git diff --quiet -- data/showcase.json; then
+            echo "no change"; exit 0
+          fi
+          before=$(git show HEAD:data/showcase.json 2>/dev/null \
+                   | python3 -c "import json,sys;d=json.load(sys.stdin);d.pop('generated',None);print(json.dumps(d,sort_keys=True))" 2>/dev/null || echo "")
+          after=$(python3 -c "import json;d=json.load(open('data/showcase.json'));d.pop('generated',None);print(json.dumps(d,sort_keys=True))")
+          if [ "$before" = "$after" ]; then
+            echo "only the timestamp moved — leaving the file alone"
+            git checkout -- data/showcase.json
+            exit 0
+          fi
+          git config user.name  "cyberduck-bot"
+          git config user.email "admin@cyberduck.club"
+          git add data/showcase.json
+          git commit -m "showcase: champions as of $(date -u +%Y-%m-%d)"
+          git push
