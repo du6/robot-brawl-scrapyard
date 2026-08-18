@@ -39,6 +39,7 @@ The records, most recent first:
 | doc | what |
 |---|---|
 | `docs/HANDOVER_iOS_Launch_2026-08-16.md` | **THE LAUNCH OPERATING MANUAL** — 1.0 build 8 submitted; production topology, the four alerts and the regex trap that silences them, the 5-min health check, symptom→subsystem playbook, the build-9 ritual, the in-review build-swap procedure, open items in bite order |
+| `docs/Promo_Video_2026-08-18.md` | **the 21s promo** — real footage driven frame-by-frame (rAF is suspended, so MediaRecorder cannot work); this ffmpeg has NO drawtext; a still input is one frame at t=0, which silently killed every caption |
 | `docs/Mailing_List_2026-08-18.md` | **the site's only working CTA** — how to fetch the list and send by hand; the CSV *is* the send list, BCC discipline, and the domain has NO SPF/DKIM/DMARC yet |
 | `docs/Server_Economy_Design_2026-08-13.md` | scrap goes ON SALE eventually (owen) — wallet+inventory server-side. SERVER HALF BUILT + DEPLOYED same day (010/011, claims/purchase/wallet, 255/255) and the client's first-win rule with it; the boot gate + client cache is the remaining piece, tracked with hazards |
 | `docs/Flagship_Hardening_2026-08-12.md` | CEILING L4 92%→50% in two measured steps; the L5 reversal; the FLOOR needle at 61%; where the rest of the gap lives |
