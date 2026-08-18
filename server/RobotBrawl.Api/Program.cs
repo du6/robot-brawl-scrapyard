@@ -2008,6 +2008,88 @@ app.MapPost("/v1/subscribers", async (SubscribeReq req) =>
     });
 }).AllowAnonymous().RequireRateLimiting("subscribe").RequireCors(SitePolicy);
 
+// ⚠ THE ONLY WAY THE LIST COMES BACK OUT. rb-db has no route from a laptop —
+// its authorised-networks list refuses one, correctly — so without this
+// endpoint the signups accumulate somewhere owen cannot read, and a mailing
+// list nobody can open is not a mailing list. That is the whole reason this
+// exists: updates are sent BY HAND for now, which means the addresses have to
+// be fetchable by hand.
+//
+// Behind the worker key, like /v1/admin/metrics. This is the single most
+// sensitive read in the API — it is every address anyone ever gave us — so it
+// is never anonymous and never behind a mere user token.
+app.MapGet("/v1/admin/subscribers", async (HttpContext ctx, string? format, bool? all) =>
+{
+    if (!WorkerAuthed(ctx)) return Results.Unauthorized();
+    // ⚠ UNSUBSCRIBED ROWS ARE EXCLUDED BY DEFAULT, and that default is the
+    // point of the tombstone. An export that quietly included them is exactly
+    // how a hand-sent update reaches someone who asked to be left alone —
+    // there is no send pipeline here to filter them out later, the CSV IS the
+    // send list. `all=true` exists for auditing a request, not for mailing.
+    var rows = new List<object>();
+    await using var c = await db.OpenAsync();
+    await using var cmd = new NpgsqlCommand(
+        "SELECT email, wants_updates, wants_seasons, consent_source, consent_at, "
+        + "verified_at IS NOT NULL, unsubscribed_at IS NULL "
+        + "FROM subscribers " + ((all == true) ? "" : "WHERE unsubscribed_at IS NULL ")
+        + "ORDER BY consent_at;", c);
+    await using var r = await cmd.ExecuteReaderAsync();
+    while (await r.ReadAsync())
+        rows.Add(new
+        {
+            email = r.GetString(0),
+            updates = r.GetBoolean(1),
+            seasons = r.GetBoolean(2),
+            source = r.GetString(3),
+            consentAt = r.GetDateTime(4).ToString("o"),
+            verified = r.GetBoolean(5),
+            subscribed = r.GetBoolean(6),
+        });
+
+    if (!string.Equals(format, "csv", StringComparison.OrdinalIgnoreCase))
+        return Results.Ok(new { count = rows.Count, subscribers = rows });
+
+    var sb = new System.Text.StringBuilder("email,updates,seasons,source,consent_at,verified,subscribed\n");
+    foreach (dynamic x in rows)
+        // Addresses cannot contain a comma unquoted, but source is free text
+        // that arrives from a query string, so every field is quoted and every
+        // quote doubled. A CSV that breaks on one row breaks the whole export.
+        sb.Append('"').Append(((string)x.email).Replace("\"", "\"\"")).Append("\",")
+          .Append(x.updates).Append(',').Append(x.seasons).Append(",\"")
+          .Append(((string)x.source).Replace("\"", "\"\"")).Append("\",")
+          .Append(x.consentAt).Append(',').Append(x.verified).Append(',')
+          .Append(x.subscribed).Append('\n');
+    return Results.Text(sb.ToString(), "text/csv");
+}).AllowAnonymous();
+
+// ⚠ UNSUBSCRIBE BY ADDRESS, BECAUSE A HAND-SENT EMAIL CANNOT CARRY A
+// PER-RECIPIENT LINK. One message BCC'd to everybody is one body with one
+// link in it, so the token flow below — which is correct, and stays for when
+// something sends per-recipient mail — cannot be what a manual update uses.
+// Without this the form's promise of an unsubscribe would be a promise we
+// could not keep.
+//
+// The trade, stated rather than hidden: anyone who knows an address can
+// unsubscribe it. For a game newsletter that is a nuisance and it is
+// reversible in one form submission, whereas the alternative — no working
+// unsubscribe at all — is the thing that gets a domain blocklisted. It
+// answers identically whether or not the address was on the list, so it is
+// still not an oracle.
+app.MapPost("/v1/subscribers/unsubscribe", async (SubscribeReq req) =>
+{
+    var email = (req.Email ?? "").Trim();
+    if (email.Length is > 0 and <= 254)
+    {
+        await using var c = await db.OpenAsync();
+        await using var cmd = new NpgsqlCommand(
+            "UPDATE subscribers SET unsubscribed_at = now() "
+            + "WHERE lower(email) = lower($1) AND unsubscribed_at IS NULL;", c);
+        cmd.Parameters.AddWithValue(email);
+        await cmd.ExecuteNonQueryAsync();
+    }
+    return Results.Ok(new { ok = true, message = "That address has been removed from the list." });
+}).AllowAnonymous().RequireRateLimiting("subscribe").RequireCors(SitePolicy);
+
 // One-click unsubscribe. GET on purpose: it is what a mail client can put
 // behind a link, and the token IS the authorisation, so there is nothing to
 // sign in to. Unknown tokens answer exactly like known ones — see above.

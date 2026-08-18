@@ -1720,6 +1720,46 @@ else
   skip "subscriber row contents (consent, token, tombstone, resubscribe)" "PGURL unset or psql missing -- 10 checks did not run"
 fi
 
+# --- the export, which is the only way the list comes back out ---
+# rb-db refuses a connection from a laptop, so if this endpoint is wrong the
+# signups are unreachable and the whole feature is decorative.
+SUB_EXPORT="exp-$$@example.com"
+c=$(req POST /v1/subscribers "{\"email\":\"$SUB_EXPORT\",\"source\":\"exporttest\"}")
+expect "a subscriber exists to export" "$c" 200
+
+c=$(req GET "/v1/admin/subscribers")
+expect "the export refuses an anonymous caller" "$c" 401
+c=$(req GET "/v1/admin/subscribers" "" "X-Worker-Key: wrong-key")
+expect "the export refuses a wrong worker key" "$c" 401
+
+c=$(req GET "/v1/admin/subscribers" "" "X-Worker-Key: $WKEY")
+expect "the export answers the worker key" "$c" 200
+if grep -q "$SUB_EXPORT" "$BODY"; then ok "the new subscriber is in the export"
+else no "the new subscriber is MISSING from the export -- the list is unreachable"; fi
+
+c=$(req GET "/v1/admin/subscribers?format=csv" "" "X-Worker-Key: $WKEY")
+expect "the export can be fetched as CSV" "$c" 200
+head -1 "$BODY" | grep -q '^email,updates,seasons,source,consent_at,verified,subscribed$' \
+  && ok "the CSV carries a header row" \
+  || no "the CSV header is wrong: $(head -1 "$BODY")"
+
+# ⚠ THE CHECK THAT MATTERS. There is no send pipeline to filter anyone out
+# later — this CSV *is* the send list — so an unsubscribed address appearing
+# in it is an address that gets emailed after asking not to be.
+c=$(req POST /v1/subscribers/unsubscribe "{\"email\":\"$SUB_EXPORT\"}")
+expect "an address can unsubscribe itself without a token" "$c" 200
+c=$(req GET "/v1/admin/subscribers?format=csv" "" "X-Worker-Key: $WKEY")
+if grep -q "$SUB_EXPORT" "$BODY"; then
+  no "an UNSUBSCRIBED address is still in the default export -- it would be mailed again"
+else ok "an unsubscribed address is excluded from the export by default"; fi
+c=$(req GET "/v1/admin/subscribers?all=true" "" "X-Worker-Key: $WKEY")
+if grep -q "$SUB_EXPORT" "$BODY"; then ok "all=true still shows them, for auditing a request"
+else no "all=true dropped an unsubscribed row -- there is then no record to audit"; fi
+
+# Unsubscribing an address that was never on the list must not error or differ.
+c=$(req POST /v1/subscribers/unsubscribe '{"email":"never-signed-up-'$$'@example.com"}')
+expect "unsubscribing an unknown address is not an error" "$c" 200
+
 # CORS: the form posts from another origin, so the browser will not accept the
 # reply without these headers. An allow-LIST, not a wildcard.
 c=$(curl -s -o "$BODY" -w '%{http_code}' -X OPTIONS "$BASE/v1/subscribers" \
