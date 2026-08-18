@@ -81,10 +81,94 @@ namespace RobotBrawl.Editor
         ///
         /// ⚠ MUST RUN IN PLAY MODE. Deco() calls Object.Destroy on the
         /// primitive's collider, which is illegal from edit mode.</summary>
-        static string VisRecipe(P1PartDef d)
+        /// <summary>⚠ SIX OF THESE PARTS ARE DRAWN DIFFERENTLY DEPENDING ON
+        /// WHICH WAY THEY WERE BOLTED, AND THE ROTATION IS NOT IN THE
+        /// TRANSFORM. For pivot/spindle/ram/blade/wedge/hook the builder does
+        /// NOT rotate the GameObject — it passes
+        /// `VisualId(def, part.DriveAxis())`, i.e. the id with an axis code
+        /// appended ("pivotYP", "wedgeXN"), and BuildPart's ParseAxis turns
+        /// that suffix back into the direction the part points. So the
+        /// orientation lives in the VISUAL, and a consumer that only has the
+        /// recorded transform cannot recover it.
+        ///
+        /// Exporting the bare id gave every one of them its DEFAULT axis, so
+        /// the website drew a robot whose weapons all pointed the fallback way.
+        /// It shows up worst on the machine with the most varied loadout —
+        /// owen spotted it on LIGHT (Hammer: pivot, spindle, blade and two
+        /// wedges) before any other class.
+        ///
+        /// Spike and spinner are Weapon category too and are NOT here on
+        /// purpose: the builder gives those a real transform rotation
+        /// (FromToRotation on the mount normal) through their own branches, so
+        /// the recorded transform already carries their orientation.</summary>
+        static readonly string[] AXIS_CODES = { "XP", "XN", "YP", "YN", "ZP", "ZN" };
+        static bool NeedsAxisVariants(P1PartDef d)
         {
-            var a = CaptureVis(d, new Color(1f, 0f, 0f));
-            var b = CaptureVis(d, new Color(0f, 1f, 0f));
+            return d.id == "pivot" || d.id == "spindle" || d.id == "ram"
+                || d.id == "blade" || d.id == "wedge" || d.id == "hook";
+        }
+
+        /// <summary>⚠ YAW IS NOT A ROTATION, IT IS A DIFFERENT SHAPE. A
+        /// transcription of PlacedPart.Half(): the builder passes
+        /// `part.Half() * 2` as the size, so a yawed part reaches BuildPart
+        /// with its components SWAPPED and the visual is regenerated around
+        /// the new long axis. Nothing is rotated, which is why the yaw cannot
+        /// be recovered from the recorded transform, and why each yaw is a
+        /// swap about a DIFFERENT axis rather than one turn about Y:
+        ///   90  -> (z,y,x)  long axis to X
+        ///   180 -> (x,z,y)  stood up, y/z
+        ///   270 -> (y,x,z)  stood up, x/y
+        /// spike, Mobility and spinner* never reach this — Half() returns for
+        /// them earlier through their own axis-aware branches.</summary>
+        static Vector3 YawSize(Vector3 s, int yaw)
+        {
+            if (yaw == 90) return new Vector3(s.z, s.y, s.x);
+            if (yaw == 180) return new Vector3(s.x, s.z, s.y);
+            if (yaw == 270) return new Vector3(s.y, s.x, s.z);
+            return s;
+        }
+
+        static readonly int[] YAWS = { 90, 180, 270 };
+
+        /// <summary>Every drawing of this part that is not the default one,
+        /// keyed "<axis><yaw>" — "XN", "y90", "XNy90". Variants identical to
+        /// the base are DROPPED, which is most of them: a cube is the same
+        /// shape at every yaw, a beam with x==y is unchanged at 270, and a
+        /// weapon on its default axis is unchanged too. Without that the table
+        /// is 24 recipes per weapon part and several hundred KB on a page that
+        /// has to open on a phone.</summary>
+        static string VisVariants(P1PartDef d, string baseRecipe)
+        {
+            bool axisPart = NeedsAxisVariants(d);
+            bool yawPart = d.id != "spike" && !d.id.StartsWith("spinner")
+                           && d.category != P1Category.Mobility;
+            var map = new List<string>();
+            var codes = new List<string>();
+            if (axisPart) codes.AddRange(AXIS_CODES); else codes.Add(null);
+            foreach (var code in codes)
+            {
+                string vid = code == null ? null : d.id + code;
+                foreach (var yaw in new[] { 0, 90, 180, 270 })
+                {
+                    if (yaw != 0 && !yawPart) continue;
+                    if (code == null && yaw == 0) continue;      // that is the base
+                    string rec = VisRecipe(d, vid, YawSize(d.size, yaw));
+                    if (rec == baseRecipe) continue;             // nothing new to say
+                    string key = (code ?? "") + (yaw == 0 ? "" : "y" + yaw);
+                    if (key.Length == 0) continue;
+                    map.Add("\"" + key + "\":" + rec);
+                }
+            }
+            if (map.Count == 0) return "";
+            return ",\"visVar\":{" + string.Join(",", map) + "}";
+        }
+
+        static string VisRecipe(P1PartDef d) { return VisRecipe(d, null, d.size); }
+
+        static string VisRecipe(P1PartDef d, string idOverride, Vector3 size)
+        {
+            var a = CaptureVis(d, new Color(1f, 0f, 0f), idOverride, size);
+            var b = CaptureVis(d, new Color(0f, 1f, 0f), idOverride, size);
             if (a.Count == 0) return "[]";
 
             var sb = new StringBuilder("[");
@@ -115,7 +199,7 @@ namespace RobotBrawl.Editor
             public bool emissive;
         }
 
-        static List<VisPiece> CaptureVis(P1PartDef d, Color fallback)
+        static List<VisPiece> CaptureVis(P1PartDef d, Color fallback, string idOverride, Vector3 size)
         {
             var list = new List<VisPiece>();
             var host = new GameObject("vis_probe_" + d.id);
@@ -146,7 +230,7 @@ namespace RobotBrawl.Editor
                 else if (d.id == "spike")
                     PartVisualFactory.BuildSpike(host.transform, d.size);
                 else
-                    PartVisualFactory.BuildPart(d.id, host.transform, d.size, false, fallback,
+                    PartVisualFactory.BuildPart(idOverride ?? d.id, host.transform, size, false, fallback,
                                                 mat != null ? mat.metallic : 0.8f,
                                                 mat != null ? mat.smoothness : 0.6f);
                 foreach (var r in host.GetComponentsInChildren<Renderer>(true))
@@ -198,6 +282,7 @@ namespace RobotBrawl.Editor
             for (int i = 0; i < defs.Length; i++)
             {
                 var d = defs[i];
+                string baseRec = VisRecipe(d);
                 sb.Append("    \"").Append(d.id).Append("\": {")
                   .Append("\"sx\":").Append(F(d.size.x))
                   .Append(",\"sy\":").Append(F(d.size.y))
@@ -206,7 +291,8 @@ namespace RobotBrawl.Editor
                   .Append(",\"disc\":").Append(IsDisc(d) ? "true" : "false")
                   .Append(",\"edge\":").Append(F(d.edgeHardness))
                   .Append(",\"label\":\"").Append(d.label.Replace("\"", "'")).Append("\"")
-                  .Append(",\"vis\":").Append(VisRecipe(d))
+                  .Append(",\"vis\":").Append(baseRec)
+                  .Append(VisVariants(d, baseRec))
                   .Append("}");
                 if (i < defs.Length - 1) sb.Append(',');
                 sb.Append('\n');
