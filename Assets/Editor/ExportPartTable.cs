@@ -81,7 +81,20 @@ namespace RobotBrawl.Editor
             sb.Append("  },\n");
 
             sb.Append("  \"materials\": {\n");
+            // ⚠ MatDB.Order IS THE PLAYER-SELECTABLE LIST, NOT EVERY MATERIAL.
+            // Materials pinned to a part (P1PartDef.materialChoice == false)
+            // never appear in it — RUBBER is the live example: every wheel in
+            // the game is Rubber, Order does not mention it, so the first
+            // export omitted it and the website rendered all six of a
+            // champion's wheels through its unknown-material fallback, as pale
+            // blue-grey semi-metal drums. Export the palette PLUS whatever the
+            // parts actually reference, or the table silently under-describes
+            // the game it is generated from.
             var mats = new List<string>(MatDB.Order);
+            foreach (var d in P1PartDef.Palette())
+                if (!string.IsNullOrEmpty(d.matName) && !mats.Contains(d.matName)
+                    && MatDB.Has(d.matName))
+                    mats.Add(d.matName);
             for (int i = 0; i < mats.Count; i++)
             {
                 var m = MatDB.Get(mats[i]);
