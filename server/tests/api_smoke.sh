@@ -1641,6 +1641,107 @@ else
   fi
 fi
 
+# --------------------------------------------------------------- section S
+# The mailing list — the website's only working call to action.
+#
+# ⚠ THIS SECTION MUST STAY ABOVE SECTION P. P exhausts a rate-limit bucket on
+# purpose, and while the subscribe endpoint has its own bucket now, that is
+# exactly the kind of thing a later edit quietly changes. Ordering is cheap
+# insurance; a 429 here would read as a broken endpoint.
+echo
+echo "--- S. mailing list ---"
+
+SUB_MAIL="sub-$$@example.com"
+
+c=$(req POST /v1/subscribers "{\"email\":\"$SUB_MAIL\",\"updates\":true,\"seasons\":true,\"source\":\"smoke\"}")
+expect "a visitor can subscribe" "$c" 200
+
+# ⚠ THE SAME ANSWER TWICE, AND THAT IS THE CHECK. A different reply for an
+# address already on the list turns this endpoint into an oracle: anyone could
+# ask it whether a given person subscribed. The upsert exists to make one
+# honest answer serve both cases, so a passing "already subscribed" message
+# here would be a privacy REGRESSION, not a nicety.
+FIRST=$(jget message)
+c=$(req POST /v1/subscribers "{\"email\":\"$SUB_MAIL\",\"updates\":true,\"seasons\":true,\"source\":\"smoke\"}")
+expect "subscribing twice is not an error" "$c" 200
+same "a repeat signup is indistinguishable from a new one" "$(jget message)" "$FIRST"
+
+# Case must not open a second row for the same person.
+c=$(req POST /v1/subscribers "{\"email\":\"$(printf '%s' "$SUB_MAIL" | tr 'a-z' 'A-Z')\",\"source\":\"smoke\"}")
+expect "a differently-cased address is the same subscriber" "$c" 200
+
+c=$(req POST /v1/subscribers '{"email":"not-an-address","source":"smoke"}')
+expect "an address with no @ is refused" "$c" 400
+c=$(req POST /v1/subscribers '{"email":"","source":"smoke"}')
+expect "an empty address is refused" "$c" 400
+c=$(req POST /v1/subscribers "{\"email\":\"$SUB_MAIL\",\"updates\":false,\"seasons\":false}")
+expect "subscribing to nothing at all is refused" "$c" 400
+
+# Unsubscribe is token-only and must not confirm whether a token was real.
+c=$(req GET "/v1/subscribers/unsubscribe?token=nosuchtoken")
+expect "an unknown unsubscribe token still answers 200" "$c" 200
+c=$(req GET "/v1/subscribers/unsubscribe")
+expect "a missing unsubscribe token still answers 200" "$c" 200
+
+# The row itself: consent recorded, tombstone clear, token present. Checked in
+# SQL because none of it is visible through the API on purpose.
+if [ -n "${PGURL:-}" ] && command -v psql >/dev/null 2>&1; then
+  ROW=$(psql "$PGURL" -tAc "SELECT count(*)||'|'||coalesce(max(consent_source),'')||'|'||
+       coalesce(max(length(unsub_token))::text,'0')||'|'||
+       count(*) FILTER (WHERE unsubscribed_at IS NULL)||'|'||
+       count(*) FILTER (WHERE verified_at IS NULL)
+       FROM subscribers WHERE lower(email)=lower('$SUB_MAIL');" 2>/dev/null | tr -d ' ')
+  is "exactly one row for the address, whatever the case" "${ROW%%|*}" "1"
+  is "the consent source was recorded" "$(echo "$ROW" | cut -d'|' -f2)" "smoke"
+  is "an unsubscribe token exists from the moment of signup" "$(echo "$ROW" | cut -d'|' -f3)" "64"
+  is "the subscriber is live" "$(echo "$ROW" | cut -d'|' -f4)" "1"
+  # Not a nicety: nothing sets verified_at yet, and a send job that assumes
+  # otherwise would mail unverified addresses. If this ever fails, double
+  # opt-in landed and the send path needs revisiting with it.
+  is "the row is UNVERIFIED — double opt-in is not built yet" "$(echo "$ROW" | cut -d'|' -f5)" "1"
+
+  # Round-trip the real token through the public endpoint.
+  TOK=$(psql "$PGURL" -tAc "SELECT unsub_token FROM subscribers WHERE lower(email)=lower('$SUB_MAIL');" 2>/dev/null | tr -d ' ')
+  if [ -n "$TOK" ]; then
+    c=$(req GET "/v1/subscribers/unsubscribe?token=$TOK")
+    expect "a real token unsubscribes" "$c" 200
+    LIVE=$(psql "$PGURL" -tAc "SELECT count(*) FROM subscribers WHERE lower(email)=lower('$SUB_MAIL') AND unsubscribed_at IS NOT NULL;" 2>/dev/null | tr -d ' ')
+    is "the unsubscribe is recorded as a tombstone, not a delete" "$LIVE" "1"
+    # Coming back through the form is a fresh opt-in and must clear it, or a
+    # single mis-click would bar someone from the list permanently.
+    c=$(req POST /v1/subscribers "{\"email\":\"$SUB_MAIL\",\"source\":\"smoke\"}")
+    expect "an unsubscriber can subscribe again" "$c" 200
+    BACK=$(psql "$PGURL" -tAc "SELECT count(*) FROM subscribers WHERE lower(email)=lower('$SUB_MAIL') AND unsubscribed_at IS NULL;" 2>/dev/null | tr -d ' ')
+    is "resubscribing clears the tombstone" "$BACK" "1"
+  else
+    skip "unsubscribe token round-trip" "could not read the token back from the database"
+  fi
+else
+  skip "subscriber row contents (consent, token, tombstone, resubscribe)" "PGURL unset or psql missing -- 10 checks did not run"
+fi
+
+# CORS: the form posts from another origin, so the browser will not accept the
+# reply without these headers. An allow-LIST, not a wildcard.
+c=$(curl -s -o "$BODY" -w '%{http_code}' -X OPTIONS "$BASE/v1/subscribers" \
+      -H 'Origin: https://cyberduck.club' \
+      -H 'Access-Control-Request-Method: POST' \
+      -H 'Access-Control-Request-Headers: Content-Type')
+if [ "$c" = "204" ] || [ "$c" = "200" ]; then ok "the browser preflight is answered ($c)"
+else no "the browser preflight was refused -- HTTP $c; the form cannot post at all"; fi
+
+ACAO=$(curl -s -D - -o /dev/null -X OPTIONS "$BASE/v1/subscribers" \
+        -H 'Origin: https://cyberduck.club' -H 'Access-Control-Request-Method: POST' \
+        | tr -d '\r' | awk -F': ' 'tolower($1)=="access-control-allow-origin"{print $2}')
+is "the site's origin is allowed" "$ACAO" "https://cyberduck.club"
+
+# The negative leg. Without this the check above passes just as happily
+# against a wildcard, which is the thing that must not ship.
+EVIL=$(curl -s -D - -o /dev/null -X OPTIONS "$BASE/v1/subscribers" \
+        -H 'Origin: https://evil.example' -H 'Access-Control-Request-Method: POST' \
+        | tr -d '\r' | awk -F': ' 'tolower($1)=="access-control-allow-origin"{print $2}')
+if [ -z "$EVIL" ]; then ok "an unlisted origin is NOT allowed"
+else no "an unlisted origin was allowed ('$EVIL') -- any site could post signups through a visitor's browser"; fi
+
 # --------------------------------------------------------------- section P
 # The proxy headers. THIS SECTION IS LAST ON PURPOSE: it deliberately
 # exhausts an auth rate-limit bucket, and if the partitioning it is testing

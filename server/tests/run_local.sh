@@ -194,6 +194,13 @@ bash tests/sql_bench.sh > "$SQL" 2>&1
 SQLRC=$?
 
 echo "running api_smoke.sh (result: qa_api_smoke.txt)…"
+# ⚠ THE SAME ONE-VARIABLE-TWO-CONSUMERS TRAP AS TRUST_PROXY ABOVE, and it is
+# written out here rather than left implicit precisely because that one cost a
+# day. Section S checks the subscriber ROW — consent source, unsubscribe
+# token, tombstone, resubscribe — none of which the API exposes on purpose, so
+# they can only be read in SQL. Without PGURL those ten checks skip, and a
+# skip beside "failed 0" reads as a pass.
+export PGURL="postgresql://rb:rb@localhost/$RB_DB"
 bash tests/api_smoke.sh "$BASE" > "$OUT" 2>&1
 
 # The restore drill runs LAST and against the database the benches just

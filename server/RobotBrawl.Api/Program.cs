@@ -139,7 +139,45 @@ builder.Services.AddRateLimiter(o =>
     o.AddPolicy("economy", ctx => RateLimitPartition.GetFixedWindowLimiter(
         ctx.User.FindFirstValue("sub") ?? ctx.Connection.RemoteIpAddress?.ToString() ?? "anon",
         _ => new FixedWindowRateLimiterOptions { PermitLimit = 60, Window = TimeSpan.FromMinutes(1) }));
+    // The mailing list gets its own bucket for the reason stated above the
+    // wallet one, and here it cuts BOTH ways: sharing "auth" would let a flood
+    // of signups from one address lock real players out of signing IN, and a
+    // player who just registered would find the form refusing them.
+    //
+    // ⚠ 20, NOT THE 5 THIS SHIPPED WITH FOR AN HOUR. "A human subscribes once"
+    // was the reasoning, and it is wrong twice over. THE BUCKET IS PER IP, NOT
+    // PER PERSON: a household, an office or a school behind one NAT share it,
+    // so five is five PEOPLE, and the sixth reader of the same link is refused
+    // with no way to tell why. And unsubscribe sits in this bucket too — a
+    // mail client that prefetches links can spend the budget before the human
+    // clicks anything. Five was also tighter than `auth` at 10, which is
+    // backwards: this endpoint cannot be used to guess a password.
+    // Found by the bench, which needs eight calls to check the round trip and
+    // got 429s on six of them; the limit was the thing that was wrong.
+    o.AddPolicy("subscribe", ctx => RateLimitPartition.GetFixedWindowLimiter(
+        ctx.Connection.RemoteIpAddress?.ToString() ?? "anon",
+        _ => new FixedWindowRateLimiterOptions { PermitLimit = 20, Window = TimeSpan.FromMinutes(1) }));
 });
+
+// ⚠ CORS EXISTS FOR EXACTLY ONE ROUTE, AND THE ALLOW-LIST IS THE POINT.
+// Until now this API sent no CORS headers at all, which is why the website
+// BAKES its data with a Python job instead of fetching live (see
+// bake_showcase.py's header). That stays true: opening the ladder up to
+// browser reads is a separate decision with its own abuse profile, and the
+// baked file is faster and survives the API being cold or down.
+//
+// The mailing-list form is different — it is a WRITE from a page on another
+// origin, so it cannot work without this. Named origins only: a wildcard here
+// would let any site on the internet post signups through this endpoint using
+// a visitor's browser. Localhost is listed so the form can be exercised
+// against a dev API without editing this file, which is how a "temporary"
+// wildcard normally gets added and left in.
+const string SitePolicy = "site";
+builder.Services.AddCors(o => o.AddPolicy(SitePolicy, p => p
+    .WithOrigins("https://cyberduck.club", "https://www.cyberduck.club",
+                 "http://localhost:8811")
+    .WithMethods("POST", "GET")
+    .WithHeaders("Content-Type")));
 
 var app = builder.Build();
 
@@ -179,6 +217,9 @@ if (trustProxy)
     app.Logger.LogInformation("Trusting X-Forwarded-For/Proto from the immediate proxy.");
 }
 
+// Before auth: a CORS preflight is an unauthenticated OPTIONS and must be
+// answered as one.
+app.UseCors(SitePolicy);
 app.UseAuthentication();
 app.UseAuthorization();
 app.UseRateLimiter();
@@ -1911,6 +1952,77 @@ app.MapPost("/v1/iap/verify", (ClaimsPrincipal user) =>
     }, statusCode: 501)
 ).RequireAuthorization().RequireRateLimiting("economy");
 
+// ========================================================= mailing list
+// The website's only call to action. Anonymous BY NECESSITY — the whole point
+// is the visitor who does not have the game yet — and therefore the only
+// endpoint here a stranger can write to without an account, which is why it
+// is the most conservative one in the file.
+//
+// ⚠ IT MUST NOT BE AN ADDRESS ORACLE. "Already subscribed" and "subscribed"
+// return the SAME 200 with the same body. Distinguishing them would let
+// anyone test whether a given person is on the list, which is a privacy leak
+// dressed up as a helpful error message. The upsert below is what makes one
+// answer honest for both cases.
+app.MapPost("/v1/subscribers", async (SubscribeReq req) =>
+{
+    var email = (req.Email ?? "").Trim();
+    // Deliberately not a regex. Address grammar is famously not one, and every
+    // clever pattern this could use rejects somebody's real address; the send
+    // path is what finds out whether an address works. Length is bounded
+    // because the column is unbounded text.
+    if (email.Length is < 3 or > 254 || !email.Contains('@') || email.Contains(' '))
+        return Bad("a real email address is required");
+    var source = (req.Source ?? "web").Trim();
+    if (source.Length > 40) source = source.Substring(0, 40);
+    bool updates = req.Updates ?? true, seasons = req.Seasons ?? true;
+    if (!updates && !seasons)
+        return Bad("choose at least one thing to hear about");
+
+    await using var c = await db.OpenAsync();
+    await using var cmd = new NpgsqlCommand(@"
+        INSERT INTO subscribers (email, wants_updates, wants_seasons, consent_source, unsub_token)
+        VALUES ($1,$2,$3,$4,$5)
+        ON CONFLICT (lower(email)) DO UPDATE SET
+            wants_updates   = EXCLUDED.wants_updates,
+            wants_seasons   = EXCLUDED.wants_seasons,
+            -- Coming back through the form is a fresh, explicit opt-in, so it
+            -- clears the tombstone and re-dates the consent. Anything else
+            -- would leave someone unable to resubscribe after one mis-click.
+            unsubscribed_at = NULL,
+            consent_at      = now(),
+            consent_source  = EXCLUDED.consent_source
+        ;", c);
+    cmd.Parameters.AddWithValue(email.ToLowerInvariant());
+    cmd.Parameters.AddWithValue(updates);
+    cmd.Parameters.AddWithValue(seasons);
+    cmd.Parameters.AddWithValue(source);
+    cmd.Parameters.AddWithValue(Guid.NewGuid().ToString("N") + Guid.NewGuid().ToString("N"));
+    await cmd.ExecuteNonQueryAsync();
+
+    // No id, no token, no "you were already on it". Nothing here tells the
+    // caller anything about who else is on the list.
+    return Results.Ok(new
+    {
+        ok = true,
+        message = "You're on the list. We'll email you when Robot Brawl launches.",
+    });
+}).AllowAnonymous().RequireRateLimiting("subscribe").RequireCors(SitePolicy);
+
+// One-click unsubscribe. GET on purpose: it is what a mail client can put
+// behind a link, and the token IS the authorisation, so there is nothing to
+// sign in to. Unknown tokens answer exactly like known ones — see above.
+app.MapGet("/v1/subscribers/unsubscribe", async (string? token) =>
+{
+    if (string.IsNullOrWhiteSpace(token) || token.Length > 128)
+        return Results.Ok(new { ok = true, message = "You have been unsubscribed." });
+    await using var c = await db.OpenAsync();
+    await using var cmd = new NpgsqlCommand(
+        "UPDATE subscribers SET unsubscribed_at = now() WHERE unsub_token = $1 AND unsubscribed_at IS NULL;", c);
+    cmd.Parameters.AddWithValue(token);
+    await cmd.ExecuteNonQueryAsync();
+    return Results.Ok(new { ok = true, message = "You have been unsubscribed." });
+}).AllowAnonymous().RequireRateLimiting("subscribe").RequireCors(SitePolicy);
+
 // ========================================================= league nights
 // §M3: "Scheduled league nights (server-initiated round-robin among top 8 per
 // category, weekly) — passive content that makes the ladder move even when
@@ -2460,6 +2572,7 @@ app.MapGet("/v1/blobs/{**key}", async (string key, HttpContext ctx, IBlobStore b
 app.Run();
 
 // ------------------------------------------------------------------ dtos
+public record SubscribeReq(string? Email, bool? Updates, bool? Seasons, string? Source);
 public record RegisterReq(string? Email, string? Password, string? DisplayName);
 public record LoginReq(string? Email, string? Password);
 public record RobotReq(string? Name);
