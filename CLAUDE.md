@@ -39,8 +39,7 @@ The records, most recent first:
 | doc | what |
 |---|---|
 | `docs/Gusset_x4_2026-08-18.md` | the gusset holds **×4**, measured with its control leg — and the finding that fell out of it: **`Main.unity` has no `BuilderManager`**, so every fight-running bench is unrunnable without a human clicking Start. Also: the ladder is at ×4 while build 9 in review is at ×1.5 |
-| `docs/Launch_Check_2026-08-19.md` | the second launch check: both blockers fixed and verified on production, six new built-in-metric alerts, five documented facts that were false |
-| `docs/HANDOVER_iOS_Launch_2026-08-16.md` | **THE LAUNCH OPERATING MANUAL** — 1.0 build 8 submitted; production topology, the four alerts and the regex trap that silences them, the 5-min health check, symptom→subsystem playbook, the build-9 ritual, the in-review build-swap procedure, open items in bite order |
+| `docs/HANDOVER_iOS_Launch_2026-08-16.md` | **THE LAUNCH OPERATING MANUAL** — 1.0 submitted (build 8 then, **build 10** now); production topology, the four alerts and the regex trap that silences them, the 5-min health check, symptom→subsystem playbook, the build-9 ritual, the in-review build-swap procedure, open items in bite order |
 | `docs/Launch_Check_2026-08-19.md` | **READ BEFORE RELEASING** — the DB accepts ~25 connections while the API fleet can open 400; unsubscribe is blockable by signup traffic (proven); and five documented facts are now false, incl. PITR being ON |
 | `docs/Promo_Video_2026-08-18.md` | **the 21s promo** — real footage driven frame-by-frame (rAF is suspended, so MediaRecorder cannot work); this ffmpeg has NO drawtext; a still input is one frame at t=0, which silently killed every caption |
 | `docs/Mailing_List_2026-08-18.md` | **the site's only working CTA** — how to fetch the list and send by hand; the CSV *is* the send list, BCC discipline, and the domain has NO SPF/DKIM/DMARC yet |
