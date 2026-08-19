@@ -869,6 +869,31 @@ app.MapPost("/v1/worker/jobs/{id:long}/validate-result",
         await up.ExecuteNonQueryAsync();
     }
 
+    // ⚠ A LEGAL UPLOAD UN-RETIRES ITS ROBOT (owen, 2026-08-19). Without this,
+    // POST /v1/robots/{id}/retire followed by a re-enlist under the same name
+    // leaves an incoherent row: an ACTIVE snapshot and a rating on a robot
+    // still flagged retired, greyed out in the client for no visible reason.
+    // Enlist matches an existing robot BY NAME, so this is the ordinary path
+    // back, not an edge case.
+    //
+    // ⚠ AND IT IS A RATING RESET, WHICH IS WORTH SAYING OUT LOUD. Retire
+    // deletes the ratings rows; re-enlisting then creates a fresh placement at
+    // the default. So retire + re-enlist is a way to shed a bad rating, and
+    // that is exactly what LadderClient.Enlist's "reuse before create" comment
+    // exists to prevent. It is accepted here as the price of being able to
+    // remove a robot at all — but it IS a hole, and if the ladder ever carries
+    // stakes worth gaming, the fix is to keep a tombstoned rating that a
+    // re-enlist under the same name inherits.
+    if (res.Legal)
+    {
+        await using var unret = new NpgsqlCommand(@"
+            UPDATE robots SET retired = false
+             WHERE id = (SELECT robot_id FROM snapshots WHERE id = $1) AND retired;", c, tx);
+        unret.Parameters.AddWithValue(res.SnapshotId);
+        if (await unret.ExecuteNonQueryAsync() > 0)
+            app.Logger.LogInformation("snapshot {Snap} un-retired its robot", res.SnapshotId);
+    }
+
     // A robot that passes validation JOINS THE LADDER, and it has to happen
     // here or the ladder cannot start at all.
     //
@@ -2555,6 +2580,92 @@ app.MapPost("/v1/cosmetics/{id}/buy", async (string id, ClaimsPrincipal user) =>
     await tx.CommitAsync();
     return Results.Ok(new { bought = id, paid = price, balance = balance - price });
 }).RequireAuthorization().RequireRateLimiting("wallet");
+
+// =============================================== retire one robot (owen, 08-19)
+// "how to remove an enlisted robot" — and until now the answer was that you
+// could not. There was no route for it at all: robots could be created,
+// listed, snapshotted, equipped and fought, and the ONLY thing that ever set
+// robots.retired was DELETE /v1/account, which retires every robot you own and
+// redacts the account with it. A player who enlisted under a name they
+// regretted had one option and it was to delete their account.
+//
+// ⚠ THREE WRITES, AND MISSING ANY ONE OF THEM LEAVES THE ROBOT HALF-RETIRED:
+//
+//   1. ratings — DELETE. This is the row that puts a robot on the board, and
+//      the board query is `ratings JOIN robots JOIN users` with NO retired
+//      filter. Setting the flag alone removes it from precisely nothing.
+//   2. snapshots ACTIVE -> SUPERSEDED. THIS is what actually stops it being
+//      fought: POST /v1/challenges refuses a non-ACTIVE snapshot on either
+//      side, and league night selects on `JOIN snapshots s ON ... ACTIVE`.
+//      `retired` is never read by either — the flag is documentation, the
+//      snapshot status is enforcement.
+//   3. robots.retired — the honest flag, returned by GET /v1/robots so a
+//      client can grey the row out.
+//
+// ⚠ AND IT REFUSES WHILE A FIGHT IS LIVE, which is the subtle one. Rating
+// settlement is an UPSERT (`INSERT INTO ratings ... ON CONFLICT DO UPDATE`),
+// so a QUEUED or RUNNING match that settles after we delete the row would
+// RECREATE it — the robot would silently reappear on the board minutes after
+// a player watched it disappear, with no error anywhere to explain it.
+// Refusing for the ~30 s a fight takes is a far better trade than a
+// resurrection nobody can account for.
+//
+// Retiring is not a delete: matches stay, because each is also somebody
+// else's history, and the ledger is untouched. It is idempotent — retiring a
+// retired robot is a 200 with zero counts, not a 409, because the caller's
+// intent is already satisfied.
+app.MapPost("/v1/robots/{robotId:guid}/retire", async (Guid robotId, ClaimsPrincipal user) =>
+{
+    var me = UserId(user);
+    await using var c = await db.OpenAsync();
+
+    string name;
+    await using (var own = new NpgsqlCommand("SELECT user_id, name, retired FROM robots WHERE id = $1;", c))
+    {
+        own.Parameters.AddWithValue(robotId);
+        await using var r0 = await own.ExecuteReaderAsync();
+        // A robot that is not yours reads as one that does not exist. Telling
+        // a stranger apart from a non-owner is an enumeration oracle.
+        if (!await r0.ReadAsync()) return Results.NotFound(new { error = "no such robot" });
+        if (r0.GetGuid(0) != me) return Results.NotFound(new { error = "no such robot" });
+        name = r0.GetString(1);
+        if (r0.GetBoolean(2))
+            return Results.Ok(new { retired = true, robotId, name, alreadyRetired = true,
+                                    ratingsRemoved = 0, snapshotsStoodDown = 0 });
+    }
+
+    // See the note above: settlement upserts the rating back.
+    await using (var busy = new NpgsqlCommand(@"
+        SELECT count(*) FROM matches m
+         WHERE m.status IN ('QUEUED','RUNNING')
+           AND (m.challenger_snapshot_id IN (SELECT id FROM snapshots WHERE robot_id = $1)
+             OR m.defender_snapshot_id   IN (SELECT id FROM snapshots WHERE robot_id = $1));", c))
+    {
+        busy.Parameters.AddWithValue(robotId);
+        var n = Convert.ToInt64(await busy.ExecuteScalarAsync());
+        if (n > 0)
+            return Results.Conflict(new { error = $"'{name}' has {n} fight(s) still to settle — "
+                + "retire it once they finish, or the result would put it back on the board" });
+    }
+
+    await using var tx = await c.BeginTransactionAsync();
+    int ratings, snaps;
+    await using (var ra = new NpgsqlCommand("DELETE FROM ratings WHERE robot_id = $1;", c, tx))
+    { ra.Parameters.AddWithValue(robotId); ratings = await ra.ExecuteNonQueryAsync(); }
+
+    await using (var s = new NpgsqlCommand(
+        "UPDATE snapshots SET status = 'SUPERSEDED' WHERE robot_id = $1 AND status = 'ACTIVE';", c, tx))
+    { s.Parameters.AddWithValue(robotId); snaps = await s.ExecuteNonQueryAsync(); }
+
+    await using (var rb = new NpgsqlCommand("UPDATE robots SET retired = true WHERE id = $1;", c, tx))
+    { rb.Parameters.AddWithValue(robotId); await rb.ExecuteNonQueryAsync(); }
+
+    await tx.CommitAsync();
+    app.Logger.LogInformation("retired robot {Robot} ({Name}) for {User}: {Ratings} rating(s), {Snaps} snapshot(s)",
+                              robotId, name, me, ratings, snaps);
+    return Results.Ok(new { retired = true, robotId, name, alreadyRetired = false,
+                            ratingsRemoved = ratings, snapshotsStoodDown = snaps });
+}).RequireAuthorization().RequireRateLimiting("upload");
 
 app.MapPost("/v1/robots/{robotId:guid}/equip", async (Guid robotId, EquipReq req, ClaimsPrincipal user) =>
 {

@@ -1983,6 +1983,133 @@ else
   skip "the display-name uniqueness invariant, checked in the database" "psql not on PATH"
 fi
 
+echo
+echo "== U. retiring one robot (owen, 2026-08-19) =="
+# Until today there was no way to remove an enlisted robot: the only thing
+# that ever set robots.retired was DELETE /v1/account, which retires every
+# robot you own and redacts the account with it.
+#
+# WARNING: THIS SECTION ASSERTS THE DATABASE, NOT THE STATUS CODE. Retiring is
+# three writes and skipping any one leaves the robot half-retired in a way a
+# 200 cannot see:
+#   ratings   DELETE             <- the row that puts it on the BOARD
+#   snapshots ACTIVE->SUPERSEDED <- what actually stops it being FOUGHT
+#   robots.retired = true        <- the flag the client greys the row out on
+# The board query is `ratings JOIN robots JOIN users` with NO retired filter,
+# so setting the flag alone removes it from precisely nothing.
+if [ -z "$TOK" ] || [ -z "$ROBOT" ]; then
+  skip "retiring a robot" "no account or robot from the earlier sections"
+else
+  S=$(req POST "/v1/robots/00000000-0000-0000-0000-000000000000/retire" '{}' "$AUTH")
+  expect "retiring a robot that does not exist is a 404" "$S" 404
+  # 404 and not 403 for someone else's robot, deliberately: distinguishing
+  # "not yours" from "no such thing" is an enumeration oracle.
+  S=$(req POST "/v1/robots/$ROBOT/retire" '{}')
+  expect "retiring without a token is refused" "$S" 401
+
+  # --- the in-flight guard, on the robot that has actually been fighting ----
+  # Rating settlement UPSERTS, so retiring a robot with a QUEUED or RUNNING
+  # match would have that result RECREATE the rating row and put the robot
+  # back on the board minutes later, with nothing anywhere to explain it.
+  # $ROBOT has an unsettled match left by the earlier sections, which is
+  # exactly the condition this refuses.
+  BUSY=$(dbq "SELECT count(*) FROM matches m WHERE m.status IN ('QUEUED','RUNNING')
+              AND (m.challenger_snapshot_id IN (SELECT id FROM snapshots WHERE robot_id='$ROBOT')
+                OR m.defender_snapshot_id   IN (SELECT id FROM snapshots WHERE robot_id='$ROBOT'));")
+  if [ "${BUSY:-0}" -gt 0 ]; then
+    S=$(req POST "/v1/robots/$ROBOT/retire" '{}' "$AUTH")
+    expect "a robot with a fight still to settle CANNOT be retired" "$S" 409
+    case "$(jget error)" in
+      *"still to settle"*) ok "...and the refusal explains why, in words" ;;
+      *) no "the 409 did not say why: $(jget error)" ;;
+    esac
+    same "...and nothing was written — its ratings are untouched" \
+         "$(dbq "SELECT count(*) > 0 FROM ratings WHERE robot_id='$ROBOT';")" "t"
+  else
+    skip "the in-flight retire guard" "no unsettled match on \$ROBOT this run"
+  fi
+
+  # --- the happy path, on a robot of its own -------------------------------
+  # A FRESH robot, enlisted and validated here, so the assertions below are
+  # about retiring and not about whatever the rest of the bench left behind.
+  req POST /v1/robots "{\"name\":\"Retiree$STAMP\"}" "$AUTH" >/dev/null
+  RROBOT=$(jget id)
+  if [ -z "$RROBOT" ]; then
+    skip "retiring a freshly enlisted robot" "could not create the fixture robot"
+  else
+    req POST /v1/snapshots "$(body_upload "$RROBOT" "$(envelope "Retiree$STAMP")")" "$AUTH" >/dev/null
+    RSNAP=$(jget id)
+    # Drain until we hold OUR job: claim() hands out the oldest first.
+    RJOB=""
+    for i in 1 2 3 4 5 6; do
+      req POST /v1/worker/jobs/claim '{"workerId":"smoke-retire"}' "X-Worker-Key: $WKEY" >/dev/null
+      got=$(jget id); [ -z "$got" ] && break
+      if [ "$(jget snapshotId)" = "$RSNAP" ]; then RJOB="$got"; break; fi
+      req POST "/v1/worker/jobs/$got/validate-result" \
+        "{\"snapshotId\":\"$(jget snapshotId)\",\"workerId\":\"smoke-retire\",\"legal\":false,\"massKg\":1,\"aabbX\":0.1,\"aabbY\":0.1,\"aabbZ\":0.1,\"category\":null,\"partsManifest\":[],\"programHash\":\"\",\"failReasons\":[\"drained by section U\"]}" \
+        "X-Worker-Key: $WKEY" >/dev/null
+    done
+    if [ -z "$RJOB" ]; then
+      skip "retiring a freshly enlisted robot" "never claimed the fixture's own validate job"
+    else
+      req POST "/v1/worker/jobs/$RJOB/validate-result" \
+        "{\"snapshotId\":\"$RSNAP\",\"workerId\":\"smoke-retire\",\"legal\":true,\"massKg\":9,\"aabbX\":0.4,\"aabbY\":0.3,\"aabbZ\":0.5,\"category\":\"FEATHER\",\"partsManifest\":[\"chassis_a\"],\"programHash\":\"\",\"failReasons\":[]}" \
+        "X-Worker-Key: $WKEY" >/dev/null
+      same "the fixture robot is enlisted and on the board" \
+           "$(dbq "SELECT count(*) FROM ratings WHERE robot_id='$RROBOT';")" "1"
+
+      S=$(req POST "/v1/robots/$RROBOT/retire" '{}' "$AUTH")
+      expect "the owner can retire their own robot" "$S" 200
+      same "...the rating rows are gone, so it leaves the board" \
+           "$(dbq "SELECT count(*) FROM ratings WHERE robot_id='$RROBOT';")" "0"
+      same "...no ACTIVE snapshot remains, so it cannot be fought" \
+           "$(dbq "SELECT count(*) FROM snapshots WHERE robot_id='$RROBOT' AND status='ACTIVE';")" "0"
+      same "...and the robot is flagged retired" \
+           "$(dbq "SELECT retired FROM robots WHERE id='$RROBOT';")" "t"
+      # A hard delete here would cascade through snapshots and take other
+      # players' match history with it. Retiring is not deleting.
+      same "...but the robot row survives, because matches reference it" \
+           "$(dbq "SELECT count(*) FROM robots WHERE id='$RROBOT';")" "1"
+      req GET "/v1/leaderboard" >/dev/null
+      if grep -q "$RROBOT" "$BODY"; then no "...and it is off the public leaderboard"
+      else ok "...and it is off the public leaderboard"; fi
+
+      # Idempotent: a client retrying after a dropped response must not fail,
+      # so this is a 200 and not a 409 — the caller's intent already holds.
+      S=$(req POST "/v1/robots/$RROBOT/retire" '{}' "$AUTH")
+      expect "retiring an already-retired robot is a 200, not an error" "$S" 200
+      same "...and it says so rather than pretending it did the work again" \
+           "$(jget alreadyRetired)" "True"
+
+      # Re-enlisting is the way back, and it must leave a COHERENT row: an
+      # ACTIVE snapshot on a robot still flagged retired would be greyed out
+      # in the client for no visible reason.
+      req POST /v1/snapshots "$(body_upload "$RROBOT" "$(envelope "Retiree$STAMP-again")")" "$AUTH" >/dev/null
+      RSNAP2=$(jget id)
+      RJOB2=""
+      for i in 1 2 3 4 5 6; do
+        req POST /v1/worker/jobs/claim '{"workerId":"smoke-retire2"}' "X-Worker-Key: $WKEY" >/dev/null
+        got=$(jget id); [ -z "$got" ] && break
+        if [ "$(jget snapshotId)" = "$RSNAP2" ]; then RJOB2="$got"; break; fi
+        req POST "/v1/worker/jobs/$got/validate-result" \
+          "{\"snapshotId\":\"$(jget snapshotId)\",\"workerId\":\"smoke-retire2\",\"legal\":false,\"massKg\":1,\"aabbX\":0.1,\"aabbY\":0.1,\"aabbZ\":0.1,\"category\":null,\"partsManifest\":[],\"programHash\":\"\",\"failReasons\":[\"drained by section U\"]}" \
+          "X-Worker-Key: $WKEY" >/dev/null
+      done
+      if [ -z "$RJOB2" ]; then
+        skip "re-enlisting un-retires the robot" "never claimed the second validate job"
+      else
+        req POST "/v1/worker/jobs/$RJOB2/validate-result" \
+          "{\"snapshotId\":\"$RSNAP2\",\"workerId\":\"smoke-retire2\",\"legal\":true,\"massKg\":9,\"aabbX\":0.4,\"aabbY\":0.3,\"aabbZ\":0.5,\"category\":\"FEATHER\",\"partsManifest\":[\"chassis_a\"],\"programHash\":\"\",\"failReasons\":[]}" \
+          "X-Worker-Key: $WKEY" >/dev/null
+        same "re-enlisting clears the retired flag" \
+             "$(dbq "SELECT retired FROM robots WHERE id='$RROBOT';")" "f"
+        same "...and it is back on the board" \
+             "$(dbq "SELECT count(*) FROM ratings WHERE robot_id='$RROBOT';")" "1"
+      fi
+    fi
+  fi
+fi
+
 rm -f "$BODY" "$VRC_SNAP_FILE" "$VRC_JOB_FILE"
 echo
 if [ "$skipped" -gt 0 ]; then

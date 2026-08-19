@@ -469,6 +469,37 @@ namespace RobotBrawl.Phase0
             }
         }
 
+        /// <summary>Take a robot off the ladder: its rating rows are deleted,
+        /// its ACTIVE snapshot is stood down, and it is flagged retired. Past
+        /// matches survive, because each is also the other player's history.
+        ///
+        /// ⚠ REFUSED (409) WHILE A FIGHT OF ITS OWN IS STILL QUEUED OR RUNNING,
+        /// and the server's message says so. That is not a race the client
+        /// should retry around: rating settlement UPSERTS, so retiring mid-fight
+        /// would have the result recreate the rating and put the robot back on
+        /// the board minutes later with nothing to explain it.
+        ///
+        /// Reversible: re-enlisting under the same name un-retires the robot —
+        /// and starts it at a fresh placement rating.
+        /// done(err) — null on success, including when it was already retired.</summary>
+        public static IEnumerator Retire(string robotId, Action<string> done)
+        {
+            if (string.IsNullOrEmpty(robotId)) { done("no robot to retire"); yield break; }
+            using (var req = PostJson("/v1/robots/" + robotId + "/retire", "{}"))
+            {
+                yield return Send(req);
+                if (req.result != UnityWebRequest.Result.Success)
+                {
+                    string text = req.downloadHandler != null ? req.downloadHandler.text : "";
+                    // The API explains itself — "'x' has 1 fight(s) still to
+                    // settle". Show that, not a status code.
+                    string why = RobotWorker.Field(text, "error") ?? req.error;
+                    LastError = why; done(why); yield break;
+                }
+                done(null);
+            }
+        }
+
         /// <summary>done(matchId, stake, err). A 429 here is the daily ticket
         /// cap (§2.2), not a network problem, and the body says which.</summary>
         public static IEnumerator Challenge(string challengerSnapshotId, string defenderSnapshotId,

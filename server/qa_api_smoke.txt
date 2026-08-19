@@ -15,7 +15,7 @@ PASS  a wrong password and an unknown account are indistinguishable (both 401)
 
 == D. robots ==
 PASS  a robot is created
-      robot 4be5fb49-7f54-4566-b8d1-ed407cedaa62
+      robot 88aacac5-c7f7-4576-9c75-bd86af51baaa
 PASS  …but not without a token
 
 == E. snapshot upload stays opaque (§5.2) ==
@@ -30,7 +30,7 @@ PASS  …and a wrong key is refused too
 PASS  a keyed worker claims a job
 PASS  …and the job is the VALIDATE the upload enqueued
 PASS  …pointing at the snapshot just uploaded
-PASS  …and carries a payload location the worker can resolve (file:///tmp/rb-blobs/snapshots/4be5fb49-7f54-4566-b8d1-ed407cedaa62/08550d605c4c4ef3821d61b4f0084a6f.json)
+PASS  …and carries a payload location the worker can resolve (file:///tmp/rb-blobs/snapshots/88aacac5-c7f7-4576-9c75-bd86af51baaa/a3e2e88d5d254ada845e6012f214ac41.json)
 PASS  …and the payload sha256 rides along, so the worker can verify storage
 PASS  another worker cannot heartbeat a job it does not hold
 PASS  …the holder can
@@ -243,7 +243,7 @@ PASS  no wallet is overdrawn
 --- E. the career economy ---
 PASS  an economy account registers
 PASS  a NON-participant asking for match envelopes is told nothing
-PASS  …and the account id came back (7c8b103a-b7eb-455a-aa56-5e06b0cc4ab1)
+PASS  …and the account id came back (48e0023a-616f-4900-85c1-2e8e6f81da0b)
 PASS  the wallet answers
 PASS  a fresh wallet holds exactly the signing bonus
 PASS  …and owns nothing
@@ -303,7 +303,7 @@ PASS  metrics carry pendingSnapshots
 PASS  pendingSnapshots agrees with the database
 PASS  failed agrees with the database
 PASS  the rbmetrics log line keeps its shape
-      rbmetrics ready=1 claimed=0 failed=4 done=16 oldest_ready_s=1 oldest_heartbeat_s=0 pending_snapshots=3 oldest_pending_s=7
+      rbmetrics ready=0 claimed=0 failed=4 done=15 oldest_ready_s=0 oldest_heartbeat_s=0 pending_snapshots=3 oldest_pending_s=5
 PASS  …and reports real counts, not a row of zeros
 
 --- B. season badges ---
@@ -375,8 +375,26 @@ PASS  no two accounts share a display name, case-insensitively
 PASS  no two accounts share an email, case-insensitively
 PASS  the unique index on display_name_lower exists
 
+== U. retiring one robot (owen, 2026-08-19) ==
+PASS  retiring a robot that does not exist is a 404
+PASS  retiring without a token is refused
+PASS  a robot with a fight still to settle CANNOT be retired
+PASS  ...and the refusal explains why, in words
+PASS  ...and nothing was written — its ratings are untouched
+PASS  the fixture robot is enlisted and on the board
+PASS  the owner can retire their own robot
+PASS  ...the rating rows are gone, so it leaves the board
+PASS  ...no ACTIVE snapshot remains, so it cannot be fought
+PASS  ...and the robot is flagged retired
+PASS  ...but the robot row survives, because matches reference it
+PASS  ...and it is off the public leaderboard
+PASS  retiring an already-retired robot is a 200, not an error
+PASS  ...and it says so rather than pretending it did the work again
+PASS  re-enlisting clears the retired flag
+PASS  ...and it is back on the board
+
 ----- NOT COVERED BY THIS RUN (1) -----
   blob URLs are built with the forwarded scheme -- no object store configured (BLOB_S3_BUCKET unset); file:// rows are passed through verbatim
 ----- a skip is not a pass; each line above is cover this run did not provide -----
 
-===== passed 317  failed 0  skipped 1 =====
+===== passed 333  failed 0  skipped 1 =====
