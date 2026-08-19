@@ -38,6 +38,8 @@ The records, most recent first:
 
 | doc | what |
 |---|---|
+| `docs/Gusset_x4_2026-08-18.md` | the gusset holds **×4**, measured with its control leg — and the finding that fell out of it: **`Main.unity` has no `BuilderManager`**, so every fight-running bench is unrunnable without a human clicking Start. Also: the ladder is at ×4 while build 9 in review is at ×1.5 |
+| `docs/Launch_Check_2026-08-19.md` | the second launch check: both blockers fixed and verified on production, six new built-in-metric alerts, five documented facts that were false |
 | `docs/HANDOVER_iOS_Launch_2026-08-16.md` | **THE LAUNCH OPERATING MANUAL** — 1.0 build 8 submitted; production topology, the four alerts and the regex trap that silences them, the 5-min health check, symptom→subsystem playbook, the build-9 ritual, the in-review build-swap procedure, open items in bite order |
 | `docs/Launch_Check_2026-08-19.md` | **READ BEFORE RELEASING** — the DB accepts ~25 connections while the API fleet can open 400; unsubscribe is blockable by signup traffic (proven); and five documented facts are now false, incl. PITR being ON |
 | `docs/Promo_Video_2026-08-18.md` | **the 21s promo** — real footage driven frame-by-frame (rAF is suspended, so MediaRecorder cannot work); this ffmpeg has NO drawtext; a still input is one frame at t=0, which silently killed every caption |
@@ -231,6 +233,23 @@ hits that matter.**
   This class of defect is invisible to every bench in this project. Naming it
   is worth more than a bench that reaches through the seam and proves nothing
   — do not "close" it with one.
+- ⚠ **`Main.unity` CONTAINS NO `BuilderManager`, AND ONLY A CLICK EVER CREATES
+  ONE.** The scene holds a camera, a light and the URP light data — nothing
+  else. `StartCareer()` is the sole creator and it hangs off a title-screen
+  button, so **every fight-running bench (`DisarmBench`, `MatrixBench`,
+  `LadderSweepBench`, `OpeningBench`, `CareerBench`) fails on a freshly opened
+  scene** unless a human clicked Start first. Measured 2026-08-18: DisarmBench
+  returned `0 pass, 1 fail — FAIL BuilderManager in scene` in under a second,
+  then **32/32** once one was created headlessly. The SAME missing object
+  crashed the worker container the same day (`WorkerBootstrap` now creates one;
+  see `docs/Gusset_x4_2026-08-18.md` §3). Create it before you run anything:
+  `new GameObject("BuilderManager").AddComponent<BuilderManager>()`.
+- ⚠ **NO BENCH IN THIS PROJECT FIGHTS A GUSSETED ROBOT.** Every fight fixture
+  descends from `VerbBench.ARMED`, which carries **zero `|G:` marks**, so
+  `GUSSET_SEAM_MULT` is never read in `DisarmBench`/`MatrixBench`/`OpeningBench`
+  /`LadderSweepBench`. Their numbers are INSENSITIVE to it at any value — an
+  unchanged 43% after the ×4 change is not a null result, it is no result.
+  Only `CareerBench`'s HARDENED enemies are gusseted at all.
 - **A UI PATH ONLY A HUMAN CAN DRIVE IS A UI PATH NOTHING CHECKS.** ENLIST
   shipped with its network half 21/21 and the button itself never once
   pressed; the first run of `EnlistUiBench` found the confirmation message

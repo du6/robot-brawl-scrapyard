@@ -42,7 +42,7 @@ PASS  Statue v Statue seed 202 simulated
         via SRC_LIMB ..................... 0  (0%)
         via SRC_RAM ...................... 12  (100%)
 
-      non-weapon parts destroyed ........ 90  (of which 90 by an edge)
+      non-weapon parts destroyed ........ 99  (of which 99 by an edge)
 
   which weapon part dies:
           spinnerZP_8     12
@@ -56,9 +56,9 @@ PASS  the sweep destroyed 12 weapon part(s) to classify
   ---- BUT THAT IS NOT HOW MOST WEAPONS ARE LOST -------------------
       weapon parts that LEFT a body, by any route ... 39
           HP-DESTROYED        12  (31%)
-          STRUCTURAL-WRECK    9  (23%)
-          STRUCTURAL-SHED     18  (46%)
-      weapons that left while STILL HAVING HP ....... 27  (69%), mean 78.1% hp remaining
+          STRUCTURAL-WRECK    10  (26%)
+          STRUCTURAL-SHED     17  (44%)
+      weapons that left while STILL HAVING HP ....... 27  (69%), mean 77.3% hp remaining
 
       PREDICTION 2 (most weapons are lost WITHOUT being beaten on HP): HELD
         => WEAPON_VS_WEAPON only scales HP DAMAGE, so it cannot reach 69% of these losses at ANY value. That is why 0.25 moved the ladder by zero bouts, and why lowering it further will not help either. The weapon is not being beaten — it is being dropped when the limb carrying it fails.
