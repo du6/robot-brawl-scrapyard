@@ -320,7 +320,8 @@ public static class EnemyRoster
             {
                 if (p.def == null || p.def.id == "core") continue;
                 if (p.def.category == P1Category.Mobility) continue;
-                p.gussetFaces = 63;   // every face — the whole-machine x1.5 the calibration measured
+                p.gussetFaces = 63;   // every face — a whole-machine weld, at GUSSET_SEAM_MULT
+                //  ⚠ this is why raising that constant is a CAREER DIFFICULTY change
             }
         return L;
     }

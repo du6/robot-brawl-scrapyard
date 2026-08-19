@@ -228,7 +228,7 @@ public class P1PartDef
             new P1PartDef { id = "gusset",  label = "Gusset (weld kit)", category = P1Category.Structural, size = new Vector3(0.10f, 0.10f, 0.10f),
                             matName = "Steel", materialChoice = false, massMul = 1.274f,
                             applique = true, flatCost = 200,
-                            desc = "Weld kit. Pick it up, then tap a placed part: every joint that part makes gets x1.5 break strength. +10 kg, no space. One per part - a second adds nothing." },
+                            desc = "Weld kit. Pick it up, then tap a surface: anything bolted to that face holds far harder. +10 kg, no space. One weld per face - a second adds nothing." },
             // OWEN 2026-07-29: "Looks like I can move the robot and the weapon
             // as long as I have battery." Correct, and the old description was
             // the reason it read as a mystery - it led with the +14 kW ceiling

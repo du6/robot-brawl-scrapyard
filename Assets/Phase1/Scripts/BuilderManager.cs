@@ -77,7 +77,7 @@ public class BuilderManager : MonoBehaviour
         /// <summary>GUSSET, PER-JOINT (owen, 2026-08-12 v2: "it should only
         /// be applied to one surface"). Bit i marks the WORLD-axis face
         /// (+x,-x,+y,-y,+z,-z — parts never rotate off-axis) of THIS part
-        /// whose mating JOINT is reinforced x1.5. One gusset = one joint;
+        /// whose mating JOINT is reinforced by GUSSET_SEAM_MULT. One gusset = one joint;
         /// each costs GUSSET_KG and one stock. Serialized "|G:mask"; a bare
         /// legacy "|G" (v1, same evening, no durable saves carry it) loads
         /// as all six faces. Mass counts per joint, so category, the cap
@@ -1476,7 +1476,8 @@ public class BuilderManager : MonoBehaviour
         PushUndo();
         hit.gussetFaces |= 1 << bit;
         RefreshGussetFaces(hit);
-        message = hit.def.label + " surface welded · parts bolted here hold ×1.5 · +"
+        message = hit.def.label + " surface welded · parts bolted here hold ×"
+                  + GUSSET_SEAM_MULT.ToString("0.#") + " · +"
                 + Mathf.RoundToInt(GUSSET_KG) + " kg";
         RefreshOverlay();
         SfxSynth.Place();
@@ -4274,10 +4275,11 @@ public class BuilderManager : MonoBehaviour
                     // matches. A weapon that falls off the instant it touches
                     // anything is not a weapon, so actuator seams carry x3.
                     if (body[i].def.actuator || body[j].def.actuator) mult *= 3f;
-                    // GUSSET, per-joint: x1.5 when EITHER side's mating face
-                    // carries the gusset bit — the lever sweep's measured
-                    // multiplier (40% -> 27%; x2 buys nothing, hence applied
-                    // ONCE even if both sides are gusseted).
+                    // GUSSET, per-joint: GUSSET_SEAM_MULT when EITHER side's
+                    // mating face carries the gusset bit. Applied ONCE even if
+                    // both sides are gusseted — a seam is one joint, and
+                    // double-counting it would make the cost of a second weld
+                    // buy strength the player did not pay for.
                     {
                         Vector3 gd = body[j].pos - body[i].pos;
                         int gfi = FaceBitFromDelta(gd), gfj = FaceBitFromDelta(-gd);
@@ -5606,7 +5608,37 @@ public class BuilderManager : MonoBehaviour
     /// rejection instead of this comment.</summary>
     public const string SNAP_STAMP4 = "#fmt4-gusset";
     public const float GUSSET_KG = 10f;
-    public const float GUSSET_SEAM_MULT = 1.5f;
+    /// <summary>How much a welded seam holds, versus the same seam bare.
+    ///
+    /// ⚠ 4.0, RAISED FROM 1.5 ON 2026-08-19 (owen: "if two parts are joined
+    /// with a gusset in between, it should be very hard to tear them apart").
+    /// 1.5 came from the disarm lever sweep, where it was the GLOBAL BREAK_K
+    /// that moved mutual disarm 40% → 27%. That is a balance number for a
+    /// lever pulled on every seam at once; this is an OPT-IN, per-face,
+    /// paid-for reinforcement, and the two do not want the same value.
+    ///
+    /// 4.0 rather than a rounder number, for a reason that is checkable: the
+    /// base `mult` is the mated-socket count, so a gusseted ONE-socket seam —
+    /// the weakest joint in the game, and the battery mount that decides
+    /// matches — now holds 4, harder than a bare THREE-socket seam. That is
+    /// the promise the part makes, expressed in the same units the seam
+    /// already uses. Beside it, an actuator seam is ×3 and a gusseted
+    /// actuator seam is ×12.
+    ///
+    /// ⚠ WHAT THIS WILL NOT DO, so nobody re-measures it hoping otherwise:
+    /// it will not move the mutual-disarm rate much. That sweep found
+    /// BREAK_K saturating at ×1.5 — ×2.0 gave an identical 4/15 and an
+    /// identical `shed` — because THE LIMB FAILS, NOT THE WEAPON
+    /// (Mutual_Disarm_Root_Cause_2026-08-09). Reinforcing the weapon's own
+    /// seam cannot save a weapon whose ARM parts one joint upstream. The
+    /// answer the design intends is that the player gussets the chain, which
+    /// is exactly the lever this part exists to hand them.
+    ///
+    /// ⚠ AND IT MAKES HARDENED ENEMIES TOUGHER. EnemyRoster sets
+    /// gussetFaces=63 on every non-wheel part of a hardened bot, so this
+    /// multiplies every seam on those machines too. That is a career
+    /// difficulty change, not only a builder one.</summary>
+    public const float GUSSET_SEAM_MULT = 4f;
     /// <summary>WORLD-axis face bits: 0/1 = ±x, 2/3 = ±y, 4/5 = ±z. Parts sit
     /// axis-aligned (yaw only swaps footprint dims), so a face is fully named
     /// by the dominant axis and sign of any world direction through it.</summary>
@@ -6790,7 +6822,7 @@ public class BuilderManager : MonoBehaviour
             GUILayout.Label(string.Format("▸ {0}  ·  {1}  ·  {2} kg  ·  cost {3}  ·  seam {4}{5}",
                 hoverPart.def.label, hm.name, Mathf.RoundToInt(hoverPart.Mass()),
                 hoverPart.Cost(), Mathf.RoundToInt(hm.strengthRel * CompoundRobot.BREAK_K),
-                hoverPart.reinforced ? "  ·  GUSSETED ×1.5 (" + hoverPart.GussetCount() + " joint" + (hoverPart.GussetCount() == 1 ? "" : "s") + ")" : ""), bodyStyle);
+                hoverPart.reinforced ? "  ·  GUSSETED ×" + GUSSET_SEAM_MULT.ToString("0.#") + " (" + hoverPart.GussetCount() + " joint" + (hoverPart.GussetCount() == 1 ? "" : "s") + ")" : ""), bodyStyle);
             // The cascade says its price BEFORE you pay it, not after.
             if (hoverPart == placed[0])
                 GUILayout.Label("right-click: the core cannot be removed", descStyle);

@@ -4914,7 +4914,8 @@ public class MobileBuilderUI : MonoBehaviour
             statsText.color = Color.white;
             statsText.text = bm.HasSelection
                 ? string.Format(bm.SelectedApplique
-                      ? "HOLDING {0} — tap a surface to weld it; parts bolted there hold ×1.5 (+10 kg)  ·  {1} kg · {2} part{3}"
+                      ? "HOLDING {0} — tap a surface to weld it; parts bolted there hold ×"
+                        + BuilderManager.GUSSET_SEAM_MULT.ToString("0.#") + " (+10 kg)  ·  {1} kg · {2} part{3}"
                       : "HOLDING {0} — tap the robot to place  ·  {1} kg · {2} part{3}",
                       bm.PartLabel(bm.SelectedPart), bm.BuildMassInt, bm.PlacedCount, bm.PlacedCount == 1 ? "" : "s")
                 : string.Format("{0} kg · {1} part{2}  ·  {3}", bm.BuildMassInt, bm.PlacedCount, bm.PlacedCount == 1 ? "" : "s", TabHint());
