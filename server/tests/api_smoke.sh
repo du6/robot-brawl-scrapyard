@@ -167,13 +167,13 @@ S=$(req GET /healthz); expect "healthz answers, which means the API reached Post
 
 echo
 echo "== B. registration (§2.3) =="
-S=$(req POST /v1/auth/register "{\"email\":\"$EMAIL\",\"password\":\"$PW\",\"displayName\":\"Smoke\"}")
+S=$(req POST /v1/auth/register "{\"email\":\"$EMAIL\",\"password\":\"$PW\",\"displayName\":\"Smoke$STAMP\"}")
 expect "a new account registers" "$S" 200
 TOK=$(jget token); USERID=$(jget userId)
 [ -n "$TOK" ] && ok "…and comes back with a token" || no "no token in the register response"
-S=$(req POST /v1/auth/register "{\"email\":\"$EMAIL\",\"password\":\"$PW\",\"displayName\":\"Twin\"}")
+S=$(req POST /v1/auth/register "{\"email\":\"$EMAIL\",\"password\":\"$PW\",\"displayName\":\"Twin$STAMP\"}")
 expect "the same email cannot register twice" "$S" 409
-S=$(req POST /v1/auth/register "{\"email\":\"x-$STAMP@example.com\",\"password\":\"short\",\"displayName\":\"Sh\"}")
+S=$(req POST /v1/auth/register "{\"email\":\"x-$STAMP@example.com\",\"password\":\"short\",\"displayName\":\"Sh$STAMP\"}")
 expect "a 5-character password is refused" "$S" 400
 
 # 2026-08-09 (relay 003). Register was two INSERTs — the user and the
@@ -520,7 +520,7 @@ else
   # account rather than borrowing one - a challenge against your own robot is
   # a different test (below).
   DEMAIL="def-$STAMP@example.com"
-  S=$(req POST /v1/auth/register "{\"email\":\"$DEMAIL\",\"password\":\"$PW\",\"displayName\":\"Defender\"}")
+  S=$(req POST /v1/auth/register "{\"email\":\"$DEMAIL\",\"password\":\"$PW\",\"displayName\":\"Def$STAMP\"}")
   DTOK=$(jget token); DUSER=$(jget userId)
   if [ -z "$DTOK" ] || [ -z "$CHSNAP" ]; then
     skip "the fight lifecycle (14 checks)" "no defender token (HTTP $S) or no ACTIVE challenger snapshot"
@@ -1285,8 +1285,17 @@ else
 
   is "…the email is gone" \
      "$(dbq "SELECT CASE WHEN email LIKE 'deleted+%@deleted.invalid' THEN 'redacted' ELSE 'STILL THERE' END FROM users WHERE id='$DUSER';")" redacted
+  # WARNING: THE PLACEHOLDER CARRIES THE ACCOUNT'S OWN ID AND THAT IS LOAD-BEARING.
+  # It used to be the constant 'deleted player', which was fine while nothing
+  # enforced uniqueness on display_name. Since 015 added
+  # users_display_name_lower_key a constant placeholder means THE SECOND
+  # DELETION EVER ATTEMPTED fails on a 23505 and rolls the whole thing back —
+  # a player asking to be forgotten is refused because someone else already
+  # was. So the check is the SHAPE, plus the property that actually matters.
   is "…so is the display name" \
-     "$(dbq "SELECT display_name FROM users WHERE id='$DUSER';")" "deletedplayer"
+     "$(dbq "SELECT CASE WHEN display_name ~ '^deleted [0-9a-f]{8}$' THEN 'redacted' ELSE display_name END FROM users WHERE id='$DUSER';")" redacted
+  is "…and a second deletion would not collide with the first" \
+     "$(dbq "SELECT count(*) FROM (SELECT display_name FROM users WHERE display_name LIKE 'deleted %' GROUP BY 1 HAVING count(*) > 1) d;")" 0
   is "…their robots are retired, so nothing of theirs can be fought again" \
      "$(dbq "SELECT count(*) FROM robots WHERE user_id='$DUSER' AND NOT retired;")" 0
   is "…and off the ladder entirely" \
@@ -1397,7 +1406,7 @@ fi
 echo
 echo "--- E. the career economy ---"
 EEMAIL="econ-$STAMP@example.com"
-c=$(req POST /v1/auth/register "{\"email\":\"$EEMAIL\",\"password\":\"$PW\",\"displayName\":\"Econ\"}")
+c=$(req POST /v1/auth/register "{\"email\":\"$EEMAIL\",\"password\":\"$PW\",\"displayName\":\"Econ$STAMP\"}")
 expect "an economy account registers" "$c" 200
 ETOK=$(jget token); ECON_UID=$(jget userId)
 EAUTH="Authorization: Bearer $ETOK"
@@ -1871,14 +1880,14 @@ else
   saw429=""
   for i in $(seq 1 12); do
     c=$(req POST /v1/auth/register \
-        "{\"email\":\"pxy-a-$$-$i@example.com\",\"password\":\"correct-horse-battery\",\"displayName\":\"PxyA$i\"}" \
+        "{\"email\":\"pxy-a-$$-$i@example.com\",\"password\":\"correct-horse-battery\",\"displayName\":\"PxyA$STAMP-$i\"}" \
         "$A" "$PXY")
     [ "$c" = "429" ] && { saw429="yes"; break; }
   done
   is "one client can be rate-limited to exhaustion" "${saw429:-no}" "yes"
 
   cB=$(req POST /v1/auth/register \
-       "{\"email\":\"pxy-b-$$@example.com\",\"password\":\"correct-horse-battery\",\"displayName\":\"PxyB\"}" \
+       "{\"email\":\"pxy-b-$$@example.com\",\"password\":\"correct-horse-battery\",\"displayName\":\"PxyB$STAMP\"}" \
        "$B" "$PXY")
   if [ "$cB" = "429" ]; then
     no "a different client keeps its own bucket -- HTTP 429; the limiter is bucketing every caller together, which behind a proxy is one global 10/min budget for the whole world"
@@ -1910,6 +1919,68 @@ else
       esac
     fi
   fi
+fi
+
+echo
+echo "== T. an account is unique on BOTH axes (owen, 2026-08-19) =="
+# WHY THIS SECTION IS LAST AND NOT IN B. Registering is rate limited to 10 per
+# minute PER IP (the "auth" policy), and this bench is one IP. Putting five
+# more registrations into section B pushed the run past the limit and the
+# ECONOMY section — a hundred checks later and nothing to do with auth —
+# failed on a 429. That is the limiter working, not a bug to widen: the fix is
+# for the bench to stop crowding a budget it is not testing. Down here the
+# minute has long rolled, and the wait below covers the case where it has not.
+#
+# WARNING: THE TWO CONFLICTS USED TO BE INDISTINGUISHABLE. Both unique indexes
+# raise 23505 and the handler answered "that email is already registered" to
+# whichever one fired, so a player whose NAME was taken was told to change
+# their EMAIL — and would change the one thing that was fine, repeatedly. The
+# client prints this string verbatim (LadderClient.Auth reads the "error"
+# field), so the MESSAGE is the whole user experience of the failure.
+# Asserting only the status code would pass against the broken version.
+UQ="uq-$STAMP"
+S=$(req POST /v1/auth/register "{\"email\":\"$UQ@example.com\",\"password\":\"$PW\",\"displayName\":\"Uq$STAMP\"}")
+if [ "$S" = "429" ]; then
+  # The one place this bench is allowed to sleep. A fixed window of a minute
+  # means at most 61 s, once, and it is announced so a slow run is explained
+  # rather than mysterious.
+  echo "      (auth window full — waiting 61 s for it to roll)"
+  sleep 61
+  S=$(req POST /v1/auth/register "{\"email\":\"$UQ@example.com\",\"password\":\"$PW\",\"displayName\":\"Uq$STAMP\"}")
+fi
+expect "a fresh account registers" "$S" 200
+
+S=$(req POST /v1/auth/register "{\"email\":\"$UQ@example.com\",\"password\":\"$PW\",\"displayName\":\"Other$STAMP\"}")
+expect "the same email cannot register twice, even under a new name" "$S" 409
+case "$(jget error)" in
+  *email*) ok "...and the reason names the EMAIL" ;;
+  *)       no "the email conflict blamed something else: $(jget error)" ;;
+esac
+
+S=$(req POST /v1/auth/register "{\"email\":\"$(printf '%s' "$UQ" | tr 'a-z' 'A-Z')@EXAMPLE.COM\",\"password\":\"$PW\",\"displayName\":\"Upper$STAMP\"}")
+expect "an email differing only in CASE is the same account" "$S" 409
+
+S=$(req POST /v1/auth/register "{\"email\":\"uqb-$STAMP@example.com\",\"password\":\"$PW\",\"displayName\":\"Uq$STAMP\"}")
+expect "a display name already taken is refused" "$S" 409
+case "$(jget error)" in
+  *"display name"*) ok "...and the reason names the DISPLAY NAME" ;;
+  *)                no "the name conflict blamed something else: $(jget error)" ;;
+esac
+
+S=$(req POST /v1/auth/register "{\"email\":\"uqc-$STAMP@example.com\",\"password\":\"$PW\",\"displayName\":\"UQ$STAMP\"}")
+expect "a display name differing only in CASE is the same name" "$S" 409
+
+# The index is the authority, not the handler: assert the database really
+# holds one row per lowercased name, not merely that the API said no.
+if command -v psql >/dev/null 2>&1; then
+  DUPN=$(dbq "SELECT count(*) FROM (SELECT lower(display_name) FROM users GROUP BY 1 HAVING count(*) > 1) d;")
+  same "no two accounts share a display name, case-insensitively" "${DUPN:-x}" "0"
+  DUPE=$(dbq "SELECT count(*) FROM (SELECT email_lower FROM users GROUP BY 1 HAVING count(*) > 1) d;")
+  same "no two accounts share an email, case-insensitively" "${DUPE:-x}" "0"
+  IDX=$(dbq "SELECT count(*) FROM pg_indexes WHERE tablename='users' AND indexname='users_display_name_lower_key';")
+  same "the unique index on display_name_lower exists" "${IDX:-x}" "1"
+else
+  skip "the display-name uniqueness invariant, checked in the database" "psql not on PATH"
 fi
 
 rm -f "$BODY" "$VRC_SNAP_FILE" "$VRC_JOB_FILE"

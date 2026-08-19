@@ -15,7 +15,7 @@ PASS  a wrong password and an unknown account are indistinguishable (both 401)
 
 == D. robots ==
 PASS  a robot is created
-      robot 9e72a777-7362-43f3-9275-cb4c7462a51c
+      robot 4be5fb49-7f54-4566-b8d1-ed407cedaa62
 PASS  …but not without a token
 
 == E. snapshot upload stays opaque (§5.2) ==
@@ -30,7 +30,7 @@ PASS  …and a wrong key is refused too
 PASS  a keyed worker claims a job
 PASS  …and the job is the VALIDATE the upload enqueued
 PASS  …pointing at the snapshot just uploaded
-PASS  …and carries a payload location the worker can resolve (file:///tmp/rb-blobs/snapshots/9e72a777-7362-43f3-9275-cb4c7462a51c/e254e07985794c0e8480d6ad5d9f7ed7.json)
+PASS  …and carries a payload location the worker can resolve (file:///tmp/rb-blobs/snapshots/4be5fb49-7f54-4566-b8d1-ed407cedaa62/08550d605c4c4ef3821d61b4f0084a6f.json)
 PASS  …and the payload sha256 rides along, so the worker can verify storage
 PASS  another worker cannot heartbeat a job it does not hold
 PASS  …the holder can
@@ -215,6 +215,7 @@ PASS  deletion without the confirmation phrase is refused
 PASS  …and with it, the account is deleted
 PASS  …the email is gone
 PASS  …so is the display name
+PASS  …and a second deletion would not collide with the first
 PASS  …their robots are retired, so nothing of theirs can be fought again
 PASS  …and off the ladder entirely
 PASS  …but the ledger survives, because it is an audit trail
@@ -242,7 +243,7 @@ PASS  no wallet is overdrawn
 --- E. the career economy ---
 PASS  an economy account registers
 PASS  a NON-participant asking for match envelopes is told nothing
-PASS  …and the account id came back (848e0631-dc8f-4a83-99f4-bfd0a798c94b)
+PASS  …and the account id came back (7c8b103a-b7eb-455a-aa56-5e06b0cc4ab1)
 PASS  the wallet answers
 PASS  a fresh wallet holds exactly the signing bonus
 PASS  …and owns nothing
@@ -302,7 +303,7 @@ PASS  metrics carry pendingSnapshots
 PASS  pendingSnapshots agrees with the database
 PASS  failed agrees with the database
 PASS  the rbmetrics log line keeps its shape
-      rbmetrics ready=0 claimed=1 failed=4 done=16 oldest_ready_s=0 oldest_heartbeat_s=0 pending_snapshots=3 oldest_pending_s=11
+      rbmetrics ready=1 claimed=0 failed=4 done=16 oldest_ready_s=1 oldest_heartbeat_s=0 pending_snapshots=3 oldest_pending_s=7
 PASS  …and reports real counts, not a row of zeros
 
 --- B. season badges ---
@@ -361,8 +362,21 @@ PASS  one client can be rate-limited to exhaustion
 PASS  a different client keeps its own bucket
 SKIP  blob URLs are built with the forwarded scheme -- no object store configured (BLOB_S3_BUCKET unset); file:// rows are passed through verbatim
 
+== T. an account is unique on BOTH axes (owen, 2026-08-19) ==
+      (auth window full — waiting 61 s for it to roll)
+PASS  a fresh account registers
+PASS  the same email cannot register twice, even under a new name
+PASS  ...and the reason names the EMAIL
+PASS  an email differing only in CASE is the same account
+PASS  a display name already taken is refused
+PASS  ...and the reason names the DISPLAY NAME
+PASS  a display name differing only in CASE is the same name
+PASS  no two accounts share a display name, case-insensitively
+PASS  no two accounts share an email, case-insensitively
+PASS  the unique index on display_name_lower exists
+
 ----- NOT COVERED BY THIS RUN (1) -----
   blob URLs are built with the forwarded scheme -- no object store configured (BLOB_S3_BUCKET unset); file:// rows are passed through verbatim
 ----- a skip is not a pass; each line above is cover this run did not provide -----
 
-===== passed 306  failed 0  skipped 1 =====
+===== passed 317  failed 0  skipped 1 =====

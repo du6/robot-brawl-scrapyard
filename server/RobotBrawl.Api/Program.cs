@@ -440,7 +440,26 @@ app.MapPost("/v1/auth/register", async (RegisterReq req) =>
     }
     catch (PostgresException ex) when (ex.SqlState == "23505")
     {
-        return Results.Conflict(new { error = "that email is already registered" });
+        // ⚠ THERE ARE TWO UNIQUE INDEXES ON `users` NOW, and this handler used
+        // to answer "that email is already registered" to whichever one fired.
+        // Since 015 added `users_display_name_lower_key`, that would tell a
+        // player their email was taken when the real problem was their name —
+        // and they would change the one thing that was fine, over and over.
+        // The client shows this string verbatim (LadderClient.Auth reads the
+        // "error" field), so the wrong string here is the whole user
+        // experience of the failure.
+        //
+        // Match on the CONSTRAINT NAME, not on the message text: the message
+        // is Postgres's to reword, the index name is ours.
+        var which = ex.ConstraintName ?? "";
+        if (which == "users_display_name_lower_key")
+            return Results.Conflict(new { error = "that display name is already taken — pick another" });
+        if (which == "users_email_lower_key")
+            return Results.Conflict(new { error = "that email is already registered" });
+        // A 23505 from neither index is a schema change nobody told this
+        // handler about. Say that, rather than blaming the email again.
+        app.Logger.LogWarning("register: unexpected unique violation on {Constraint}", which);
+        return Results.Conflict(new { error = "that account could not be created — please try different details" });
     }
 }).RequireRateLimiting("auth");
 
@@ -2631,10 +2650,20 @@ app.MapDelete("/v1/account", async (ClaimsPrincipal user,
     // The redaction itself. email_lower is generated from email, so writing a
     // unique placeholder keeps the unique index satisfied without keeping
     // anything that identifies anyone.
+    //
+    // ⚠ display_name GETS THE SAME TREATMENT AND IT IS NOT COSMETIC. It used
+    // to be the constant 'deleted player', which was fine while nothing
+    // enforced uniqueness on it. Since 015 added users_display_name_lower_key,
+    // a constant here means THE SECOND ACCOUNT DELETION EVER ATTEMPTED fails
+    // on a 23505 and rolls back the whole transaction — a player who asks to
+    // be forgotten is told no, because someone else already was. The suffix is
+    // the first 8 of the account's own uuid, which is already in the row, so
+    // it identifies nobody new. 'deleted ' + 8 = 16 chars, inside the 2-24
+    // CHECK.
     await using (var u = new NpgsqlCommand(@"
         UPDATE users SET email = 'deleted+' || id::text || '@deleted.invalid',
                          pw_hash = 'deleted',
-                         display_name = 'deleted player'
+                         display_name = 'deleted ' || left(replace(id::text, '-', ''), 8)
          WHERE id = $1;", c, tx))
     { u.Parameters.AddWithValue(me); await u.ExecuteNonQueryAsync(); }
 
