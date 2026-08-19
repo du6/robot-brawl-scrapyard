@@ -1782,6 +1782,33 @@ EVIL=$(curl -s -D - -o /dev/null -X OPTIONS "$BASE/v1/subscribers" \
 if [ -z "$EVIL" ]; then ok "an unlisted origin is NOT allowed"
 else no "an unlisted origin was allowed ('$EVIL') -- any site could post signups through a visitor's browser"; fi
 
+# --- unsubscribe must survive a signup flood -----------------------------
+# ⚠ REGRESSION TEST FOR A DEFECT MEASURED ON PRODUCTION, 2026-08-19. Both
+# routes shared one bucket, so 24 rapid signups exhausted it and the 24
+# unsubscribe calls that followed ALL returned 429 — nobody was removed. The
+# bucket is per IP, so one office NAT could stop everyone behind it leaving
+# the list. If these ever share a bucket again, this fails.
+FLOOD_MAIL="flood-$$@example.com"
+c=$(req POST /v1/subscribers "{\"email\":\"$FLOOD_MAIL\",\"source\":\"floodtest\"}")
+expect "an address to remove exists" "$c" 200
+# Exhaust the SIGNUP bucket deliberately (limit is 20/min).
+saw429=""
+for i in $(seq 1 26); do
+  cc=$(req POST /v1/subscribers "{\"email\":\"flood-$$-$i@example.com\",\"source\":\"floodtest\"}")
+  [ "$cc" = "429" ] && { saw429="yes"; break; }
+done
+if [ -n "$saw429" ]; then ok "the signup bucket still refuses a flood"
+else no "26 rapid signups were all accepted -- the subscribe limiter is not working"; fi
+# ...and unsubscribe must STILL work while that bucket is exhausted.
+c=$(req POST /v1/subscribers/unsubscribe "{\"email\":\"$FLOOD_MAIL\"}")
+expect "unsubscribe still works while the signup bucket is exhausted" "$c" 200
+if [ -n "${PGURL:-}" ] && command -v psql >/dev/null 2>&1; then
+  GONE=$(psql "$PGURL" -tAc "SELECT count(*) FROM subscribers WHERE lower(email)=lower('$FLOOD_MAIL') AND unsubscribed_at IS NOT NULL;" 2>/dev/null | tr -d ' ')
+  is "and it actually removed them, not just answered 200" "${GONE:-0}" "1"
+else
+  skip "unsubscribe-under-flood row check" "PGURL unset or psql missing -- 1 check did not run"
+fi
+
 # --------------------------------------------------------------- section N
 # The on-demand worker nudge. The worker is a headless UNITY PLAYER and a
 # cold boot costs ~115 s at 2 vCPU BEFORE it can even look at the queue, so

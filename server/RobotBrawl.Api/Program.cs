@@ -164,6 +164,25 @@ builder.Services.AddRateLimiter(o =>
     o.AddPolicy("subscribe", ctx => RateLimitPartition.GetFixedWindowLimiter(
         ctx.Connection.RemoteIpAddress?.ToString() ?? "anon",
         _ => new FixedWindowRateLimiterOptions { PermitLimit = 20, Window = TimeSpan.FromMinutes(1) }));
+    // ⚠ UNSUBSCRIBE GETS ITS OWN BUCKET, AND SHARING ONE WAS A REAL DEFECT —
+    // measured on production during the 2026-08-19 launch check, by accident:
+    // 24 rapid signups exhausted the shared budget, and all 24 unsubscribe
+    // calls that followed returned 429. Nobody was unsubscribed.
+    //
+    // The bucket is PER IP, so that is not hypothetical: a burst of signups
+    // from one office or household NAT stops everyone behind it leaving the
+    // list. Leaving is the one action that must always work — a broken
+    // unsubscribe is what gets a sending domain blocklisted, and the site's
+    // own copy promises "one-step unsubscribe".
+    //
+    // 60/min because unsubscribing is not an abuse vector worth defending
+    // against: the worst a flood achieves is removing addresses the sender
+    // then does not mail, and this endpoint deliberately answers identically
+    // whether or not the address was on the list, so it cannot be used to
+    // enumerate anyone. The limit exists only to bound a DoS.
+    o.AddPolicy("unsubscribe", ctx => RateLimitPartition.GetFixedWindowLimiter(
+        ctx.Connection.RemoteIpAddress?.ToString() ?? "anon",
+        _ => new FixedWindowRateLimiterOptions { PermitLimit = 60, Window = TimeSpan.FromMinutes(1) }));
 });
 
 // ⚠ CORS EXISTS FOR EXACTLY ONE ROUTE, AND THE ALLOW-LIST IS THE POINT.
@@ -2102,7 +2121,7 @@ app.MapPost("/v1/subscribers/unsubscribe", async (SubscribeReq req) =>
         await cmd.ExecuteNonQueryAsync();
     }
     return Results.Ok(new { ok = true, message = "That address has been removed from the list." });
-}).AllowAnonymous().RequireRateLimiting("subscribe").RequireCors(SitePolicy);
+}).AllowAnonymous().RequireRateLimiting("unsubscribe").RequireCors(SitePolicy);
 
 // One-click unsubscribe. GET on purpose: it is what a mail client can put
 // behind a link, and the token IS the authorisation, so there is nothing to
@@ -2117,7 +2136,7 @@ app.MapGet("/v1/subscribers/unsubscribe", async (string? token) =>
     cmd.Parameters.AddWithValue(token);
     await cmd.ExecuteNonQueryAsync();
     return Results.Ok(new { ok = true, message = "You have been unsubscribed." });
-}).AllowAnonymous().RequireRateLimiting("subscribe").RequireCors(SitePolicy);
+}).AllowAnonymous().RequireRateLimiting("unsubscribe").RequireCors(SitePolicy);
 
 // ========================================================= league nights
 // §M3: "Scheduled league nights (server-initiated round-robin among top 8 per
