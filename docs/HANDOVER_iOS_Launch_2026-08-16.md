@@ -13,7 +13,7 @@ at "debug-signed .aab + .apk built, no Play Console yet".
 |---|---|
 | App | Robot Brawl: Bolt & Blade, **app id 6801680303** |
 | ASC account | Yuelin Du (leondu167@gmail.com), team `BMLXB23PHU` |
-| Version / build | **1.0, build 2.1.1 (8)** — Waiting for Review since 2026-08-15 ~22:05 |
+| Version / build | ⚠ **STALE — this said build 8.** 08-17: build **9** replaced it. 08-18: build **10** replaces build 9, carrying `GUSSET_SEAM_MULT = 4` so the client agrees with the live worker (`docs/Gusset_x4_2026-08-18.md` §6). owen's call, taken 08-18: **swap into the 1.0 submission**, accepting the queue reset, rather than holding ×4 for 1.0.1 |
 | Age rating | 9+ (driver was CONTESTS frequency, not violence — set Infrequent, honestly: the ladder is opt-in) |
 | Price / regions | Free, 175 regions |
 | Review demo account | `appreview@cyberduck.club` / `password123` — exists on production, login verified 200 |
@@ -50,7 +50,7 @@ iPhone/iPad app ──HTTPS──▶ rb-api (Cloud Run, us-central1)
                            rb-db (Cloud SQL Postgres — NO public IP)
                               ▲
    rb-worker (Cloud Run JOB, │ drains queue & exits)
-   started by Cloud Scheduler every 5 min
+   nudged on demand by the API; Cloud Scheduler every 30 min is the net
    replays/blobs ──▶ GCS
 ```
 
@@ -60,8 +60,8 @@ iPhone/iPad app ──HTTPS──▶ rb-api (Cloud Run, us-central1)
 | API URL | `https://rb-api-902243335343.us-central1.run.app` |
 | Secrets | Secret Manager: `rb-jwt-secret`, `rb-worker-key`, `rb-pg-conn`, `rb-s3-key/secret` |
 | Sessions | JWT **30 days** (720h). Client (`LadderClient`) retires the session on any 401 (`SessionExpired`) and re-login restores everything — arena history is server-side (`ReturningPlayerBench` + journey J9 both prove it) |
-| DB backups | daily 09:00 UTC, 7 retained; `restore_drill.sh` passed 10/10. **PITR is OFF** — a restore loses up to 24h. Deliberate ($25/mo budget); revisit if launch traffic makes a day of data expensive |
-| Worker cadence | 5 min = the fight-settlement latency ceiling players see. Always-on worker ≈ $35/mo vs ~$25 budget — a dial, owen's call |
+| DB backups | daily 09:00 UTC, 7 retained; `restore_drill.sh` passed 10/10. ⚠ **THIS ROW SAID "PITR is OFF" AND IT WAS FALSE** — checked against the live instance 08-19: **PITR is ON**. Better recovery than documented, and WAL storage is a real cost that three documents record as deliberately declined. If the bill does not fall as expected, look here first (`docs/Launch_Check_2026-08-19.md` §3) |
+| Worker cadence | ⚠ **STALE.** The API now NUDGES the worker on demand (`WorkerTrigger`, DB-backed debounce), and the Cloud Scheduler tick is a **30-minute safety net**, not the latency ceiling. The 5-min tick was avoiding an "always-on worker ≈ $35/mo" and itself measured **~$51/mo** — worse than the thing it avoided. The queue-staleness alert was raised 900s → 2100s to match |
 | Season | **Season 1 ends 2026-09-09T22:21:38Z.** Rollover deploy is TWO commands IN ORDER, owen's go — `docs/Seasons_Live_2026-08-12.md`. Put this date on a calendar |
 
 Deploy scripts (`server/scripts/`): `deploy_api.zsh`, `deploy_worker.zsh`,
@@ -79,6 +79,8 @@ auto-mode never deploys** (`docs/AUTO_MODE_2026-08-15.md`).
 log-based metrics extracted from the reaper's `rbmetrics` stdout line
 (`Infra.cs:418`).
 
+⚠ **Those four all watch the QUEUE.** None of them notices the API returning 500s, answering slowly, exhausting the database pool or hitting its instance ceiling — most of what goes wrong on a launch day. **Six more policies were added 08-19 on Cloud Run's and Cloud SQL's BUILT-IN metrics**, which unlike the log-regex ones cannot be silenced by rewording a log line: 5xx rate >5%, p95 >3s, at the maxScale ceiling, DB connections >18, DB CPU >85%, DB disk >85%. Each was verified to have live data. See `docs/Launch_Check_2026-08-19.md` §0.
+
 ⚠ **The metrics are a REGEX over log text.** Reword the `rbmetrics` line and
 every metric goes FLAT, not red — `api_smoke.sh` section M pins the exact
 shape for precisely this reason. A quiet dashboard after an API change is a
@@ -87,7 +89,7 @@ thing to distrust, not celebrate.
 | alert | threshold | what it actually means |
 |---|---|---|
 | `rb-api health` uptime check | `/healthz/` (TRAILING SLASH — slashless is unreachable on some networks) over 443 | API down or Cloud Run cold-start storm |
-| ladder: jobs are not being worked | oldest READY job > 900s for 5 min | Scheduler stopped firing, or worker crashes on start — check `gcloud run jobs executions list` |
+| ladder: jobs are not being worked | oldest READY job > **2100s** for 5 min (was 900s — below the 30-min safety net it would have fired on a condition that self-heals) | Scheduler stopped firing, or worker crashes on start — check `gcloud run jobs executions list` |
 | ladder: the reaper is not reaping | oldest heartbeat > 900s | API's internal reaper timer dead — matches will never time out; restart rb-api |
 | ladder: jobs are failing | > 5 FAILED over 10 min | Worker validating/fighting is erroring — read the job execution logs; a malformed snapshot from a new client version is the likely cause post-launch |
 | ladder: uploaded robots are stuck | oldest PENDING snapshot > 1800s | Enlist pipeline stalled — players enlisted but never appear on the board |

@@ -17,7 +17,7 @@ than a feeling. Everything below is either **measured**, **decided**, or
 | Alerting | 4 policies + uptime check; delivery confirmed by drill. ⚠ the uptime check needs `/healthz/` **with the trailing slash** — `/healthz` 404s, and that is documented, not broken |
 | **The app knows where the server is** | was `http://localhost:5000` with no caller — fixed today. Editor → local, build → production |
 | Benches cannot write to production | they refuse; proven by aiming one at production on purpose |
-| **The iOS app builds** | Succeeded, 0 errors, Xcode project at `build/ios`, `com.owen.robotbrawl` 2.1.1, min iOS 15 |
+| **The iOS app builds** | Succeeded, 0 errors, Xcode project at `build/ios`, 2.1.1, min iOS 15. ⚠ **The bundle id here was `com.owen.robotbrawl` and that is WRONG** — the shipped id is **`club.cyberduck.robotbrawl`** (checked against the live App Store Connect record 08-19) |
 | ATS correct | `allowsArbitraryLoads=False`, and production is https |
 | No QA harnesses in the player | `dev-only-worker-key` 1 → 0 in the shipped metadata |
 | Owner state | career save `18614d0e`, mtime unchanged across ~600 real fights today |

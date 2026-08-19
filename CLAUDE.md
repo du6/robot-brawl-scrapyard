@@ -488,9 +488,12 @@ container, and two accounts have fought a real cloud match with replays in GCS.
 
 Things explicitly NOT done:
 
-1. **Point-in-time recovery is off** on `rb-db`. Daily backups (09:00 UTC,
-   7 retained) are on and the restore drill passes, but a restore loses up
-   to 24h. It costs WAL storage against a $25/mo budget — **owen's call.**
+1. ⚠ ~~**Point-in-time recovery is off** on `rb-db`.~~ **FALSE, corrected
+   2026-08-19 against the live instance: PITR is ON.** Daily backups (09:00
+   UTC, 7 retained) are on and the restore drill passes. This entry said PITR
+   had been deliberately declined to save WAL storage against a $25/mo
+   budget, and three documents repeated it. Nobody has priced the WAL — if
+   the bill does not fall as expected, look here first.
 2. ✅ **ARENA STYLING — DONE 2026-08-10.** All five surfaces (board,
    scouting card + challenge, MY FIGHTS + replay launcher, ENLIST, sign-in)
    are UGUI **in the dock**, so they inherit the safe-area insets, the 44 pt
