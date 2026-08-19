@@ -15,7 +15,7 @@ PASS  a wrong password and an unknown account are indistinguishable (both 401)
 
 == D. robots ==
 PASS  a robot is created
-      robot 88aacac5-c7f7-4576-9c75-bd86af51baaa
+      robot f2b1508b-a426-49d2-b26c-d19fe85b5f5e
 PASS  …but not without a token
 
 == E. snapshot upload stays opaque (§5.2) ==
@@ -30,7 +30,7 @@ PASS  …and a wrong key is refused too
 PASS  a keyed worker claims a job
 PASS  …and the job is the VALIDATE the upload enqueued
 PASS  …pointing at the snapshot just uploaded
-PASS  …and carries a payload location the worker can resolve (file:///tmp/rb-blobs/snapshots/88aacac5-c7f7-4576-9c75-bd86af51baaa/a3e2e88d5d254ada845e6012f214ac41.json)
+PASS  …and carries a payload location the worker can resolve (file:///tmp/rb-blobs/snapshots/f2b1508b-a426-49d2-b26c-d19fe85b5f5e/2493a414364d4018b33ec90a13c6577f.json)
 PASS  …and the payload sha256 rides along, so the worker can verify storage
 PASS  another worker cannot heartbeat a job it does not hold
 PASS  …the holder can
@@ -243,7 +243,7 @@ PASS  no wallet is overdrawn
 --- E. the career economy ---
 PASS  an economy account registers
 PASS  a NON-participant asking for match envelopes is told nothing
-PASS  …and the account id came back (48e0023a-616f-4900-85c1-2e8e6f81da0b)
+PASS  …and the account id came back (956d7541-8baf-498e-8019-13f37ce86854)
 PASS  the wallet answers
 PASS  a fresh wallet holds exactly the signing bonus
 PASS  …and owns nothing
@@ -268,9 +268,10 @@ PASS  replaying the same purchase is refused, not double-charged
 PASS  …and the inventory holds ONE cube, not two
 PASS  an expensive part buys while affordable (187)
 PASS  …and one beyond the wallet (1601 > 1032) is refused
-PASS  a sale credits half back
-PASS  …7 → 4 (round-half-to-even, same as the client)
-PASS  selling a part you no longer own is refused
+PASS  a sale is REFUSED — parts cannot be sold back
+PASS  …and the refusal says so in words a player can read
+PASS  …and the inventory is untouched — a refused sale consumes nothing
+PASS  …and no SHOP_SELL row was ever written for this account
 PASS  a rosterOnly part is not for sale (retirement holds server-side)
 PASS  a mat-pinned part refuses other materials (gusset is Steel)
 PASS  …and the pinned row carries the flat price
@@ -303,7 +304,7 @@ PASS  metrics carry pendingSnapshots
 PASS  pendingSnapshots agrees with the database
 PASS  failed agrees with the database
 PASS  the rbmetrics log line keeps its shape
-      rbmetrics ready=0 claimed=0 failed=4 done=15 oldest_ready_s=0 oldest_heartbeat_s=0 pending_snapshots=3 oldest_pending_s=5
+      rbmetrics ready=0 claimed=0 failed=4 done=15 oldest_ready_s=0 oldest_heartbeat_s=0 pending_snapshots=3 oldest_pending_s=3
 PASS  …and reports real counts, not a row of zeros
 
 --- B. season badges ---
@@ -397,4 +398,4 @@ PASS  ...and it is back on the board
   blob URLs are built with the forwarded scheme -- no object store configured (BLOB_S3_BUCKET unset); file:// rows are passed through verbatim
 ----- a skip is not a pass; each line above is cover this run did not provide -----
 
-===== passed 333  failed 0  skipped 1 =====
+===== passed 334  failed 0  skipped 1 =====

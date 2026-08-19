@@ -1487,11 +1487,22 @@ c=$(req POST /v1/economy/purchase '{"op":"buy","partId":"cube","mat":"Titanium",
 expect "an expensive part buys while affordable (187)" "$c" 200
 c=$(req POST /v1/economy/purchase '{"op":"buy","partId":"cube","mat":"Tungsten","idemKey":"p-3"}' "$EAUTH")
 expect "…and one beyond the wallet (1601 > 1032) is refused" "$c" 400
+# SELLING IS CLOSED (owen, 2026-08-19). These two checks used to prove a sale
+# credited half back and that selling what you no longer own was refused.
+# Both are now the same answer for the same reason, and the point of asserting
+# it HERE is that the server is the authority: the SHOP has no SELL button any
+# more and Career.TrySell refuses locally, but neither of those binds a client
+# running an older build.
 c=$(req POST /v1/economy/purchase '{"op":"sell","partId":"cube","mat":"ABS","idemKey":"p-4"}' "$EAUTH")
-expect "a sale credits half back" "$c" 200
-is "…7 → 4 (round-half-to-even, same as the client)" "$(jget refunded)" 4
-c=$(req POST /v1/economy/purchase '{"op":"sell","partId":"cube","mat":"ABS","idemKey":"p-5"}' "$EAUTH")
-expect "selling a part you no longer own is refused" "$c" 400
+expect "a sale is REFUSED — parts cannot be sold back" "$c" 400
+case "$(jget error)" in
+  *"cannot be sold"*) ok "…and the refusal says so in words a player can read" ;;
+  *)                  no "the sell refusal gave an unhelpful reason: $(jget error)" ;;
+esac
+is "…and the inventory is untouched — a refused sale consumes nothing" \
+   "$(dbq "SELECT count FROM inventory WHERE user_id='$ECON_UID' AND part_id='cube' AND mat='ABS';")" 1
+same "…and no SHOP_SELL row was ever written for this account" \
+   "$(dbq "SELECT count(*) FROM ledger WHERE user_id='$ECON_UID' AND reason='SHOP_SELL';")" "0"
 c=$(req POST /v1/economy/purchase '{"op":"buy","partId":"chassis","mat":"Steel","idemKey":"p-6"}' "$EAUTH")
 expect "a rosterOnly part is not for sale (retirement holds server-side)" "$c" 404
 c=$(req POST /v1/economy/purchase '{"op":"buy","partId":"gusset","mat":"ABS","idemKey":"p-7"}' "$EAUTH")

@@ -1932,6 +1932,20 @@ app.MapPost("/v1/economy/purchase", async (PurchaseReq req, ClaimsPrincipal user
     if (string.IsNullOrWhiteSpace(req.IdemKey))
         return Bad("an idempotency key is required — without one a dropped response cannot be retried safely");
     if (op != "buy" && op != "sell") return Bad("op must be buy or sell");
+    // ⚠ SELLING IS CLOSED (owen, 2026-08-19). The word is still ACCEPTED above
+    // and refused here rather than being dropped from the op list, because a
+    // client from before this change queues sells into Career.pendingPurchases
+    // and flushes them later. Those must come back with a reason the player can
+    // read — EconomySync COMPENSATES a refusal, so an in-flight sell reverses
+    // cleanly and the part returns to their inventory. Removing "sell" from the
+    // accepted set instead would answer "op must be buy or sell" to a client
+    // that had just sent exactly that, which is a confusing lie.
+    //
+    // The server is the authority here, not the button: the client refuses in
+    // Career.TrySell and the SHOP has no SELL control any more, but neither of
+    // those binds anyone running an older build.
+    if (op == "sell")
+        return Bad("parts cannot be sold back — buying a part is a permanent commitment");
 
     await using var c = await db.OpenAsync();
     await using var tx = await c.BeginTransactionAsync();

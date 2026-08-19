@@ -690,16 +690,26 @@ public static class Career
         return true;
     }
 
+    /// <summary>⛔ SELLING IS CLOSED (owen, 2026-08-19): "disallow users from
+    /// selling parts back." Kept as a function that always refuses rather than
+    /// deleted, so any caller left anywhere gets a REASON instead of a compile
+    /// error that tempts someone into re-adding the path.
+    ///
+    /// ⚠ IT REFUSES BEFORE TOUCHING ANY STATE, and that ordering is the point.
+    /// The till applies optimistically — TryConsume, Txn, QueuePurchase — and
+    /// EconomySync reconciles with the server later. If this consumed the part
+    /// first and the server then refused, the player would watch a part vanish
+    /// and come back seconds later with an amber message they did not ask for.
+    /// Nothing is consumed, nothing is queued, nothing is saved.
+    ///
+    /// ⚠ AND IT MEANS A MATERIAL CANNOT BE CHANGED ANY MORE. REWORK was removed
+    /// 2026-08-05, so SELL+BUY was the only route left: the shop's own hint
+    /// still said "to change a material, SELL and BUY" until this change, and
+    /// that line is now gone with it. Buying a part is a one-way commitment.</summary>
     public static bool TrySell(string partId, string mat)
     {
-        shopMsg = "";
-        if (partId == "core") { shopMsg = "The core cannot be sold."; return false; }
-        string off; if (ShopOffline(out off)) { shopMsg = off; return false; }
-        if (!TryConsume(partId, mat, 1)) { shopMsg = "None owned to sell."; return false; }
-        Txn(CareerDB.SellPrice(partId, mat), "sell " + partId + " " + mat);
-        QueuePurchase("sell", partId, mat);
-        if (autosave) Save();
-        return true;
+        shopMsg = "Parts cannot be sold back — buying a part is a permanent commitment.";
+        return false;
     }
 
     /// <summary>Compensation (EconomySync): the server REFUSED a purchase the

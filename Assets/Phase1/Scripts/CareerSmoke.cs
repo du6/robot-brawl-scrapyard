@@ -166,7 +166,6 @@ public class CareerSmoke : MonoBehaviour
             TapNamed("shophead_" + beamSec0); yield return null;
         }
         int beamP = CareerDB.PartPrice("beam", "Aluminum");
-        int sellP = CareerDB.SellPrice("beam", "Aluminum");
         int s0 = Career.Data.scrap;
         // OWEN 2026-08-02: addressed by part+material now. The old
         // "shopbuy_1" was a palette-index name that stopped existing when the
@@ -194,10 +193,20 @@ public class CareerSmoke : MonoBehaviour
               && Career.shopMsg.Contains("Not enough"),
               "insufficient funds: refused with the amber message, nothing changes");
 
-        TapNamed("sell_beam_Aluminum"); yield return null;
-        exp += sellP;
-        Check(Career.CountOf("beam", "Aluminum") == 1 && Career.Data.scrap == s1 + sellP,
-              "sell: owned -1, scrap +50% of price");
+        // SELLING IS CLOSED (owen, 2026-08-19). What used to be a round-trip —
+        // sell, get half back, then an armed second tap to sell a part bolted
+        // to the build — is now one assertion: there is no button, and the
+        // function behind it refuses without touching anything.
+        Check(GameObject.Find("sell_beam_Aluminum") == null,
+              "the SHOP has no SELL control at all");
+        int beforeSell = Career.CountOf("beam", "Aluminum");
+        int scrapBeforeSell = Career.Data.scrap;
+        Check(!Career.TrySell("beam", "Aluminum"), "Career.TrySell refuses");
+        Check(Career.CountOf("beam", "Aluminum") == beforeSell
+              && Career.Data.scrap == scrapBeforeSell,
+              "…and it refuses BEFORE touching inventory or scrap");
+        Check(Career.shopMsg.Contains("cannot be sold"),
+              "…and says why, in words the shop can show");
 
         // ---- in-use guard rail: bolt the last owned beam onto the build ----
         Tap("BUILD"); yield return null;
@@ -215,14 +224,9 @@ public class CareerSmoke : MonoBehaviour
         Tap("DONE"); yield return null;
         Tap("SHOP"); yield return null;
 
-        int owned = Career.CountOf("beam", "Aluminum");
-        TapNamed("sell_beam_Aluminum"); yield return null;
-        Check(Career.CountOf("beam", "Aluminum") == owned,
-              "in-use sell: first tap arms, does not sell");
-        TapNamed("sell_beam_Aluminum"); yield return null;
-        exp += sellP;
-        Check(Career.CountOf("beam", "Aluminum") == owned - 1,
-              "in-use sell: second tap sells anyway");
+        // The in-use arm guard went with the button: there is nothing to arm
+        // when nothing can be sold. The placement above still earns its keep —
+        // it is what proves a bought part can be bolted on.
 
         // The REWORK round-trip that lived here is gone with the button
         // (owen, 2026-08-05). Its grant and its cost both came off `exp`, so
@@ -822,13 +826,19 @@ public class CareerSmoke : MonoBehaviour
         // either thing owen asked for. That makes "none of the gated buttons
         // are interactable = false" the load-bearing assertion here: it is the
         // one property that would silently take the hint away again.
-        Career.Data.inventory.Clear();       // own nothing, so SELL is the dead one
+        // ⚠ THIS SECTION USED TO GATE ON *SELL*, and SELL no longer exists
+        // (owen, 2026-08-19). The rule under test is owen's 2026-08-03 one —
+        // "whenever a button is disabled, it should show a hint why" — and it
+        // needs a button that can still be dead. BUY is that button: drain the
+        // wallet and it cannot be afforded. Re-pointed rather than deleted,
+        // because deleting it would have quietly retired the rule with it.
+        Career.Txn(-Career.Data.scrap, "test: empty the wallet so BUY is dead");
         Tap("SHOP"); yield return null;
         // The accordion header TOGGLES. C4 already left the beam section open,
         // so tapping it "to open it" closed it instead and the two taps below
         // landed on nothing - the identical failure the c4 shop assertion had.
         // Ask whether the row is reachable rather than toggling blind.
-        if (GameObject.Find("sell_beam_Aluminum") == null)
+        if (GameObject.Find("buy_beam_Aluminum") == null)
         {
             int beamSec8 = -1;
             for (int i = 1; i < bm.PaletteCount; i++) if (bm.PartId(i) == "beam") beamSec8 = i;
@@ -836,25 +846,27 @@ public class CareerSmoke : MonoBehaviour
         }
         yield return null;
 
-        var sellB = ByName("sell_beam_Aluminum");
+        var buyB = ByName("buy_beam_Aluminum");
         var prevB = ByName("tipprev");
         var nextB = ByName("tipnext");
-        Check(sellB != null && sellB.interactable
+        Check(buyB != null && buyB.interactable
               && prevB != null && prevB.interactable
               && nextB != null && nextB.interactable,
               "gated buttons stay clickable so they can explain themselves");
 
         // An unavailable action used to blank its label and go fully
         // transparent - not a disabled button, an unexplained gap.
-        Check(sellB != null && sellB.GetComponentInChildren<Text>().text == "SELL",
-              "an unavailable SELL keeps its label instead of vanishing");
+        Check(buyB != null && buyB.GetComponentInChildren<Text>().text.StartsWith("BUY"),
+              "an unaffordable BUY keeps its label instead of vanishing");
 
         // Assert the TAP as well as its effect, every time. A silent false is
         // how the whole shop section stayed dead for weeks.
-        bool sellTapped8 = TapNamed("sell_beam_Aluminum"); yield return null;
+        bool buyTapped8 = TapNamed("buy_beam_Aluminum"); yield return null;
         var shdr8 = GameObject.Find("shopheader");
-        Check(sellTapped8 && shdr8 != null && shdr8.GetComponent<Text>().text.Contains("\u26a0"),
-              "tapping the dead SELL answers with the amber reason");
+        Check(buyTapped8 && shdr8 != null && shdr8.GetComponent<Text>().text.Contains("\u26a0"),
+              "tapping the dead BUY answers with the amber reason");
+        Check(GameObject.Find("sell_beam_Aluminum") == null,
+              "and there is no SELL button anywhere in the shop");
 
         // ==== C10: the tutorial (owen 2026-08-03) ====
         // The old 3-tip list had rotted into misinformation - it opened with
@@ -877,7 +889,8 @@ public class CareerSmoke : MonoBehaviour
         for (int i = 0; i < BuilderManager.TIP_COUNT; i++) allTips += bm.CareerTip(i, "") + "\n";
         Check(allTips.Contains("wheel") && allTips.Contains("battery"), "tips teach what makes a machine legal");
         Check(allTips.Contains("Tungsten"), "tips teach the material trade-off");
-        Check(allTips.Contains("SHOP") && allTips.Contains("SELL"), "tips teach where scrap goes");
+        Check(allTips.Contains("SHOP") && allTips.Contains("yours for good"),
+              "tips teach where scrap goes, and that a purchase is permanent");
         Check(allTips.Contains("core is the KO target"), "tips teach how you lose");
 
         // Progress-driven, so it never sits telling you to do what you did.

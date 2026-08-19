@@ -1376,7 +1376,7 @@ public class BuilderManager : MonoBehaviour
             // same amber channel every other refusal uses.
             var cdef = palette[selected];
             message = "No " + MatDB.Get(cdef.EffectiveMat(activeMat)).name + " " + cdef.label
-                    + " left \u2014 shop or sell-back.";
+                    + " left \u2014 buy one in the SHOP.";
             SfxSynth.Deny();
         }
         else if (down0 && !overPanel && clicksLive && selected >= 0 && ghostValid)
@@ -1470,7 +1470,7 @@ public class BuilderManager : MonoBehaviour
         }
         if (!CareerAllows(selected))
         {
-            message = "No Gusset left — shop or sell-back.";
+            message = "No Gusset left — buy one in the SHOP.";
             SfxSynth.Deny(); return;
         }
         PushUndo();
@@ -1563,7 +1563,7 @@ public class BuilderManager : MonoBehaviour
         {
             // C1: repaint is a transmute - it needs a spare of the target
             // material in stock, or Steel could be conjured from Aluminium.
-            message = "No " + MatDB.Get(want).name + " " + p.def.label + " in stock \u2014 shop or sell-back.";
+            message = "No " + MatDB.Get(want).name + " " + p.def.label + " in stock \u2014 buy one in the SHOP.";
             SfxSynth.Deny();
             return false;
         }
@@ -3451,7 +3451,7 @@ public class BuilderManager : MonoBehaviour
         if (i == 4)
             return n + "materials: the same beam is 7\u00d7 heavier in Tungsten than Aluminium, and twice as strong \u2014 spend that weight where you hit, not everywhere";
         if (i == 5)
-            return n + "scrap: SHOP buys parts and SELL returns half \u2014 to change a part's material, sell it and buy the one you want";
+            return n + "scrap: SHOP is where scrap goes \u2014 a part you buy is yours for good, so choose its material before you spend";
         return n + "the core is the KO target \u2014 lose it and you lose the fight. Armour it, and bolt the battery across two seams so one break cannot take it";
     }
 
@@ -3470,7 +3470,7 @@ public class BuilderManager : MonoBehaviour
     {
         var lack = CareerShortfall();
         if (lack.Count > 0)
-            return "Build uses parts you don't own: " + string.Join(", ", lack.ToArray()) + " \u2014 shop or sell-back first.";
+            return "Build uses parts you don't own: " + string.Join(", ", lack.ToArray()) + " \u2014 buy one in the SHOP first.";
         int mass = BuildMassInt;
         if (mass > lg.weightCap)
             return string.Format("{0} kg over the {1} cap ({2} kg limit, build is {3} kg).",
@@ -6043,7 +6043,7 @@ public class BuilderManager : MonoBehaviour
             message += (message.Length > 0 ? "  " : "")
                     + "\u26a0 This build uses parts you don't own: "
                     + string.Join(", ", lack.ToArray())
-                    + " \u2014 shop or sell-back before fighting.";
+                    + " \u2014 buy one in the SHOP before fighting.";
             CompoundRobot.Log("LoadSnapshot: " + message);
         }
         RefreshOverlay();
@@ -6769,7 +6769,7 @@ public class BuilderManager : MonoBehaviour
                 if (Career.active)
                 {
                     GUILayout.Label("SHOP \u00b7 scrap " + Career.Data.scrap
-                        + " \u00b7 sell-back 50% \u00b7 to change a material, SELL and BUY", descStyle);
+                        + " \u00b7 no sell-back \u2014 a part you buy is yours for good", descStyle);
                     bool pinnedMat = !d.materialChoice;
                     foreach (var mk in PartLegalMats(i))
                     {
@@ -6783,30 +6783,13 @@ public class BuilderManager : MonoBehaviour
                             if (Career.TryBuy(d.id, mk)) message = MatDB.Get(mk).name + " " + d.label + " bought \u2014 " + Career.CountOf(d.id, mk) + " owned.";
                             else { message = Career.shopMsg; SfxSynth.Deny(); }
                         }
-                        if (mown > 0)
-                        {
-                            GUILayout.BeginHorizontal();
-                            GUILayout.Space(18f);
-                            if (mown > 0 && GUILayout.Button("SELL " + CareerDB.SellPrice(d.id, mk) + " scrap", matStyle))
-                            {
-                                // Guard rail: every owned unit of THIS material is
-                                // bolted to the current build - a second click.
-                                bool inUse = CareerRemainingMat(i, mk) == 0;
-                                if (inUse && (desktopArmSell != i || desktopArmSellMat != mk))
-                                {
-                                    desktopArmSell = i; desktopArmSellMat = mk;
-                                    message = "Every " + MatDB.Get(mk).name + " " + d.label + " is in use by this build \u2014 click SELL again to sell anyway.";
-                                    SfxSynth.Deny();
-                                }
-                                else
-                                {
-                                    desktopArmSell = -1; desktopArmSellMat = "";
-                                    if (Career.TrySell(d.id, mk)) message = MatDB.Get(mk).name + " " + d.label + " sold.";
-                                    else { message = Career.shopMsg; SfxSynth.Deny(); }
-                                }
-                            }
-                            GUILayout.EndHorizontal();
-                        }
+                        // \u26d4 THE DESKTOP SELL BUTTON IS GONE (owen, 2026-08-19).
+                        // This OnGUI material picker is a SECOND seller, easy to
+                        // miss when looking only at the SHOP tab: it called the
+                        // same Career.TrySell and would have kept working after
+                        // the dock's button was removed. Deleted here rather than
+                        // left to be refused, so no surface offers a sale it
+                        // cannot complete.
                     }
                 }
             }

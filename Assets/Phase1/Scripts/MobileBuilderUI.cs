@@ -2806,9 +2806,15 @@ public class MobileBuilderUI : MonoBehaviour
                 mr.buy = MkButton("buy_" + bm.PartId(i) + "_" + mat, row.transform, "BUY", 13, () => ShopBuy(idx, mat));
                 mr.buy.gameObject.AddComponent<LayoutElement>().minWidth = 62f;
                 mr.buyT = mr.buy.GetComponentInChildren<Text>();
-                mr.sell = MkButton("sell_" + bm.PartId(i) + "_" + mat, row.transform, "SELL", 13, () => ShopSell(idx, mat));
-                mr.sell.gameObject.AddComponent<LayoutElement>().minWidth = 78f;
-                mr.sellT = mr.sell.GetComponentInChildren<Text>();
+                // ⛔ NO SELL BUTTON (owen, 2026-08-19: "disallow users from
+                // selling parts back"). Deliberately NOT a disabled-but-visible
+                // control: the 2026-08-03 rule that a dead button must say why
+                // is about a gate the player can OPEN — own none, cannot afford
+                // it. This one can never open again, and a permanent button
+                // that never works is worse than the absence of one. The row's
+                // fixed label column is what keeps BUY from wandering, and that
+                // still holds with one action on the row.
+                mr.sell = null; mr.sellT = null;
                 // OWEN 2026-08-03. RefreshShop owns these colours, so these are
                 // hint-only gates - two writers on one Image is how a button
                 // ends up flickering between two people's ideas of "dead".
@@ -2818,11 +2824,6 @@ public class MobileBuilderUI : MonoBehaviour
                     return Career.Data.scrap >= pr ? null
                          : "Not enough scrap \u2014 " + MatDB.Get(mat).name + " " + bm.PartLabel(idx)
                            + " costs " + pr + ", you hold " + Career.Data.scrap + ".";
-                });
-                HoverHint(mr.sell, () => {
-                    if (bm == null || !Career.active || Career.Data == null) return null;
-                    return Career.CountOf(bm.PartId(idx), mat) > 0 ? null
-                         : "You own no " + MatDB.Get(mat).name + " " + bm.PartLabel(idx) + " to sell.";
                 });
                 shopMats.Add(mr);
             }
@@ -4098,27 +4099,11 @@ public class MobileBuilderUI : MonoBehaviour
         else ShopFeedback(Career.shopMsg, true);
     }
 
-    void ShopSell(int i, string mat)
-    {
-        if (bm == null) return;
-        string id = bm.PartId(i);
-        // Guard rail: every owned unit IN THIS MATERIAL is bolted to the current
-        // build - selling one needs a second, explicit tap (armed, like REMOVE).
-        // The arm now carries the material too, or one tap would arm all six of
-        // a part's rows at once.
-        bool inUse = Career.CountOf(id, mat) > 0 && bm.CareerRemainingMat(i, mat) == 0;
-        if (inUse && (armSell != i || armSellMat != mat))
-        {
-            armSell = i; armSellMat = mat;
-            ShopFeedback("Every " + MatDB.Get(mat).name + " " + bm.PartLabel(i) + " is in this build \u2014 tap SELL again to sell anyway.", true);
-            return;
-        }
-        armSell = -1; armSellMat = "";
-        int back = CareerDB.SellPrice(id, mat);
-        if (Career.TrySell(id, mat))
-            ShopFeedback(MatDB.Get(mat).name + " " + bm.PartLabel(i) + " sold \u2014 " + back + " scrap back.", false);
-        else ShopFeedback(Career.shopMsg, true);
-    }
+    // ⛔ ShopSell and its armed-tap guard are GONE (owen, 2026-08-19). The
+    // arm existed because selling the last unit of a part that was bolted to
+    // the current build needed a second, deliberate tap. With no way to sell,
+    // there is nothing to arm and nothing to confirm. `armSell` is kept as a
+    // field only because ShowTab and the dock reset it; it is now always -1.
 
     /// <summary>Doc 7: a material swap on an OWNED part costs the price
 
@@ -4160,7 +4145,7 @@ public class MobileBuilderUI : MonoBehaviour
                 ? (shopNoteBad ? "\u26a0 " : "") + shopNote + "   \u00b7   SCRAP " + Career.Data.scrap
                 : "SCRAP " + Career.Data.scrap
                   + "   \u00b7   tap a part to compare its materials   \u00b7   HP/kg is what a weight cap buys"
-                  + "   \u00b7   SELL returns 50%; to change a material, SELL and BUY";
+                  + "   \u00b7   a part you buy is yours for good \u2014 there is no selling back";
         }
         shopHeader.color = shopNoteBad ? new Color(1f, 0.82f, 0.25f) : new Color(0.80f, 0.88f, 1f);
 
@@ -4262,10 +4247,6 @@ public class MobileBuilderUI : MonoBehaviour
             // it, or even see it. Now it stays visible, keeps its label, reads
             // dead, and says why (own none) on hover
             // or tap. Fixed columns either way, which was the original point.
-            bool canSell = ownm > 0;
-            mr.sellT.text = canSell ? "SELL " + CareerDB.SellPrice(id, mr.mat) : "SELL";
-            mr.sellT.color = canSell ? GATE_TXT_LIVE : GATE_TXT_DEAD;
-            mr.sell.GetComponent<Image>().color = canSell ? GATE_LIVE : GATE_DEAD;
         }
     }
 
