@@ -45,8 +45,22 @@ gcloud run deploy rb-api \
   --cpu=1 --memory=512Mi \
   --allow-unauthenticated \
   --add-cloudsql-instances="$SQL_INSTANCE" \
-  --set-env-vars=BLOB_S3_BUCKET=${PROJECT_ID}-snapshots,BLOB_S3_ENDPOINT=https://storage.googleapis.com \
+  --set-env-vars=BLOB_S3_BUCKET=${PROJECT_ID}-snapshots,BLOB_S3_ENDPOINT=https://storage.googleapis.com,RB_WORKER_JOB=projects/${PROJECT_ID}/locations/${REGION}/jobs/rb-worker \
   --set-secrets=JWT_SECRET=rb-jwt-secret:latest,WORKER_KEY=rb-worker-key:latest,PG_CONN=rb-pg-conn:latest,BLOB_S3_KEY=rb-s3-key:latest,BLOB_S3_SECRET=rb-s3-secret:latest
+
+# ⚠ THE API NEEDS PERMISSION TO START THE WORKER, and without it the nudge
+# logs a 403 and every job waits for the safety-net tick instead. Idempotent,
+# so it is applied on every deploy rather than being a step someone remembers.
+# run.jobs.run is the ONLY thing it needs; roles/run.developer is the narrowest
+# predefined role that carries it.
+API_SA=$(gcloud run services describe rb-api --project "$PROJECT_ID" --region "$REGION" \
+         --format='value(spec.template.spec.serviceAccountName)' 2>/dev/null)
+[[ -z "$API_SA" ]] && API_SA="$(gcloud projects describe "$PROJECT_ID" --format='value(projectNumber)')-compute@developer.gserviceaccount.com"
+gcloud run jobs add-iam-policy-binding rb-worker \
+  --project "$PROJECT_ID" --region "$REGION" \
+  --member="serviceAccount:${API_SA}" --role="roles/run.developer" >/dev/null 2>&1 \
+  && echo "worker-start permission: granted to ${API_SA}" \
+  || echo "WARNING: could not grant run.jobs.run to ${API_SA} — the nudge will 403"
 
 URL=$(gcloud run services describe rb-api --project "$PROJECT_ID" --region "$REGION" --format='value(status.url)')
 echo ""

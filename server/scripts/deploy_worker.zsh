@@ -23,18 +23,37 @@
 # budget whose database already takes $10-15. §7 says this scales to zero and
 # costs ~$0 at prototype traffic.
 #
-# So the worker DRAINS AND EXITS (RB_MAX_IDLE) and Cloud Scheduler starts it.
-# It bills only while there is work. The cost of that choice, stated plainly:
-# a queued fight waits up to one scheduler period instead of starting at once.
-# The ladder is asynchronous by design — you challenge and read the result
-# later — so this trades latency nobody is waiting on for money that would
-# otherwise be spent idling.
+# So the worker DRAINS AND EXITS (RB_MAX_IDLE) and something starts it.
+#
+# ⚠ "IT BILLS ONLY WHILE THERE IS WORK" WAS WRONG, AND IT WAS THE MOST
+# EXPENSIVE THING IN THE PROJECT. This job is a headless UNITY PLAYER, and
+# Unity has to boot before the worker loop can even ask whether the queue is
+# empty. Measured on a real execution, 2026-08-14:
+#
+#     15:02:25  [WorkerHost] up.
+#     15:02:36  queue empty for 3 consecutive polls; exiting
+#     15:02:46  Container called exit(0).
+#        billed: 126 s at 2 vCPU / 2 GiB, claimed=0
+#
+# Eleven seconds of worker; ~115 seconds of engine boot and shutdown to learn
+# there was nothing to do. At the old */5 that is ~288 boots a day, ~2.1M
+# vCPU-seconds a month, roughly $51 — twice the budget this comment was
+# defending. It was paused on 08-14 and the bill halved.
+#
+# THE FIX IS THAT THE QUEUE TELLS THE WORKER. The API starts this job when it
+# enqueues something (WorkerTrigger in Infra.cs), so a queued fight starts in
+# seconds instead of waiting a period, AND an idle ladder boots nothing at all.
+#
+# This schedule is now a SAFETY NET at */30, not the mechanism: it exists so a
+# nudge lost to a 403, a deploy, or a crash cannot strand work forever. If you
+# ever find yourself shortening it to improve latency, fix the nudge instead —
+# the schedule is the expensive path by construction.
 set -e
 
 PROJECT_ID="${PROJECT_ID:-robot-brawl-ladder}"
 REGION="${REGION:-us-central1}"
 API_URL="${API_URL:-https://rb-api-902243335343.us-central1.run.app}"
-SCHEDULE="${SCHEDULE:-*/5 * * * *}"
+SCHEDULE="${SCHEDULE:-*/30 * * * *}"
 IMAGE="${REGION}-docker.pkg.dev/${PROJECT_ID}/rb/worker:$(date +%Y%m%d-%H%M%S)"
 PROJ="$(cd "$(dirname "$0")/../.." && pwd)"
 SA="$(gcloud projects describe "$PROJECT_ID" --format='value(projectNumber)')-compute@developer.gserviceaccount.com"
@@ -107,7 +126,7 @@ else
     --project "$PROJECT_ID" --location "$REGION" \
     --schedule="$SCHEDULE" --time-zone=UTC --uri="$URI" --http-method=POST \
     --oauth-service-account-email="$SA" \
-    --description="Drain the ladder queue. The worker exits when the queue is empty, so this costs nothing while idle." >/dev/null
+    --description="SAFETY NET ONLY. The API starts this job when work is enqueued (WorkerTrigger); this catches anything a lost nudge left behind." >/dev/null
 fi
 
 echo ""

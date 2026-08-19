@@ -1,5 +1,5 @@
 == resetting fixtures ==
-      users b5ec9ece-39dc-4aba-adbc-ac60b8c3faf9 / dfe5d4c5-e2d5-4912-acc4-ff96468b5758 ; robots c434f931-fdf8-4858-99fd-2ccc1ca843fd / 3fb8d53d-cffe-47a0-bc68-54f1a5cda463
+      users 48a9669e-c5fa-4ce7-998d-7d3bb956e6ae / 78c0b000-c6cc-4506-a527-3065705dea47 ; robots 0faf5cca-78ee-4c92-9aa0-384c8419f7ea / 476460bb-d30d-4fb7-b443-8acad0b76be6
 
 == A. identity and snapshots ==
 PASS  case-insensitive email is unique (OWEN@example.com is Owen) (ERROR:  duplicate key value violates unique constraint "users_email_lowe)

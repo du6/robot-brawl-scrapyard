@@ -10,6 +10,8 @@
 
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
+using Microsoft.Extensions.Logging;
 using Npgsql;
 
 namespace RobotBrawl.Api;
@@ -428,5 +430,119 @@ public sealed class ReaperService : BackgroundService
             }
             try { await Task.Delay(every, ct); } catch (OperationCanceledException) { }
         }
+    }
+}
+
+// ===========================================================================
+// WorkerTrigger — start the fight/validate worker the moment there is work.
+//
+// ⚠ WHY THIS EXISTS: THE WORKER COST TWICE THE PROJECT'S ENTIRE BUDGET TO DO
+// NOTHING. Cloud Scheduler started the rb-worker Cloud Run job every five
+// minutes, and the job is a HEADLESS UNITY PLAYER — the real game, because
+// only the game can referee a fight (§5.2). Measured on a live execution:
+//
+//     15:02:25  [WorkerHost] up.
+//     15:02:36  queue empty for 3 consecutive polls; exiting
+//     15:02:46  Container called exit(0).
+//        total billed: 126 s at 2 vCPU / 2 GiB
+//
+// The worker loop ran ELEVEN SECONDS and claimed nothing. The other ~115 s was
+// Unity booting and shutting down — physics, input, App UI — purely to find
+// out the queue was empty. At 288 ticks a day that is ~2.1M vCPU-seconds a
+// month, about $51, against a $25 budget. deploy_worker.zsh's comment that the
+// worker "costs nothing while idle" was wrong in the most expensive way: it
+// exits promptly, but only AFTER paying a cold boot to learn there is nothing
+// to do.
+//
+// So the queue tells the worker, instead of the worker asking the queue. This
+// starts the job when a job is actually enqueued, and never otherwise.
+//
+// ⚠ IT IS AWAITED, NOT FIRE-AND-FORGET. Cloud Run throttles CPU outside
+// request processing unless the instance is configured always-allocated, so
+// work started in a discarded Task after the response may simply not run. A
+// bounded await costs the caller a few hundred milliseconds on the rare
+// request that enqueues something, and actually happens.
+//
+// Disabled unless RB_WORKER_JOB is set, so local runs, the bench and any
+// deployment that has not opted in are unaffected and pay nothing.
+// ===========================================================================
+public sealed class WorkerTrigger
+{
+    readonly Db _db;
+    readonly string? _job;          // projects/P/locations/L/jobs/rb-worker
+    readonly int _debounceSeconds;
+    readonly HttpClient _http = new() { Timeout = TimeSpan.FromSeconds(4) };
+
+    public bool Enabled => !string.IsNullOrWhiteSpace(_job);
+
+    public WorkerTrigger(Db db, string? job, int debounceSeconds = 30)
+    {
+        _db = db;
+        _job = string.IsNullOrWhiteSpace(job) ? null : job.Trim();
+        _debounceSeconds = Math.Max(0, debounceSeconds);
+    }
+
+    /// <summary>Start the worker if nobody has started it very recently.
+    /// NEVER THROWS: a missed nudge must not fail the request that enqueued
+    /// the work. The job stays in the queue either way, and the safety-net
+    /// schedule picks up anything a lost nudge left behind.</summary>
+    public async Task NudgeAsync(ILogger log, CancellationToken ct = default)
+    {
+        if (!Enabled) return;
+        try
+        {
+            if (!await ClaimNudgeAsync(ct)) return;   // someone else just did it
+            var token = await MetadataTokenAsync(ct);
+            if (token is null) { log.LogWarning("[nudge] no metadata token; worker not started"); return; }
+
+            using var req = new HttpRequestMessage(HttpMethod.Post,
+                $"https://run.googleapis.com/v2/{_job}:run");
+            req.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+            req.Content = new StringContent("{}", Encoding.UTF8, "application/json");
+            var res = await _http.SendAsync(req, ct);
+            if (res.IsSuccessStatusCode) log.LogInformation("[nudge] worker started");
+            else log.LogWarning("[nudge] run.googleapis.com said {Code}: {Body}",
+                                (int)res.StatusCode, await res.Content.ReadAsStringAsync(ct));
+        }
+        catch (Exception ex)
+        {
+            log.LogWarning(ex, "[nudge] could not start the worker; the job stays queued");
+        }
+    }
+
+    /// <summary>⚠ THE DEBOUNCE IS IN THE DATABASE, NOT IN THIS PROCESS. The API
+    /// runs up to four Cloud Run instances, so an in-memory timestamp would let
+    /// four of them start four Unity players for one burst of enlists — the
+    /// exact cost this class exists to remove. One conditional UPSERT decides
+    /// it for all of them: whoever updates the row wins, everyone else is told
+    /// no. The worker drains the WHOLE queue, so one execution covers a burst
+    /// anyway.</summary>
+    async Task<bool> ClaimNudgeAsync(CancellationToken ct)
+    {
+        var now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        await using var c = await _db.OpenAsync();
+        await using var cmd = new NpgsqlCommand(@"
+            INSERT INTO ladder_config (key, value, note)
+            VALUES ('worker_nudge_at', $1, 'unix time the worker was last started on demand — WorkerTrigger')
+            ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = now()
+            WHERE ladder_config.value <= $2
+            RETURNING value;", c);
+        cmd.Parameters.AddWithValue((int)now);
+        cmd.Parameters.AddWithValue((int)(now - _debounceSeconds));
+        return await cmd.ExecuteScalarAsync(ct) is not null;
+    }
+
+    /// <summary>The instance's own service-account token, from the metadata
+    /// server. No key file anywhere: the API's identity IS the credential, and
+    /// it needs run.jobs.run on the worker job and nothing else.</summary>
+    async Task<string?> MetadataTokenAsync(CancellationToken ct)
+    {
+        using var req = new HttpRequestMessage(HttpMethod.Get,
+            "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token");
+        req.Headers.Add("Metadata-Flavor", "Google");
+        var res = await _http.SendAsync(req, ct);
+        if (!res.IsSuccessStatusCode) return null;
+        using var doc = JsonDocument.Parse(await res.Content.ReadAsStringAsync(ct));
+        return doc.RootElement.TryGetProperty("access_token", out var t) ? t.GetString() : null;
     }
 }

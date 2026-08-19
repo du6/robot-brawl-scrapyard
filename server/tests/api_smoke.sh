@@ -1782,6 +1782,44 @@ EVIL=$(curl -s -D - -o /dev/null -X OPTIONS "$BASE/v1/subscribers" \
 if [ -z "$EVIL" ]; then ok "an unlisted origin is NOT allowed"
 else no "an unlisted origin was allowed ('$EVIL') -- any site could post signups through a visitor's browser"; fi
 
+# --------------------------------------------------------------- section N
+# The on-demand worker nudge. The worker is a headless UNITY PLAYER and a
+# cold boot costs ~115 s at 2 vCPU BEFORE it can even look at the queue, so
+# starting it every five minutes regardless cost ~$51/mo to do nothing. The
+# queue now tells the worker instead.
+echo
+echo "--- N. worker nudge ---"
+
+# ⚠ THE MOST IMPORTANT CHECK IS THAT IT IS OFF HERE. RB_WORKER_JOB is unset on
+# a local run, and if the trigger ever became unconditional this bench would be
+# firing Cloud Run job executions from a developer's laptop.
+if [ -n "${RB_WORKER_JOB:-}" ]; then
+  skip "nudge is disabled without RB_WORKER_JOB" "RB_WORKER_JOB is set in this shell -- 4 checks did not run"
+else
+  ok "the nudge is disabled on a local run (RB_WORKER_JOB unset)"
+
+  # Enqueueing must still work, and must not be slowed or broken by a trigger
+  # that has nothing to talk to.
+  if [ -n "${PGURL:-}" ] && command -v psql >/dev/null 2>&1; then
+    # Use the bench's OWN upload helpers — a snapshot needs a signed envelope,
+    # and hand-rolling the body here got a 400 that looked like the nudge had
+    # broken the insert. The check was wrong, not the endpoint.
+    BEFORE=$(psql "$PGURL" -tAc "SELECT count(*) FROM match_jobs;" 2>/dev/null | tr -d ' ')
+    c=$(req POST /v1/snapshots "$(body_upload "$ROBOT" "$(envelope "Nudge-$RANDOM")")" "$AUTH")
+    expect "a snapshot still enqueues with the nudge compiled in" "$c" 200
+    AFTER=$(psql "$PGURL" -tAc "SELECT count(*) FROM match_jobs;" 2>/dev/null | tr -d ' ')
+    if [ "${AFTER:-0}" -gt "${BEFORE:-0}" ]; then ok "the VALIDATE job reached the queue ($BEFORE -> $AFTER)"
+    else no "no job was enqueued -- the nudge path may have thrown before the insert"; fi
+    # Nothing may be written to the debounce row when the trigger is off: a
+    # nudge that "happened" with no worker to start would make the next real
+    # one think it had just fired.
+    NUDGED=$(psql "$PGURL" -tAc "SELECT count(*) FROM ladder_config WHERE key='worker_nudge_at';" 2>/dev/null | tr -d ' ')
+    is "a disabled nudge does not claim the debounce slot" "${NUDGED:-0}" "0"
+  else
+    skip "nudge enqueue + debounce row" "PGURL unset or psql missing -- 3 checks did not run"
+  fi
+fi
+
 # --------------------------------------------------------------- section P
 # The proxy headers. THIS SECTION IS LAST ON PURPOSE: it deliberately
 # exhausts an auth rate-limit bucket, and if the partitioning it is testing

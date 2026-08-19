@@ -65,6 +65,13 @@ var tokens = new Tokens(jwtSecret, TimeSpan.FromHours(cfg.GetValue("Jwt:Hours", 
 builder.Services.AddSingleton(db);
 builder.Services.AddSingleton(tokens);
 builder.Services.AddSingleton(new JobQueue(db, sqlDir));
+// Start the worker when work arrives instead of every five minutes forever.
+// Unset RB_WORKER_JOB and this is a no-op, which is what local runs and the
+// bench get. See WorkerTrigger for the 126-seconds-to-do-nothing measurement.
+builder.Services.AddSingleton(new WorkerTrigger(
+    db,
+    cfg["Worker:Job"] ?? Environment.GetEnvironmentVariable("RB_WORKER_JOB"),
+    int.TryParse(Environment.GetEnvironmentVariable("RB_WORKER_NUDGE_DEBOUNCE_S"), out var _nd) ? _nd : 30));
 // Object storage when it is configured, the local filesystem otherwise.
 // The fallback is not laziness: run_local.sh and every bench must work with
 // no network and no credentials, and a test suite that needs a cloud account
@@ -556,7 +563,7 @@ app.MapGet("/v1/robots", async (ClaimsPrincipal user) =>
 }).RequireAuthorization();
 
 // ------------------------------------------------------------- snapshots
-app.MapPost("/v1/snapshots", async (SnapshotReq req, ClaimsPrincipal user, IBlobStore blobs) =>
+app.MapPost("/v1/snapshots", async (SnapshotReq req, ClaimsPrincipal user, IBlobStore blobs, WorkerTrigger nudge) =>
 {
     if (req.RobotId == Guid.Empty) return Bad("robotId is required");
     if (string.IsNullOrEmpty(req.Envelope)) return Bad("envelope is required");
@@ -613,6 +620,12 @@ app.MapPost("/v1/snapshots", async (SnapshotReq req, ClaimsPrincipal user, IBlob
         await job.ExecuteNonQueryAsync();
     }
     await tx.CommitAsync();
+    // ⚠ AFTER THE COMMIT, NEVER BEFORE. A worker started while the transaction
+    // is still open either finds nothing (and pays a Unity boot for it) or
+    // races the row it was sent to collect; and a rolled-back transaction that
+    // had already started a worker is a boot bought for work that never
+    // existed.
+    await nudge.NudgeAsync(app.Logger);
     return Results.Ok(new { id = snapId, status = "PENDING" });
 }).RequireAuthorization().RequireRateLimiting("upload");
 
@@ -865,7 +878,7 @@ app.MapPost("/v1/worker/jobs/{id:long}/validate-result",
 // §5.3 step 1. Every check, the escrow debit, the match row and the job are
 // one transaction: a stake debited without a match is money destroyed, and a
 // match without a stake is money created.
-app.MapPost("/v1/challenges", async (ChallengeReq req, ClaimsPrincipal user) =>
+app.MapPost("/v1/challenges", async (ChallengeReq req, ClaimsPrincipal user, WorkerTrigger nudge) =>
 {
     var me = UserId(user);
     if (req.ChallengerSnapshotId == req.DefenderSnapshotId)
@@ -981,6 +994,7 @@ app.MapPost("/v1/challenges", async (ChallengeReq req, ClaimsPrincipal user) =>
         await job.ExecuteNonQueryAsync();
     }
     await tx.CommitAsync();
+    await nudge.NudgeAsync(app.Logger);
 
     return Results.Ok(new { matchId, status = "QUEUED", stake, gap, category = df.Category, seeds });
 }).RequireAuthorization().RequireRateLimiting("upload");
@@ -2126,7 +2140,7 @@ app.MapGet("/v1/subscribers/unsubscribe", async (string? token) =>
 //
 // What DOES apply is everything about rating: same-category pairs, so gap 0,
 // both sides updated, the defense floor and the repeat taper both live.
-app.MapPost("/v1/admin/league-night/{category}", async (string category, HttpContext ctx, int? top) =>
+app.MapPost("/v1/admin/league-night/{category}", async (string category, HttpContext ctx, int? top, WorkerTrigger nudge) =>
 {
     // Worker-key gated, not player-authenticated: this is an operator action.
     if (!WorkerAuthed(ctx)) return Results.Unauthorized();
@@ -2199,6 +2213,9 @@ app.MapPost("/v1/admin/league-night/{category}", async (string category, HttpCon
             created.Add(id);
         }
     await tx.CommitAsync();
+    // One nudge for the whole batch: the worker drains the queue, so N jobs
+    // still only need one Unity boot.
+    await nudge.NudgeAsync(app.Logger);
 
     return Results.Ok(new { category, field = field.Count, matches = created.Count, matchIds = created });
 }).AllowAnonymous();
