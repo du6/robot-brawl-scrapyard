@@ -317,6 +317,18 @@ Three things follow, and they are worth more than the win column:
    63% record purely by being made of more pieces. Whether that is the
    intended shape of the judges' card is a design call, not a bench call.
 
+⛔ **RULED OUT BY OWEN, 2026-08-19: "we should never build a robot that can
+never fight."** `abl_norotor` is retired as a design direction — it stays in
+this document only as the ablation that measured what the rotor is worth, and
+as the balance flag above. **Do not build on it, and do not treat its 5–3 as a
+result worth pursuing.** The judges'-card exploit it exposes is a thing to
+FIX, not a thing to ship.
+
+⚠ And note which robot that ruling is about, because the names are easy to
+confuse and getting it wrong throws away the best machine on this page:
+**`abl_norotor` is the weaponless one (5–3). `abl_min` has the full rotor and
+goes 15–1** — it is `bulwark_v1` with the fat cut off, and it is a keeper.
+
 ## 4.5 How to build a machine that beats Spinner1
 
 Written for whoever picks this up next, human or agent. It is ordered by
