@@ -24,6 +24,22 @@ be built again.
 > engine, no gussets and a single-sided aluminium bar. It is now the *easy*
 > fight. See "What I would try next".
 
+> ## ⚠ AND §4.5's RULE 1 IS NOT THE ONLY WAY — see "Without a spindle" (2026-08-19)
+>
+> owen asked whether anything BUT a spinner can beat the champion. It can:
+> **`flipper_v2` — a `pivot`, a Titanium arm and a Titanium wedge — is 16–0**
+> across two seed sets with no rotor anywhere on it. Nine more sweeps and
+> 72 more bouts, appended as the last top-level section of this file.
+>
+> **Read that section before quoting §4.5's rule 1 ("BOLT ON A SPINDLE ROTOR,
+> nothing else came close").** The ablation there replaces the pivot with a
+> mass-matched structural cube and the machine goes 16–0 → 2–6, which is the
+> same shape as removing the rotor. **The rule that survives both sections is
+> not "fit a spindle" — it is "fit a POWERED ACTUATOR".** Two other numbers on
+> this page are also contradicted there for a pivot: §4.5 says engines are
+> worth 6–2 → 8–0, and on a pivot they are worth 5–3 → 16–0; §5.1's scored
+> "spend the 700 kg — WRONG" is RIGHT for a machine with a duty cycle.
+
 Rules of engagement, and they are enforced by the harness, not by good manners:
 
 1. **Same weight class.** FEATHER, cap **1500 kg** (`RobotCategory.LADDER`).
@@ -343,6 +359,12 @@ backed by a row in the ledger; where it is not, it says so.
    weapon is a bar on a spindle — **you beat it by doing the same thing
    properly**, not by finding a clever counter. §5's old hypothesis 2 ("do not
    out-spin a spinner") was the most expensive wrong sentence on this page.
+   ⚠ **AMENDED 2026-08-19 — this rule is true and it is not the only way.** A
+   `pivot` carrying a Titanium arm goes 16–0 with no rotor at all, and the
+   ablation that removes IT takes the machine 16–0 → 2–6, exactly as removing
+   the rotor did here. The general rule is **fit a powered actuator**; which
+   one is a trade, not a requirement. See "Without a spindle" at the end of
+   this file, and read its W6 before copying the engine number from this §.
 2. **Two arms, not one.** Spinner1's bar is single-sided. A balanced two-armed
    rotor hits twice per revolution for the same top speed, and it does not
    fight its own gyroscopic wobble.
@@ -489,10 +511,15 @@ ended up with three documents repeating a fact nobody had measured.
 3. **Attack the bar** — untested as an aiming policy; nothing here steers.
    Spinner1 loses its weapon in **31 of 32 bouts** against any rotor-carrying
    candidate regardless, so the intent never had to be expressed.
-4. **A wedge gets under things — STILL OPEN, and now the most interesting
-   untried idea.** Three of the eight `abl_min` wins were Spinner1 flipped and
-   counted out, achieved with no lifting surface at all; `wedge` carries
-   `liftBias 0.75` and `ApplyTopple` reads it. Nobody has tried it.
+4. **A wedge gets under things — ~~STILL OPEN, and now the most interesting
+   untried idea~~. CLOSED 2026-08-19, and BOTH HALVES ARE WRONG.** Three of the
+   eight `abl_min` wins were Spinner1 flipped and counted out, achieved with no
+   lifting surface at all; `wedge` carries `liftBias 0.75` and `ApplyTopple`
+   reads it. Now tried, twice: the low static wedge that was supposed to pass
+   under the swing is `dozer_v1`, **2–6**, and it does not pass under anything;
+   and stripping `liftBias` to 0 off the machine that DOES win takes it 16–0 →
+   **7–1 while it still flips Spinner1 three times**. The verb works; the
+   explanation for why was wrong. See "Without a spindle", W0 and W4.
 5. **Armour is a shape** — superseded by something sharper: armour is a
    *category*. See §2.5.
 6. **The program may matter more than the parts — NO, not against this
@@ -625,3 +652,524 @@ The generator that produced these builds — it checks flushness, socket counts,
 seam thresholds, overlaps and orphans offline, before a sweep is spent — is
 not committed; it lived in a scratch directory. If this work resumes, rebuild
 it first. Getting a build *legal* is fiddly and costs sweeps otherwise.
+✅ **Rebuilt 2026-08-19** — see §J at the very end of this file for what it
+checks and the two rules worth carrying forward. Still not committed.
+
+---
+
+# Without a spindle
+
+**2026-08-19.** owen: *"spinning robots are dominating. Test robots/programs
+WITHOUT the spindle component and see if any other type of robot can beat
+Spinner1."*
+
+> ## ✅ ANSWERED — YES. `flipper_v2` beats Spinner1 **16–0**, and it has no rotor.
+>
+> A **pivot** on a horizontal hinge, a Titanium beam arm, a Titanium wedge at
+> the tip: a latched uppercut that winds up in place and releases at full
+> stored energy. Two 8-bout sweeps on independent seed sets, 8–0 and 8–0,
+> **Spinner1 disarmed in 15 of 16 bouts** and reduced to nothing in nine of
+> them — Spinner1 lost **212 parts to `flipper_v2`'s 30**. Empty program,
+> like the champion.
+> The build is printed verbatim in "The winner, verbatim" below.
+>
+> ⚠ **The reason it wins is NOT the reason it was designed.** The wedge was
+> chosen for `liftBias` and the flip win-path; the ablation that removes the
+> lift entirely still goes 7–1. What actually wins is the **latch** — see
+> "What each lever is worth" — and that is a property of the `pivot`, not of
+> the wedge.
+
+Everything above this line in this document was written against a machine
+carrying a spindle rotor, and §4.5's first rule — *"BOLT ON A SPINDLE ROTOR,
+nothing else in the ablations came close"* — is the exact move this section is
+forbidden. Most of that page does not transfer. What did: **gussets are
+survivability**, **engines are the difference between winning and winning
+cleanly** (and here they are far more than that), **mass is flip insurance**,
+and **part count is a defensive statistic**.
+
+## A. The rules, and all five are checked by the harness
+
+§1's three, plus two added to `ChallengeBench` on 2026-08-19.
+**Naming in this section: lettered headings (§A…§J) are sections; W0–W8 are ledger rows in §C.**
+
+
+4. **No `spindle`.** Verified before any design work: fed `bulwark_v1`, the
+   16–0 machine off §6, the gate refuses it and runs **zero** bouts —
+   `GATE_PROBE_bulwark  INELIGIBLE  W/L/D 0/0/0  challenger uses BANNED
+   part(s): spindle` in `qa_challenge_history.txt`.
+5. **A real weapon** — at least one part above `DamageResolver`'s edge floor.
+   ⛔ `abl_norotor`, the weaponless fortress that took the champion to 5–3 on
+   the judges' structure count, is **ruled out by owen**: *"we should never
+   build a robot that can never fight."* This gate is what stops it being
+   rediscovered by accident.
+
+⚠ **Banning the spindle bans an ARCHITECTURE, not a damage source.** The
+`spindle` is `edgeHardness 1.0` — it is the actuator that swings a weapon, not
+the weapon. Two actuators survive the ban (`pivot`, `ram`) and every static
+edge does (`blade` 1.7 · `spinner` 1.5 · `hook` 1.3 · `spike` 1.2 ·
+`wedge` 1.15).
+
+⚠ **And `flipper_v2` is not a spinner wearing a different hat.** A `pivot`
+sweeps `PIVOT_ARC_DEG` = 150° and stops; it **latches** (`Phase.Winding`,
+travel frozen at rest until `WIND_RELEASE_FRAC` of full rate) and then springs
+back unpowered. It has a duty cycle of roughly 2 s and fires perhaps forty
+times in a bout. A `spindle` is a held flywheel with no arc, no latch and no
+recovery. They are different machines and the ablations below measure the
+difference.
+
+## B. The physics this section added to §2.5
+
+Read off the source, and each one changed a design decision:
+
+* **`Actuator.Bite`'s damage path does NOT gate on `IsEdge`.** §2.5 says "a
+  structural bump does NOTHING", and that is true of `DamageResolver.RamHit`
+  (`STRUCT_RAM_DMG = 0`, checked at the top of the method) — but `Bite` calls
+  `ApplyHit` directly with the limb part's own hardness, and `ApplyHit` only
+  consults `IsEdge` to pick the ×0.25 / ×1.0 multiplier. **Spinner1's plain
+  aluminium bar is a limb, and it deals full damage.** Corollary that cost a
+  sweep: cladding yourself in blades does NOT buy ×0.25 against that bar,
+  because ×0.25 applies only when the STRIKER is an edge.
+* **A pivot latches; a spindle does not.** `WIND_RELEASE_FRAC` holds the arm
+  at rest until it carries `½·I·MaxRate²`, so **every swing lands the whole
+  weapon**. A spindle bite drains 40% and the next one is fought at 60% until
+  the motor catches up. This is the single fact the winning design is built on.
+* **A pivot's rate ceiling is a flat 14 rad/s**, not the spindle's
+  `SPINDLE_MAX_RPM` — `RateCeiling` returns `min(design, tipSpeedCap/tipRadius)`
+  with `design = 14` for a pivot. So arm length buys energy until
+  `tipSpeedCap/R` drops under 14, and past that it buys nothing.
+* **`WIND_TIMEOUT_S` = 2.0 s is a hard design constraint on a pivot.** Wind
+  time is `E / motorKW`, so a 5.9 kJ arm needs 1.48 s at 4 kW (two engines)
+  and 2.37 s at 2.5 kW (one) — and a limb that hits the timeout is released
+  part-charged. **Engine count is not a refinement on a pivot; it is what
+  decides whether the weapon exists.**
+* **`PickArcSign` decides which way the arm goes, at wire time, from the
+  geometry** — an arc that digs into the deck inside 45° is reversed. A
+  forward-pointing arm on a horizontal hinge therefore sweeps UP. That is what
+  makes this a flipper rather than a hammer, and nothing in the build screen
+  says so.
+* **Spinner1's only edge is its steel spike, and its collider band is
+  0.40–0.62 m above the floor** (measured off the real
+  `PlacedPart.Half()`, not computed: `spike[0.40..0.62]`, `beam`/`beamlong`
+  bar at `[0.63..0.83]`, `gyro[0.39..0.63]`). This looked like an exploitable
+  hole and it is not — see `dozer_v1`.
+
+## C. The ledger
+
+| # | candidate | idea in one line | W/L/D | what it taught |
+|---|---|---|---|---|
+| W0 | `dozer_v1` | 1445 kg / 25 parts. A low wedge plough: **nothing on it stands taller than 0.38 m**, so the champion's spike (0.40–0.62 m) should sweep over it, and every charge is a `J²/2μ` topple | **2/6/0** | **prediction WRONG (I said 5–7).** Dismantled: 13 452 damage taken, 25 of 25 parts lost in five bouts of eight. Ducking does not work — see the scored note below |
+| W1 | `flipper_v1` | 994 kg / 22 parts. Pivot on a horizontal hinge, Titanium beam arm, Titanium wedge at the tip, two engines, empty program | **6/2/0** | **prediction WRONG (I said 3–5).** Spinner1 disarmed 6/8. Two wins by flipping it. One loss to being flipped ITSELF — the `abl_min` failure mode, and the only one I could name |
+| W2 | `flipper_v2` | v1 + **mass and track only**: six rails not four, two of them Titanium, wheels out to ±0.67 m. 1354 kg / 24 parts. Offence byte-identical | **8/0/0** | prediction right (6–8). 6 KO, 1 flip, 1 judges. Parts lost **9 to 104** |
+| W3 | `flipper_v2` re-run, seeds `17/555/909/1234` | the confirmation leg | **8/0/0** | **16–0 over 16 bouts across two seed sets.** Spinner1 disarmed 8/8, four wins by flip, four by KO |
+| W4 | `abl_nolift` | tip `wedge` → Titanium `spike`: **`liftBias` 0.75 → 0**, hardness 1.15 → 1.20, tip radius 1.10 → 1.05 m, −15 kg. As close to a single-variable test of the flip as the catalogue allows | **7/1/0** | prediction right (6–8), **and the mechanism is the finding**: it still flipped Spinner1 **three times** with no lift term at all, and added a win path nothing else produced — *"every one of its 4 wheels had been torn off"*, twice. **The wedge is worth about one bout in eight and it is not why this design wins** |
+| W5 | `abl_nopivot` | the `pivot` becomes a CarbonFiber `cube` (22.1 kg against the pivot's 21.6 — the closest mass-neutral structural stand-in there is). Same arm, same wedge, now welded to the frame | **2/6/0** | prediction right (1–3). **Damage dealt 8371 → 1049, an 87% collapse.** Both wins are judges' decisions taken on pieces while LOSING damage — `abl_norotor`'s shape, from a machine with five weapons on it. The actuator is the whole result |
+| W6 | `abl_noengine` | both engines deleted; `motorKW` 4.0 → 1.0, so 5.9 kJ needs 5.9 s to wind and `WIND_TIMEOUT_S` releases the arm at ~34% of its rate | **5/3/0** | prediction right (2–5, at the top edge). Parts lost 21→40 mine, 108→65 theirs, and a cause string that appears nowhere else: *"Called early — both machines disarmed"*, twice. **On a pivot the engine is not a refinement — it is most of the weapon** |
+| W7 | `piston_v1` | the THIRD actuator. Same chassis, `ram` instead of `pivot`, the longest and heaviest limb the class affords (Ti `beamlong` + Ti `spike`, nose at 1.90 m, 2.35 m at full stroke) | **4/4/0** | **prediction WRONG (I said 0–2).** A ram stores ~1.3 kJ against the pivot's 5.9 and I wrote it off on that arithmetic alone — but it disarmed Spinner1 **8/8** and dealt 5725 damage. What I left out: `Bite` adds a closing-speed term capped at 600 N·s, which roughly doubles a weak bite, and a 1.9 m limb is also a collider |
+| W8 | `piston_v1` re-run, fresh seeds | the confirmation leg, because a 4–4 is exactly the coin flip §2 warns about | **5/3/0** | prediction right (3–5). **9–7 over 16 bouts: the ram is MARGINAL, not a winner** — and by §2's own rule a 5–3 is not a win. Its losses are self-flips, not a failure to hurt anything |
+
+### W0 scored — `dozer_v1`, and why "duck under the spinner" is dead
+
+§5's hypothesis 4 — *"the champion's spike is at 1.03 m, well above the floor;
+a low wedge may pass under the swing entirely"* — has been the most
+interesting untried idea on this page since 2026-08-18. It is now tried and it
+is **wrong**, and the arithmetic that killed it is worth more than the record.
+
+The premise measured out exactly as predicted. Off the live builder:
+Spinner1's spike occupies **0.40–0.62 m** above the floor and `dozer_v1`'s
+tallest part is its core at **0.38 m**. On paper the champion cannot touch it.
+
+Three things close that gap, and any one of them is enough:
+
+1. **A limb's hit volume is inflated.** `Actuator.Init` sets
+   `trig.size = spec.size + Vector3.one * 0.10f` — **0.05 m on every side** —
+   and `UpdateSweptVolumes` then stretches it backwards along the path the
+   part just travelled. The spike's *trigger* starts at 0.35 m, not 0.40 m.
+   The whole 0.02 m of designed clearance lives inside the inflation.
+2. **Robots pitch.** Neither machine is a rigid body on a table; both rock
+   under every contact.
+3. **The bar deals damage anyway** (W2, first bullet).
+
+It also went wrong the other way: a 1.88 m × 1.65 m slab turns slowly, so it
+presented its flank, and both of its wins were **judges' decisions on
+structure while being out-damaged 5:1** — the `abl_norotor` shape, from a
+machine that has six weapons on it. That is a second, independent reason to
+distrust the judges' card and not a reason to like `dozer_v1`.
+
+⚠ **Do not read this as "a low machine is bad."** It is "0.02 m is not
+clearance, because the collider that matters is 0.05 m bigger than the part."
+A machine whose top is under **0.30 m** has never been tried.
+
+### W1–W3 — the winner, and the one change that took it from 6–2 to 16–0
+
+`flipper_v1` was designed for the flip: a `pivot` whose hinge lies on X, a
+Titanium `beam` reaching forward past it and a Titanium `wedge` at the tip.
+`PickArcSign` reverses any arc that digs into the deck, so a forward arm on a
+horizontal hinge sweeps **up** — an uppercut. Sized before the run, off §2.5
+and `Actuator`'s constants:
+
+```
+tip radius R = 1.10 m      w = min(14, 14.79/1.10) = 13.4 rad/s
+I  ~ 66 kg.m2              E = 1/2.I.w^2 ~ 5.9 kJ
+drain 0.4E = 2.4 kJ        topple = drain x 0.75 x 0.85 = 1511 J
+                           vs ~940 J to roll 799 kg over its 0.42 m half-track
+wind = 5.9 kJ / 4 kW = 1.48 s, inside WIND_TIMEOUT_S (2.0). At one engine it
+is 2.37 s and the timeout fires the arm part-charged — hence two engines.
+```
+
+It went **6–2**. Of the two losses, one is a judges' decision it lost on
+damage, and the other names its own fix: `flipper_v1` **flipped onto its own
+back with nothing aboard to right it**, at 994 kg on a 0.94 m track. §4.5
+already knows that failure — it is `abl_min`'s single loss — and the lever
+is mass.
+
+`flipper_v2` changes **mass and track and nothing else**: six rails instead of
+four with two of them Titanium, wheels out to ±0.67 m. 994 → 1354 kg,
+track 0.94 → 1.34 m. The pivot, the arm, the wedge, the engines, the
+batteries and the four side blades are byte-identical.
+
+**8–0, then 8–0 again on `17/555/909/1234`.**
+
+```
+16 bouts:  16 W / 0 L / 0 D
+Spinner1 finished with NO WEAPON in 15 of 16, and with NOTHING AT ALL
+  (16 of 16 parts) in nine of them
+parts lost           30 by flipper_v2   vs   212 by Spinner1
+damage               14 386 dealt       vs   11 031 taken
+mean bout            47 s
+how they ended       10 KO . 5 flipped and counted out . 1 judges' decision
+```
+
+⚠ **Exactly ONE of the sixteen wins was a judges' decision**, and that matters:
+`flipper_v2` carries 24 parts against Spinner1's 16, so it holds the same
+structure-fraction advantage `abl_norotor` exploited and could in principle
+have won on it. It did not. Fifteen of sixteen ended with the champion
+KO'd or counted out.
+
+### W4 scored — the flip is NOT the mechanism, and that is the finding
+
+`abl_nolift` swaps the tip `wedge` for a Titanium `spike`. It is the cleanest
+single-variable test of `liftBias` this catalogue permits: hardness barely
+moves (1.15 → 1.20), tip radius barely moves (1.10 → 1.05 m), mass barely
+moves (−15 kg of 1354), and `Actuator.LiftBiasOf` goes **0.75 → 0**.
+
+I predicted 6–8 and it went **7–1**. The record was right and the mechanism
+was the surprise:
+
+```
+Spinner1 still disarmed 8/8 . parts lost 16 vs 80 . damage 7090 vs 6247
+and it STILL flipped Spinner1 onto its back THREE times, with no lift term
+plus a win path nothing else produced, twice:
+  "Enemy counted out - every one of its 4 wheels had been torn off"
+```
+
+So the toppling in W2/W3 was not mostly `ApplyTopple`. A latched arm arriving
+with 5.9 kJ turns a 799 kg machine over through the plain shove and the
+collision, whether or not the striking part has a lift bias. **`liftBias` is
+worth roughly one bout in eight and about 24 s off the mean bout length
+(47 → 71 s). It is a finisher, not the weapon.**
+
+⚠ Consequence for §5's hypothesis 4, which has stood open since 2026-08-18:
+**the wedge works, but not for the reason the hypothesis gives.** Fit one
+because it ends bouts faster, not because lifting is how a non-spinner wins.
+
+### W5 scored — the pivot is the whole thing
+
+`abl_nopivot` replaces the `pivot` with a CarbonFiber `cube`: 22.1 kg against
+the pivot's 21.6, the closest mass-neutral structural stand-in in the
+catalogue. Same arm, same wedge, same everything — the arm is now chassis.
+
+Predicted 1–3. It went **2–6**, and the damage column is the whole story:
+
+```
+damage dealt   8371 (flipper_v2 rerun)  ->  1049 (abl_nopivot)     -87%
+parts lost     21 mine / 108 theirs     ->  68 mine / 22 theirs
+```
+
+Both of its wins are **judges' decisions won on pieces while losing the damage
+criterion** — the `abl_norotor` shape again, from a machine with five weapons
+bolted to it. Take the actuator away and a Titanium wedge on a 1.55 m arm is
+just a long lever for the champion to shear off.
+
+**This is the exact shape of §4.5's rule 1, with a different part in it.** For
+`bulwark_v1` the rotor was the whole thing; here the pivot is. The general
+rule underneath both is not "fit a spindle" — it is **fit a powered
+actuator**, because a limb the engine drives is the only thing in this game
+that delivers stored energy into an opponent. Everything else you bolt on is
+armour, ballast or a judges' argument.
+
+### W6 scored — on a pivot, the engine IS the weapon
+
+`abl_noengine` deletes both engines and nothing else. `motorKW` goes 4.0 → 1.0,
+so the 5.9 kJ arm needs 5.9 s to wind and `WIND_TIMEOUT_S` (2.0 s) releases it
+holding roughly a third of its energy — a ~2 kJ swing instead of a 5.9 kJ one.
+
+**16–0 → 5–3.** Parts lost went 21 → 40 mine and 108 → 65 theirs, and one
+cause string appears here and nowhere else in this section, twice: *"Called
+early — both machines disarmed, no damage possible for 12 s"*. A part-charged
+arm does not shear the champion's bar off before the champion shears the arm.
+
+⚠ **This is a harder ablation on a pivot than the same one is on a rotor, and
+the reason is structural.** §4.5 notes that a rotor's ENERGY is unchanged by
+the motor, because the tip-speed cap sets ω — the engine only buys wind-up. A
+pivot has no such floor: `WIND_TIMEOUT_S` converts a slow motor directly into
+a weaker swing. **Do not carry §4.5's "engines turn 6–2 into 8–0" across to a
+pivot. Here they turn 5–3 into 16–0.**
+
+⚠ And note what 5–3 is: §2's rule says do not call a 5–3 a win, and this is an
+ablation leg, not a candidate. Read it as "somewhere between a coin flip and a
+clear win", not as 63%.
+
+### W7–W8 — the ram, and the prediction that deserved to be wrong
+
+I predicted `piston_v1` would go 0–2 and justified it with one line of
+arithmetic: a ram's `MaxRate` is a flat 3.5 m/s (`min(3.5, STEP_DISP_CAP/dt)`)
+no matter what you hang on it, so the heaviest limb the class affords stores
+`½ · 213 · 3.5²` ≈ 1.3 kJ against the pivot's 5.9 kJ, and `0.4 · E · 1.2 ·
+0.045` ≈ 28 damage a bite is under the HP of every part on Spinner1.
+
+It went **4–4, then 5–3 — 9–7 over sixteen bouts** — and disarmed the champion
+**8 of 8 in both legs**. Two things I left out of the estimate:
+
+* **`Actuator.Bite` adds a closing-speed term.** `linImp = min(relV ·
+  min(m_a, m_b) · 0.5, LIN_IMP_CAP)` with `LIN_IMP_CAP` = 600 N·s, tapered by
+  `rate/MaxRate`. On a 1425 kg machine driving in, that flat 600 more than
+  doubles a weak bite. **A flat additive term dominates a weak weapon and
+  disappears against a strong one** — which is exactly what the constant's own
+  comment says it does, and I read that comment and did not apply it.
+* **A 1.9 m limb is a collider before it is a damage source.** It shears
+  seams through `CompoundRobot.Accumulate` whether or not its bite lands, and
+  Spinner1's whole offence hangs off aluminium seams of ~900 N·s.
+
+Nine-seven is not a win — §2's rule is explicit and this is the case it exists
+for. But it is not the dismantling I predicted either, and the correct reading
+is: **the pivot beats Spinner1, the ram draws with it, and a static edge
+loses to it.** All three of those are actuator statements.
+
+## D. How to build a machine that beats Spinner1 WITHOUT a spindle
+
+Ordered by measured importance. Every line has a ledger row behind it.
+
+### The five rules, in order
+
+1. **FIT A POWERED ACTUATOR. It is the whole result — the spindle was never
+   the point.** Replacing the `pivot` with a mass-matched structural cube took
+   the same machine from 16–0 to 2–6 and dropped its damage output by 87%
+   (W5). This is §4.5's rule 1 with a different part in it, and the honest
+   general form is: **a limb the motor drives is the only thing in this game
+   that delivers stored energy into an opponent.** Static edges are armour and
+   a judges' argument.
+2. **CARRY ENGINES, AND MORE OF THEM THAN A ROTOR NEEDS.** A pivot LATCHES:
+   `WIND_RELEASE_FRAC` holds the arm until it carries `½·I·MaxRate²`, so wind
+   time is `E / motorKW` and `WIND_TIMEOUT_S` (2.0 s) fires anything slower
+   part-charged. Two engines is not a refinement here, it is 5–3 → 16–0 (W6).
+   **Size the arm so that `E / motorKW < 2.0 s` and treat that as a hard
+   constraint of the build, checked with arithmetic before a sweep is spent.**
+3. **SPEND THE MASS, AND SPEND IT ON TRACK WIDTH.** 994 kg on a 0.94 m track
+   is 6–2; 1354 kg on a 1.34 m track, with a byte-identical weapon, is 16–0
+   (W1 → W2). §4.5 calls mass "flip insurance" and that is exactly right — the
+   loss it removes is `flipper_v1` on its own back.
+4. **Titanium for the arm, CarbonFiber for the frame, one material per limb.**
+   Unchanged from §4.5 rule 3 and for the same reason: `tipSpeedCap` is read
+   from the WEAKEST material anywhere on the limb.
+5. **A wedge at the tip is a finisher, not the weapon.** `liftBias` is worth
+   about one bout in eight and ~24 s off the mean bout (W4). Fit one — it is
+   nearly free — but do not build the machine around it, and do not believe
+   that a flip you observed came from the lift term.
+
+### What each lever is actually worth, measured
+
+| lever | evidence | verdict |
+|---|---|---|
+| a powered actuator, at all | `abl_nopivot` 2–6 vs `flipper_v2` 16–0, damage −87% | **decisive — this is the whole thing** |
+| engines (motor 4.0 vs 1.0 kW) | `abl_noengine` 5–3 | **decisive on a pivot**, unlike on a rotor |
+| mass + track (994→1354 kg, 0.94→1.34 m) | `flipper_v1` 6–2 → `flipper_v2` 16–0 | large; it removes the self-flip loss |
+| `liftBias` on the tip | `abl_nolift` 7–1, mean bout 47 → 71 s | a finisher: ~1 bout in 8, and speed |
+| a static edge with no actuator behind it | `dozer_v1` 2–6 · `abl_nopivot` 2–6 | **not a weapon**; both wins were judges'-on-pieces |
+| a low profile to duck the spike | `dozer_v1` 2–6 at 0.38 m under a 0.40 m spike | **does not work** — the trigger is 0.05 m bigger than the part |
+| a program | never used; the winner is 16–0 without one | unnecessary here, exactly as in §4.5 |
+
+### The mass budget, as actually spent (1354 kg of a 1500 kg class)
+
+| | kg | why |
+|---|---|---|
+| 6 rails (4 CarbonFiber, 2 Titanium) | 617 | the raft, and the Titanium pair is deliberate ballast — mass with HP attached, not dead weight |
+| 6 wheels on a 1.34 m track | 82 | wheels carry no HP; the track width is the anti-flip lever |
+| 2 engines | 213 | **5–3 → 16–0.** Sized so `E/motorKW` = 1.48 s < `WIND_TIMEOUT_S` |
+| the weapon: pivot + Titanium beam + Titanium wedge | 177 | ~5.9 kJ latched, ~123 damage a bite, ~1.5 kJ of topple |
+| 2 batteries | 84 | 480 kJ; a swing costs ~6.8 kJ off the pack |
+| core + 4 cladding blades | 100 | |
+| 8 gusset faces | 80 | core, engines, batteries, actuator, arm joints, tip |
+
+## E. The winner, verbatim
+
+`flipper_v2` · **16 W / 0 L / 0 D** over two independent 8-bout sweeps (seeds
+`101/202/303/404` and `17/555/909/1234`) · **1354 kg · 24 parts** · FEATHER ·
+**0% identical placement** with Spinner1 · **program: EMPTY** (AI-driven, same
+as the champion) · carries **no `spindle`** and the harness checked.
+
+```
+#fmt4-gusset
+beamlong|-0.500,0.180,0.000|0|0.00,0.00,0.00|CarbonFiber
+beamlong|-0.300,0.180,0.000|0|0.00,0.00,0.00|CarbonFiber
+beamlong|-0.100,0.180,0.000|0|0.00,0.00,0.00|Titanium
+beamlong|0.100,0.180,0.000|0|0.00,0.00,0.00|Titanium
+beamlong|0.300,0.180,0.000|0|0.00,0.00,0.00|CarbonFiber
+beamlong|0.500,0.180,0.000|0|0.00,0.00,0.00|CarbonFiber
+wheel|-0.670,0.180,-0.350|0|-1.00,0.00,0.00|Rubber
+wheel|-0.670,0.180,0.000|0|-1.00,0.00,0.00|Rubber
+wheel|-0.670,0.180,0.350|0|-1.00,0.00,0.00|Rubber
+wheel|0.670,0.180,-0.350|0|1.00,0.00,0.00|Rubber
+wheel|0.670,0.180,0.000|0|1.00,0.00,0.00|Rubber
+wheel|0.670,0.180,0.350|0|1.00,0.00,0.00|Rubber
+core|0.000,0.230,-0.650|0|0.00,0.00,0.00|Aluminum|G:16
+engine|-0.190,0.405,-0.270|0|0.00,0.00,0.00|Aluminum|G:8
+engine|0.190,0.405,-0.270|0|0.00,0.00,0.00|Aluminum|G:8
+battery|-0.240,0.405,0.060|0|0.00,0.00,0.00|Aluminum|G:8
+battery|0.240,0.405,0.060|0|0.00,0.00,0.00|Aluminum|G:8
+pivot|0.000,0.430,0.450|0|1.00,0.00,0.00|CarbonFiber|G:8
+beam|0.000,0.430,0.900|0|0.00,0.00,0.00|Titanium|G:32
+wedge|0.000,0.430,1.375|0|0.00,0.00,1.00|Titanium|G:32
+blade|-0.425,0.515,-0.270|90|0.00,0.00,0.00|Titanium
+blade|0.425,0.515,-0.270|90|0.00,0.00,0.00|Titanium
+blade|-0.425,0.515,0.300|90|0.00,0.00,0.00|Titanium
+blade|0.425,0.515,0.300|90|0.00,0.00,0.00|Titanium
+```
+
+How it is put together, in four sentences. Six `beamlong` rails make a raft
+1.20 m wide — four CarbonFiber for HP per kilogram and **two Titanium purely
+as ballast**, because the class allows 1500 kg and this design wants every one
+it can carry low down. Six wheels sit on a **1.34 m track**, which is the
+anti-flip lever and the single change that took this machine from 6–2 to
+16–0. A **CarbonFiber `pivot` with its hinge on X** stands on the deck at the
+front carrying a **Titanium `beam` arm and a Titanium `wedge`** — tip radius
+1.10 m, `ω = min(14, 14.79/1.10) = 13.4 rad/s`, `E ≈ 5.9 kJ`, and because a
+pivot LATCHES, **every swing arrives with all of it**. Two engines put
+`motorKW` at 4.0 so the wind is 1.48 s, comfortably inside `WIND_TIMEOUT_S`
+(2.0 s) — that margin is the tightest number in the design and W6 is what
+happens without it.
+
+⚠ **The arm must not touch the chassis.** `Actuator.Wire` defines the limb as
+whatever touches the actuator, so the same warning §4.5 ends on applies here:
+the arm sits at z ∈ [0.60, 1.20] and the rails stop at z = 0.50, and the
+engines' +Z faces stop at z = −0.045 against the pivot's z = 0.30. Check the
+clearances by arithmetic before spending a sweep.
+
+## F. §5's open hypotheses, scored again by this section
+
+1. **Spend the 700 kg** — §5 scored this WRONG in 2026-08-18 against a rotor
+   machine, and **without a rotor it is RIGHT**. `flipper_v1` at 994 kg is
+   6–2; the same weapon at 1354 kg on a wider track is 16–0. `abl_min` could
+   afford to be light because its rotor ended bouts before mass mattered; a
+   pivot's duty cycle is ~2 s and the machine has to survive the gaps.
+   **Both scorings stand — they are about different machines**, which is
+   exactly why this line is worth keeping.
+2. **Do not out-spin a spinner** — still wrong as stated, and now for a second
+   reason: you do not have to out-spin it OR out-anything it. You have to
+   deliver stored energy, and a latched arm does that better per hit than a
+   flywheel does (5.9 kJ every swing vs a rotor's 40%-drained bite).
+3. **Attack the bar, not the body** — untested as an *aiming policy*, still,
+   because nothing here steers. But it is what happened: Spinner1 finished
+   with no weapon in **15 of 16** bouts against `flipper_v2` and **8 of 8**
+   against both `abl_nolift` and `piston_v1`. Every actuated candidate in this
+   section disarms it; that is not intent, it is what a swinging limb does.
+4. **A wedge gets under things — TESTED AT LAST, and BOTH HALVES ARE WRONG.**
+   The low static wedge that "may pass under the swing entirely" is
+   `dozer_v1`, 2–6, and it does not pass under anything (W0). And the wedge
+   that *does* ride on a winner turns out not to be why it wins: strip
+   `liftBias` to 0 and the record goes 16–0 → 7–1 while the machine **still
+   flips Spinner1 three times** (W4). The verb works; the explanation was
+   wrong.
+5. **Armour is a shape** — superseded, and W2 sharpens §2.5's version: armour
+   is a category, but the ×0.25 weapon-on-weapon discount is keyed on the
+   STRIKER. Against Spinner1's plain aluminium bar — a limb, and limbs skip
+   the structural gate — blades are ordinary armour at full rate.
+6. **The program may matter more than the parts** — still NO. Every candidate
+   in this section carries an empty program, exactly like the champion, and
+   the best is 16–0.
+
+## G. What I would try next
+
+1. **The obvious one: two pivots.** A single arm is idle for roughly 1.9 s of
+   every 2.1 s cycle. Two arms firing on the same trigger nearly double the
+   contact rate for ~180 kg, and there is deck room in front of the engines.
+   This is the cheapest remaining upgrade and nobody has tried it.
+2. **Push the ram.** `piston_v1` is EVEN with the champion (W7) on a design I
+   predicted would be dismantled, and its losses are self-flips, not a failure
+   to hurt anything — it disarmed Spinner1 8/8. A ram with the same anti-flip
+   treatment that took `flipper_v1` to `flipper_v2` may well cross the line,
+   and that would make "fit a powered actuator" true of all three rather than
+   an argument about two of them.
+3. **A machine whose top is under 0.30 m.** W0 killed "duck the spike" at
+   0.38 m against a 0.40 m spike, but it died on the 0.05 m trigger inflation,
+   not on the idea. 0.30 m clears the inflated trigger with 0.05 m to spare.
+   I would not bet on it — pitch is still pitch — but the arithmetic has never
+   actually been given a fair margin.
+4. **A harder opponent, still.** Everything here, like everything above it, is
+   conditional on Spinner1: no engine, no gussets, a single-sided aluminium
+   bar. `ChallengeBench` hard-codes `CHAMPION_BUILD`; the interesting fight
+   now is `flipper_v2` vs `bulwark_v1`, i.e. **is the latched pivot actually
+   competitive with the rotor, or only with the champion?** Nothing in this
+   section answers that, and the headline should not be read as if it does.
+
+## H. A balance note for owen, and it is not the one from last time
+
+`abl_norotor`'s judges'-card exploit is closed by fiat (the harness now
+requires a weapon) but **the underlying hole is still open, and it showed up
+twice more today without being sought.** Both of `dozer_v1`'s wins and both of
+`abl_nopivot`'s were **judges' decisions taken on the structure fraction while
+LOSING the damage criterion** — one of them while being out-damaged 5:1.
+Those are machines with five and six real weapons bolted on. They are not
+exploiting anything; they are simply bigger, and `structFrac` is a fraction.
+
+So the observation from 2026-08-18 generalises: **it is not "a weaponless
+robot can win on pieces". It is "the machine with more pieces wins the
+tiebreak, and the damage column is often never consulted."** Whether that is
+the intended shape of the judges' card is a design call, not a bench call.
+
+## J. Session record — 2026-08-19
+
+**Nine measured sweeps, 72 bouts**, all local (`ChallengeBench` in the editor
+over the Unity MCP bridge). No production contact, no ladder writes, no
+enlisting. **No product code was modified** — `ChallengeBench.cs` already
+carried `BannedParts` and `RequireWeapon` when this session started and was
+read, not edited; `Actuator.cs`, `DamageResolver.cs`, `Phase1Parts.cs`,
+`BuilderManager.cs` and `CompoundRobot.cs` were read only.
+
+**Owner state (hard rule 5), fingerprinted either side and once mid-session:**
+
+| | md5 | mtime | size |
+|---|---|---|---|
+| before | `a4b73bc7500d81e74e8b43c38efc1066` | Aug 19 07:35:36 2026 | 8599 |
+| after | `a4b73bc7500d81e74e8b43c38efc1066` | Aug 19 07:35:36 2026 | 8599 |
+
+Byte-identical, and the mtime never moved — the save was never written.
+
+**Predictions scored: 5 of 8 right.** `flipper_v2` (right), `abl_nolift`
+(right on the record, **wrong on the mechanism** — I predicted the flip would
+carry the design and it is worth one bout in eight), `abl_nopivot` (right),
+`abl_noengine` (right), `piston_v1_rerun` (right); `dozer_v1`
+(**wrong**, 2 wins against a predicted 5–7), `flipper_v1` (**wrong**, 6
+against a predicted 3–5), `piston_v1` (**wrong**, 4 against a predicted 0–2).
+
+The three misses have one shape and it is not last session's. **I was accurate
+about the physics and wrong about which physics mattered.** Every number in
+the `dozer_v1` design was correct — the spike really does sit at 0.40 m and
+the machine really is 0.38 m tall — and the build lost anyway because I costed
+the PART and the game collides the TRIGGER, which is 0.05 m bigger. Both
+actuator misses are the same error mirrored: I priced a limb by its stored
+energy alone and forgot that a swinging limb is also a 100 kg collider and
+carries a flat 600 N·s closing term. **Reading a constant is not the same as
+knowing which term dominates**; the estimate that misled me twice was the one
+I could do in my head.
+
+**Offline check-first, as §7 asked for.** §7 ends by noting the previous
+session's build generator was never committed and recommending it be rebuilt.
+It was, as a Python mirror of `PlacedPart.Half()`, `Touching()`, `Validate()`
+and `MatDB` masses, and it paid for itself immediately: every build in this
+section was legal on its first load and **not one sweep was spent on a
+geometry error** (one orphan was caught offline, in `abl_nopivot`, where a
+seam gap came out at exactly 0.030 m). It still lives in a scratch directory
+and is still not committed — the same debt, handed on again, with the note
+that the two rules worth having are `Touching`'s "≤0.03 m on all three axes
+and flush on at least one" and the fact that gusset mass is **10 kg per welded
+FACE**, not per part.
