@@ -104,6 +104,26 @@ namespace RobotBrawl.Phase0
         public static string ChallengerProgram = "";
         /// <summary>Bouts per side. Total bouts = Seeds.Length * 2.</summary>
         public static int[] Seeds = { 101, 202, 303, 404 };
+
+        /// <summary>Part ids a candidate may NOT use. Empty = no restriction.
+        ///
+        /// Added 2026-08-19 for owen's "spinning robots are dominating — see if
+        /// any other type can beat Spinner1". The whole point of that question
+        /// is that the answer must not be another spinner, and a rule a
+        /// designer is merely ASKED to follow is a rule that gets followed
+        /// right up until it is inconvenient. This one is checked.</summary>
+        public static string[] BannedParts = new string[0];
+
+        /// <summary>Require at least one part the damage model calls a weapon
+        /// — `DamageResolver.IsEdge(edgeHardness)`, which is the definition
+        /// CLAUDE.md says to use rather than matching on id prefixes.
+        ///
+        /// owen, 2026-08-19: "we should never build a robot that can never
+        /// fight." `abl_norotor` took the champion to 5-3 with NO weapon at
+        /// all, purely on the judges' structure count. That is a scoring hole
+        /// to close, not a design to pursue, and banning the spindle without
+        /// this gate is an open invitation to rediscover it.</summary>
+        public static bool RequireWeapon = false;
         /// <summary>Where the report is written, relative to the project.
         /// Overwritten every run — it is the LAST candidate, not a ledger.</summary>
         public static string ReportPath = "Assets/Phase1/qa_challenge_bench.txt";
@@ -269,6 +289,40 @@ namespace RobotBrawl.Phase0
                  + " = " + Pct(same, mineKeys.Count) + "  (limit " + Pct((int)(MAX_IDENTICAL_PLACEMENT * 100), 100) + ")");
             Check(frac <= MAX_IDENTICAL_PLACEMENT,
                   "challenger is not a copy of Spinner1");
+
+            // ---- 3b. banned parts, and the weapon floor ------------------------
+            if (BannedParts != null && BannedParts.Length > 0)
+            {
+                var used = new List<string>();
+                foreach (var p in bm.placed)
+                {
+                    if (p == null || p.def == null) continue;
+                    foreach (var ban in BannedParts)
+                        if (p.def.id == ban && !used.Contains(ban)) used.Add(ban);
+                }
+                Note("banned parts in this run: " + string.Join(", ", BannedParts));
+                Check(used.Count == 0, used.Count == 0
+                      ? "challenger uses none of the banned parts"
+                      : "challenger uses BANNED part(s): " + string.Join(", ", used.ToArray()));
+            }
+
+            if (RequireWeapon)
+            {
+                // The damage model's own definition, not a name match — see
+                // CLAUDE.md on PartSpec.edgeHardness being what "is this a
+                // weapon" means here.
+                int edges = 0;
+                var kinds = new List<string>();
+                foreach (var p in bm.placed)
+                {
+                    if (p == null || p.def == null) continue;
+                    if (DamageResolver.IsEdge(p.def.edgeHardness))
+                    { edges++; if (!kinds.Contains(p.def.id)) kinds.Add(p.def.id); }
+                }
+                Note("weapon parts (edgeHardness above the edge floor): " + edges
+                     + (kinds.Count > 0 ? "  [" + string.Join(", ", kinds.ToArray()) + "]" : ""));
+                Check(edges > 0, "challenger carries something that can actually deal damage");
+            }
 
             eligible = failed == 0;
             if (!eligible)
