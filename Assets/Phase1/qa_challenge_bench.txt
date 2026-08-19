@@ -1,0 +1,33 @@
+passed 6 failed 0   verdict LOSES TO SPINNER1   W/L/D 0/4/0
+challenger: REFERENCE_ARMED
+      found a BuilderManager with an empty palette (stale after a domain reload) — replacing it
+      created a headless BuilderManager
+      builder ready, palette 25 parts
+PASS  champion build parses (16 parts)
+PASS  challenger build loads (19 parts)
+      challenger mass 924 kg · 19 parts · category FEATHER
+PASS  challenger is a LEGAL build
+PASS  challenger is in the champion's class (FEATHER), got FEATHER
+      identical placements with Spinner1: 1/19 = 5%  (limit 30%)
+PASS  challenger is not a copy of Spinner1
+PASS  bouts were fought (4)
+      
+      ---- RESULT ------------------------------------------------------
+      REFERENCE_ARMED vs Spinner1:  0 W / 4 L / 0 D over 4 bouts   (win rate 0%)
+      as A (spawn side 0): 0/2   as B (spawn side 1): 0/2   <- a big gap here is the SPAWN talking, not the design
+      damage dealt: 488.9 by REFERENCE_ARMED vs 4183.0 by Spinner1
+      parts lost:   58 by REFERENCE_ARMED vs 2 by Spinner1
+      bouts ending with NO WEAPON LEFT: REFERENCE_ARMED 2/4   Spinner1 0/4
+      mean bout length 35.5 s
+      
+      how the bouts ended:
+          2x  [challenger LOST]  (side A, A-relative wording) Counted out — out of power — 240 kJ of its 240 kJ pack was torn off th
+          2x  [challenger LOST]  (side B, A-relative wording) KO — enemy core destroyed
+      
+      per-bout:
+        seed 101   as A  LOSS  dealt   159.2 vs   747.0   partsLost 9/1   weaponsAlive 1/1   t=27.3s  hits=18
+        seed 202   as A  LOSS  dealt    58.9 vs  1105.8   partsLost 11/0   weaponsAlive 1/1   t=35.4s  hits=31
+        seed 101   as B  LOSS  dealt    87.2 vs  1241.7   partsLost 19/1   weaponsAlive 0/1   t=35.0s  hits=23
+        seed 202   as B  LOSS  dealt   183.5 vs  1088.4   partsLost 19/0   weaponsAlive 0/1   t=44.3s  hits=31
+      
+      VERDICT: LOSES TO SPINNER1   (0% win rate over 4 bouts)
