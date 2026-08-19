@@ -30,8 +30,34 @@ test, and it asserts the row was really tombstoned rather than merely
 answered, because a 200 that removed nobody is the same defect wearing a
 better face.
 
-**Still open: H1** (the alert threshold below). Everything in §3 and §5 also
-stands.
+**H1 fixed too** — the "jobs are not being worked" threshold is 900s → **2100s**,
+so it fires only when the 30-minute safety net has ALSO failed rather than on a
+condition that self-heals.
+
+**Launch alerting added** (`scripts/gcp_monitoring.zsh`, idempotent). The four
+original policies all watch the QUEUE — none of them notices the API returning
+500s, answering slowly, running out of database connections, or hitting its
+instance ceiling, which is most of what goes wrong on a launch day. Six new
+policies on Cloud Run's and Cloud SQL's BUILT-IN metrics, so unlike the
+log-regex ones they cannot be silenced by rewording a log line:
+
+| alert | fires when |
+|---|---|
+| `api: 5xx error rate is high` | >5% of requests are 5xx for 10 min (a **ratio**, with denominator) |
+| `api: responses are slow (p95 > 3s)` | p95 latency >3s for 10 min |
+| `api: at the instance ceiling (4)` | at maxScale for 10 min — demand meeting the wall |
+| `db: connections near the ceiling` | backends >18 (fleet is bounded to 20, tier accepts ~25) |
+| `db: CPU is saturated` | >85% for 10 min on a shared-core instance |
+| `db: disk is filling` | >85% |
+
+⚠ **Every one was verified to have live data**, because a policy on a metric
+that never reports is decorative: Cloud Run 1639/1637/738 points per 6h,
+Cloud SQL 353/1790/352, and the database policies' exact composite filter
+resolves to 5 series. Current connections: latest 2, max 5 over two hours —
+which independently confirms B1's bound, since 40 concurrent requests peaked
+at 5 rather than 100.
+
+Everything in §3 and §5 still stands.
 
 ## 1. BLOCKERS — fix before the app is released
 

@@ -143,7 +143,14 @@ echo "alert policies:"
 # 15 minutes. A VALIDATE normally completes in seconds; this is the threshold
 # for 'a job exists and nothing is working it', which is what a dead worker
 # fleet looks like from the API's side.
-mk_policy "ladder: jobs are not being worked" rb_queue_oldest_ready_s 900 "300s" \
+# ⚠ 2100s, NOT 900. Until 2026-08-19 the scheduler ran every 5 minutes, so a
+# job older than 15 was unambiguously wrong. The API now starts the worker on
+# demand and the SCHEDULE is a 30-minute safety net — so a single missed nudge
+# leaves a job waiting up to 30 minutes and then collects it automatically. At
+# 900 this alerted on a condition that self-heals, and an alert that cries wolf
+# gets muted, which costs more than the alert was worth. 2100 fires only when
+# the safety net has ALSO failed to run.
+mk_policy "ladder: jobs are not being worked" rb_queue_oldest_ready_s 2100 "300s" \
   "A job has been READY for over 15 minutes. Usually means no worker is polling. Check the worker fleet, then GET /v1/admin/metrics with the worker key."
 # The reaper returns a job at 300s. Seeing 900 means the reaper itself is not
 # running — a different fault from a stuck worker, and it needs the API looked
@@ -188,6 +195,129 @@ print('  created for ${HOST}' if 'name' in d else '  FAILED: '+json.dumps(d)[:30
 else
   echo "  reusing $EXISTING"
 fi
+
+
+# ======================================================================
+# LAUNCH MONITORING — added 2026-08-19, for the day real players arrive.
+#
+# ⚠ THE FOUR POLICIES ABOVE ALL WATCH THE QUEUE. They answer "is the ladder
+# processing work", and they answered it well enough for a project with one
+# user. NONE of them notices the API returning 500s, taking ten seconds to
+# answer, running out of database connections, or hitting its instance
+# ceiling — which is most of what actually goes wrong on a launch day.
+#
+# These use Cloud Run's and Cloud SQL's BUILT-IN metrics rather than the
+# log-regex above, so they cannot be silenced by rewording a log line.
+# ======================================================================
+
+# <display> <filter> <threshold> <duration> <aligner> <reducer> <doc> [denominatorFilter]
+#
+# ⚠ THE PAYLOAD IS BUILT BY PYTHON, NOT BY A HEREDOC, and that is not style.
+# A Monitoring filter is full of double quotes — metric.type="run.googleapis…"
+# — and interpolating one into a JSON heredoc produces invalid JSON every
+# time. The first run of this section failed six for six on exactly that.
+# json.dumps escapes it correctly and cannot be got wrong later.
+mk_builtin() {
+  local disp="$1" filt="$2" thr="$3" dur="$4" align="$5" reduce="$6" doc="$7" denom="${8:-}"
+  local existing
+  existing=$(curl -s -H "Authorization: Bearer $(TOKEN)" "${API}/alertPolicies" \
+    | DISP="$disp" python3 -c "
+import json,os,sys
+want=os.environ['DISP']
+d=json.load(sys.stdin).get('alertPolicies',[])
+print(next((p['name'] for p in d if p.get('displayName')==want), ''))")
+
+  DISP="$disp" FILT="$filt" THR="$thr" DUR="$dur" ALIGN="$align" RED="$reduce" \
+  DOC="$doc" DENOM="$denom" CHAN="$CH" python3 - > /tmp/rb_launch_policy.json <<'PYEOF'
+import json, os
+agg = {"alignmentPeriod": "300s",
+       "perSeriesAligner": os.environ["ALIGN"],
+       "crossSeriesReducer": os.environ["RED"]}
+cond = {
+    "filter": os.environ["FILT"],
+    "aggregations": [agg],
+    "comparison": "COMPARISON_GT",
+    "thresholdValue": float(os.environ["THR"]),
+    "duration": os.environ["DUR"],
+    "trigger": {"count": 1},
+    # Same reasoning as the queue policies: min-instances=0 means these
+    # metrics are legitimately absent when nobody is using the app, and
+    # firing on absence would page for an idle night.
+    "evaluationMissingData": "EVALUATION_MISSING_DATA_INACTIVE",
+}
+if os.environ.get("DENOM"):
+    cond["denominatorFilter"] = os.environ["DENOM"]
+    cond["denominatorAggregations"] = [agg]
+print(json.dumps({
+    "displayName": os.environ["DISP"],
+    "combiner": "OR",
+    "conditions": [{"displayName": os.environ["DISP"], "conditionThreshold": cond}],
+    "notificationChannels": [os.environ["CHAN"]],
+    "alertStrategy": {"autoClose": "86400s"},
+    "documentation": {"content": os.environ["DOC"], "mimeType": "text/markdown"},
+}))
+PYEOF
+
+  if [ -n "$existing" ]; then
+    curl -s -X PATCH -H "Authorization: Bearer $(TOKEN)" -H 'Content-Type: application/json' \
+      "https://monitoring.googleapis.com/v3/${existing}?updateMask=conditions,notificationChannels,documentation,alertStrategy" \
+      -d @/tmp/rb_launch_policy.json >/dev/null
+    echo "  updated ${disp}"
+  else
+    curl -s -X POST -H "Authorization: Bearer $(TOKEN)" -H 'Content-Type: application/json' \
+      "${API}/alertPolicies" -d @/tmp/rb_launch_policy.json \
+      | python3 -c "
+import json,sys
+d=json.load(sys.stdin)
+print('  created' if 'name' in d else '  FAILED: '+json.dumps(d)[:300])"
+  fi
+}
+
+RUN_SVC='resource.type="cloud_run_revision" AND resource.labels.service_name="rb-api"'
+SQL_INST="resource.type=\"cloudsql_database\" AND resource.labels.database_id=\"${PROJECT_ID}:rb-db\""
+
+echo "launch policies:"
+
+# THE ONE OWEN ASKED FOR. A RATIO, not a count: 50 errors means nothing
+# without knowing whether it was out of 100 requests or 100,000.
+# ⚠ 10 minutes, not 5, and the reason is arithmetic: at 3am with four
+# requests an hour, ONE 500 is a 25% error rate. A longer window makes the
+# breakage persist before it wakes anyone. It is still not a volume floor —
+# Monitoring cannot express "and more than N requests" in one condition — so
+# treat a 3am page as "look, then judge", not "the site is down".
+mk_builtin "api: 5xx error rate is high" \
+  "metric.type=\"run.googleapis.com/request_count\" AND ${RUN_SVC} AND metric.labels.response_code_class=\"5xx\"" \
+  0.05 "600s" ALIGN_RATE REDUCE_SUM \
+  "More than 5% of requests returned 5xx for 10 minutes. Read the logs first: a deploy that boots but cannot reach the database looks exactly like this, and so does an exhausted connection pool. Roll back with gcloud run services update-traffic rb-api --to-revisions=PREVIOUS=100." \
+  "metric.type=\"run.googleapis.com/request_count\" AND ${RUN_SVC}"
+
+mk_builtin "api: responses are slow (p95 > 3s)" \
+  "metric.type=\"run.googleapis.com/request_latencies\" AND ${RUN_SVC}" \
+  3000 "600s" ALIGN_PERCENTILE_95 REDUCE_MAX \
+  "95th percentile latency above 3s for 10 minutes. Usual causes in order: the database is the bottleneck (see the two db alerts), a cold-start storm after a deploy, or requests queueing for a pooled connection."
+
+# ⚠ THE CEILING, AND IT IS LOW ON PURPOSE. maxScale is 4. Sitting at 4 is not
+# a fault — it is demand meeting the wall. Raising maxScale REQUIRES raising
+# the DB connection ceiling first.
+mk_builtin "api: at the instance ceiling (4)" \
+  "metric.type=\"run.googleapis.com/container/instance_count\" AND ${RUN_SVC}" \
+  3.5 "600s" ALIGN_MAX REDUCE_MAX \
+  "rb-api has been at its maxScale of 4 for 10 minutes. Not a fault, a capacity wall. Before raising maxScale, raise the database ceiling: 4 instances x Maximum Pool Size 5 = 20 against a db-f1-micro that accepts about 25. Raising one without the other trades a queue for 'too many clients'."
+
+mk_builtin "db: connections near the ceiling" \
+  "metric.type=\"cloudsql.googleapis.com/database/postgresql/num_backends\" AND ${SQL_INST}" \
+  18 "300s" ALIGN_MAX REDUCE_MAX \
+  "Postgres backends above 18. db-f1-micro accepts about 25 and the API fleet is bounded to 20. Above 18 means either the bound was lost from rb-pg-conn, or something outside the fleet is connecting. Every endpoint dies together when this ceiling is reached, sign-in included."
+
+mk_builtin "db: CPU is saturated" \
+  "metric.type=\"cloudsql.googleapis.com/database/cpu/utilization\" AND ${SQL_INST}" \
+  0.85 "600s" ALIGN_MEAN REDUCE_MAX \
+  "Cloud SQL CPU above 85% for 10 minutes. db-f1-micro is a SHARED-CORE instance, so sustained load is throttled rather than served, and players see everything get slow. The fix is a tier change, which is a cost decision."
+
+mk_builtin "db: disk is filling" \
+  "metric.type=\"cloudsql.googleapis.com/database/disk/utilization\" AND ${SQL_INST}" \
+  0.85 "600s" ALIGN_MEAN REDUCE_MAX \
+  "Cloud SQL disk above 85%. Replays and snapshots live in GCS, not the database, so this means row growth or WAL. PITR is ON, which retains WAL."
 
 echo
 echo "done. review at https://console.cloud.google.com/monitoring/alerting?project=${PROJECT_ID}"
