@@ -11,6 +11,28 @@ so — a skip is not a pass.
 
 ---
 
+## 0. STATUS — both blockers FIXED and verified on production, same day
+
+Deployed as `rb-api-00023-hw8`. Kept below in full, because the reasoning is
+worth more than the verdict.
+
+**B1 fixed.** `rb-pg-conn` version 2 adds `Maximum Pool Size=5`, so the fleet
+tops out at 4 x 5 = 20 against roughly 22 usable. Verified on production: 40
+concurrent requests to `/v1/leaderboard/FEATHER` — a real query, not a
+process-only health check — **all returned 200**. Requests now queue for a
+connection instead of exhausting the database.
+
+**B2 fixed.** Unsubscribe has its own 60/min bucket. Verified by reproducing
+the original failure on production: subscribe an address, deliberately exhaust
+the SIGNUP bucket (429 after 20), then unsubscribe that address — **200**,
+where before every such call was refused. `api_smoke` carries the regression
+test, and it asserts the row was really tombstoned rather than merely
+answered, because a 200 that removed nobody is the same defect wearing a
+better face.
+
+**Still open: H1** (the alert threshold below). Everything in §3 and §5 also
+stands.
+
 ## 1. BLOCKERS — fix before the app is released
 
 ### B1. The database cannot serve the API at scale. ⚠ THIS IS THE BIG ONE.
