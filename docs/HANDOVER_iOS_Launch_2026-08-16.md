@@ -19,6 +19,7 @@ at "debug-signed .aab + .apk built, no Play Console yet".
 | Review demo account | `appreview@cyberduck.club` / `password123` — exists on production, login verified 200 |
 | Encryption | "None of the algorithms mentioned above" — HTTPS-only exempt. **Apple asks this PER BUILD**; answer it in TestFlight → Manage before a new build can attach |
 | Build 8 delivery UUID | `88fa136d-aa0b-4dd3-9b04-d2f90d4f80e0` |
+| **Build 10 delivery UUID** | `1d6e0c31-ce05-42a3-a53c-0c8de8f68732` — submitted `2026-08-19T05:05:33Z`, review submission `ff88eef4-4343-4de2-999a-52f00191fc9c`. ✅ **The whole §1 swap procedure below can be driven through the ASC API instead of the web UI** — validate/upload with `altool`, `PATCH builds/{id} usesNonExemptEncryption=false`, `PATCH reviewSubmissions/{id} canceled=true`, `PATCH appStoreVersions/{id}/relationships/build`, then POST a new submission + item and `PATCH submitted=true`. Answer encryption BEFORE cancelling; that keeps the no-submission window to seconds. Done once, 08-18 |
 
 **Why build 8 and not 7:** build 7 was originally submitted; it carries the
 post-live-fight bug (BACK TO THE ARENA lands on the BUILD tab — the
