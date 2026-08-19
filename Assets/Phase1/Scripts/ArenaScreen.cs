@@ -769,6 +769,57 @@ namespace RobotBrawl.Phase0
         public string EnlistName { get { return enlistName; } set { enlistName = value; } }
         public void EnlistNow() { if (!busy) StartCoroutine(DoEnlist()); }
 
+        // ---- retiring a robot (owen, 2026-08-19) --------------------------
+        /// <summary>Robot id whose RETIRE button is ARMED, or "" for none.
+        /// Retiring deletes the robot's rating rows, so it is two taps: the
+        /// first arms, the second does it. One tap on a row in a scrolling
+        /// list is far too easy to hit by accident, and the thing it destroys
+        /// is a rating that took real fights to earn.</summary>
+        public string RetireArmed { get { return retireArmed; } }
+        string retireArmed = "";
+
+        /// <summary>Arm, or fire if this row is already armed. Arming a
+        /// different row disarms the first — only ever one live at a time.</summary>
+        public void RetireTap(string robotId)
+        {
+            if (busy || string.IsNullOrEmpty(robotId)) return;
+            if (retireArmed == robotId) { StartCoroutine(DoRetire(robotId)); return; }
+            retireArmed = robotId;
+            Say("tap RETIRE again to take it off the ladder — its rating is deleted", SC_ACCOUNT);
+        }
+
+        public void RetireDisarm() { retireArmed = ""; }
+
+        IEnumerator DoRetire(string robotId)
+        {
+            busy = true;
+            string name = robotId;
+            foreach (var m in mine) if (m.id == robotId) { name = m.name; break; }
+
+            string err = null;
+            yield return LadderClient.Retire(robotId, e => { err = e; });
+            retireArmed = "";
+
+            if (err != null)
+            {
+                // The server's refusal is the useful sentence — "'x' has 1
+                // fight(s) still to settle" is actionable, "409" is not. And
+                // it is said AFTER the flag is cleared so a failed retire does
+                // not leave a row armed.
+                Say("retire: " + err, SC_ACCOUNT);
+                busy = false; yield break;
+            }
+
+            // ⚠ REFRESH FIRST, THEN SPEAK — the DoEnlist rule, and it has bitten
+            // twice already in this file. Refresh() ends by writing "<n> ranked"
+            // over the status, so a confirmation set before it is thrown away
+            // and the button looks dead.
+            yield return Refresh();
+            Say(name + " is off the ladder. re-enlisting under that name brings "
+                + "it back — at a fresh placement rating, not its old one.", SC_ACCOUNT);
+            busy = false;
+        }
+
         public bool Registering { get { return registering; } }
         public void ToggleRegistering() { registering = !registering; Say("", SC_ACCOUNT); }
         public string Email { get { return email; } set { email = value; } }
@@ -1151,6 +1202,12 @@ namespace RobotBrawl.Phase0
         public bool TestShowEnlist { get { return showEnlist; } set { showEnlist = value; } }
         public void TestSetEnlistName(string n) { enlistName = n; }
         public void TestEnlist() { StartCoroutine(DoEnlist()); }
+        /// <summary>The ARM half of RETIRE, without the network half. A bench
+        /// can prove the two-tap gate holds — that one tap never fires, that
+        /// arming a second row disarms the first — without a live server and
+        /// without deleting anybody's rating.</summary>
+        public void TestRetireTap(string robotId) { RetireTap(robotId); }
+        public string TestRetireArmed { get { return retireArmed; } }
         /// <summary>Draw one frame of the enlist panel off-screen, so a bench
         /// can prove it does not throw against whatever career state it is
         /// handed. DrawEnlist reads Career directly and an OnGUI exception is

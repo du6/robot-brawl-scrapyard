@@ -3253,11 +3253,25 @@ public class MobileBuilderUI : MonoBehaviour
             t.gameObject.AddComponent<LayoutElement>().minHeight = 20f;
             foreach (var m in arenaScreen.MyRobots)
             {
+                // ⚠ EACH ROW IS NOW A ROW, not a line of text: the label and a
+                // RETIRE button side by side. Until 2026-08-19 there was no way
+                // to take a robot off the ladder from anywhere in the product —
+                // the only thing that retired a robot was deleting your whole
+                // account.
+                string id = m.id;                       // captured per row, not the loop var
+                var row = MkPanel("minerow_" + id, arenaAccountContent, new Color(0.10f,0.11f,0.14f,1f));
+                var rle = row.AddComponent<LayoutElement>();
+                // A full touch row, because it now contains something tappable.
+                rle.flexibleHeight = 0f; rle.minHeight = TouchRow(); rle.preferredHeight = TouchRow();
+                var rh = row.AddComponent<HorizontalLayoutGroup>();
+                rh.spacing = 4f; rh.childForceExpandHeight = true; rh.childForceExpandWidth = false;
+                rh.padding = new RectOffset(6, 4, 2, 2);
+
                 // StatusText lives on MyRobot so this row and ArenaScreen's
                 // OnGUI copy cannot drift. It used to say "waiting to be
                 // checked" for a REJECTED robot as well as a pending one,
                 // forever, because the server sent nothing that told them apart.
-                var r = MkText("mine_" + m.id, arenaAccountContent,
+                var r = MkText("mine_" + id, row.transform,
                     "   " + m.name + "   ·   " + m.StatusText,
                     13, TextAnchor.MiddleLeft);
                 // Amber for a refusal — it is the one state the player can act
@@ -3266,8 +3280,31 @@ public class MobileBuilderUI : MonoBehaviour
                 r.color = m.CanFight  ? new Color(0.82f, 0.88f, 0.96f)
                         : m.Rejected  ? new Color(1.00f, 0.75f, 0.30f)
                                       : new Color(0.72f, 0.74f, 0.66f);
-                r.gameObject.AddComponent<LayoutElement>().minHeight = 20f;
+                var tle = r.gameObject.AddComponent<LayoutElement>();
+                tle.flexibleWidth = 1f; tle.minHeight = TouchRow();
+
+                // Two taps, and the ARMED state is visible in the label as well
+                // as the colour: retiring deletes the robot's rating rows, and
+                // one stray tap in a scrolling list should not be able to do
+                // that. ArenaScreen owns the armed flag so the rule is testable
+                // without a server (TestRetireTap).
+                bool armed = arenaScreen.RetireArmed == id;
+                var rb = MkButton("mineretire_" + id, row.transform,
+                                  armed ? "SURE?" : "RETIRE", 12,
+                                  () => { if (arenaScreen != null) { arenaScreen.RetireTap(id); arenaAccountStamp = ""; } });
+                var ble = rb.gameObject.AddComponent<LayoutElement>();
+                ble.flexibleWidth = 0f; ble.minWidth = 84f; ble.preferredWidth = 84f;
+                ble.minHeight = TouchRow(); ble.preferredHeight = TouchRow();
+                rb.GetComponent<Image>().color = armed
+                    ? new Color(0.62f, 0.16f, 0.14f, 0.98f)      // the REMOVE-armed red
+                    : new Color(0.24f, 0.26f, 0.31f, 0.96f);
             }
+            var retirenote = MkText("retirenote", arenaAccountContent,
+                "RETIRE takes a robot off the board and deletes its rating. "
+                + "re-enlisting under the same name brings it back at a fresh placement.",
+                11, TextAnchor.UpperLeft);
+            retirenote.color = new Color(0.62f, 0.68f, 0.78f);
+            retirenote.gameObject.AddComponent<LayoutElement>().minHeight = 30f;
         }
 
         var so = MkButton("accsignout", arenaAccountContent,
