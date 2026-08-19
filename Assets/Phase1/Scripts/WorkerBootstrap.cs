@@ -36,6 +36,40 @@ namespace RobotBrawl.Phase0
         static void AutoStart()
         {
             Debug.Log("[WorkerBootstrap] RB_WORKER build — launching the worker host");
+
+            // ⚠ NOBODY CAN PRESS "START CAREER" IN A CONTAINER, AND THAT IS THE
+            // ONLY THING THAT EVER MADE A BuilderManager. Main.unity holds a
+            // camera, a light and nothing else — unchanged since 2026-07-29 —
+            // and the sole creator of a BuilderManager is StartCareer(), which
+            // is reached by clicking a GUI button on ModeSelect. WorkerHost
+            // then requires one and Quit(3)s without it, so a worker built
+            // from this source booted, found no builder and died:
+            //
+            //     [WorkerBootstrap] RB_WORKER build — launching the worker host
+            //     [WorkerHost] no BuilderManager in the scene; ...
+            //     Container called exit(3).
+            //
+            // Measured 2026-08-19 on a fresh rebuild, which is how it surfaced:
+            // the image deployed since 08-12 works, so the worker in production
+            // was an artefact THIS REPOSITORY COULD NO LONGER REPRODUCE. That is
+            // the real defect; the boot failure was only its symptom.
+            //
+            // ⚠ NOT StartCareer(). That also runs Career.Load() and
+            // EconomySync.Kick() — owner state and a network call the worker has
+            // no business touching (hard rule 5). The loops only ever use
+            // bm.SnapshotString() and bm.LoadSnapshot(), so a bare component is
+            // exactly the dependency, and nothing more.
+            //
+            // Autosave is pinned off BEFORE the component exists rather than
+            // after, because "off for the whole lifetime" has to include the
+            // constructor.
+            Career.autosave = false;
+            if (Object.FindFirstObjectByType<BuilderManager>() == null)
+            {
+                new GameObject("BuilderManager").AddComponent<BuilderManager>();
+                Debug.Log("[WorkerBootstrap] created a headless BuilderManager");
+            }
+
             WorkerHost.Launch();
         }
 #endif
