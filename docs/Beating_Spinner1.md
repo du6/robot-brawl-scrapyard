@@ -1,5 +1,47 @@
 # Beating Spinner1 — the design log
 
+> # ⛔ EVERY RESULT BELOW THIS LINE IS AGAINST THE WRONG ROBOT — 2026-08-20
+>
+> owen went **0–3** in the real arena with `flipper_v2`, a design this
+> document scored at 75%. The records were right and the bench was wrong.
+>
+> **`ChallengeBench.CHAMPION_BUILD` was a 16-part, program-less prototype.
+> The Spinner1 on the ladder is 45 parts, 1286 kg, with SIX blades, FOUR
+> spikes, a full sensor suite (compass, rangefinder, tiltsensor, wallsensor,
+> trapsensor, dmgbus) and a REAL PROGRAM.** The bench had zero of the blades,
+> zero of the sensors, and nothing on that side driving it.
+>
+> ⚠ **AND IT HAD BEEN "VERIFIED".** The constant was byte-identical to the
+> `spinner1` in owen's LOCAL career save — checked, and it matched. The career
+> save is a stale copy on one machine; what a player fights is the ACTIVE
+> SNAPSHOT, uploaded 2026-08-16. **Verifying a fixture against the wrong
+> source of truth is the same class of error as a green endpoint with no
+> caller** — and this project has now made it twice.
+>
+> **Re-pointed at the real champion (build AND program recovered from the GCS
+> payload blob, sha256-verified against its envelope), the bench reproduces
+> the ladder exactly:**
+>
+> | design | vs the prototype | vs the REAL Spinner1 |
+> |---|---|---|
+> | `flipper_v2` | 12/4 · 75% | **0/16 · 0%** |
+> | `flipper_v4_welded` | 28/32 · 88% | **0/16 · 0%** |
+>
+> Not close. `flipper_v2` is stripped to **zero weapons in 15 of 16 bouts** and
+> loses all 24 parts in nine of them, while Spinner1 finishes with 6–10 weapons
+> alive and deals 1162–2692 damage per bout.
+>
+> **The gusset finding did not survive.** Against a real opponent, seam marks
+> on four flank blades are not the difference between winning and losing.
+>
+> The real build is committed at `docs/spinner1_ladder_build_2026-08-16.txt`
+> and is now `CHAMPION_BUILD`; `CHAMPION_PROGRAM` carries the real program.
+> **Everything below was measured before that and answers a question nobody
+> asked.** Kept because the METHOD and the two build-format traps are still
+> good; every VERDICT in it is void.
+>
+> ---
+
 **Started 2026-08-18.** A standing brief for whoever (human or agent) is trying
 to build a FEATHER machine that beats owen's champion. **This document is the
 memory of that effort**: read it before designing anything, and add to it after

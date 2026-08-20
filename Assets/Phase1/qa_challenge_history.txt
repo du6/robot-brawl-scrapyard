@@ -23,3 +23,5 @@ flipper_v3_skirt             INELIGIBLE           W/L/D 0/0/0  challenger is a L
 flipper_v3_skirt             INELIGIBLE           W/L/D 0/0/0  challenger is a LEGAL build — Structure has floating parts — Wedge at (-0.43, 0.52, -0.27) isn't flush with anything. Faces must touch; sockets must mate.
 flipper_v4_welded            BEATS SPINNER1       W/L/D 14/2/0  
 flipper_v4_confirm           BEATS SPINNER1       W/L/D 14/2/0  
+flipper_v2_vs_REAL           LOSES TO SPINNER1    W/L/D 0/16/0  
+flipper_v4_vs_REAL           LOSES TO SPINNER1    W/L/D 0/16/0  

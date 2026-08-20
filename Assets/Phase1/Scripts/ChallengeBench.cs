@@ -66,7 +66,7 @@ namespace RobotBrawl.Phase0
         // with a program bolted on would be measuring a robot that does not
         // exist.
         public const string CHAMPION_NAME = "Spinner1";
-        public const string CHAMPION_PROGRAM = "";
+        public static readonly string CHAMPION_PROGRAM = @"{""version"":2,""title"":"""",""hats"":[{""name"":"""",""note"":"""",""when"":[{""kind"":1,""cmp"":0,""value"":12.0},{""kind"":0,""cmp"":1,""value"":0.0}],""body"":[{""op"":15,""part"":0,""idx"":0,""arg"":100.0,""dur"":0.0,""rounds"":0,""target"":0,""cond"":{""kind"":0,""cmp"":0,""value"":0.0}},{""op"":16,""part"":0,""idx"":0,""arg"":100.0,""dur"":1.0,""rounds"":0,""target"":0,""cond"":{""kind"":0,""cmp"":0,""value"":0.0}}]},{""name"":"""",""note"":"""",""when"":[{""kind"":7,""cmp"":0,""value"":6.0}],""body"":[{""op"":12,""part"":0,""idx"":0,""arg"":-70.0,""dur"":1.0,""rounds"":0,""target"":0,""cond"":{""kind"":0,""cmp"":0,""value"":0.0}}]},{""name"":"""",""note"":"""",""when"":[{""kind"":13,""cmp"":0,""value"":2.200000047683716},{""kind"":0,""cmp"":1,""value"":0.0}],""body"":[{""op"":12,""part"":0,""idx"":0,""arg"":-85.0,""dur"":0.5,""rounds"":0,""target"":0,""cond"":{""kind"":0,""cmp"":0,""value"":0.0}}]},{""name"":"""",""note"":"""",""when"":[{""kind"":9,""cmp"":0,""value"":0.8999999761581421}],""body"":[{""op"":16,""part"":0,""idx"":0,""arg"":-85.0,""dur"":1.5,""rounds"":0,""target"":0,""cond"":{""kind"":0,""cmp"":0,""value"":0.0}},{""op"":15,""part"":0,""idx"":0,""arg"":100.0,""dur"":0.0,""rounds"":0,""target"":0,""cond"":{""kind"":0,""cmp"":0,""value"":0.0}}]},{""name"":"""",""note"":"""",""when"":[{""kind"":1,""cmp"":1,""value"":12.0}],""body"":[{""op"":12,""part"":0,""idx"":0,""arg"":100.0,""dur"":2.0,""rounds"":0,""target"":0,""cond"":{""kind"":0,""cmp"":0,""value"":0.0}}]}]}";
         // ⚠⚠ THIS FIXTURE IS STALE AND EVERY NUMBER THIS BENCH HAS EVER
         // PRODUCED IS AGAINST IT, NOT AGAINST THE LADDER'S SPINNER1.
         // Measured against production 2026-08-20, after owen went 0-3 in the
@@ -99,24 +99,54 @@ namespace RobotBrawl.Phase0
         //
         // UNTIL THEN: read every verdict from this bench as "beats a 16-part
         // program-less prototype", which is not the question anyone is asking.
-        public const string CHAMPION_BUILD =
-            "#fmt3-disc\n" +
-            "core|0.000,0.700,0.000|0|0.00,0.00,0.00|Aluminum\n" +
-            "beam|-0.250,0.700,0.000|0|0.00,0.00,0.00|Aluminum\n" +
-            "beam|-0.250,0.700,-0.600|0|0.00,0.00,0.00|Aluminum\n" +
-            "beam|0.250,0.700,0.000|0|0.00,0.00,0.00|Aluminum\n" +
-            "beam|0.250,0.700,-0.600|0|0.00,0.00,0.00|Aluminum\n" +
-            "wheel|0.420,0.700,0.150|0|1.00,0.00,0.00|Rubber\n" +
-            "wheel|0.420,0.700,-0.750|0|1.00,0.00,0.00|Rubber\n" +
-            "wheel|-0.420,0.700,0.150|0|-1.00,0.00,0.00|Rubber\n" +
-            "wheel|-0.420,0.700,-0.750|0|-1.00,0.00,0.00|Rubber\n" +
-            "beam|0.000,0.700,-0.450|0|0.00,0.00,0.00|Aluminum\n" +
-            "battery|0.000,0.925,-0.450|0|0.00,0.00,0.00|Aluminum\n" +
-            "spindle|0.000,1.000,0.000|0|0.00,1.00,0.00|Aluminum\n" +
-            "beam|0.000,1.250,0.000|0|0.00,0.00,0.00|Aluminum\n" +
-            "beamlong|0.000,1.250,0.800|0|0.00,0.00,0.00|Aluminum\n" +
-            "gyro|0.000,1.030,1.100|0|0.00,0.00,0.00|Aluminum\n" +
-            "spike|0.000,1.030,1.370|0|0.00,0.00,1.00|Steel\n";
+        public static readonly string CHAMPION_BUILD = @"#fmt3-disc
+#fmt4-gusset
+core|0.000,0.700,0.000|0|0.00,0.00,0.00|Aluminum
+beamlong|0.000,0.700,0.650|0|0.00,0.00,0.00|CarbonFiber
+beam|0.000,0.700,-0.450|0|0.00,0.00,0.00|CarbonFiber
+beam|-0.400,0.700,0.950|90|0.00,0.00,0.00|CarbonFiber
+beam|0.400,0.700,0.950|90|0.00,0.00,0.00|CarbonFiber
+beam|0.400,0.700,-0.600|90|0.00,0.00,0.00|CarbonFiber
+beam|-0.400,0.700,-0.600|90|0.00,0.00,0.00|CarbonFiber
+beamlong|-0.550,0.700,0.000|0|0.00,0.00,0.00|CarbonFiber
+beamlong|0.550,0.700,0.000|0|0.00,0.00,0.00|CarbonFiber|G:1
+wheel|0.380,0.700,-0.300|0|-1.00,0.00,0.00|Rubber
+wheel|0.380,0.700,0.300|0|-1.00,0.00,0.00|Rubber
+wheel|-0.380,0.700,-0.300|0|1.00,0.00,0.00|Rubber
+wheel|-0.380,0.700,0.300|0|1.00,0.00,0.00|Rubber
+wheel|0.220,0.700,0.000|0|1.00,0.00,0.00|Rubber
+wheel|-0.220,0.700,0.000|0|-1.00,0.00,0.00|Rubber
+battery|0.000,0.925,-0.300|0|0.00,0.00,0.00|Aluminum
+battery|0.000,0.975,0.000|0|0.00,0.00,0.00|Aluminum
+blade|0.400,0.700,1.110|0|0.00,0.00,1.00|CarbonFiber
+blade|-0.400,0.700,1.110|0|0.00,0.00,1.00|CarbonFiber
+spindle|0.000,0.950,0.650|0|0.00,1.00,0.00|CarbonFiber
+beam|0.000,1.200,0.650|0|0.00,0.00,0.00|CarbonFiber
+beamlong|0.000,1.200,1.450|0|0.00,0.00,0.00|CarbonFiber
+wallsensor|-0.215,0.975,0.000|0|0.00,0.00,0.00|Aluminum
+tiltsensor|-0.205,0.925,-0.300|0|0.00,0.00,0.00|Aluminum
+compass|0.225,0.975,0.000|0|0.00,0.00,0.00|Aluminum
+trapsensor|0.205,0.925,-0.300|0|0.00,0.00,0.00|Aluminum
+rangefinder|0.000,0.880,0.350|0|0.00,0.00,0.00|Aluminum
+engine|0.000,0.925,-0.750|0|0.00,0.00,0.00|Aluminum
+dmgbus|0.000,0.925,-1.055|0|0.00,0.00,0.00|Aluminum
+beam|0.000,0.925,-1.235|90|0.00,0.00,0.00|CarbonFiber
+blade|-0.160,1.200,1.600|90|-1.00,0.00,0.00|CarbonFiber
+blade|0.160,1.200,1.600|90|1.00,0.00,0.00|CarbonFiber
+beamlong|-0.550,0.900,0.000|0|0.00,0.00,0.00|CarbonFiber
+beamlong|0.550,0.900,0.000|0|0.00,0.00,0.00|CarbonFiber
+spike|-0.550,0.700,-0.850|0|0.00,0.00,-1.00|CarbonFiber
+spike|0.550,0.700,-0.850|0|0.00,0.00,-1.00|CarbonFiber
+spike|-0.150,0.925,-1.485|0|0.00,0.00,-1.00|CarbonFiber
+spike|0.150,0.925,-1.485|0|0.00,0.00,-1.00|CarbonFiber
+beam|0.400,0.925,-1.085|0|0.00,0.00,0.00|CarbonFiber
+beam|-0.400,0.925,-1.085|0|0.00,0.00,0.00|CarbonFiber
+plate|-0.680,0.850,0.150|270|0.00,0.00,0.00|CarbonFiber
+plate|0.680,0.850,0.150|270|0.00,0.00,0.00|CarbonFiber
+beam|0.000,1.200,2.250|0|0.00,0.00,0.00|CarbonFiber
+blade|-0.160,1.200,2.250|90|-1.00,0.00,0.00|CarbonFiber
+blade|0.160,1.200,2.250|90|1.00,0.00,0.00|CarbonFiber
+";
 
         public const string REQUIRED_CATEGORY = "FEATHER";
 

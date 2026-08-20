@@ -1,7 +1,7 @@
-passed 8 failed 0   verdict BEATS SPINNER1   W/L/D 14/2/0
-challenger: flipper_v4_confirm
+passed 8 failed 0   verdict LOSES TO SPINNER1   W/L/D 0/16/0
+challenger: flipper_v4_vs_REAL
       builder ready, palette 25 parts
-PASS  champion build parses (16 parts)
+PASS  champion build parses (45 parts)
 PASS  challenger build loads (24 parts)
       challenger mass 1394 kg · 24 parts · category FEATHER
 PASS  challenger is a LEGAL build
@@ -15,39 +15,38 @@ PASS  challenger carries something that can actually deal damage
 PASS  bouts were fought (16)
       
       ---- RESULT ------------------------------------------------------
-      flipper_v4_confirm vs Spinner1:  14 W / 2 L / 0 D over 16 bouts   (win rate 88%)
-      as A (spawn side 0): 8/8   as B (spawn side 1): 6/8   <- a big gap here is the SPAWN talking, not the design
-      damage dealt: 15743.8 by flipper_v4_confirm vs 10443.6 by Spinner1
-      parts lost:   30 by flipper_v4_confirm vs 195 by Spinner1
-      bouts ending with NO WEAPON LEFT: flipper_v4_confirm 1/16   Spinner1 15/16
-      mean bout length 47.6 s
+      flipper_v4_vs_REAL vs Spinner1:  0 W / 16 L / 0 D over 16 bouts   (win rate 0%)
+      as A (spawn side 0): 0/8   as B (spawn side 1): 0/8   <- a big gap here is the SPAWN talking, not the design
+      damage dealt: 10414.4 by flipper_v4_vs_REAL vs 30978.3 by Spinner1
+      parts lost:   327 by flipper_v4_vs_REAL vs 44 by Spinner1
+      bouts ending with NO WEAPON LEFT: flipper_v4_vs_REAL 15/16   Spinner1 0/16
+      mean bout length 43.2 s
       
       how the bouts ended:
-          6x  [challenger WON]  (side A, A-relative wording) KO — enemy core destroyed
-          1x  [challenger WON]  (side A, A-relative wording) Judges' decision — damage 1004 vs 1100 (8.7% margin their way) · piece
-          1x  [challenger WON]  (side A, A-relative wording) Enemy counted out — flipped onto its back — its gyro had already been 
-          4x  [challenger WON]  (side B, A-relative wording) KO — your core was destroyed
-          1x  [challenger LOST]  (side B, A-relative wording) Called early — both machines disarmed, no damage possible for 12 s · J
-          1x  [challenger WON]  (side B, A-relative wording) Judges' decision — damage 1012 vs 827 (18.3% margin your way) · pieces
-          1x  [challenger WON]  (side B, A-relative wording) Counted out — out of power — 240 kJ of its 240 kJ pack was torn off th
+          1x  [challenger LOST]  (side A, A-relative wording) Counted out — out of power — 600 kJ of its 600 kJ pack was torn off th
+          6x  [challenger LOST]  (side A, A-relative wording) KO — your core was destroyed
+          1x  [challenger LOST]  (side A, A-relative wording) Counted out — beached — 0 of 3 wheels touching the ground, so the driv
           1x  [challenger LOST]  (side B, A-relative wording) Enemy counted out — flipped onto its back with nothing aboard to right
+          1x  [challenger LOST]  (side B, A-relative wording) Judges' decision — damage 1732 vs 905 (47.7% margin your way) · pieces
+          5x  [challenger LOST]  (side B, A-relative wording) KO — enemy core destroyed
+          1x  [challenger LOST]  (side B, A-relative wording) Enemy counted out — out of power — 600 kJ of its 600 kJ pack was torn 
       
       per-bout:
-        seed 17    as A  WIN   dealt   717.7 vs   641.6   partsLost 1/16   weaponsAlive 4/0   t=23.8s  hits=29
-        seed 555   as A  WIN   dealt  1004.1 vs  1099.9   partsLost 4/8   weaponsAlive 1/0   t=92.7s  hits=57
-        seed 909   as A  WIN   dealt  1407.9 vs   688.2   partsLost 1/16   weaponsAlive 4/0   t=41.7s  hits=39
-        seed 1234  as A  WIN   dealt   640.3 vs   186.7   partsLost 0/7   weaponsAlive 5/0   t=21.7s  hits=24
-        seed 4242  as A  WIN   dealt  1356.5 vs   410.5   partsLost 0/16   weaponsAlive 5/0   t=26.4s  hits=28
-        seed 31337 as A  WIN   dealt  1171.4 vs  1087.9   partsLost 3/16   weaponsAlive 2/0   t=44.3s  hits=47
-        seed 8675  as A  WIN   dealt   973.4 vs   414.5   partsLost 1/16   weaponsAlive 4/0   t=36.7s  hits=58
-        seed 2718  as A  WIN   dealt  1177.2 vs    57.7   partsLost 0/16   weaponsAlive 5/0   t=22.4s  hits=16
-        seed 17    as B  WIN   dealt  1070.6 vs   313.4   partsLost 1/16   weaponsAlive 4/0   t=30.4s  hits=17
-        seed 555   as B  WIN   dealt  1000.2 vs   594.4   partsLost 0/16   weaponsAlive 5/0   t=29.5s  hits=31
-        seed 909   as B  LOSS  dealt   255.6 vs  1669.0   partsLost 11/2   weaponsAlive 0/0   t=85.5s  hits=49
-        seed 1234  as B  WIN   dealt   826.9 vs  1012.1   partsLost 1/9   weaponsAlive 5/0   t=91.9s  hits=34
-        seed 4242  as B  WIN   dealt  1383.3 vs   619.0   partsLost 0/16   weaponsAlive 5/0   t=42.5s  hits=33
-        seed 31337 as B  WIN   dealt  1422.6 vs   309.4   partsLost 0/16   weaponsAlive 5/0   t=72.2s  hits=31
-        seed 8675  as B  WIN   dealt  1219.6 vs   330.4   partsLost 1/9   weaponsAlive 5/0   t=76.3s  hits=29
-        seed 2718  as B  LOSS  dealt   116.5 vs  1008.9   partsLost 6/0   weaponsAlive 4/1   t=23.2s  hits=18
+        seed 101   as A  LOSS  dealt   517.8 vs  1898.7   partsLost 12/3   weaponsAlive 0/8   t=52.9s  hits=53
+        seed 202   as A  LOSS  dealt   313.2 vs  2188.5   partsLost 24/3   weaponsAlive 0/7   t=22.8s  hits=73
+        seed 303   as A  LOSS  dealt   534.2 vs  1429.7   partsLost 24/3   weaponsAlive 0/8   t=20.4s  hits=52
+        seed 404   as A  LOSS  dealt   697.1 vs  2525.2   partsLost 17/4   weaponsAlive 1/7   t=39.4s  hits=77
+        seed 505   as A  LOSS  dealt   618.1 vs  1427.8   partsLost 24/1   weaponsAlive 0/9   t=19.7s  hits=51
+        seed 606   as A  LOSS  dealt   552.3 vs  2087.5   partsLost 24/5   weaponsAlive 0/6   t=31.2s  hits=53
+        seed 707   as A  LOSS  dealt   783.7 vs   544.1   partsLost 24/2   weaponsAlive 0/8   t=31.1s  hits=42
+        seed 808   as A  LOSS  dealt   660.8 vs  2657.1   partsLost 24/2   weaponsAlive 0/9   t=25.8s  hits=99
+        seed 101   as B  LOSS  dealt   510.5 vs  2290.4   partsLost 12/1   weaponsAlive 0/10   t=55.8s  hits=51
+        seed 202   as B  LOSS  dealt   905.3 vs  1732.2   partsLost 11/4   weaponsAlive 0/8   t=92.8s  hits=75
+        seed 303   as B  LOSS  dealt   698.5 vs  2416.5   partsLost 24/2   weaponsAlive 0/9   t=83.8s  hits=56
+        seed 404   as B  LOSS  dealt  1457.4 vs  2118.8   partsLost 24/7   weaponsAlive 0/7   t=38.5s  hits=77
+        seed 505   as B  LOSS  dealt   669.0 vs  2225.4   partsLost 11/4   weaponsAlive 0/7   t=49.6s  hits=64
+        seed 606   as B  LOSS  dealt   548.0 vs  2189.1   partsLost 24/0   weaponsAlive 0/10   t=60.3s  hits=55
+        seed 707   as B  LOSS  dealt   660.9 vs  2127.0   partsLost 24/2   weaponsAlive 0/8   t=38.4s  hits=71
+        seed 808   as B  LOSS  dealt   287.5 vs  1120.5   partsLost 24/1   weaponsAlive 0/9   t=28.0s  hits=32
       
-      VERDICT: BEATS SPINNER1   (88% win rate over 16 bouts)
+      VERDICT: LOSES TO SPINNER1   (0% win rate over 16 bouts)
