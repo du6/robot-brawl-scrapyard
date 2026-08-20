@@ -1300,3 +1300,75 @@ and is still not committed — the same debt, handed on again, with the note
 that the two rules worth having are `Touching`'s "≤0.03 m on all three axes
 and flush on at least one" and the fact that gusset mass is **10 kg per welded
 FACE**, not per part.
+
+---
+
+# The real search — 2026-08-20, against the ACTUAL Spinner1
+
+Everything above this heading was measured against the wrong robot. This
+section is the first work done against the champion recovered from GCS.
+
+## What Spinner1 actually does
+
+Its program decodes to five hats:
+
+| when | then |
+|---|---|
+| `EnemyRange < 12` | weapon on, **drive TOWARD** for 1 s |
+| `EdgeDist < 6` (wall sensor) | back off 70% |
+| `TrapDist < 2.2` | back off 85% |
+| **`HpFrac < 0.9`** | **drive AWAY 85% for 1.5 s**, weapon stays on |
+| `EnemyRange > 12` | close at 100% |
+
+⚠ **Hat 4 is the whole fight.** It lands a hit, retreats to re-spin, comes
+back. A challenger that cannot follow a retreating opponent never gets a
+second exchange — and `flipper_v2` carries **no sensors at all**, so it
+cannot follow anything. It is blind against a robot with six senses.
+
+## Measured
+
+| design | build | program | result |
+|---|---|---|---|
+| `flipper_v2` | 24 parts, 1394 kg | none | **0/16 · 0%** |
+| `flipper_v4_welded` | 24 parts | none | **0/16 · 0%** |
+| **`hunter_v1`** | **25 parts, 1182 kg** (+compass, rails to CarbonFiber) | chase | **6W 7L 3D · 38%** |
+| `hunter_v3` | same build | chase + withdraw < 2.5 m | 6W 8L 2D · 38% |
+
+**A compass and two lines of program took a design from losing every bout to
+nearly even.** The mechanism, not the score, is the finding:
+
+| | blind `flipper_v2` | `hunter_v1` |
+|---|---|---|
+| parts lost per bout | 24 in 9 of 16 | **1–3** |
+| weapons alive at the end | 0 | **4 of 5** |
+| damage taken | 1162–2692 | **200–630** |
+| how bouts end | shredded in 20–60 s | **run the full 92 s to judges** |
+
+`hunter_v3`'s withdraw refinement changed nothing (6/8/2 vs 6/7/3 — noise).
+**The gain is entirely the chase**; a standing order to close is what denies
+Spinner1 its hit-and-run. Do not spend more effort on retreat tactics.
+
+## What is still missing
+
+Fourteen of sixteen bouts now go the distance and are decided on DAMAGE, and
+`hunter_v1` deals 100–570 against Spinner1's 200–630. It survives; it cannot
+kill. **The remaining gap is offence, and there are 318 kg of FEATHER
+headroom to spend on it** — which is the next experiment, not more program.
+
+## ⚠ Traps, all paid for in failed runs
+
+1. **SENSOR PARTS GATE PROGRAM CONDITIONS.** `HpFrac` was refused outright:
+   *"hat 2 (breakoff): needs a Damage bus — SHOP"*. A program is not free —
+   every WHEN costs a part and the mass to carry it. With a compass alone you
+   get `Always`, `EnemyRange`, `EnemyBearingAbs`; `HpFrac`/`PowerFrac` need a
+   `dmgbus`, `EdgeDist` a wall sensor, `TrapDist` a trap sensor, `Flipped` a
+   tilt sensor. **Spinner1 carries all of them, which is why its program can
+   be that good.**
+2. **PLACEMENT IS NOT GUESSABLE.** Three runs died on *"isn't flush with
+   anything"* — a wedge at a blade's exact coordinates, a wedge at ±0.62, a
+   dmgbus between the engines. The one that DID mate (compass at
+   `0,0.405,0.060`) worked because a rail sits under it at z≈0. **Add parts
+   only above existing structure, or expect to pay a run to find out.**
+3. **SWAPPING PART TYPES IS NEVER MASS-NEUTRAL** — four Ti wedges for four Ti
+   blades pushed FEATHER into LIGHT. Conversely, dropping two Titanium rails
+   to CarbonFiber freed 212 kg, which is what paid for the compass.
