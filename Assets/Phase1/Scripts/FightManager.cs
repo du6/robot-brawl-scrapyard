@@ -369,6 +369,26 @@ public class FightManager : MonoBehaviour
         // --- shoving deadlock: a referee break, never a one-sided loss ---
         TickShove(dt);
 
+        // --- RING-OUT: thrown clean out of the arena (owen, 2026-08-20) ---
+        // ⚠ CHECKED BEFORE THE COUNT-OUT, and that order is the point. A bot in
+        // the void is falling, so it is neither flipped-and-slow nor immobile —
+        // Incap() cannot see it and no count ever starts. It keeps full HP,
+        // the clock runs the remaining minute out over an empty arena, and the
+        // fight is decided by JUDGES on damage. owen hit exactly that: his
+        // flipper threw Spinner1 out at 1:01 with both bots healthy and the
+        // view stuck on nothing.
+        //
+        // The arena is walled to 1.5 m with an invisible barrier to 6 m, added
+        // 2026-07-30 for precisely this ("throw it clean out of the arena").
+        // That barrier was tall enough for the throws that existed then; a
+        // Tungsten-tipped pivot clears it. Raising the barrier is the other
+        // half of this fix and is owen's call — but the referee must not hang
+        // on a fight that is over however the bot got out.
+        bool pGone = OutOfArena(player), eGone = OutOfArena(enemy);
+        if (pGone && eGone) { End(Outcome.Draw, "Both bots left the arena"); return; }
+        if (eGone) { End(Outcome.PlayerWin, "Ring-out — you threw " + enemy.label + " clean out of the arena"); return; }
+        if (pGone) { End(Outcome.PlayerLoss, "Ring-out — you were thrown clean out of the arena"); return; }
+
         // --- count-out (both sides, decided TOGETHER) ---
         // Round-3 fix 1: the old code ticked the player first and returned on
         // any state change, so a genuinely symmetric stall always resolved
@@ -505,6 +525,31 @@ public class FightManager : MonoBehaviour
     /// <summary>Per-side count-out tick. Returns TRUE on the frame the count
     /// hits zero; the caller decides the outcome so a symmetric stall is a draw
     /// rather than a loss for whoever is evaluated first.</summary>
+    /// <summary>Has this side left the arena for good?
+    ///
+    /// The floor is a Plane covering the arena and nothing else, so outside
+    /// the walls there is no ground at all — a bot that clears the barrier
+    /// falls forever. Before this existed NOTHING in the whole fight watched
+    /// height or bounds, which is why such a fight could only end at the
+    /// timer.
+    ///
+    /// ⚠ THE HEIGHT TEST IS THE LOAD-BEARING ONE, not the horizontal one. A
+    /// bot inside the arena can never be 2 m BELOW the floor, so `y &lt; -2`
+    /// cannot false-positive no matter how violent the fight gets; a bot that
+    /// is out reaches it within about 0.6 s of falling. The horizontal test is
+    /// a belt-and-braces catch for a bot that somehow comes to rest outside
+    /// without falling, and is deliberately generous (HALF + 2) so that
+    /// clipping a wall or resting ON one is never mistaken for a ring-out —
+    /// resting on a wall is "beached", which the count-out already owns.</summary>
+    bool OutOfArena(Side s)
+    {
+        if (s.bot == null || s.bot.rb == null) return false;
+        Vector3 p = s.bot.rb.position;
+        if (p.y < -2f) return true;
+        float edge = BuilderManager.ARENA_HALF + 2f;
+        return Mathf.Abs(p.x) > edge || Mathf.Abs(p.z) > edge;
+    }
+
     bool TickCountOut(Side s, float dt)
     {
         if (s.bot == null) return false;
