@@ -1491,3 +1491,67 @@ physically motivated, both are constants, and neither makes a rotor unfun —
 they make it a *choice* rather than the answer. **Do not stack them with 4**;
 one variable at a time, and this harness now fights the real champion, so it
 can actually tell.
+
+---
+
+# 🔬 The sweep — what actually makes a non-rotor win, 2026-08-20
+
+Every row: same champion (the real 45-part programmed Spinner1), same eight
+seeds, both spawn sides, 16 bouts, FEATHER, no spindle.
+
+| # | design | one Tungsten part | compass + program | result |
+|---|---|---|---|---|
+| 1 | `flipper_v2` | — | — | **0/16 · 0%** |
+| 2 | `flipper_v4_welded` | — | — | 0/16 · 0% |
+| 3 | `iso_A2` | **on the nose** | — | **1/15 · 6%** |
+| 4 | `hunter_v1` | — | **yes** | **6W 7L 3D · 38%** |
+| 5 | `iso_B` | on a **flank** | yes | **8W 5L 3D · 50%** |
+| 6 | **`hunter_v6`** | **on the nose** | **yes** | **15W 0L 1D · 94%** ×2 seed sets |
+| — | `bulwark_v1` (ROTOR, for scale) | — | — | 12/4 · 75% |
+
+## Three findings, and none of them is "add damage"
+
+**1. The ingredients are not additive — they multiply.** Tungsten alone is
+6%. Compass-and-program alone is 38%. Together they are **94%**. Neither is
+worth much without the other, so a player who tries either one in isolation
+learns the wrong lesson and stops.
+
+**2. Armour only counts if you can aim it.** One Tungsten part on the NOSE
+is 94%; the SAME part moved to a flank is **50%**; blind with it on the nose
+is **6%**. The Tungsten is a single hard face, so it only pays while the
+robot keeps that face to the enemy — which is precisely what the compass and
+the standing chase buy. The program is not there to be clever, it is there
+to keep the shield pointed.
+
+**3. The win is DEFENSIVE and quiet.** `hunter_v6` deals a modest 117–633 a
+bout — less than `hunter_v1` sometimes does. What changed is what it takes:
+Spinner1's damage into it falls from 200–630 to **59–370**, it loses 0–2
+parts instead of 1–3, and every bout runs the full 92 s to a judges'
+decision won on a 2–4× ratio. **It never out-hits the rotor. It just refuses
+to be hurt and wins on points.**
+
+## And a coupling worth keeping in the game
+
+⚠ **A Tungsten wedge does not fit on a Titanium-railed chassis.** The first
+attempt landed in LIGHT; `hunter_v6` only fits because its rails were
+dropped to CarbonFiber first (1394 → 1182 kg, then 1338 with the Tungsten).
+Six Tungsten parts blow the class outright. So the counter costs a real
+trade: **lighten the frame to afford one hard face.** That is good design
+tension and should survive any balance change.
+
+## The economy is where the balance problem actually lives
+
+The counter-play exists, replicates, and beats the rotor's own 75%. But:
+
+| | |
+|---|---|
+| Tungsten wedge | **1737 scrap** |
+| Titanium wedge | 203 scrap |
+| Season **1st place** | 1000 scrap |
+| Single-player league ceiling (lifetime) | 13,850 scrap |
+
+**One part of the counter costs more than winning the season.** A player who
+cannot reach Tungsten experiences rotors as unbeatable — exactly what owen
+reported — while a player who can flips the matchup to 94%. Before touching
+rotor power or self-damage, the question to answer is whether Tungsten is
+reachable at all on current earnings.

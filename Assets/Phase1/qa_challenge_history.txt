@@ -34,3 +34,6 @@ bulwark_SPINDLE_control      BEATS SPINNER1       W/L/D 12/4/0
 hunter_v5_tungsten           INELIGIBLE           W/L/D 0/0/0  challenger is in the champion's class (FEATHER), got LIGHT
 hunter_v6_tungsten_nose      BEATS SPINNER1       W/L/D 15/0/1  
 hunter_v6_confirm            BEATS SPINNER1       W/L/D 15/0/1  
+iso_A_tungsten_blind         INELIGIBLE           W/L/D 0/0/0  challenger is in the champion's class (FEATHER), got LIGHT
+iso_A2_tungsten_blind        LOSES TO SPINNER1    W/L/D 1/15/0  
+iso_B_tungsten_flank         BEATS SPINNER1       W/L/D 8/5/3  
