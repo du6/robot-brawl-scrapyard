@@ -75,6 +75,16 @@ namespace RobotBrawl.Phase0
     public class MyRobot
     {
         public string id = "", name = "", activeSnapshotId = "", category = "";
+        /// <summary>⚠ THE SERVER HAS ALWAYS SENT THIS AND THE CLIENT NEVER READ
+        /// IT (fixed 2026-08-19). GET /v1/robots returns `retired` on every row;
+        /// MyRobots parsed id/name/activeSnapshotId/category/snapshotStatus and
+        /// dropped it on the floor. That was harmless while nothing could
+        /// retire a robot — and the moment RETIRE shipped it became the reason
+        /// a retired robot sat in the list forever reading "waiting to be
+        /// checked": retiring supersedes the ACTIVE snapshot, and StatusText
+        /// treated SUPERSEDED as "the worker has yet to speak". The client
+        /// could not tell the two apart because it never had the field.</summary>
+        public bool retired;
         public bool CanFight { get { return !string.IsNullOrEmpty(activeSnapshotId); } }
 
         /// <summary>Status of the LATEST snapshot, whatever it is — "PENDING",
@@ -121,6 +131,10 @@ namespace RobotBrawl.Phase0
         {
             get
             {
+                // Retired is checked FIRST. A retired robot has no ACTIVE
+                // snapshot and its latest is SUPERSEDED, so every branch below
+                // would answer something that is true of a different situation.
+                if (retired) return "retired \u2014 re-enlist to bring it back";
                 if (CanFight) return category;
                 if (Rejected)
                     return failReasons.Count > 0 && !string.IsNullOrEmpty(failReasons[0])
@@ -448,25 +462,41 @@ namespace RobotBrawl.Phase0
                 yield return Send(req);
                 if (req.result != UnityWebRequest.Result.Success)
                 { LastError = req.error; done(null, req.error); yield break; }
-                var rows = new List<MyRobot>();
-                // A BARE top-level array, unlike every other endpoint here.
-                foreach (string obj in Objects(req.downloadHandler.text, null))
-                {
-                    var m = new MyRobot
-                    {
-                        id = RobotWorker.Field(obj, "id") ?? "",
-                        name = RobotWorker.Field(obj, "name") ?? "",
-                        activeSnapshotId = RobotWorker.Field(obj, "activeSnapshotId") ?? "",
-                        category = RobotWorker.Field(obj, "category") ?? "",
-                        snapshotStatus = RobotWorker.Field(obj, "snapshotStatus") ?? "",
-                    };
-                    // Same helper the scouting card uses for partsManifest — a
-                    // real JSON array, not a quoted string, so no second parse.
-                    m.failReasons.AddRange(StringArray(obj, "failReasons"));
-                    rows.Add(m);
-                }
-                done(rows, null);
+                done(ParseMyRobots(req.downloadHandler.text), null);
             }
+        }
+
+        /// <summary>Rows of GET /v1/robots. A BARE top-level array, unlike every
+        /// other endpoint here.
+        ///
+        /// ⚠ EXTRACTED SO IT CAN BE TESTED WITHOUT A SERVER (2026-08-19). It
+        /// was inline in the coroutine, which meant the only way to exercise it
+        /// was a live round trip — and it silently dropped `retired` for as long
+        /// as that field existed. Nothing noticed until RETIRE shipped and a
+        /// retired robot sat in the list reading "waiting to be checked". A
+        /// parser that can only be reached over the network is a parser nothing
+        /// checks.</summary>
+        public static List<MyRobot> ParseMyRobots(string body)
+        {
+            var rows = new List<MyRobot>();
+            foreach (string obj in Objects(body, null))
+            {
+                var m = new MyRobot
+                {
+                    id = RobotWorker.Field(obj, "id") ?? "",
+                    name = RobotWorker.Field(obj, "name") ?? "",
+                    activeSnapshotId = RobotWorker.Field(obj, "activeSnapshotId") ?? "",
+                    category = RobotWorker.Field(obj, "category") ?? "",
+                    snapshotStatus = RobotWorker.Field(obj, "snapshotStatus") ?? "",
+                    // JSON true/false arrives as text through Field().
+                    retired = (RobotWorker.Field(obj, "retired") ?? "") == "true",
+                };
+                // Same helper the scouting card uses for partsManifest — a real
+                // JSON array, not a quoted string, so no second parse.
+                m.failReasons.AddRange(StringArray(obj, "failReasons"));
+                rows.Add(m);
+            }
+            return rows;
         }
 
         /// <summary>Take a robot off the ladder: its rating rows are deleted,

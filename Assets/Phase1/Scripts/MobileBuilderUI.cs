@@ -3247,12 +3247,22 @@ public class MobileBuilderUI : MonoBehaviour
             eb.GetComponent<Image>().color = new Color(0.20f,0.45f,0.65f,1f);
         }
 
-        if (arenaScreen.MyRobots.Count > 0)
+        // ⚠ A RETIRED ROBOT IS NOT "ALREADY ON THE LADDER", and listing it there
+        // is the bug owen hit: retire a robot and its row stayed put, reading
+        // "waiting to be checked" forever. Two causes, both now fixed — the
+        // client never parsed the server's `retired` flag (see MyRobot), and
+        // this list showed every robot the account has ever owned rather than
+        // the ones actually enlisted. The row disappearing IS the feedback that
+        // the retire worked; re-enlisting under the same name brings it back.
+        var onLadder = new List<MyRobot>();
+        foreach (var m in arenaScreen.MyRobots) if (!m.retired) onLadder.Add(m);
+        int retiredCount = arenaScreen.MyRobots.Count - onLadder.Count;
+        if (onLadder.Count > 0)
         {
             var t = MkText("enlistmine", arenaAccountContent, "already on the ladder:", 13, TextAnchor.MiddleLeft);
             t.color = new Color(0.70f, 0.76f, 0.86f);
             t.gameObject.AddComponent<LayoutElement>().minHeight = 20f;
-            foreach (var m in arenaScreen.MyRobots)
+            foreach (var m in onLadder)
             {
                 // ⚠ EACH ROW IS NOW A ROW, not a line of text: the label and a
                 // RETIRE button side by side. Until 2026-08-19 there was no way
@@ -3302,7 +3312,11 @@ public class MobileBuilderUI : MonoBehaviour
             }
             var retirenote = MkText("retirenote", arenaAccountContent,
                 "RETIRE takes a robot off the board and deletes its rating. "
-                + "re-enlisting under the same name brings it back at a fresh placement.",
+                + "re-enlisting under the same name brings it back at a fresh placement."
+                + (retiredCount > 0
+                    ? "\n" + retiredCount + " retired robot" + (retiredCount == 1 ? " is" : "s are")
+                      + " not shown \u2014 enlist that name again to bring it back."
+                    : ""),
                 11, TextAnchor.UpperLeft);
             retirenote.color = new Color(0.62f, 0.68f, 0.78f);
             retirenote.gameObject.AddComponent<LayoutElement>().minHeight = 30f;
