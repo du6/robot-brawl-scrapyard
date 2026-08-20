@@ -1130,10 +1130,17 @@ namespace RobotBrawl.Phase0
             {
                 var eligible = EligibleFor(card);
                 myPick = Mathf.Clamp(myPick, 0, eligible.Count - 1);
-                GUILayout.BeginHorizontal();
-                for (int i = 0; i < eligible.Count && i < 4; i++)
+                // ⚠ NO CAP. This carried the same `i < 4` as the dock and hid
+                // the same robots — with five eligible, the fifth was drawn
+                // nowhere and announced nowhere (owen, 2026-08-20). This
+                // renderer wraps instead: IMGUI has no mask to fight, so the
+                // honest thing is simply to draw them all.
+                for (int i = 0; i < eligible.Count; i++)
+                {
+                    if (i % 4 == 0) GUILayout.BeginHorizontal();
                     if (GUILayout.Toggle(myPick == i, eligible[i].name, GUI.skin.button)) myPick = i;
-                GUILayout.EndHorizontal();
+                    if (i % 4 == 3 || i == eligible.Count - 1) GUILayout.EndHorizontal();
+                }
 
                 int gapUp = GapForPick(card);
                 if (!pending)

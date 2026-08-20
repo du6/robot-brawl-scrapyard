@@ -218,6 +218,23 @@ public class MobileBuilderUI : MonoBehaviour
     GameObject arenaCardRoot;
     Transform arenaCardContent;
     string arenaCardStamp = "";
+    /// <summary>Is the challenger picker expanded? Collapsed it is one row
+    /// naming the current pick; expanded it lists EVERY eligible robot.
+    ///
+    /// This replaced a row of buttons hard-capped at four (owen, 2026-08-20).
+    /// With five eligible robots the fifth was not rendered at all and nothing
+    /// said so — a robot you own, ACTIVE and legal, simply unreachable. The
+    /// server returns robots OLDEST FIRST, so the one silently dropped was
+    /// always the one you had just enlisted.
+    ///
+    /// ⚠ Deliberately NOT a UnityEngine.UI.Dropdown. There is no Dropdown
+    /// anywhere in this project, and this card sits inside a ScrollRect whose
+    /// viewport carries a Mask — a popup list is exactly what a mask clips,
+    /// and no bench here asks whether one control is drawn on top of another
+    /// (TEST DRIVE shipped with its bottom 55% eaten by a viewport). Rows in
+    /// the existing vertical layout cannot be clipped by anything the ladder
+    /// rows are not already clipped by.</summary>
+    bool arenaPickOpen;
     // Surface 3: MY FIGHTS and the replay launcher.
     GameObject arenaInboxRoot, arenaCatRow;
     Transform arenaInboxContent;
@@ -3519,10 +3536,16 @@ public class MobileBuilderUI : MonoBehaviour
         var card = arenaScreen.Card;
         if (card == null) return;
 
-        // Rebuild only on a real change: the card, the pick, the confirm step
-        // and the wallet are the whole of its state.
+        // Rebuild only on a real change: the card, the pick, the confirm step,
+        // the wallet and WHETHER THE PICKER IS OPEN are the whole of its state.
+        // ⚠ arenaPickOpen belongs here. Both toggle sites also clear the stamp
+        // by hand, so the UI works without it — but a rebuild key that omits a
+        // field it renders from is the kind of thing that survives until
+        // someone adds a third way to open the picker and cannot see why it
+        // does not redraw.
         string stamp = card.snapshotId + "|" + arenaScreen.Pick + "|" + arenaScreen.Pending
-                     + "|" + arenaScreen.Balance + "|" + arenaScreen.MyRobots.Count;
+                     + "|" + arenaScreen.Balance + "|" + arenaScreen.MyRobots.Count
+                     + "|" + arenaPickOpen;
         if (stamp == arenaCardStamp) return;
         arenaCardStamp = stamp;
 
@@ -3569,23 +3592,54 @@ public class MobileBuilderUI : MonoBehaviour
         {
             var eligible = arenaScreen.EligibleFor(card);
 
-            // Which of yours answers. One row of buttons, capped at four —
-            // past that the row stops being tappable and starts being a list.
-            var pickRow = MkPanel("cardpicks", arenaCardContent, new Color(0f,0f,0f,0f));
-            var prle = pickRow.AddComponent<LayoutElement>();
-            prle.flexibleHeight = 0f; prle.minHeight = TouchRow(); prle.preferredHeight = TouchRow();
-            var prh = pickRow.AddComponent<HorizontalLayoutGroup>();
-            prh.spacing = 3f; prh.childForceExpandWidth = true; prh.childForceExpandHeight = true;
-            for (int i = 0; i < eligible.Count && i < 4; i++)
+            // ---- WHICH OF YOURS ANSWERS -------------------------------------
+            // A disclosure row, not a row of buttons: collapsed it names the
+            // current pick, expanded it lists EVERY eligible robot. See
+            // arenaPickOpen for why this is not a Dropdown.
+            //
+            // ⚠ NOTHING IS EVER TRUNCATED HERE. The previous version drew
+            // `i < eligible.Count && i < 4` and drew NO indication that a
+            // fifth existed, so the robot you had just enlisted was invisible
+            // and unreachable. If a cap is ever reintroduced it must SAY so.
+            int picked = Mathf.Clamp(arenaScreen.Pick, 0, Mathf.Max(0, eligible.Count - 1));
+            string pickedName = eligible.Count > 0 ? eligible[picked].name : "none";
+
+            var headGO = MkButton("cardpickhead", arenaCardContent,
+                (arenaPickOpen ? "▾  " : "▸  ") + "fielding: " + pickedName
+                + (eligible.Count > 1 ? "   ·   " + eligible.Count + " eligible" : ""), 13,
+                () => { arenaPickOpen = !arenaPickOpen; arenaCardStamp = ""; });
+            var hle = headGO.gameObject.AddComponent<LayoutElement>();
+            hle.flexibleHeight = 0f; hle.minHeight = TouchRow(); hle.preferredHeight = TouchRow();
+            var himg = headGO.GetComponent<Image>();
+            if (himg != null) himg.color = new Color(0.16f,0.17f,0.21f,1f);
+            var htx = headGO.GetComponentInChildren<Text>();
+            if (htx != null) htx.color = new Color(0.86f,0.90f,0.98f);
+
+            if (arenaPickOpen)
             {
-                int idx = i;
-                bool on = i == Mathf.Clamp(arenaScreen.Pick, 0, eligible.Count - 1);
-                var pb = MkButton("cardpick_" + i, pickRow.transform, eligible[i].name, 13,
-                                  () => { if (arenaScreen != null) { arenaScreen.SetPick(idx); arenaCardStamp = ""; } });
-                var pimg = pb.GetComponent<Image>();
-                if (pimg != null) pimg.color = on ? new Color(0.20f,0.45f,0.65f,1f) : new Color(0.16f,0.17f,0.21f,1f);
-                var pt = pb.GetComponentInChildren<Text>();
-                if (pt != null) pt.color = on ? Color.white : new Color(0.72f,0.78f,0.88f);
+                for (int i = 0; i < eligible.Count; i++)
+                {
+                    int idx = i;
+                    bool on = i == picked;
+                    var pb = MkButton("cardpick_" + i, arenaCardContent,
+                                      (on ? "✓  " : "     ") + eligible[i].name
+                                      + "   ·   " + eligible[i].category, 13,
+                                      () => {
+                                          if (arenaScreen != null) arenaScreen.SetPick(idx);
+                                          arenaPickOpen = false;      // collapse on choose
+                                          arenaCardStamp = "";
+                                      });
+                    var ple = pb.gameObject.AddComponent<LayoutElement>();
+                    ple.flexibleHeight = 0f; ple.minHeight = TouchRow(); ple.preferredHeight = TouchRow();
+                    var pimg = pb.GetComponent<Image>();
+                    if (pimg != null) pimg.color = on ? new Color(0.20f,0.45f,0.65f,1f) : new Color(0.13f,0.14f,0.18f,1f);
+                    var pt = pb.GetComponentInChildren<Text>();
+                    if (pt != null)
+                    {
+                        pt.color = on ? Color.white : new Color(0.72f,0.78f,0.88f);
+                        pt.alignment = TextAnchor.MiddleLeft;
+                    }
+                }
             }
 
             int gapUp = arenaScreen.GapForPick(card);
