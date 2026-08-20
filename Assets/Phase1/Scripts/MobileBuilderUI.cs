@@ -3655,7 +3655,30 @@ public class MobileBuilderUI : MonoBehaviour
     void SetArenaStatus(string s)
     {
         if (arenaStatus == null) return;
-        arenaStatus.text = Debug.isDebugBuild ? s + "   ·   [dev] " + LadderClient.BaseUrl : s;
+        // ⚠ THIS USED TO KEY ON Debug.isDebugBuild, WHICH IS THE WRONG QUESTION
+        // AND NEARLY COST TWO TESTERS A PRODUCTION ACCOUNT EACH.
+        //
+        // The badge read "[dev]" and players read that as "this is the dev
+        // SERVER". It never meant that — it meant "this is a development
+        // RUNTIME". On a simulator those come apart completely: Unity ships
+        // ONE simulator runtime per arch, the development one, so
+        // Debug.isDebugBuild is TRUE even on a verified RELEASE sim build
+        // (measured 2026-08-12). A prod-pointed simulator therefore printed
+        // "[dev] https://rb-api-…run.app": the badge said dev, the URL said
+        // production, and the badge is what people believe.
+        //
+        // It now reports the thing it was always read as: WHICH SERVER. Not
+        // production → say so, with the URL. Production → say nothing, which is
+        // what a shipped release build already showed, so a player is still
+        // never shown a URL (ARENA_Judged_2026-08-10 §2.3).
+        //
+        // Consequence worth stating: a PROD-POINTED SIMULATOR NOW LOOKS EXACTLY
+        // LIKE PRODUCTION, because as far as anything on screen goes it IS
+        // production. Build identity on a simulator comes from artifacts —
+        // bundle path, boot.config, process lineage — never from the screen.
+        arenaStatus.text = LadderClient.IsProduction
+            ? s
+            : s + "   ·   [dev server] " + LadderClient.BaseUrl;
         arenaStatus.color = new Color(0.80f, 0.88f, 1f);
     }
 
