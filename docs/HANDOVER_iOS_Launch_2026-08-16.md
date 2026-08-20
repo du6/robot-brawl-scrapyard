@@ -21,6 +21,7 @@ at "debug-signed .aab + .apk built, no Play Console yet".
 | Build 8 delivery UUID | `88fa136d-aa0b-4dd3-9b04-d2f90d4f80e0` |
 | **Build 12 (TestFlight only)** | `262f6fda-e6a3-4f9a-a9f0-004c16684eda`, 2026-08-19. First client with **no SELL button**. **DELIBERATELY NOT SWAPPED INTO 1.0** — build 11 keeps its place in review. In the Family internal group, compliance answered. ⚠ Apple **auto-adds** builds to an INTERNAL group once processing and compliance are done; an explicit `POST betaGroups/{id}/relationships/builds` is refused 422 "Cannot add internal group to a build". If a build looks absent from the group, wait rather than assign it |
 | **Build 11 delivery UUID** | `829d29a4-0a83-4fb2-8e79-d8bf649c3752` — submitted `2026-08-19T18:05:49Z`, review submission `458395f5-9c3c-41fb-ba96-86e59ea05e8f`. Adds the RETIRE control against the endpoint deployed the same day; still `GUSSET_SEAM_MULT = 4`. **SECOND queue reset of 08-19** — build 10 had waited 5.5 h and that was discarded, owen's call, knowingly. ⚠ **The RETIRE button has never run in a player**: it was driven through its real `onClick` in the editor and both states rendered, and that is the whole of the evidence |
+| **Build 13 delivery UUID** | `b973cd41-f865-460b-a918-7bc470727106` — uploaded `2026-08-19T20:46Z`, build id is the same UUID. Encryption answered via `PATCH /v1/builds/{id} usesNonExemptEncryption=false`; `internalBuildState: IN_BETA_TESTING`, identical to build 12. **TestFlight ONLY — the in-review 1.0 still carries build 11.** Carries the arena-pays-by-season client half (`0eb8729`), the retire fix (`f603610`) and the `[dev]` badge fix (`2256c3a`) |
 | **Build 10 delivery UUID** | `1d6e0c31-ce05-42a3-a53c-0c8de8f68732` — submitted `2026-08-19T05:05:33Z`, review submission `ff88eef4-4343-4de2-999a-52f00191fc9c`. ✅ **The whole §1 swap procedure below can be driven through the ASC API instead of the web UI** — validate/upload with `altool`, `PATCH builds/{id} usesNonExemptEncryption=false`, `PATCH reviewSubmissions/{id} canceled=true`, `PATCH appStoreVersions/{id}/relationships/build`, then POST a new submission + item and `PATCH submitted=true`. Answer encryption BEFORE cancelling; that keeps the no-submission window to seconds. Done once, 08-18 |
 
 **Why build 8 and not 7:** build 7 was originally submitted; it carries the
@@ -167,7 +168,8 @@ write to on production. Everything else refuses:
 Auto-mode covers this end-to-end; the human checkpoints are red benches and
 the review-swap decision.
 
-1. **Verify first**: PlaytestBench (43), TouchSmoke (55), plus whatever the
+1. **Verify first**: PlaytestBench (43), TouchSmoke (**53 as of build 13**, not
+   55 — see the note below), plus whatever the
    change touches — ONE AT A TIME. Career-save fingerprint before and after.
 2. Bump: `PlayerSettings.iOS.buildNumber = "9"` (+ SaveAssets). Confirm
    `RB_DEV_SERVER` absent from iOS defines.
@@ -194,6 +196,23 @@ the review-swap decision.
 5. TestFlight: answer encryption for the new build. If it should replace an
    in-review build, §1's swap procedure.
 6. Push commits to the session side branch (never main; never force).
+
+⚠ **TouchSmoke reads 53, not 55, and the delta was NOT chased to ground.**
+Measured for build 13 with 0 failures. It is not caused by that build's
+changes: `TouchSmoke.cs` is unmodified since `5930746` (2026-08-15) and
+references none of the symbols that moved — no `cardstake`, `cardchallenge`,
+`stake` or `purse`. The likely cause is this file's own line 154, that these
+counts are read "on the closest Device Simulator profile", and the profile
+differs. **Recorded rather than explained** — a pass count that drifts down
+with zero failures is the exact shape of two checks silently not running, so
+if it drops again, chase it before shipping.
+
+⚠ **DISK, and it will bite before the build does.** A device build needs the
+il2cpp output (~1.1 GB), the archive (~690 MB) and the export (~110 MB) on top
+of whatever is already in `build/`. Build 13 started with **2.0 GB free** and
+had to reclaim 4.2 GB of stale simulator artifacts first. `du -sh build/*`
+before starting; the whole directory is gitignored and regenerable, but the
+`.xcarchive`s hold the dSYMs for crash symbolication — delete those last.
 
 Server hotfix path: edit `server/`, `server/tests/run_local.sh` green
 (sql_bench 53/53 + api_smoke 208/208 at last count), then **STOP — deploy is
