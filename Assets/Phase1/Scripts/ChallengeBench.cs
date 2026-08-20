@@ -67,6 +67,38 @@ namespace RobotBrawl.Phase0
         // exist.
         public const string CHAMPION_NAME = "Spinner1";
         public const string CHAMPION_PROGRAM = "";
+        // ⚠⚠ THIS FIXTURE IS STALE AND EVERY NUMBER THIS BENCH HAS EVER
+        // PRODUCED IS AGAINST IT, NOT AGAINST THE LADDER'S SPINNER1.
+        // Measured against production 2026-08-20, after owen went 0-3 in the
+        // real arena with a design this bench scored at 75%:
+        //
+        //                       this fixture      the ENLISTED Spinner1
+        //   parts                      16                        45
+        //   blades                      0                         6
+        //   spikes                      1                         4
+        //   sensors            gyro only    compass, rangefinder, tiltsensor,
+        //                                   wallsensor, trapsensor, dmgbus
+        //   program                  NONE      REAL (hash 3f3f0328…)
+        //   mass                        —                   1286 kg
+        //
+        // ⚠ AND IT LOOKED VERIFIED. This constant is byte-identical to the
+        // `spinner1` in owen's LOCAL career save — I checked that, and it
+        // passed. The career save is a stale copy on one machine; the thing a
+        // player actually fights is the ACTIVE SNAPSHOT on the ladder, which
+        // was uploaded 2026-08-16 and is a different machine entirely.
+        // Checking a fixture against the wrong source of truth is the same
+        // class of error as a green endpoint with no caller.
+        //
+        // WHAT IT WOULD TAKE TO FIX: the snapshot endpoint deliberately serves
+        // a parts MANIFEST and never geometry or program (that protection is
+        // correct and should stay). So the real build has to come from someone
+        // who owns it — owen exporting Spinner1 from the device that enlisted
+        // it — or from `/v1/matches/{id}/envelopes` as a participant, which
+        // yields the BUILD but never the PROGRAM. A faithful fixture may not
+        // be obtainable at all while the opponent runs a program we cannot read.
+        //
+        // UNTIL THEN: read every verdict from this bench as "beats a 16-part
+        // program-less prototype", which is not the question anyone is asking.
         public const string CHAMPION_BUILD =
             "#fmt3-disc\n" +
             "core|0.000,0.700,0.000|0|0.00,0.00,0.00|Aluminum\n" +
