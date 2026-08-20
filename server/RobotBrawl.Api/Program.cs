@@ -967,6 +967,18 @@ app.MapPost("/v1/challenges", async (ChallengeReq req, ClaimsPrincipal user, Wor
 
     if (ch.UserId != me)          return Results.Forbid();
     if (ch.RobotId == df.RobotId) return Bad("a robot cannot challenge itself");
+    // ⚠ THE HOLE THE 2026-08-19 ABUSE WALKED THROUGH. The line above compares
+    // ROBOTS; nothing compared OWNERS, so an account could enlist a junk
+    // robot and beat it up with its good one — a fight with no opponent,
+    // which paid a full PURSE and moved real rating. Migration 016 removed
+    // the money; this removes the fight. Both are needed: without this, the
+    // exact same self-dealing simply farms RATING instead of scrap, and
+    // rating is what the season prize now ranks. §2.2's repeat-opponent taper
+    // is not a substitute — it bounds wins against ONE opponent and an
+    // account may enlist any number of them, which is precisely the shape of
+    // the reported abuse.
+    if (ch.UserId == df.UserId)
+        return Bad("you already own that robot — a fight between two of your own robots is not a ladder result");
     // §1.2: only an ACTIVE snapshot is on the ladder. PENDING has not been
     // judged and REJECTED was judged and failed.
     if (ch.Status != "ACTIVE")    return Bad($"your snapshot is {ch.Status}, not ACTIVE");
@@ -1042,9 +1054,15 @@ app.MapPost("/v1/challenges", async (ChallengeReq req, ClaimsPrincipal user, Wor
         ins.Parameters.AddWithValue(stake);
         matchId = (Guid)(await ins.ExecuteScalarAsync())!;
     }
-    await using (var deb = new NpgsqlCommand(
-        "INSERT INTO ledger (user_id, delta, reason, match_id) VALUES ($1,$2,'STAKE',$3);", c, tx))
+    // stake_base is 0 since 2026-08-19 (migration 016), so this is normally
+    // skipped entirely. The guard is not cosmetic: `ledger_delta_nonzero`
+    // REFUSES a zero row — "a zero-value row is not a transaction, it is
+    // noise in an audit trail" — so writing the escrow unconditionally would
+    // make every challenge 500 the moment the stake went to zero.
+    if (stake > 0)
     {
+        await using var deb = new NpgsqlCommand(
+            "INSERT INTO ledger (user_id, delta, reason, match_id) VALUES ($1,$2,'STAKE',$3);", c, tx);
         deb.Parameters.AddWithValue(me);
         deb.Parameters.AddWithValue(-stake);   // into escrow; settled in step 3
         deb.Parameters.AddWithValue(matchId);
@@ -1294,38 +1312,29 @@ app.MapPost("/v1/worker/jobs/{id:long}/fight-result",
         l.Parameters.AddWithValue(reason); l.Parameters.AddWithValue(res.MatchId);
         await l.ExecuteNonQueryAsync();
     }
-    // NO STAKE, NO SETTLEMENT. A league night is server-initiated: nobody
-    // chose the fight and nobody paid for it, so there is nothing to return
-    // and nothing to win. Paying a purse here would be a faucet attached to
-    // content the server generates on a timer, which is exactly the
-    // one-way door §2.3 warns about. The ladder still moves - rating is the
-    // reward for a league night, and scrap can be added later if it needs it.
-    bool escrowed = stakePaid > 0;
-    if (!escrowed)
-    {
-        // nothing to settle
-    }
-    else if (res.Verdict == "CHALLENGER")
-    {
-        // The stake always comes back — it is escrow, not a fee, and §2.2
-        // tapers GAINS. Confiscating the stake on a tapered win would be a
-        // penalty the spec never asks for.
+    // ---- A MATCH NO LONGER PAYS ANYTHING (owen, 2026-08-19) --------------
+    // "remove per game rewards, but give rewards per session. top 10 users
+    // for each season get rewards." Migration 016 carries the reasoning; the
+    // short version is that PURSE and DEFENSE were a faucet attached to a
+    // fight the winner could supply BOTH SIDES OF, so the rate was set by how
+    // many junk robots an account felt like enlisting. There is now no amount
+    // a match can pay, which is why no threshold had to be guessed.
+    //
+    // Rating still moves, below, and rating is now the only thing a fight is
+    // for — it is what the season ranks and the season is what pays.
+    //
+    // WHAT SURVIVES HERE IS THE UNWIND, and it is not dead code. stake_base
+    // is 0 from now on, but matches CREATED BEFORE this deploy escrowed real
+    // scrap and some of them are still QUEUED. Their money has to come home.
+    //
+    // Refunded on EVERY verdict, including the defender's win that used to
+    // forfeit it: the forfeit only made sense as the thing that funded
+    // DEFENSE, and DEFENSE is gone. Keeping the forfeit without the payment
+    // would BURN a legacy challenger's scrap into nobody's wallet — the
+    // ledger would stop summing, and the player would have paid an entry fee
+    // for a prize that was abolished while their fight was in the queue.
+    if (stake > 0)
         await Credit(chUser, stake, "STAKE_REFUND");
-        if (!tapered)
-        {
-            // (1 + 0.5*gap)^2 — punching up two categories pays 4x base.
-            double mult = Math.Pow(1 + 0.5 * gap, 2);
-            await Credit(chUser, (int)Math.Round(cfg["win_purse_base"] * mult), "PURSE");
-        }
-    }
-    else if (res.Verdict == "DEFENDER")
-    {
-        await Credit(dfUser, (int)cfg["defense_purse"], "DEFENSE");   // challenger's stake is forfeit
-    }
-    else
-    {
-        await Credit(chUser, stake, "STAKE_REFUND");
-    }
 
     // ---- §2.1: the ladder actually moves -------------------------------
     // In the same transaction as the money: a rating that survived a rollback
@@ -1546,6 +1555,67 @@ app.MapGet("/v1/leaderboard/{category?}", async (string? category, int? limit) =
     // starts season 1's clock — render the season number alone in that case.
     return Results.Ok(new { category = category ?? "ALL", count = rows.Count,
                             season = curSeason, seasonEndsAt, entries = rows });
+}).AllowAnonymous();
+
+// ---- WHO IS ACTUALLY WINNING THE SEASON ---------------------------------
+// New 2026-08-19, with the move to season-only rewards. A prize nobody can
+// see the standings for is a prize nobody plays for: the old per-match purse
+// landed in the wallet within minutes of a fight, and replacing it with a
+// payment weeks away and invisible until it arrives would read to a player
+// as the arena simply having stopped paying.
+//
+// ⚠ THIS MUST APPLY THE SAME RULE THE ROLLOVER PAYS ON. It is deliberately
+// the same query — best NON-PROVISIONAL rating per user, ties on deviation
+// then id — because a preview that ranks differently from the payout is
+// worse than no preview. If one changes, change both; api_smoke checks the
+// preview against a real forced rollover for exactly this reason.
+app.MapGet("/v1/seasons/standings", async () =>
+{
+    await using var c = await db.OpenAsync();
+    var cfg = await LadderConfig(c);
+    int season = cfg.TryGetValue("current_season", out var cs) ? (int)cs : 1;
+    int payBase = (int)(cfg.TryGetValue("season_payout_base", out var pb) ? pb : 1000);
+    int places = (int)(cfg.TryGetValue("season_payout_places", out var pl) ? pl : 10);
+    double rankBelowRd = cfg.TryGetValue("season_rank_max_deviation", out var fbr) ? fbr : 350;
+    DateTime? endsAt = null;
+    await using (var se = new NpgsqlCommand("SELECT ends_at FROM seasons WHERE id = $1;", c))
+    {
+        se.Parameters.AddWithValue(season);
+        if (await se.ExecuteScalarAsync() is DateTime dt) endsAt = dt;
+    }
+
+    await using var cmd = new NpgsqlCommand(@"
+        WITH best AS (
+            SELECT rb.user_id, MAX(rt.rating) AS rating
+              FROM ratings rt
+              JOIN robots rb ON rb.id = rt.robot_id
+             WHERE rt.season_id = $1 AND rt.deviation < $2
+             GROUP BY rb.user_id)
+        SELECT b.user_id, b.rating, u.display_name,
+               ROW_NUMBER() OVER (ORDER BY b.rating DESC, b.user_id) AS place
+          FROM best b JOIN users u ON u.id = b.user_id
+         ORDER BY place LIMIT $3;", c);
+    cmd.Parameters.AddWithValue(season);
+    cmd.Parameters.AddWithValue(rankBelowRd);
+    cmd.Parameters.AddWithValue(places);
+
+    var rows = new List<object>();
+    await using (var r = await cmd.ExecuteReaderAsync())
+        while (await r.ReadAsync())
+        {
+            long place = r.GetInt64(3);
+            rows.Add(new
+            {
+                place,
+                userId = r.GetGuid(0),
+                player = r.GetString(2),
+                rating = Math.Round(r.GetDouble(1), 1),
+                // What this place pays IF the season ended now. Named "would"
+                // in the client copy for a reason — standings move.
+                scrap = payBase / (int)place,
+            });
+        }
+    return Results.Ok(new { season, endsAt, places, payoutBase = payBase, standings = rows });
 }).AllowAnonymous();
 
 // A single match, public. M2's acceptance requires that "a third account can
@@ -2315,8 +2385,20 @@ app.MapPost("/v1/admin/season/rollover", async (HttpContext ctx) =>
     int from = cfg.TryGetValue("current_season", out var cs) ? (int)cs : 1;
     int to = from + 1;
     double keep = (cfg.TryGetValue("season_compress_pct", out var cp) ? cp : 50) / 100.0;
-    int payBase = (int)(cfg.TryGetValue("season_payout_base", out var pb) ? pb : 300);
-    int places = (int)(cfg.TryGetValue("season_payout_places", out var pl) ? pl : 3);
+    int payBase = (int)(cfg.TryGetValue("season_payout_base", out var pb) ? pb : 1000);
+    int places = (int)(cfg.TryGetValue("season_payout_places", out var pl) ? pl : 10);
+    int badgePlaces = (int)(cfg.TryGetValue("season_badge_places", out var bp) ? bp : 3);
+    // ⚠ ELIGIBILITY: "has this rating been EARNED?" Enlistment assigns exactly
+    // 1200 at deviation 350 and only real fights move deviation down, so a
+    // STRICTLY-BELOW-350 test is precisely "has fought at least once" — which
+    // is what keeps an account from walking into the paid places by uploading
+    // and never fighting, the 2026-08-19 abuse in a different coat.
+    //
+    // NOT the board's provisional line (deviation > 200). That was the first
+    // choice and it was measured: after a full api_smoke run the tightest
+    // rating on the dev ladder was RD 258, so a 200 gate paid NOBODY.
+    // Migration 016 carries the arithmetic. Tunable if the ladder gets busy.
+    double rankBelowRd = cfg.TryGetValue("season_rank_max_deviation", out var fbr) ? fbr : 350;
     int weeks = (int)(cfg.TryGetValue("season_weeks", out var sw) ? sw : 4);
 
     // THE TIMING GUARD, 2026-08-12 — what makes this endpoint schedulable.
@@ -2398,16 +2480,31 @@ app.MapPost("/v1/admin/season/rollover", async (HttpContext ctx) =>
         await back.ExecuteNonQueryAsync();
     }
 
-    // ---- payouts, before the ratings are compressed ---------------------
-    // The standings being paid are the FINAL ones, so this has to read them
-    // before the compression rewrites them.
-    var awards = new List<object>();
+    // ---- badges: the PERMANENT per-category record ----------------------
+    // Unchanged in what it does, and deliberately so. A badge is what a
+    // scouting card shows two seasons later; it is glory, not money, and no
+    // amount of junk-robot enlistment can devalue an honour. It stays
+    // per-CATEGORY and per-ROBOT — the shape §2.1 rates in — even though the
+    // scrap below has moved to per-USER. The two used to share one number
+    // (season_payout_places); migration 016 split them so the money could
+    // change without deleting the history.
+    //
+    // Read before the compression rewrites the ratings, same as always.
+    // ⚠ ELIGIBILITY APPLIES HERE TOO, and it was missed on the first pass.
+    // Badges are not money, so it is tempting to leave them unguarded — but a
+    // robot that never fought sits at exactly 1200/350, and on a young ladder
+    // 1200 is a podium. It would take a permanent "2nd, FEATHER, Season 3"
+    // off a robot that turned up, and a scouting card would show a placing
+    // earned by uploading. Found by planting the abuse in api_smoke rather
+    // than by reasoning: the fixture took a badge on its first run.
+    var badges = new List<object>();
     await using (var top = new NpgsqlCommand(@"
         SELECT category, robot_id, rating,
                ROW_NUMBER() OVER (PARTITION BY category ORDER BY rating DESC) AS place
-          FROM ratings WHERE season_id = $1;", c, tx))
+          FROM ratings WHERE season_id = $1 AND deviation < $2;", c, tx))
     {
         top.Parameters.AddWithValue(from);
+        top.Parameters.AddWithValue(rankBelowRd);
         var rows = new List<(string Cat, Guid Robot, double Rating, long Place)>();
         await using (var r = await top.ExecuteReaderAsync())
             while (await r.ReadAsync())
@@ -2415,54 +2512,86 @@ app.MapPost("/v1/admin/season/rollover", async (HttpContext ctx) =>
 
         foreach (var row in rows)
         {
-            if (row.Place > places) continue;
-            int amount = payBase / (int)row.Place;      // 300 / 150 / 100
+            if (row.Place > badgePlaces) continue;
+            // ON CONFLICT DO NOTHING because (robot, season, category) is the
+            // primary key, and a rollover that somehow ran twice must not
+            // raise here and roll back a payout that was already correct.
+            await using var badge = new NpgsqlCommand(@"
+                INSERT INTO season_badges (robot_id, season_id, category, place, final_rating)
+                VALUES ($1,$2,$3,$4,$5) ON CONFLICT DO NOTHING;", c, tx);
+            badge.Parameters.AddWithValue(row.Robot);
+            badge.Parameters.AddWithValue(from);
+            badge.Parameters.AddWithValue(row.Cat);
+            badge.Parameters.AddWithValue((int)row.Place);
+            badge.Parameters.AddWithValue(row.Rating);
+            await badge.ExecuteNonQueryAsync();
+            badges.Add(new { category = row.Cat, place = row.Place, robotId = row.Robot });
+        }
+    }
+
+    // ---- THE SEASON PAYOUT: TOP 10 USERS -------------------------------
+    // owen, 2026-08-19: "give rewards per session. top 10 users for each
+    // season get rewards." This is now the arena's ONLY faucet — per-match
+    // PURSE and DEFENSE were deleted in the same commit (migration 016).
+    //
+    // WHY PER USER AND NOT PER ROBOT, beyond having been asked for: the old
+    // scheme paid the owner of each podium robot in each of five categories,
+    // so one account could hold the whole podium of a thin class and collect
+    // three times for it. Ranking accounts makes the prize what a person
+    // won, and caps the whole season's exposure at exactly ten payments.
+    //
+    // A USER'S SCORE IS THEIR BEST RATED ROBOT. Not a sum — a sum pays for
+    // BREADTH, which is "enlist more robots", the very behaviour being
+    // closed. Not an average either: that punishes experimenting. Best-robot
+    // means one account, one entry, and more robots never helps.
+    //
+    // ⚠ ONLY EARNED RATINGS COUNT — see season_rank_max_deviation above.
+    // An account that uploads and never fights sits at exactly 1200/350 and
+    // must not collect; one fight is enough to be in the running.
+    //
+    // Ties break on deviation then user id — arbitrary, but TOTAL and
+    // deterministic, because ROW_NUMBER over a non-deterministic order would
+    // pay different people on a re-run of the same standings.
+    var awards = new List<object>();
+    await using (var top = new NpgsqlCommand(@"
+        WITH best AS (
+            SELECT rb.user_id, MAX(rt.rating) AS rating
+              FROM ratings rt
+              JOIN robots rb ON rb.id = rt.robot_id
+             WHERE rt.season_id = $1 AND rt.deviation < $2
+             GROUP BY rb.user_id)
+        SELECT user_id, rating,
+               ROW_NUMBER() OVER (ORDER BY rating DESC, user_id) AS place
+          FROM best ORDER BY place LIMIT $3;", c, tx))
+    {
+        top.Parameters.AddWithValue(from);
+        top.Parameters.AddWithValue(rankBelowRd);
+        top.Parameters.AddWithValue(places);
+        var rows = new List<(Guid User, double Rating, long Place)>();
+        await using (var r = await top.ExecuteReaderAsync())
+            while (await r.ReadAsync())
+                rows.Add((r.GetGuid(0), r.GetDouble(1), r.GetInt64(2)));
+
+        foreach (var row in rows)
+        {
+            int amount = payBase / (int)row.Place;   // 1000 / 500 / 333 / …
             if (amount <= 0) continue;
-            Guid owner;
-            await using (var o = new NpgsqlCommand("SELECT user_id FROM robots WHERE id = $1;", c, tx))
-            {
-                o.Parameters.AddWithValue(row.Robot);
-                owner = (Guid)(await o.ExecuteScalarAsync())!;
-            }
             await using (var l = new NpgsqlCommand(
                 "INSERT INTO ledger (user_id, delta, reason, idem_key) VALUES ($1,$2,'SEASON',$3);", c, tx))
             {
-                l.Parameters.AddWithValue(owner);
+                l.Parameters.AddWithValue(row.User);
                 l.Parameters.AddWithValue(amount);
-                // The idempotency key is the real guard: even if the season
-                // check above were bypassed, the unique index refuses a
-                // second payout for the same podium.
+                // The idempotency key is the real guard: even if the
+                // duplicate-season check above were bypassed, the unique
+                // index refuses a second payout for the same season.
                 //
-                // The CATEGORY is part of the key because a robot can place
-                // in more than one - §2.1 rates per robot PER CATEGORY, and a
-                // featherweight that punched up is ranked in both. Keying on
-                // robot alone collided the moment that happened, which is the
-                // ledger's unique index doing exactly its job.
-                l.Parameters.AddWithValue($"season:{from}:{row.Cat}:{row.Robot}");
+                // One key per (season, user) — and unlike the old
+                // per-category key there is nothing left that can collide,
+                // because a user places exactly once.
+                l.Parameters.AddWithValue($"season:{from}:user:{row.User}");
                 await l.ExecuteNonQueryAsync();
             }
-            // The badge is the PERMANENT half of a season result — the ledger
-            // row pays the scrap and is never looked at again, the badge is
-            // what a scouting card shows two seasons later. Written inside the
-            // same transaction as the payout so a podium can never be paid
-            // without being recorded, or recorded without being paid.
-            //
-            // ON CONFLICT DO NOTHING for the same reason the payout has an
-            // idempotency key: (robot, season, category) is the primary key,
-            // and a rollover that somehow ran twice must not raise here and
-            // roll back a payout that was already correct.
-            await using (var badge = new NpgsqlCommand(@"
-                INSERT INTO season_badges (robot_id, season_id, category, place, final_rating)
-                VALUES ($1,$2,$3,$4,$5) ON CONFLICT DO NOTHING;", c, tx))
-            {
-                badge.Parameters.AddWithValue(row.Robot);
-                badge.Parameters.AddWithValue(from);
-                badge.Parameters.AddWithValue(row.Cat);
-                badge.Parameters.AddWithValue((int)row.Place);
-                badge.Parameters.AddWithValue(row.Rating);
-                await badge.ExecuteNonQueryAsync();
-            }
-            awards.Add(new { category = row.Cat, place = row.Place, robotId = row.Robot, scrap = amount });
+            awards.Add(new { place = row.Place, userId = row.User, rating = row.Rating, scrap = amount });
         }
     }
 
@@ -2506,7 +2635,7 @@ app.MapPost("/v1/admin/season/rollover", async (HttpContext ctx) =>
     // this never touched it.
     return Results.Ok(new { rolled = true, fromSeason = from, toSeason = to,
                             ratingsCarried = carried,
-                            compressedToPct = keep * 100, awards });
+                            compressedToPct = keep * 100, awards, badges });
 }).AllowAnonymous();
 
 // ============================================================== cosmetics

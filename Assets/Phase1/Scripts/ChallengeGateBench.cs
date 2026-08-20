@@ -126,25 +126,31 @@ namespace RobotBrawl.Phase0
                 Check(el2.Count == 1 && el2[0].name == "F",
                       "mixed stable: only the FEATHER answers a LIGHT (HEAVY is down, P unjudged)");
 
-                // ---- the stake ladder ------------------------------------
-                // 50 per class of difference. Punching up costs more, which is
-                // what makes "punch up" a decision rather than free upside.
+                // ---- the stake and purse ladders are GONE ----------------
+                // Both were client MIRRORS of ladder_config dials — 50 x
+                // (1+gap) and 100 x (1+0.5*gap)^2 — and eight checks here
+                // pinned the mirrors to the letter. On 2026-08-19 the server
+                // stopped charging and stopped paying (migration 016: per-match
+                // arena rewards abolished, the season pays its top 10 users),
+                // and StakeForPick/PurseForPick were deleted with them.
+                //
+                // ⚠ THE CHECKS WENT WITH THE METHODS ON PURPOSE, and this note
+                // is the guard against re-adding them from memory: eight green
+                // assertions that a card displays 50 and 225 would have gone on
+                // passing for as long as the mirror kept agreeing with itself,
+                // while the server charged nothing and paid nothing. A bench
+                // that pins a client's copy of a number nobody honours is not
+                // coverage — it is the reason a wrong price can survive a green
+                // suite. What replaced them is server-side: api_smoke section Q
+                // asserts a settled match writes NO payment row at all, which
+                // is a claim about the money rather than about the label.
                 ui.TestSetMine(new List<MyRobot> { Bot("Mine", "FEATHER") });
                 ui.SetPick(0);
-                Check(ui.StakeForPick(Card("FEATHER")) == 50, "same class stakes 50");
-                Check(ui.StakeForPick(Card("LIGHT")) == 100, "one class up stakes 100");
-                Check(ui.StakeForPick(Card("MIDDLE")) == 150, "two classes up stakes 150");
-                Check(ui.StakeForPick(Card("SUPER")) == 250, "four classes up stakes 250");
-
-                // ---- the purse ladder ------------------------------------
-                // (1 + 0.5*gap)^2 x 100, mirroring §2.3 exactly — the reward
-                // half of "punch up". Two classes up pays 4x; the card must
-                // SAY so, and this is the number it says.
-                Check(ui.PurseForPick(Card("FEATHER")) == 100, "same class pays 100");
-                Check(ui.PurseForPick(Card("LIGHT")) == 225, "one class up pays 225");
-                Check(ui.PurseForPick(Card("MIDDLE")) == 400, "two classes up pays 400");
-                Check(ui.PurseForPick(Card("SUPER")) == 900, "four classes up pays 900");
+                // The gap itself is still surfaced and still shown — fighting up
+                // is worth more RATING now, and the card still says so.
+                Check(ui.GapForPick(Card("FEATHER")) == 0, "gap reads 0 in the same class");
                 Check(ui.GapForPick(Card("MIDDLE")) == 2, "gap reads 2 for two classes up");
+                Check(ui.GapForPick(Card("SUPER")) == 4, "gap reads 4 for four classes up");
 
                 // ---- confirm cannot fire through a closed gate ------------
                 // The board reloads while the card is open, so a pick that was

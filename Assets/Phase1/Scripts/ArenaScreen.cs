@@ -413,16 +413,18 @@ namespace RobotBrawl.Phase0
             busy = false;
         }
 
-        /// <summary>The stake the server WILL charge, computed the same way it
-        /// does: 50 x (1 + gap). Shown before the button is pressed, because a
-        /// confirm that does not say the price is not a confirm.</summary>
-        int StakeFor(MyRobot m, ScoutCard c)
-        {
-            int a = System.Array.IndexOf(Order, m.category);
-            int b = System.Array.IndexOf(Order, c.category);
-            if (a < 0 || b < 0) return 0;
-            return 50 * (1 + Mathf.Max(0, b - a));
-        }
+        // StakeFor IS GONE with the purse it paid for. It mirrored
+        // stake_base × (1 + gap) with the 50 HARDCODED, and stake_base is 0
+        // since 2026-08-19 (migration 016) — a challenge costs nothing.
+        //
+        // Deleted rather than made to return 0, because the hardcode was the
+        // problem: a client copy of a server dial can only ever be right by
+        // luck, and the one place a price genuinely must be shown — the
+        // moment a charge actually happens — already has the SERVER's own
+        // number, which /v1/matches/challenge returns as `stake`. DoChallenge
+        // reads that and says so only if it is non-zero, so if owen ever
+        // turns the dial back up the client tells the truth without a
+        // deploy. That is the whole reason ladder_config exists (§2.3).
 
         IEnumerator DoChallenge(MyRobot m, ScoutCard c)
         {
@@ -433,8 +435,14 @@ namespace RobotBrawl.Phase0
                 // The API's own words. It distinguishes punching down, an
                 // empty wallet and a spent daily ticket, and a client that
                 // flattens those into "failed" throws that away.
+                // The SERVER's stake, not a client guess — and normally 0, so
+                // normally unmentioned. Saying "0 scrap staked" would advertise
+                // a mechanic that no longer runs; saying nothing when a real
+                // charge happened would hide one. Both cases are covered by
+                // reading the number the API actually charged.
                 Say(err != null ? err
-                    : "challenge accepted — " + stake + " scrap staked", SC_CARD);
+                    : stake > 0 ? "challenge accepted — " + stake + " scrap staked"
+                                : "challenge accepted", SC_CARD);
                 if (err == null) { pending = false; card = null; liveId = matchId; liveSeeds = seeds; }
             });
             yield return LadderClient.Wallet((b, e) => { if (e == null) balance = b; });
@@ -709,13 +717,6 @@ namespace RobotBrawl.Phase0
             return null;
         }
 
-        public int StakeForPick(ScoutCard c)
-        {
-            var el = EligibleFor(c);
-            if (el.Count == 0) return 0;
-            return StakeFor(el[Mathf.Clamp(myPick, 0, el.Count - 1)], c);
-        }
-
         /// <summary>How many classes UP the picked robot would be fighting.
         /// 0 = same class.</summary>
         public int GapForPick(ScoutCard c)
@@ -728,20 +729,17 @@ namespace RobotBrawl.Phase0
             return Mathf.Max(0, b - a);
         }
 
-        /// <summary>The purse a WIN pays, computed as the server does it:
-        /// win_purse_base(100) × (1 + 0.5·gap)² — §2.3, same mirror idiom as
-        /// StakeFor above. Punching up two classes pays 4×. Shown beside the
-        /// stake because the stake alone tells a player what fighting up
-        /// COSTS and never what it PAYS — and the paying half is the reason
-        /// the rule exists (owen: a good design may beat higher weights, and
-        /// should win more for it).</summary>
-        public int PurseForPick(ScoutCard c)
-        {
-            var el = EligibleFor(c);
-            if (el.Count == 0) return 0;
-            double gap = GapForPick(c);
-            return (int)System.Math.Round(100 * System.Math.Pow(1 + 0.5 * gap, 2));
-        }
+        // PurseForPick IS GONE (owen, 2026-08-19: "remove per game rewards").
+        // It mirrored win_purse_base × (1 + 0.5·gap)², and both the constant
+        // and the server code that paid it were deleted in the same commit —
+        // see migration 016. A mirror of an arithmetic nothing performs is
+        // worse than no mirror: it is a number on the confirm screen that a
+        // player would budget against and never receive.
+        //
+        // Fighting up still pays MORE, and still for the reason owen gave —
+        // it just pays in RATING now, and rating is what the season ranks.
+        // The gap is still surfaced (GapForPick, above); only the scrap
+        // figure went away.
 
         // ---- surface 3: the inbox and the replay launcher -----------------
         /// <summary>Which list the ARENA is showing. The weight-class filters
@@ -1137,20 +1135,17 @@ namespace RobotBrawl.Phase0
                     if (GUILayout.Toggle(myPick == i, eligible[i].name, GUI.skin.button)) myPick = i;
                 GUILayout.EndHorizontal();
 
-                int stake = StakeForPick(card);
                 int gapUp = GapForPick(card);
-                int purse = PurseForPick(card);
                 if (!pending)
                 {
-                    if (GUILayout.Button("challenge for " + stake + " scrap · win pays " + purse
+                    if (GUILayout.Button("challenge"
                                          + (gapUp > 0 ? " · fighting " + gapUp + " up" : "")) && !busy) ArmChallenge();
                 }
                 else
                 {
-                    GUILayout.Label("stake " + stake + " scrap"
-                                    + (balance >= 0 ? " of your " + balance : "")
-                                    + " — returned if you win or draw, lost if you do not."
-                                    + " a win pays " + purse + " scrap.");
+                    GUILayout.Label("no scrap changes hands — a fight moves your RATING."
+                                    + " the season pays its top 10 players when it ends."
+                                    + (gapUp > 0 ? " fighting " + gapUp + " up is worth more rating." : ""));
                     GUILayout.BeginHorizontal();
                     if (GUILayout.Button("confirm") && !busy) ConfirmChallenge();
                     if (GUILayout.Button("cancel")) CancelChallenge();

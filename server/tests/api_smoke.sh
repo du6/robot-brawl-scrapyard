@@ -545,7 +545,11 @@ else
     S=$(req POST /v1/challenges "{\"challengerSnapshotId\":\"$CHSNAP\",\"defenderSnapshotId\":\"$DSNAP\"}" "$AUTH")
     expect "a challenge is accepted" "$S" 200
     MATCH=$(jget matchId); STAKE=$(jget stake)
-    is "…priced at the base stake for a same-category fight" "$STAKE" 50
+    # ZERO since 2026-08-19 (migration 016). This used to read 50 and is the
+    # check that would notice stake_base being turned back on by accident —
+    # the client no longer mirrors the price, so the API's own number is the
+    # only place a resurrected charge would show up.
+    is "…and it costs NOTHING to enter: the arena pays at season end, not per fight" "$STAKE" 0
     is "…and the match is QUEUED" "$(jget status)" QUEUED
     # ONE seed since 2026-08-14: the client plays the fight live and a
     # spectator sits through every bout, so a challenge is one decisive
@@ -571,9 +575,13 @@ else
       # balance moved is what proves the debit happened at all - the endpoint
       # would answer 200 either way.
       BAL1=$(dbq "SELECT COALESCE(SUM(delta),0) FROM ledger WHERE user_id='$USERID';")
-      is "…and the stake left the wallet into escrow" "$BAL1" "$((BAL0 - 50))"
-      is "…recorded as a STAKE row against this match" \
-         "$(dbq "SELECT reason FROM ledger WHERE match_id='$MATCH' AND user_id='$USERID';")" STAKE
+      is "…and the wallet is UNTOUCHED, because nothing was staked" "$BAL1" "$BAL0"
+      # ⚠ NOT "the row says 0". `ledger_delta_nonzero` refuses a zero row, so
+      # the correct outcome is NO ROW AT ALL. Writing one unconditionally was
+      # a live 500 the moment stake_base went to zero; this is the check that
+      # would have caught it.
+      is "…and writes no ledger row at all, rather than a zero-value one" \
+         "$(dbq "SELECT count(*) FROM ledger WHERE match_id='$MATCH' AND user_id='$USERID';")" 0
 
       # --- step 2: the worker claims the FIGHT job ------------------------
       S=$(req POST /v1/worker/jobs/claim '{"workerId":"smoke-fight"}' "X-Worker-Key: $WKEY")
@@ -605,9 +613,15 @@ else
         is "…with the verdict recorded" "$(dbq "SELECT verdict FROM matches WHERE id='$MATCH';")" CHALLENGER
         is "…and the replay attached" \
            "$(dbq "SELECT CASE WHEN array_length(replay_urls,1) >= 1 THEN 'yes' ELSE 'no' END FROM matches WHERE id='$MATCH';")" yes
-        # Scrap must be conserved: the stake came back and the purse was paid.
-        is "…the winner's wallet is stake-refunded and paid the purse" \
-           "$(dbq "SELECT COALESCE(SUM(delta),0) FROM ledger WHERE user_id='$USERID';")" "$((BAL0 + 100))"
+        # ⚠ THE CHECK THIS WHOLE CHANGE EXISTS FOR (owen, 2026-08-19). Winning
+        # a ladder fight must move NO SCRAP WHATSOEVER — not a purse, not a
+        # refund, nothing. The old assertion here was BAL0 + 100, i.e. the
+        # faucet a user could point at their own junk robot. A settled win
+        # leaving the wallet exactly level is the abolition, measured.
+        is "…and winning moves NO scrap at all — the per-match purse is abolished" \
+           "$(dbq "SELECT COALESCE(SUM(delta),0) FROM ledger WHERE user_id='$USERID';")" "$BAL0"
+        is "…with no PURSE row written anywhere for it" \
+           "$(dbq "SELECT count(*) FROM ledger WHERE match_id='$MATCH' AND reason IN ('PURSE','DEFENSE');")" 0
         is "…and the FIGHT job is retired, not left to spin" \
            "$(dbq "SELECT status FROM match_jobs WHERE id=$FJOB;")" DONE
 
@@ -647,7 +661,7 @@ else
             "X-Worker-Key: $WKEY")
         expect "the same result cannot be settled twice" "$S" 409
         is "…and the wallet did not move on the second attempt" \
-           "$(dbq "SELECT COALESCE(SUM(delta),0) FROM ledger WHERE user_id='$USERID';")" "$((BAL0 + 100))"
+           "$(dbq "SELECT COALESCE(SUM(delta),0) FROM ledger WHERE user_id='$USERID';")" "$BAL0"
       fi
     fi
 
@@ -661,9 +675,10 @@ else
     # from a right one. So this block fights the heaviest class there is.
     cat_idx() { case "$1" in FEATHER) echo 0;; LIGHT) echo 1;; MIDDLE) echo 2;; HEAVY) echo 3;; SUPER) echo 4;; *) echo -1;; esac; }
     GAP=$(( $(cat_idx SUPER) - $(cat_idx "$CHCAT") ))
-    WANT_STAKE=$(( 50 * (1 + GAP) ))
-    # (1 + 0.5*gap)^2 in integer arithmetic: 100*(2+gap)^2/4
-    WANT_PURSE=$(( 100 * (2 + GAP) * (2 + GAP) / 4 ))
+    # WANT_STAKE / WANT_PURSE are GONE with the formulas they mirrored — the
+    # stake is 0 at every gap and a win pays nothing at any gap (migration
+    # 016). What this block still sweeps is the part that never was about
+    # money: cross-category RATING, which §2.1 makes asymmetric on purpose.
 
     req POST /v1/robots '{"name":"Colossus"}' "$DAUTH" >/dev/null; HROBOT=$(jget id)
     req POST /v1/snapshots "$(body_upload "$HROBOT" "$(envelope Colossus)")" "$DAUTH" >/dev/null
@@ -681,16 +696,20 @@ else
       S=$(req POST /v1/challenges "{\"challengerSnapshotId\":\"$CHSNAP\",\"defenderSnapshotId\":\"$HSNAP\"}" "$AUTH")
       expect "a $CHCAT may punch up to a SUPER" "$S" 200
       is "…at a gap of $GAP" "$(jget gap)" "$GAP"
-      is "…staking 50 x (1 + gap)" "$(jget stake)" "$WANT_STAKE"
+      is "…and still free at four classes up — the stake is gone at every gap" "$(jget stake)" 0
       BIGMATCH=$(jget matchId)
       req POST /v1/worker/jobs/claim '{"workerId":"smoke-fight"}' "X-Worker-Key: $WKEY" >/dev/null
       BIGJOB=$(jget id)
       req POST "/v1/worker/jobs/$BIGJOB/fight-result" \
         "{\"matchId\":\"$BIGMATCH\",\"workerId\":\"smoke-fight\",\"verdict\":\"CHALLENGER\",\"replayUrls\":[\"file:///dev/null\"],\"bouts\":[]}" \
         "X-Worker-Key: $WKEY" >/dev/null
-      # Won it: stake back plus a purse that grows with the SQUARE of the gap.
-      is "…and winning pays 100 x (1 + 0.5 x gap)^2 = $WANT_PURSE" \
-         "$(dbq "SELECT COALESCE(SUM(delta),0) FROM ledger WHERE user_id='$USERID';")" "$((BAL2 + WANT_PURSE))"
+      # ⚠ THE SWEPT CASE, and the one most worth keeping. The old purse grew
+      # with the SQUARE of the gap, so a punch-up four classes up paid 900 —
+      # by far the richest per-match faucet, and the most attractive to point
+      # at a robot you owned. At gap 0 an abolition is indistinguishable from
+      # a formula that happens to return 0; at gap 4 it is not.
+      is "…and winning four classes up STILL pays nothing" \
+         "$(dbq "SELECT COALESCE(SUM(delta),0) FROM ledger WHERE user_id='$USERID';")" "$BAL2"
       # §2.1's anti-farming rule, and the one most likely to be got wrong:
       # "The defender's rating is untouched by cross-category fights."
       # A heavy must not be able to farm rating by squashing lightweights, nor
@@ -716,6 +735,38 @@ else
       # §1.2, the rule that actually protects the ladder.
       S=$(req POST /v1/challenges "{\"challengerSnapshotId\":\"$HSNAP\",\"defenderSnapshotId\":\"$CHSNAP\"}" "$DAUTH")
       expect "a SUPER cannot punch DOWN to a $CHCAT" "$S" 400
+
+      # ⚠ THE ABUSE ITSELF, 2026-08-19 — and it lives HERE, not earlier,
+      # because this is the first point in the run where one account owns two
+      # ACTIVE snapshots. The defender account holds Defiant ($CHCAT) and
+      # Colossus (SUPER); a first draft of this check enlisted its own sandbag
+      # instead and pushed section K over the `upload` rate limiter, turning
+      # three unrelated checks into 429s. Reusing what already exists costs
+      # nothing and measures the same thing.
+      #
+      # The check compares OWNERS. For months the only self-challenge guard
+      # was `ch.RobotId == df.RobotId`, which compares ROBOTS — so an account
+      # could enlist a junk robot and farm it with a good one, a fight with no
+      # opponent that paid a full purse every time. §2.2's repeat-opponent
+      # taper does not close it: it bounds wins against ONE opponent and an
+      # account may enlist any number of them.
+      #
+      # THIS CHALLENGE IS LEGAL IN EVERY OTHER RESPECT — a $CHCAT punching UP
+      # to a SUPER, both ACTIVE, tickets available — which is what makes it a
+      # test of the owner rule specifically rather than of some other refusal.
+      S=$(req POST /v1/challenges "{\"challengerSnapshotId\":\"$DSNAP\",\"defenderSnapshotId\":\"$HSNAP\"}" "$DAUTH")
+      expect "an account cannot challenge a robot it owns (the junk-robot farm)" "$S" 400
+      is "…and no match row was created for it" \
+         "$(dbq "SELECT count(*) FROM matches m
+                  WHERE m.challenger_snapshot_id='$DSNAP' AND m.defender_snapshot_id='$HSNAP';")" 0
+      # ⚠ AND IT MUST NOT HAVE COST A TICKET. A refusal that still spends one
+      # of the day's ten would let the same self-dealing attempt be used to
+      # exhaust a rival's — a refusal has to be free.
+      # COUNT, not the value: `is` cannot tell an empty result from an empty
+      # expectation, so "no row" and "the query broke" would read identically.
+      is "…and it cost the challenger no daily ticket" \
+         "$(dbq "SELECT count(*) FROM tickets t JOIN snapshots s ON s.robot_id=t.robot_id
+                  WHERE s.id='$DSNAP' AND t.day=CURRENT_DATE AND t.used > 0;")" 0
     fi
 
     # ---- the defender-wins branch ---------------------------------------
@@ -734,10 +785,13 @@ else
           "{\"matchId\":\"$LOSTMATCH\",\"workerId\":\"smoke-fight\",\"verdict\":\"DEFENDER\",\"replayUrls\":[\"file:///dev/null\"],\"bouts\":[]}" \
           "X-Worker-Key: $WKEY")
       expect "a defender win settles" "$S" 200
-      is "…paying the defender the flat 40-scrap defense purse" \
-         "$(dbq "SELECT COALESCE(SUM(delta),0) FROM ledger WHERE user_id='$DUSER';")" "$((DBAL0 + 40))"
-      is "…and the challenger's stake is forfeit, not refunded" \
-         "$(dbq "SELECT COALESCE(SUM(delta),0) FROM ledger WHERE user_id='$USERID';")" "$((CBAL0 - 50))"
+      # The defender used to collect a flat 40 for being challenged — passive
+      # income, and the half of the exploit that did not even need the
+      # attacker to win. Both wallets now stand exactly still.
+      is "…paying the defender NOTHING — the defense purse is abolished too" \
+         "$(dbq "SELECT COALESCE(SUM(delta),0) FROM ledger WHERE user_id='$DUSER';")" "$DBAL0"
+      is "…and costing the loser nothing either: there was no stake to forfeit" \
+         "$(dbq "SELECT COALESCE(SUM(delta),0) FROM ledger WHERE user_id='$USERID';")" "$CBAL0"
     fi
   fi
 fi
@@ -804,11 +858,17 @@ else
       "X-Worker-Key: $WKEY" >/dev/null
     is "a 4th win vs the same opponent is flagged tapered" \
        "$(dbq "SELECT rating_deltas->>'tapered' FROM matches WHERE id='$TMATCH';")" true
-    # The stake still comes back — the taper zeroes GAINS, not the escrow.
-    is "…the stake is still refunded, so the wallet is exactly level" \
+    # The wallet stands still, as it now does for EVERY match — this used to
+    # be the taper's doing and is now simply what a fight costs and pays.
+    is "…the wallet is exactly level" \
        "$(dbq "SELECT COALESCE(SUM(delta),0) FROM ledger WHERE user_id='$USERID';")" "$WBEFORE"
     is "…no PURSE row was written for it" \
        "$(dbq "SELECT count(*) FROM ledger WHERE match_id='$TMATCH' AND reason='PURSE';")" 0
+    # ⚠ AND THE TAPER STILL MATTERS — MORE than it used to. It was written to
+    # stop win-trading for SCRAP; there is no scrap to trade now, and its
+    # remaining job is to stop the same pair farming RATING, which is what the
+    # season prize ranks. Deleting it alongside the purse would have moved the
+    # exploit rather than closed it. The rating check below is the live half.
     is "…and the winner's rating did not move" \
        "$(dbq "SELECT round(rating) FROM ratings WHERE robot_id='$LCHROBOT' AND category='$CHCAT';")" "$RBEFORE"
   fi
@@ -1151,9 +1211,86 @@ else
   is "…still on the same season" \
      "$(dbq "SELECT value::int FROM ladder_config WHERE key='current_season';")" "$S0"
 
+  # ---- the standings PREVIEW, read before the season is closed ---------
+  # New with season-only rewards (2026-08-19). The preview is what a player
+  # sees while the season runs; the rollover is what actually pays. They are
+  # the same query on purpose, and this is the check that keeps them so — a
+  # preview that ranks differently from the payout is worse than none.
+  # ⚠ THE ABUSE, PLANTED ON PURPOSE, because the exclusion rule was VACUOUS
+  # without it: the first green run reported "0 enlisted without fighting",
+  # so the check that junk enlistment earns nothing had nothing to exclude and
+  # would have passed identically with no rule at all.
+  #
+  # This is the reported behaviour in its purest form — an account whose robot
+  # is enlisted, rated, and has never fought, i.e. sitting at exactly the
+  # placement values 1200/350. Built in SQL rather than through the API on
+  # purpose: it needs no upload budget, and the point is the RATING ROW, which
+  # is the only thing the payout query looks at.
+  JUNKU=$(dbq "INSERT INTO users (email, pw_hash, display_name)
+               VALUES ('junk-$$@smoke.invalid', 'x', 'JunkFleet$$') RETURNING id;")
+  JUNKR=$(dbq "INSERT INTO robots (user_id, name) VALUES ('$JUNKU', 'Sandbag') RETURNING id;")
+  dbq "INSERT INTO ratings (robot_id, category, season_id, rating, deviation, volatility)
+       VALUES ('$JUNKR', 'FEATHER', $S0, 1200, 350, 0.06);" >/dev/null
+  # ⚠ AND IT IS SEEDED ABOVE THE LEADER, not below. A junk robot parked at
+  # 1200 on a ladder whose leader is already above 1200 would be excluded by
+  # RANK alone, and the check would pass without the eligibility rule ever
+  # running — the same vacuum in a subtler form. Lifting it past everyone
+  # makes rank actively WANT to pay it, so only eligibility can keep it out.
+  dbq "UPDATE ratings SET rating = (SELECT MAX(rating) + 500 FROM ratings WHERE season_id=$S0)
+        WHERE robot_id='$JUNKR';" >/dev/null
+  note "planted a never-fought robot at $(dbq "SELECT round(rating) FROM ratings WHERE robot_id='$JUNKR';") — the top of the ladder by rating alone"
+
+  S=$(req GET /v1/seasons/standings)
+  expect "the season standings answer" "$S" 200
+  is "…and the highest-rated robot on the ladder does NOT rank, because it never fought" \
+     "$("$PY" -c "import json;d=json.load(open('$BODY'));print('$JUNKU' in [e['userId'] for e in d['standings']])")" False
+  is "…scoped to the season about to close" "$(jget season)" "$S0"
+  is "…and capped at the payout places" \
+     "$("$PY" -c "import json;d=json.load(open('$BODY'));print(len(d['standings'])<=d['places'])")" True
+  # ⚠ ONE ENTRY PER USER, not per robot. The old scheme paid per robot per
+  # category, so one account could hold three podium places in a thin class
+  # and collect three times. This is the claim that the unit of ranking
+  # changed, and it is checked against the DB rather than against itself.
+  is "…listing each player at most once" \
+     "$("$PY" -c "import json;d=json.load(open('$BODY'));u=[e['userId'] for e in d['standings']];print(len(u)==len(set(u)))")" True
+  is "…with first place paying the full payout base" \
+     "$("$PY" -c "import json;d=json.load(open('$BODY'));s=d['standings'];print(s[0]['scrap'] if s else d['payoutBase'])")" \
+     "$(dbq "SELECT value::int FROM ladder_config WHERE key='season_payout_base';")"
+  PREVIEW_TOP=$("$PY" -c "import json;d=json.load(open('$BODY'));s=d['standings'];print(s[0]['userId'] if s else '')")
+  PREVIEW_N=$("$PY" -c "import json;d=json.load(open('$BODY'));print(len(d['standings']))")
+  note "standings preview: $PREVIEW_N player(s), leader $PREVIEW_TOP"
+  # ⚠ A PROVISIONAL RATING MUST NOT RANK. At enlistment a robot sits at
+  # exactly 1200 with deviation 350, so without the eligibility filter an
+  # account could walk into the paid places by uploading and never fighting —
+  # the 2026-08-19 abuse wearing a different hat. Asserted against the DB:
+  # nobody in the standings may be a user whose every rating is provisional.
+  # ⚠ A PROVISIONAL RATING MUST NOT RANK — asserted in SQL rather than by
+  # comparing the endpoint to itself. ELIGIBLE counts the users the rule
+  # admits; PROVISIONAL_ONLY counts users the rule must exclude, and the DB
+  # must contain at least one of the latter for this check to mean anything
+  # (every account that uploaded and never fought is one), so it is noted.
+  # The rule the SERVER applies, restated in SQL rather than re-read from the
+  # endpoint: a rating ranks only if it was EARNED, i.e. deviation is strictly
+  # below the enlistment value of 350. An account that uploaded and never
+  # fought sits at exactly 1200/350 and must not appear.
+  RANKRD=$(dbq "SELECT value::int FROM ladder_config WHERE key='season_rank_max_deviation';")
+  ELIGIBLE=$(dbq "SELECT count(DISTINCT rb.user_id) FROM ratings rt JOIN robots rb ON rb.id=rt.robot_id
+                   WHERE rt.season_id=$S0 AND rt.deviation < $RANKRD;")
+  UNFOUGHT=$(dbq "SELECT count(*) FROM (SELECT rb.user_id FROM ratings rt JOIN robots rb ON rb.id=rt.robot_id
+                   WHERE rt.season_id=$S0 GROUP BY rb.user_id HAVING MIN(rt.deviation) >= $RANKRD) d;")
+  note "season $S0: $ELIGIBLE player(s) earned a rating, $UNFOUGHT enlisted without fighting and are therefore unpaid"
+  WANT_STANDINGS=$ELIGIBLE
+  PLACES_CFG=$(dbq "SELECT value::int FROM ladder_config WHERE key='season_payout_places';")
+  [ "$WANT_STANDINGS" -gt "$PLACES_CFG" ] && WANT_STANDINGS=$PLACES_CFG
+  is "…and excluding players who enlisted but never fought" \
+     "$PREVIEW_N" "$WANT_STANDINGS"
+
   S=$(req POST '/v1/admin/season/rollover?force=1' '{}' "X-Worker-Key: $WKEY")
   expect "a FORCED season rolls over" "$S" 200
   S1=$(jget toSeason)
+  # What the rollover says it paid, kept for the comparison below.
+  ROLL_TOP=$("$PY" -c "import json;d=json.load(open('$BODY'));a=d.get('awards') or [];print(a[0]['userId'] if a else '')")
+  ROLL_N=$("$PY" -c "import json;d=json.load(open('$BODY'));print(len(d.get('awards') or []))")
   is "…into the next season" "$S1" "$((S0 + 1))"
   is "…and the config now points at it" \
      "$(dbq "SELECT value::int FROM ladder_config WHERE key='current_season';")" "$S1"
@@ -1193,6 +1330,56 @@ else
   dbq "UPDATE ladder_config SET value=$S1 WHERE key='current_season';" >/dev/null
   is "…so nobody was paid for that season twice" \
      "$(dbq "SELECT count(*) FROM (SELECT idem_key FROM ledger WHERE reason='SEASON' GROUP BY idem_key HAVING count(*)>1) d;")" 0
+
+  # ---- WHO THE SEASON ACTUALLY PAID (owen, 2026-08-19) -----------------
+  # "top 10 users for each season get rewards." Every claim below is read off
+  # the ledger, not off the endpoint's own response — the response is what the
+  # server SAYS it did, the ledger is what it did.
+  is "…and the rollover paid exactly the players the preview named" "$ROLL_N" "$PREVIEW_N"
+  # ⚠ Guarded, because "" == "" would otherwise read as a PASS on a ladder
+  # where nobody was eligible — a vacuous green on the one claim this section
+  # exists to make. No eligible player is a SKIP, which is missing cover.
+  if [ -n "$PREVIEW_TOP" ]; then
+    is "…with the same player in first place" "$ROLL_TOP" "$PREVIEW_TOP"
+  else
+    skip "the preview/payout leader agreement (1 check)" "no player earned a rating in the closing season"
+  fi
+  # ⚠ THE SHAPE CHANGE, asserted where it cannot be faked. The old idem_key
+  # was season:<n>:<CATEGORY>:<robot>; it is now season:<n>:user:<user>. A
+  # single per-category key surviving would mean a robot was paid, which is
+  # the scheme this replaced.
+  is "…every season payout keyed to a USER, none to a robot in a category" \
+     "$(dbq "SELECT count(*) FROM ledger WHERE reason='SEASON' AND idem_key NOT LIKE 'season:%:user:%';")" 0
+  is "…paying each player at most once for the season" \
+     "$(dbq "SELECT count(*) FROM (SELECT user_id FROM ledger WHERE reason='SEASON' AND idem_key LIKE 'season:$S0:user:%' GROUP BY user_id HAVING count(*)>1) d;")" 0
+  is "…and never more players than the configured places" \
+     "$(dbq "SELECT CASE WHEN count(*) <= (SELECT value FROM ladder_config WHERE key='season_payout_places') THEN 'ok' ELSE 'too many' END
+              FROM ledger WHERE reason='SEASON' AND idem_key LIKE 'season:$S0:user:%';")" ok
+  # base/rank: the biggest single payment is first place's, and it is the base
+  # exactly. A wrong divisor shows up here rather than in a total that happens
+  # to look plausible.
+  if [ -n "$PREVIEW_TOP" ]; then
+    is "…paying the leader the full base" \
+       "$(dbq "SELECT COALESCE(MAX(delta),0) FROM ledger WHERE reason='SEASON' AND idem_key LIKE 'season:$S0:user:%';")" \
+       "$(dbq "SELECT value::int FROM ladder_config WHERE key='season_payout_base';")"
+    is "…into the leader's own wallet" \
+       "$(dbq "SELECT user_id FROM ledger WHERE reason='SEASON' AND idem_key='season:$S0:user:$PREVIEW_TOP';")" \
+       "$PREVIEW_TOP"
+  else
+    skip "the leader's payout (2 checks)" "no eligible player in the closing season"
+  fi
+  # ⚠ AND THE PLANTED FLEET WAS NEVER PAID. The standings check above proves
+  # it does not RANK; this proves no scrap reached it, which is the claim owen
+  # actually made. Ledger, not endpoint.
+  is "…and the never-fought robot's owner was paid nothing at all" \
+     "$(dbq "SELECT COALESCE(SUM(delta),0) FROM ledger WHERE user_id='$JUNKU';")" 0
+  is "…nor did it collect a season badge it did not fight for" \
+     "$(dbq "SELECT count(*) FROM season_badges WHERE robot_id='$JUNKR';")" 0
+
+  # Badges are the half that did NOT move: still per robot, per category.
+  is "…while badges stayed per-robot and per-category, as the record needs" \
+     "$(dbq "SELECT CASE WHEN count(*) = count(DISTINCT (robot_id, category)) THEN 'ok' ELSE 'duplicated' END
+              FROM season_badges WHERE season_id=$S0;")" ok
 
   # --- the board across a rollover: the DOUBLE-LISTING regression ----------
   # ratings keeps the old season's rows for the record and carries compressed
@@ -1629,14 +1816,21 @@ if [ "${BADGES:-0}" = "0" ]; then
   skip "season badges (5 checks)" "no rollover has run in this session, so there is no podium to record"
 else
   ok "the rollover awarded $BADGES badge(s)"
-  # A badge must pair with the payout that bought it: same robot, same season,
-  # same category. A podium paid but not recorded is a season result that
-  # vanishes; recorded but not paid is worse.
-  is "every badge has a matching SEASON payout" \
+  # ⚠ A BADGE NO LONGER PAIRS WITH A PAYOUT, and that is the change (owen,
+  # 2026-08-19). This check used to require every badge to have a ledger row
+  # keyed season:<n>:<CATEGORY>:<robot>, because the same loop wrote both.
+  # Money is now per USER and top-10; badges stayed per ROBOT per CATEGORY and
+  # top-3. Requiring the pairing would now fail by design.
+  #
+  # What replaces it is the claim that still matters: a badge must belong to a
+  # season that was actually CLOSED. A badge written for a season that never
+  # rolled would be a podium recorded for a race still being run.
+  is "every badge belongs to a season that actually closed" \
      "$(dbq "SELECT count(*) FROM season_badges b
-              WHERE NOT EXISTS (SELECT 1 FROM ledger l
-                                 WHERE l.reason = 'SEASON'
-                                   AND l.idem_key = 'season:' || b.season_id || ':' || b.category || ':' || b.robot_id);")" 0
+              WHERE b.season_id >= (SELECT value FROM ladder_config WHERE key='current_season');")" 0
+  is "…and no badge is for a place beyond the configured badge places" \
+     "$(dbq "SELECT count(*) FROM season_badges
+              WHERE place > (SELECT value FROM ladder_config WHERE key='season_badge_places');")" 0
   is "…and no place is 0 or negative" \
      "$(dbq "SELECT count(*) FROM season_badges WHERE place < 1;")" 0
   is "…and no robot holds two badges in one category in one season" \

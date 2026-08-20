@@ -362,9 +362,20 @@ echo "== J. ladder_config, the tunable constants (§2.3) =="
 # §2.3: "All constants live in one server-side table and are tunable without a
 # client update." If a key goes missing the API prices a challenge at zero, so
 # presence is the check, not just the table's existence.
-for k in stake_base win_purse_base defense_purse first_blood_bonus; do
+for k in stake_base first_blood_bonus season_payout_base season_payout_places season_badge_places; do
   V=$(q "SELECT value FROM ladder_config WHERE key='$k';")
   [ -n "$V" ] && ok "ladder_config carries $k ($V)" || no "ladder_config is missing $k"
+done
+# ⚠ AND TWO KEYS MUST BE ABSENT. win_purse_base and defense_purse were the
+# per-match arena faucet, and migration 016 DELETED them rather than zeroing
+# them precisely because this table is tunable without a deploy — a zeroed key
+# is a live lever that reopens a known exploit with one UPDATE. Presence here
+# means somebody re-seeded the hole, which no amount of API testing would
+# notice until it was being farmed.
+for k in win_purse_base defense_purse; do
+  V=$(q "SELECT count(*) FROM ladder_config WHERE key='$k';")
+  [ "$V" = "0" ] && ok "ladder_config no longer carries $k (per-match arena rewards are abolished)" \
+                 || no "ladder_config has resurrected $k — the junk-robot faucet is back"
 done
 check_err "a config key cannot be duplicated" \
   "INSERT INTO ladder_config (key,value,note) VALUES ('stake_base',1,'dupe');"

@@ -3568,7 +3568,6 @@ public class MobileBuilderUI : MonoBehaviour
         else
         {
             var eligible = arenaScreen.EligibleFor(card);
-            int stake = arenaScreen.StakeForPick(card);
 
             // Which of yours answers. One row of buttons, capped at four —
             // past that the row stops being tappable and starts being a list.
@@ -3590,11 +3589,10 @@ public class MobileBuilderUI : MonoBehaviour
             }
 
             int gapUp = arenaScreen.GapForPick(card);
-            int purse = arenaScreen.PurseForPick(card);
             if (!arenaScreen.Pending)
             {
                 var cb = MkButton("cardchallenge", arenaCardContent,
-                                  "CHALLENGE FOR " + stake + " SCRAP · WIN PAYS " + purse
+                                  "CHALLENGE"
                                   + (gapUp > 0 ? " · FIGHTING " + gapUp + " UP" : ""), 14,
                                   () => { if (arenaScreen != null) { arenaScreen.ArmChallenge(); arenaCardStamp = ""; } });
                 var cle2 = cb.gameObject.AddComponent<LayoutElement>();
@@ -3603,15 +3601,21 @@ public class MobileBuilderUI : MonoBehaviour
             }
             else
             {
-                // The confirm step spells out what is at risk and what comes
-                // back. A stake is the only thing on this screen that can cost
-                // the player something, so it never happens on one tap.
+                // The confirm step spells out what is at risk. It used to be
+                // scrap; since 2026-08-19 a challenge is free and the two-tap
+                // stayed, because what it guards moved rather than vanished:
+                // one of TEN DAILY TICKETS per robot is spent whether you win
+                // or lose, and the rating it moves is what the season prize
+                // ranks. A misfire still costs a tenth of the day.
+                //
+                // ⚠ Do not put a scrap figure back on this line. The old copy
+                // named a stake and a purse the server no longer charges or
+                // pays, which is the failure this whole change exists to end.
                 var warn = MkText("cardstake", arenaCardContent,
-                    "stake " + stake + " scrap"
-                    + (arenaScreen.Balance >= 0 ? " of your " + arenaScreen.Balance : "")
-                    + " — returned if you win or draw, lost if you do not."
-                    + " a win pays " + purse + " scrap"
-                    + (gapUp > 0 ? " (fighting " + gapUp + " class" + (gapUp > 1 ? "es" : "") + " up)." : "."),
+                    "no scrap changes hands — this spends one of today's 10 challenges"
+                    + " and moves your RATING, win or lose."
+                    + " the season pays its top 10 players when it ends"
+                    + (gapUp > 0 ? ", and fighting " + gapUp + " class" + (gapUp > 1 ? "es" : "") + " up is worth more rating." : "."),
                     13, TextAnchor.UpperLeft);
                 warn.color = new Color(1f, 0.87f, 0.55f);
                 warn.gameObject.AddComponent<LayoutElement>().minHeight = 34f;

@@ -15,7 +15,7 @@ PASS  a wrong password and an unknown account are indistinguishable (both 401)
 
 == D. robots ==
 PASS  a robot is created
-      robot f2b1508b-a426-49d2-b26c-d19fe85b5f5e
+      robot 6b990613-bd61-4ee6-b68b-baacbea734f1
 PASS  …but not without a token
 
 == E. snapshot upload stays opaque (§5.2) ==
@@ -30,7 +30,7 @@ PASS  …and a wrong key is refused too
 PASS  a keyed worker claims a job
 PASS  …and the job is the VALIDATE the upload enqueued
 PASS  …pointing at the snapshot just uploaded
-PASS  …and carries a payload location the worker can resolve (file:///tmp/rb-blobs/snapshots/f2b1508b-a426-49d2-b26c-d19fe85b5f5e/2493a414364d4018b33ec90a13c6577f.json)
+PASS  …and carries a payload location the worker can resolve (file:///tmp/rb-blobs/snapshots/6b990613-bd61-4ee6-b68b-baacbea734f1/7183132ad12143d28fef0216b532589c.json)
 PASS  …and the payload sha256 rides along, so the worker can verify storage
 PASS  another worker cannot heartbeat a job it does not hold
 PASS  …the holder can
@@ -77,14 +77,14 @@ PASS  a legal robot with no category is refused (HTTP 400)
 == K. the fight lifecycle, walked end to end (§5.3) ==
 PASS  a defender snapshot is ACTIVE and ready to be challenged
 PASS  a challenge is accepted
-PASS  …priced at the base stake for a same-category fight
+PASS  …and it costs NOTHING to enter: the arena pays at season end, not per fight
 PASS  …and the match is QUEUED
 PASS  …with exactly ONE server-chosen seed (live fights are single-bout)
 PASS  a participant fetches the match feed
 PASS  …and it carries the opponent's build (to render the chassis)
 PASS  …and NEVER the opponent's program (secret IP)
-PASS  …and the stake left the wallet into escrow
-PASS  …recorded as a STAKE row against this match
+PASS  …and the wallet is UNTOUCHED, because nothing was staked
+PASS  …and writes no ledger row at all, rather than a zero-value one
 PASS  a worker claims the FIGHT job the challenge enqueued
 PASS  …carrying BOTH robots' payload locations, so the fight can be run
 PASS  the worker uploads a replay
@@ -92,7 +92,8 @@ PASS  the worker posts the verdict
 PASS  …the match is COMPLETE
 PASS  …with the verdict recorded
 PASS  …and the replay attached
-PASS  …the winner's wallet is stake-refunded and paid the purse
+PASS  …and winning moves NO scrap at all — the per-match purse is abolished
+PASS  …with no PURSE row written anywhere for it
 PASS  …and the FIGHT job is retired, not left to spin
 PASS  …the winner climbed above the 1200 placement and the loser fell below (17081200 vs 1142)
 PASS  …and the winner's deviation tightened from the 350 placement to 315
@@ -102,16 +103,19 @@ PASS  …and the wallet did not move on the second attempt
 PASS  a robot cannot challenge itself
 PASS  a FEATHER may punch up to a SUPER
 PASS  …at a gap of 4
-PASS  …staking 50 x (1 + gap)
-PASS  …and winning pays 100 x (1 + 0.5 x gap)^2 = 900
+PASS  …and still free at four classes up — the stake is gone at every gap
+PASS  …and winning four classes up STILL pays nothing
 PASS  a punch-up creates NO rating for the defender in the challenger's class
 PASS  …and the defender's own-class rating is untouched by the punch-up
 PASS  …while the challenger IS rated, in the class it reached up into
 PASS  …and the match records that the defender was deliberately not rated
 PASS  a SUPER cannot punch DOWN to a FEATHER
+PASS  an account cannot challenge a robot it owns (the junk-robot farm)
+PASS  …and no match row was created for it
+PASS  …and it cost the challenger no daily ticket
 PASS  a defender win settles
-PASS  …paying the defender the flat 40-scrap defense purse
-PASS  …and the challenger's stake is forfeit, not refunded
+PASS  …paying the defender NOTHING — the defense purse is abolished too
+PASS  …and costing the loser nothing either: there was no stake to forfeit
 
 == L. defender protection (§2.2) ==
 PASS  the ticket cap is configured
@@ -119,7 +123,7 @@ PASS  a robot out of tickets cannot initiate another challenge
 PASS  …but defending is unlimited and free (they can still be challenged)
       prior wins by this pair in the window: 4 (taper after 3)
 PASS  a 4th win vs the same opponent is flagged tapered
-PASS  …the stake is still refunded, so the wallet is exactly level
+PASS  …the wallet is exactly level
 PASS  …no PURSE row was written for it
 PASS  …and the winner's rating did not move
 PASS  the provisional threshold is configured
@@ -183,6 +187,16 @@ PASS  …saying rolled=false
 PASS  …and the refusal RETIRED the 2099 sentinel (the clock is real now)
 PASS  …starting a clock that ends within season_weeks, not decades out
 PASS  …still on the same season
+      planted a never-fought robot at 2074 — the top of the ladder by rating alone
+PASS  the season standings answer
+PASS  …and the highest-rated robot on the ladder does NOT rank, because it never fought
+PASS  …scoped to the season about to close
+PASS  …and capped at the payout places
+PASS  …listing each player at most once
+PASS  …with first place paying the full payout base
+      standings preview: 2 player(s), leader d22a2a15-e85c-411a-8ed0-cfaad2d7d8f1
+      season 1: 2 player(s) earned a rating, 1 enlisted without fighting and are therefore unpaid
+PASS  …and excluding players who enlisted but never fought
 PASS  a FORCED season rolls over
 PASS  …into the next season
 PASS  …and the config now points at it
@@ -192,6 +206,16 @@ PASS  …and resetting deviation HIGH, so the new season is genuinely open
 PASS  …leaving wallets intact apart from the season payouts
 PASS  …and closing the SAME season twice is refused, even forced
 PASS  …so nobody was paid for that season twice
+PASS  …and the rollover paid exactly the players the preview named
+PASS  …with the same player in first place
+PASS  …every season payout keyed to a USER, none to a robot in a category
+PASS  …paying each player at most once for the season
+PASS  …and never more players than the configured places
+PASS  …paying the leader the full base
+PASS  …into the leader's own wallet
+PASS  …and the never-fought robot's owner was paid nothing at all
+PASS  …nor did it collect a season badge it did not fight for
+PASS  …while badges stayed per-robot and per-category, as the record needs
 PASS  the board still answers after a rollover
 PASS  …scoped to the CURRENT season
 PASS  …listing each rated robot exactly once, not once per season
@@ -238,12 +262,12 @@ PASS  no refund ever exceeds the stake it returns
 PASS  a challenger who lost never got their stake back
 PASS  a drawn match never paid a purse
 PASS  no wallet is overdrawn
-      ledger: 27 rows, net 3390 scrap across 3 wallets
+      ledger: 8 rows, net 2700 scrap across 3 wallets
 
 --- E. the career economy ---
 PASS  an economy account registers
 PASS  a NON-participant asking for match envelopes is told nothing
-PASS  …and the account id came back (956d7541-8baf-498e-8019-13f37ce86854)
+PASS  …and the account id came back (86b0aeff-9afc-4ff7-830f-6001a0c3a41b)
 PASS  the wallet answers
 PASS  a fresh wallet holds exactly the signing bonus
 PASS  …and owns nothing
@@ -304,12 +328,13 @@ PASS  metrics carry pendingSnapshots
 PASS  pendingSnapshots agrees with the database
 PASS  failed agrees with the database
 PASS  the rbmetrics log line keeps its shape
-      rbmetrics ready=0 claimed=0 failed=4 done=15 oldest_ready_s=0 oldest_heartbeat_s=0 pending_snapshots=3 oldest_pending_s=3
+      rbmetrics ready=1 claimed=0 failed=4 done=16 oldest_ready_s=5 oldest_heartbeat_s=0 pending_snapshots=3 oldest_pending_s=13
 PASS  …and reports real counts, not a row of zeros
 
 --- B. season badges ---
-PASS  the rollover awarded 5 badge(s)
-PASS  every badge has a matching SEASON payout
+PASS  the rollover awarded 3 badge(s)
+PASS  every badge belongs to a season that actually closed
+PASS  …and no badge is for a place beyond the configured badge places
 PASS  …and no place is 0 or negative
 PASS  …and no robot holds two badges in one category in one season
 PASS  an anonymous scout sees the robot's season history (1 entry/entries)
@@ -398,4 +423,4 @@ PASS  ...and it is back on the board
   blob URLs are built with the forwarded scheme -- no object store configured (BLOB_S3_BUCKET unset); file:// rows are passed through verbatim
 ----- a skip is not a pass; each line above is cover this run did not provide -----
 
-===== passed 334  failed 0  skipped 1 =====
+===== passed 356  failed 0  skipped 1 =====
