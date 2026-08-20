@@ -1372,3 +1372,73 @@ headroom to spend on it** — which is the next experiment, not more program.
 3. **SWAPPING PART TYPES IS NEVER MASS-NEUTRAL** — four Ti wedges for four Ti
    blades pushed FEATHER into LIGHT. Conversely, dropping two Titanium rails
    to CarbonFiber freed 212 kg, which is what paid for the compass.
+
+---
+
+# ⚖️ THE BALANCE ANSWER — 2026-08-20
+
+owen: *"if nothing can beat spindle, we need to think about how to balance
+the part and encourage other designs."*
+
+**Something does beat Spinner1: another spinner, with no program at all.**
+
+| design | rotor? | sensors | program | result | damage dealt/bout |
+|---|---|---|---|---|---|
+| `flipper_v2` | no | **none** | **none** | **0/16 · 0%** | 0–1969 |
+| `flipper_v4_welded` | no | none | none | 0/16 · 0% | — |
+| `hunter_v1` | no | compass | 2 instructions | 6W 7L 3D · **38%** | **100–570** |
+| `hunter_v3` | no | compass | 4 instructions | 6W 8L 2D · 38% | — |
+| **`bulwark_v1`** | **YES** | **none** | **none** | **12W 4L · 75%** | **1409–5387** |
+
+⚠ **A rotor with NOTHING driving it beats the champion three times in four.
+A rammer with a sensor and a hand-written program manages 38%.** The rotor is
+worth more than a full sensor suite plus a program, and then some.
+
+**The gap is damage per bout, and it is roughly TEN TIMES.** `hunter_v1`
+deals 100–570 and survives to a judges' decision it usually loses on points.
+`bulwark_v1` deals 1409–5387 and simply dismantles the champion — 45 of
+Spinner1's 45 parts destroyed in two of the sixteen bouts.
+
+⚠ **THE PAIR IS NOT PERFECTLY MATCHED, and that must be said.** `bulwark_v1`
+is 31 parts / 1314 kg against `hunter_v1`'s 25 parts / 1182 kg — a bigger
+robot in the same class. Six parts and 132 kg do not explain a 10× damage
+ratio, but the clean experiment (one chassis, rotor vs pivot, nothing else
+changed) has NOT been run, and it should be before any constant moves.
+
+## Why non-rotor designs lose, mechanically
+
+* Fights they survive go the full **92 s** and are decided on **damage** —
+  which is the axis the rotor is built to win. A wedge that controls the
+  fight and never destroys anything loses the card.
+* Spinner1's own hat 4 (retreat at `HpFrac<0.9`, keep spinning) means a
+  slow robot never gets a second exchange. Countering it costs a compass
+  and a program — parts and mass a rotor design does not have to spend.
+* `hunter_v1` proves durability is solvable (1–3 parts lost, 4 of 5 weapons
+  alive). **Survival is not the problem. Scoring is.**
+
+## Levers, cheapest first — all measurable with this harness
+
+1. **Make the rotor pay for power.** Power is already modelled (a bout ended
+   "out of power — 240 kJ of its 240 kJ pack was torn off") and `PowerFrac`
+   already exists as a condition. Spin-up that drains the pack forces a real
+   choice between rotor and mobility. **A dial, not a rewrite.**
+2. **Self-damage on impact.** Real spinners wreck themselves; here
+   `bulwark_v1` sheds 1–8 parts while removing 45. Returning a share of
+   delivered energy to the rotor taxes exactly the behaviour that dominates.
+3. **Longer re-spin after a big hit.** `Actuator.Phase` already has
+   `Recovering`. Spinner1's program retreats to re-spin, so the mechanic
+   exists — it may simply be too quick to matter.
+4. **Fix the scoring, not the weapon.** Judges decide on damage, so control
+   designs cannot win a long fight however well they play. A control or
+   aggression component would let wedges score. ⚠ This overlaps the
+   already-open judges'-card structure-fraction question — **do not tune the
+   card twice for two different reasons.**
+5. **Buff the counter instead.** `GUSSET_SEAM_MULT` ×4 fixed structure; the
+   analogous move for wedges is a damage or leverage bonus for getting
+   underneath. Least risk to what already feels good about rotors.
+
+**Recommendation: 1 and 2 together, measured before shipping.** Both are
+physically motivated, both are constants, and neither makes a rotor unfun —
+they make it a *choice* rather than the answer. **Do not stack them with 4**;
+one variable at a time, and this harness now fights the real champion, so it
+can actually tell.

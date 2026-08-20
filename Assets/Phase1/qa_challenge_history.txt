@@ -29,3 +29,5 @@ hunter_v1                    LOSES TO SPINNER1    W/L/D 6/7/3
 hunter_v2                    INELIGIBLE           W/L/D 0/0/0  challenger is a LEGAL build — hat 2 (breakoff): needs a Damage bus — SHOP
 hunter_v2b                   INELIGIBLE           W/L/D 0/0/0  challenger is a LEGAL build — Structure has floating parts — Damage bus at (0.00, 0.41, -0.27) isn't flush with anything. Faces must touch; sockets must mate.
 hunter_v3                    LOSES TO SPINNER1    W/L/D 6/8/2  
+hunter_v4_reach              INELIGIBLE           W/L/D 0/0/0  challenger is a LEGAL build — Structure has floating parts — Beam at (0.00, 0.43, 1.38) isn't flush with anything. Faces must touch; sockets must mate.
+bulwark_SPINDLE_control      BEATS SPINNER1       W/L/D 12/4/0  
