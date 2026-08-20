@@ -4,7 +4,9 @@ owen: *"users can abuse arena rewards by unloading junk robots. let's remove
 per game rewards, but give rewards per session. top 10 users for each season
 get rewards."*
 
-Server + client + benches, measured. **Not deployed** — this is owen's call.
+Server + client + benches, measured. **DEPLOYED TO PRODUCTION** the same day
+(owen: "push to prod") — revision `rb-api-00026-5t2`, rollback point
+`rb-api-00025-vsg`. The client half is NOT in any build yet; see §8.
 
 ---
 
@@ -181,12 +183,56 @@ passed identically with no rule at all. The fixture is now planted on purpose,
 and **seeded ABOVE the leader** — parked at 1200 it would have been excluded by
 rank alone, which is the same vacuum in a subtler form.
 
-## 8. Not done
+## 8. The production deploy
 
-* **Not deployed.** `deploy_api.zsh` is owen's call. Migration 016 runs at
-  container boot, so deploying the API applies it.
+`deploy_api.zsh`, 2026-08-19 20:14 PDT. Image `api:20260819-201438`, revision
+**`rb-api-00026-5t2`** at 100% of traffic. **Roll back to `rb-api-00025-vsg`.**
+
+Verified against the live service, read-only throughout — no account was
+registered and nothing was written:
+
+* `applying migration 016_arena_pays_by_season` in the boot log. The whole
+  migration is one `BEGIN…COMMIT` **with its own `schema_version` insert
+  inside**, and `MigrateAsync` runs at boot and would have thrown — so a
+  service that is up and serving is proof every statement in it committed,
+  the two `DELETE`s included.
+* `GET /v1/seasons/standings` answers with `places: 10`, `payoutBase: 1000`.
+  Those were 3 and 300 before, so the config `UPDATE`s are live.
+* `/healthz/` 200. ⚠ Bare `/healthz` 404s — that is the documented
+  interception on owen's network, **not** a regression: it 404'd before the
+  deploy too. The trailing slash is the real check.
+* Zero `severity>=ERROR` lines on the new revision.
+
+**The live standings today**, and the sanity check that the eligibility rule
+behaves on real data rather than only on the dev fixture: 26 rated robots on
+the board, **15 have actually fought**, and they belong to **6 users** — so 11
+never-fought robots are correctly excluded. If the season ended now (it ends
+**2026-09-09**):
+
+| | player | rating | scrap |
+|---|---|---|---|
+| 1 | Owen | 2044.8 | 1000 |
+| 2 | BOSSLeon | 1573.8 | 500 |
+| 3 | Grinder Pilot | 1276.1 | 333 |
+| 4 | Rival | 1266.9 | 250 |
+| 5 | Challenger | 1218.1 | 200 |
+| 6 | Piston Pilot | 1037.7 | 166 |
+
+The worker was NOT redeployed and does not need to be: settlement is entirely
+API-side (`fight-result`), and the worker reads none of the constants that
+moved.
+
+## 9. Still owed
+
+⚠ **THE SHIPPED CLIENT NOW LIES.** TestFlight build 12 predates this and its
+challenge card still reads **"CHALLENGE FOR 50 SCRAP · WIN PAYS 100"**, while
+the deployed server charges nothing and pays nothing. Nothing breaks — the
+fight runs, the wallet simply does not move — but the copy is wrong until a
+build carries `0eb8729`. That build also owes `f603610` (retire) and
+`2256c3a` (the `[dev]` badge).
+
 * Existing in-flight matches with a real escrowed stake are refunded on **every**
   verdict, including a defender win that used to forfeit it — the forfeit only
   ever funded `DEFENSE`, and keeping it without the payment would burn a
   player's scrap into nobody's wallet.
-* No client build carries this yet.
+* **Sybil is open** (§4) and no threshold closes it.
