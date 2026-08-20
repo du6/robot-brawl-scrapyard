@@ -17,3 +17,4 @@ abl_nopivot                  LOSES TO SPINNER1    W/L/D 2/6/0
 abl_noengine                 BEATS SPINNER1       W/L/D 5/3/0  
 piston_v1                    EVEN WITH SPINNER1   W/L/D 4/4/0  
 piston_v1_rerun              BEATS SPINNER1       W/L/D 5/3/0  
+flipper_v2_control           BEATS SPINNER1       W/L/D 12/4/0  

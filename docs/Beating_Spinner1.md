@@ -27,6 +27,29 @@ be built again.
 > ## ⚠ AND §4.5's RULE 1 IS NOT THE ONLY WAY — see "Without a spindle" (2026-08-19)
 >
 > owen asked whether anything BUT a spinner can beat the champion. It can:
+> ⚠ **RETRACTED IN PART, 2026-08-19 (owen: "the spinner type of robot is
+> still dominating"). Re-measured on EIGHT fresh seeds x 2 spawn sides:
+> `flipper_v2` is 12–4, a 75% win rate — NOT unbeaten.** The 16–0 below was
+> two four-seed sets; doubling the seeds found the losses. The design is
+> still the best no-rotor answer on record and still wins the series, but
+> "beats Spinner1" and "never loses to Spinner1" are different claims and
+> only the first survives. Full per-bout table: `Assets/Phase1/qa_challenge_bench.txt`.
+>
+> **What the losses look like, and why they feel worse than 25%:** the wins
+> are lopsided (dealt ~1000–1600 vs ~500–800) and the losses are
+> catastrophic — seed 202 side B shed **24 parts** and every weapon in 25 s,
+> seed 707 side A shed 11. Spinner1 either never lands a clean flank bite or
+> lands one and ends the fight. A player meeting that tail three times in a
+> row reasonably concludes the matchup is hopeless; the mean says otherwise
+> and the variance is the actual product problem.
+>
+> ⚠ **One loss is not a fight at all.** Seed 707 side B: 19.1 s, **2 hits**,
+> 17.3 damage vs 16.8 — a near-zero bout awarded against the challenger.
+> That is the judges'-card structure-fraction question in the open-items
+> list, showing up as a real recorded loss rather than a hypothetical.
+>
+> The original claim, kept for the record:
+>
 > **`flipper_v2` — a `pivot`, a Titanium arm and a Titanium wedge — is 16–0**
 > across two seed sets with no rotor anywhere on it. Nine more sweeps and
 > 72 more bouts, appended as the last top-level section of this file.
