@@ -3629,8 +3629,14 @@ public class MobileBuilderUI : MonoBehaviour
                                           arenaPickOpen = false;      // collapse on choose
                                           arenaCardStamp = "";
                                       });
-                    var ple = pb.gameObject.AddComponent<LayoutElement>();
-                    ple.flexibleHeight = 0f; ple.minHeight = TouchRow(); ple.preferredHeight = TouchRow();
+                    // `rowLe`, not `ple`: the parts-manifest label at the top of
+                    // this same method already owns that name, and C# refuses a
+                    // shadowing local (CS0136). That is what put the editor in
+                    // safe mode — my change was committed unbuilt because the
+                    // bridge had dropped, and an unbuilt commit is exactly how
+                    // a one-word mistake reaches someone else's editor.
+                    var rowLe = pb.gameObject.AddComponent<LayoutElement>();
+                    rowLe.flexibleHeight = 0f; rowLe.minHeight = TouchRow(); rowLe.preferredHeight = TouchRow();
                     var pimg = pb.GetComponent<Image>();
                     if (pimg != null) pimg.color = on ? new Color(0.20f,0.45f,0.65f,1f) : new Color(0.13f,0.14f,0.18f,1f);
                     var pt = pb.GetComponentInChildren<Text>();
