@@ -31,3 +31,6 @@ hunter_v2b                   INELIGIBLE           W/L/D 0/0/0  challenger is a L
 hunter_v3                    LOSES TO SPINNER1    W/L/D 6/8/2  
 hunter_v4_reach              INELIGIBLE           W/L/D 0/0/0  challenger is a LEGAL build — Structure has floating parts — Beam at (0.00, 0.43, 1.38) isn't flush with anything. Faces must touch; sockets must mate.
 bulwark_SPINDLE_control      BEATS SPINNER1       W/L/D 12/4/0  
+hunter_v5_tungsten           INELIGIBLE           W/L/D 0/0/0  challenger is in the champion's class (FEATHER), got LIGHT
+hunter_v6_tungsten_nose      BEATS SPINNER1       W/L/D 15/0/1  
+hunter_v6_confirm            BEATS SPINNER1       W/L/D 15/0/1  

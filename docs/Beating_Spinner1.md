@@ -1375,12 +1375,61 @@ headroom to spend on it** — which is the next experiment, not more program.
 
 ---
 
-# ⚖️ THE BALANCE ANSWER — 2026-08-20
+# ✅ SOMETHING DOES BEAT IT — `hunter_v6`, 30/32 (94%)
+
+**Read this before the balance section below, which it partly overturns.**
+
+One part's MATERIAL — the contact wedge, Titanium → **Tungsten** — took the
+same chassis, same compass, same two-instruction program from 38% to 94%:
+
+| design | contact wedge | seeds `101…808` | seeds `17…2718` | combined |
+|---|---|---|---|---|
+| `hunter_v1` | Titanium | 6W 7L 3D · 38% | — | — |
+| **`hunter_v6`** | **Tungsten** | **15W 0L 1D** | **15W 0L 1D** | **30/32 · 94%** |
+
+Replicated exactly on a disjoint seed set. Nothing else changed — 25 parts,
+1338 kg, still FEATHER.
+
+**And it beats the rotor's own score:** `bulwark_v1` (rotor, no program) went
+12/4 · 75%. The best non-rotor design now on record is *better* than that.
+
+## The mechanism is DEFENSIVE, and that is the surprise
+
+`hunter_v6` does not out-hit Spinner1 — it deals a modest 117–633 a bout.
+What changed is what it *takes*:
+
+| | Spinner1's damage INTO it | parts lost | weapons alive |
+|---|---|---|---|
+| `hunter_v1` (Titanium wedge) | 200–630 | 1–3 | 4 of 5 |
+| **`hunter_v6` (Tungsten wedge)** | **59–370** | **0–2** | **4–5 of 5** |
+
+**A Tungsten face blunts the rotor.** Spinner1 hits it and achieves almost
+nothing; every bout then runs the full 92 s to a judges' decision that
+`hunter_v6` wins on a 2–4× damage ratio. The counter to a spinner is not a
+better weapon — it is a harder thing to hit.
+
+⚠ **THE COUNTER IS GATED BEHIND PRICE, WHICH IS THE REAL BALANCE QUESTION.**
+A Tungsten wedge is **1737 scrap**, against Titanium's 203 — 8.5×, and more
+than a season's first-place payout (1000). The counter-play exists and is
+decisive; whether a player can *afford* to discover it is a different matter,
+and that is an economy question, not a physics one.
+
+⚠ **AND TUNGSTEN IS ONLY AFFORDABLE IN ONES.** Six Tungsten parts pushed the
+same build out of FEATHER into LIGHT. One is transformative; two may not fit.
+That is a genuinely interesting design constraint — spend your one hard part
+where the enemy hits you.
+
+---
+
+# ⚖️ The balance picture — 2026-08-20 (SUPERSEDED IN PART by the above)
 
 owen: *"if nothing can beat spindle, we need to think about how to balance
 the part and encourage other designs."*
 
-**Something does beat Spinner1: another spinner, with no program at all.**
+**Written before `hunter_v6` existed. Its conclusion — that only a rotor
+beats a rotor — is WRONG, and the section above has the numbers. What still
+stands is the measurement that a rotor with NO program reaches 75%, which is
+an enormous amount of free performance for one part.**
 
 | design | rotor? | sensors | program | result | damage dealt/bout |
 |---|---|---|---|---|---|
