@@ -99,54 +99,54 @@ namespace RobotBrawl.Phase0
         //
         // UNTIL THEN: read every verdict from this bench as "beats a 16-part
         // program-less prototype", which is not the question anyone is asking.
-        public static readonly string CHAMPION_BUILD = @"#fmt3-disc
-#fmt4-gusset
-core|0.000,0.700,0.000|0|0.00,0.00,0.00|Aluminum
-beamlong|0.000,0.700,0.650|0|0.00,0.00,0.00|CarbonFiber
-beam|0.000,0.700,-0.450|0|0.00,0.00,0.00|CarbonFiber
-beam|-0.400,0.700,0.950|90|0.00,0.00,0.00|CarbonFiber
-beam|0.400,0.700,0.950|90|0.00,0.00,0.00|CarbonFiber
-beam|0.400,0.700,-0.600|90|0.00,0.00,0.00|CarbonFiber
-beam|-0.400,0.700,-0.600|90|0.00,0.00,0.00|CarbonFiber
-beamlong|-0.550,0.700,0.000|0|0.00,0.00,0.00|CarbonFiber
-beamlong|0.550,0.700,0.000|0|0.00,0.00,0.00|CarbonFiber|G:1
-wheel|0.380,0.700,-0.300|0|-1.00,0.00,0.00|Rubber
-wheel|0.380,0.700,0.300|0|-1.00,0.00,0.00|Rubber
-wheel|-0.380,0.700,-0.300|0|1.00,0.00,0.00|Rubber
-wheel|-0.380,0.700,0.300|0|1.00,0.00,0.00|Rubber
-wheel|0.220,0.700,0.000|0|1.00,0.00,0.00|Rubber
-wheel|-0.220,0.700,0.000|0|-1.00,0.00,0.00|Rubber
-battery|0.000,0.925,-0.300|0|0.00,0.00,0.00|Aluminum
-battery|0.000,0.975,0.000|0|0.00,0.00,0.00|Aluminum
-blade|0.400,0.700,1.110|0|0.00,0.00,1.00|CarbonFiber
-blade|-0.400,0.700,1.110|0|0.00,0.00,1.00|CarbonFiber
-spindle|0.000,0.950,0.650|0|0.00,1.00,0.00|CarbonFiber
-beam|0.000,1.200,0.650|0|0.00,0.00,0.00|CarbonFiber
-beamlong|0.000,1.200,1.450|0|0.00,0.00,0.00|CarbonFiber
-wallsensor|-0.215,0.975,0.000|0|0.00,0.00,0.00|Aluminum
-tiltsensor|-0.205,0.925,-0.300|0|0.00,0.00,0.00|Aluminum
-compass|0.225,0.975,0.000|0|0.00,0.00,0.00|Aluminum
-trapsensor|0.205,0.925,-0.300|0|0.00,0.00,0.00|Aluminum
-rangefinder|0.000,0.880,0.350|0|0.00,0.00,0.00|Aluminum
-engine|0.000,0.925,-0.750|0|0.00,0.00,0.00|Aluminum
-dmgbus|0.000,0.925,-1.055|0|0.00,0.00,0.00|Aluminum
-beam|0.000,0.925,-1.235|90|0.00,0.00,0.00|CarbonFiber
-blade|-0.160,1.200,1.600|90|-1.00,0.00,0.00|CarbonFiber
-blade|0.160,1.200,1.600|90|1.00,0.00,0.00|CarbonFiber
-beamlong|-0.550,0.900,0.000|0|0.00,0.00,0.00|CarbonFiber
-beamlong|0.550,0.900,0.000|0|0.00,0.00,0.00|CarbonFiber
-spike|-0.550,0.700,-0.850|0|0.00,0.00,-1.00|CarbonFiber
-spike|0.550,0.700,-0.850|0|0.00,0.00,-1.00|CarbonFiber
-spike|-0.150,0.925,-1.485|0|0.00,0.00,-1.00|CarbonFiber
-spike|0.150,0.925,-1.485|0|0.00,0.00,-1.00|CarbonFiber
-beam|0.400,0.925,-1.085|0|0.00,0.00,0.00|CarbonFiber
-beam|-0.400,0.925,-1.085|0|0.00,0.00,0.00|CarbonFiber
-plate|-0.680,0.850,0.150|270|0.00,0.00,0.00|CarbonFiber
-plate|0.680,0.850,0.150|270|0.00,0.00,0.00|CarbonFiber
-beam|0.000,1.200,2.250|0|0.00,0.00,0.00|CarbonFiber
-blade|-0.160,1.200,2.250|90|-1.00,0.00,0.00|CarbonFiber
-blade|0.160,1.200,2.250|90|1.00,0.00,0.00|CarbonFiber
-";
+        public static readonly string CHAMPION_BUILD =
+            "#fmt3-disc\n" +
+            "#fmt4-gusset\n" +
+            "core|0.000,0.700,0.000|0|0.00,0.00,0.00|Aluminum\n" +
+            "beamlong|0.000,0.700,0.650|0|0.00,0.00,0.00|CarbonFiber\n" +
+            "beam|0.000,0.700,-0.450|0|0.00,0.00,0.00|CarbonFiber\n" +
+            "beam|-0.400,0.700,0.950|90|0.00,0.00,0.00|CarbonFiber\n" +
+            "beam|0.400,0.700,0.950|90|0.00,0.00,0.00|CarbonFiber\n" +
+            "beam|0.400,0.700,-0.600|90|0.00,0.00,0.00|CarbonFiber\n" +
+            "beam|-0.400,0.700,-0.600|90|0.00,0.00,0.00|CarbonFiber\n" +
+            "beamlong|-0.550,0.700,0.000|0|0.00,0.00,0.00|CarbonFiber\n" +
+            "beamlong|0.550,0.700,0.000|0|0.00,0.00,0.00|CarbonFiber|G:1\n" +
+            "wheel|0.380,0.700,-0.300|0|-1.00,0.00,0.00|Rubber\n" +
+            "wheel|0.380,0.700,0.300|0|-1.00,0.00,0.00|Rubber\n" +
+            "wheel|-0.380,0.700,-0.300|0|1.00,0.00,0.00|Rubber\n" +
+            "wheel|-0.380,0.700,0.300|0|1.00,0.00,0.00|Rubber\n" +
+            "wheel|0.220,0.700,0.000|0|1.00,0.00,0.00|Rubber\n" +
+            "wheel|-0.220,0.700,0.000|0|-1.00,0.00,0.00|Rubber\n" +
+            "battery|0.000,0.925,-0.300|0|0.00,0.00,0.00|Aluminum\n" +
+            "battery|0.000,0.975,0.000|0|0.00,0.00,0.00|Aluminum\n" +
+            "blade|0.400,0.700,1.110|0|0.00,0.00,1.00|CarbonFiber\n" +
+            "blade|-0.400,0.700,1.110|0|0.00,0.00,1.00|CarbonFiber\n" +
+            "spindle|0.000,0.950,0.650|0|0.00,1.00,0.00|CarbonFiber\n" +
+            "beam|0.000,1.200,0.650|0|0.00,0.00,0.00|CarbonFiber\n" +
+            "beamlong|0.000,1.200,1.450|0|0.00,0.00,0.00|CarbonFiber\n" +
+            "wallsensor|-0.215,0.975,0.000|0|0.00,0.00,0.00|Aluminum\n" +
+            "tiltsensor|-0.205,0.925,-0.300|0|0.00,0.00,0.00|Aluminum\n" +
+            "compass|0.225,0.975,0.000|0|0.00,0.00,0.00|Aluminum\n" +
+            "trapsensor|0.205,0.925,-0.300|0|0.00,0.00,0.00|Aluminum\n" +
+            "rangefinder|0.000,0.880,0.350|0|0.00,0.00,0.00|Aluminum\n" +
+            "engine|0.000,0.925,-0.750|0|0.00,0.00,0.00|Aluminum\n" +
+            "dmgbus|0.000,0.925,-1.055|0|0.00,0.00,0.00|Aluminum\n" +
+            "beam|0.000,0.925,-1.235|90|0.00,0.00,0.00|CarbonFiber\n" +
+            "blade|-0.160,1.200,1.600|90|-1.00,0.00,0.00|CarbonFiber\n" +
+            "blade|0.160,1.200,1.600|90|1.00,0.00,0.00|CarbonFiber\n" +
+            "beamlong|-0.550,0.900,0.000|0|0.00,0.00,0.00|CarbonFiber\n" +
+            "beamlong|0.550,0.900,0.000|0|0.00,0.00,0.00|CarbonFiber\n" +
+            "spike|-0.550,0.700,-0.850|0|0.00,0.00,-1.00|CarbonFiber\n" +
+            "spike|0.550,0.700,-0.850|0|0.00,0.00,-1.00|CarbonFiber\n" +
+            "spike|-0.150,0.925,-1.485|0|0.00,0.00,-1.00|CarbonFiber\n" +
+            "spike|0.150,0.925,-1.485|0|0.00,0.00,-1.00|CarbonFiber\n" +
+            "beam|0.400,0.925,-1.085|0|0.00,0.00,0.00|CarbonFiber\n" +
+            "beam|-0.400,0.925,-1.085|0|0.00,0.00,0.00|CarbonFiber\n" +
+            "plate|-0.680,0.850,0.150|270|0.00,0.00,0.00|CarbonFiber\n" +
+            "plate|0.680,0.850,0.150|270|0.00,0.00,0.00|CarbonFiber\n" +
+            "beam|0.000,1.200,2.250|0|0.00,0.00,0.00|CarbonFiber\n" +
+            "blade|-0.160,1.200,2.250|90|-1.00,0.00,0.00|CarbonFiber\n" +
+            "blade|0.160,1.200,2.250|90|1.00,0.00,0.00|CarbonFiber\n";
 
         public const string REQUIRED_CATEGORY = "FEATHER";
 

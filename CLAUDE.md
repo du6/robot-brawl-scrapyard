@@ -249,6 +249,18 @@ hits that matter.**
   /`LadderSweepBench`. Their numbers are INSENSITIVE to it at any value — an
   unchanged 43% after the ×4 change is not a null result, it is no result.
   Only `CareerBench`'s HARDENED enemies are gusseted at all.
+- ⚠ **A `#` AT THE START OF A LINE INSIDE A VERBATIM STRING BREAKS THE PLAYER
+  BUILD AND NOT THE EDITOR.** In a DISABLED `#if` region the C# lexer does not
+  recognise string literals at all — it only scans for directives — so
+  `@"#fmt3-disc…"` inside `#if UNITY_EDITOR || DEVELOPMENT_BUILD` is read as a
+  preprocessor directive and fails **CS1024**. The editor compiles it fine
+  (region enabled, the `#` is just a character); the *release player* does not.
+  Cost a build on 2026-08-20 (`ChallengeBench.CHAMPION_BUILD`, a snapshot whose
+  first two lines are `#fmt3-disc` / `#fmt4-gusset`). **Snapshot text belongs in
+  escaped concatenated literals** (`"#fmt3-disc\n" + …`), which is the form the
+  original constant used and now we know why. Every bench in this project lives
+  in such a region, so any fixture pasted as `@"…"` is a build waiting to fail —
+  and no editor-side check can see it.
 - **A UI PATH ONLY A HUMAN CAN DRIVE IS A UI PATH NOTHING CHECKS.** ENLIST
   shipped with its network half 21/21 and the button itself never once
   pressed; the first run of `EnlistUiBench` found the confirmation message
