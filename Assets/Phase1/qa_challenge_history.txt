@@ -18,3 +18,8 @@ abl_noengine                 BEATS SPINNER1       W/L/D 5/3/0
 piston_v1                    EVEN WITH SPINNER1   W/L/D 4/4/0  
 piston_v1_rerun              BEATS SPINNER1       W/L/D 5/3/0  
 flipper_v2_control           BEATS SPINNER1       W/L/D 12/4/0  
+wedge_wall                   EVEN WITH SPINNER1   W/L/D 8/8/0  
+flipper_v3_skirt             INELIGIBLE           W/L/D 0/0/0  challenger is a LEGAL build — Structure has floating parts — Wedge at (-0.62, 0.23, -0.27) isn't flush with anything. Faces must touch; sockets must mate. ; challenger is in the champion's class (FEATHER), got LIGHT
+flipper_v3_skirt             INELIGIBLE           W/L/D 0/0/0  challenger is a LEGAL build — Structure has floating parts — Wedge at (-0.43, 0.52, -0.27) isn't flush with anything. Faces must touch; sockets must mate.
+flipper_v4_welded            BEATS SPINNER1       W/L/D 14/2/0  
+flipper_v4_confirm           BEATS SPINNER1       W/L/D 14/2/0  

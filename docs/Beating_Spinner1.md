@@ -48,6 +48,68 @@ be built again.
 > That is the judges'-card structure-fraction question in the open-items
 > list, showing up as a real recorded loss rather than a hypothetical.
 >
+> ---
+>
+> ## ✅ `flipper_v4_welded` — 28/32 (88%), and the fix was one character per line
+>
+> Measured 2026-08-19 after the retraction above, spindle banned, weapon
+> required, against the same Spinner1 build:
+>
+> | design | seeds `101…808` | seeds `17…2718` | combined |
+> |---|---|---|---|
+> | `flipper_v2` | 12/4 (75%) | — | — |
+> | `wedge_wall` (no pivot) | 8/8 (50%) | — | — |
+> | **`flipper_v4_welded`** | **14/2 (88%)** | **14/2 (88%)** | **28/32 (88%)** |
+>
+> **The change is `G:16` on the four flank blades. Nothing moved.** They were
+> the only parts in `flipper_v2` carrying no seam mark at all — and they were
+> exactly what the catastrophic losses shed. `GUSSET_SEAM_MULT` is 4 now
+> (2026-08-18), so a seam mark is worth four times what it was when this
+> design was drawn, and the design had never been revisited since.
+>
+> ⚠ **BELIEVE THE MECHANISM, NOT THE 14/2.** Two bouts at n=16 is inside this
+> project's measured noise (12/5 and 10/7 from an UNCHANGED build,
+> `CareerBench_Sample_Size_2026-08-10`). What is NOT noise is the damage
+> ledger, which moved in the same direction on both seed sets:
+>
+> | | parts shed / 16 bouts | zero-loss bouts | worst bout |
+> |---|---|---|---|
+> | `flipper_v2` | 57 | 4/16 | 24 |
+> | `flipper_v4` set A | 32 | 9/16 | 24 |
+> | `flipper_v4` set B | 30 | 6/16 | 11 |
+>
+> Shedding roughly **half** the parts, and going from four clean bouts to
+> six-to-nine, is a mechanism claim the win rate merely agrees with.
+>
+> ⚠ **The tail is thinner, NOT gone.** Set A seed 303/B still shed 24 parts
+> and every weapon in 23 s. A player who meets that on their first challenge
+> still concludes the matchup is hopeless. **The variance is the product
+> problem and gusseting did not solve it** — it made it rarer.
+>
+> ### The negative result, which is the more useful half
+>
+> `wedge_wall` replaced the pivot with a fixed low wedge wall and went **8/8**.
+> Its damage collapsed to 76–694 per bout against `flipper_v2`'s 1000–1600: it
+> survives beautifully (7 weapons alive, 0–3 parts lost) and cannot kill, so
+> it wins only by count-out. **The pivot assembly is the damage, not the
+> wedge.** Anyone tempted to simplify the flipper into a ram should read this
+> row first.
+>
+> ### Two build-format traps, both cost a run
+>
+> ⚠ **A WEDGE DOES NOT MATE WHERE A BLADE DOES.** Placing wedges at the flank
+> blades' *exact* coordinates (`±0.425, 0.515, ±…`) was rejected: *"Wedge …
+> isn't flush with anything."* Swapping a part type at an unchanged position
+> is NOT a safe edit.
+>
+> ⚠ **AND SWAPPING PART TYPES IS NEVER MASS-NEUTRAL.** Four Titanium wedges
+> for four Titanium blades pushed 1354 kg past the 1500 kg FEATHER ceiling
+> into LIGHT, which the bench rejects as out-of-class. Both faults are why
+> `flipper_v4` changes only metadata: a `G:` mark cannot float and barely
+> moves mass.
+>
+> ---
+>
 > The original claim, kept for the record:
 >
 > **`flipper_v2` — a `pivot`, a Titanium arm and a Titanium wedge — is 16–0**
