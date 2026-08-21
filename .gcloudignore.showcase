@@ -1,0 +1,15 @@
+# Upload only the two python files and the dockerfile. Without this the
+# context is the whole repo and Library/ alone is 5 GB.
+#
+# ⚠ The negations must re-open each PARENT directory before its children.
+# gitignore semantics say a file cannot be re-included if a parent directory
+# is excluded, so a bare `*` + `!website/tools/**` uploads NOTHING — see the
+# 54-byte context measured in .gcloudignore.worker.
+/*
+!/website
+/website/*
+!/website/tools
+/website/tools/*
+!/website/tools/bake_showcase.py
+!/website/tools/refresh_showcase_cloud.py
+!/website/tools/Dockerfile.showcase
