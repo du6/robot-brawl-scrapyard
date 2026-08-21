@@ -201,6 +201,17 @@ public class FightManager : MonoBehaviour
     /// the other. The floor keeps a narrow screen from losing its margin
     /// entirely, which is the state that produced the clipping this fixes.</summary>
     static float SIDE_PAD(float w) { return Mathf.Max(20f, w * 0.045f); }
+
+    /// <summary>Draw one results-screen stat row at its MEASURED height and
+    /// return the y to start the next one at. See the note at the call site:
+    /// these strings wrap, and a fixed row height silently clips or overlaps
+    /// them on a screen the author did not happen to test.</summary>
+    float StatRow(float y, float pad, float w, string s)
+    {
+        float h = smallStyle.CalcHeight(new GUIContent(s), w);
+        GUI.Label(new Rect(pad, y, w, h), s, smallStyle);
+        return y + h + 4f;
+    }
     GUIStyle idStyle, hudIdStyle, moneyStyle, moneySmall, medalStyle;
 
     public void Setup(BuilderManager owner, CompoundRobot pBot, RaycastWheelDrive pDrive,
@@ -1294,13 +1305,26 @@ public class FightManager : MonoBehaviour
         // the row spacing opened just enough to hold the second line (the gaps
         // move 0.04/0.09/0.13 -> 0.045/0.09/0.135; the match-time row and the
         // money block below it keep their original offsets).
-        float rowH = H * 0.042f;
-        GUI.Label(new Rect(pad, statsTop,            W - pad*2f, rowH), SideLine("YOU", player), smallStyle);
-        GUI.Label(new Rect(pad, statsTop + H*0.045f, W - pad*2f, rowH), SideDetail(player), smallStyle);
-        GUI.Label(new Rect(pad, statsTop + H*0.09f,  W - pad*2f, rowH), SideLine(enemy.label, enemy), smallStyle);
-        GUI.Label(new Rect(pad, statsTop + H*0.135f, W - pad*2f, rowH), SideDetail(enemy), smallStyle);
-        GUI.Label(new Rect(0, statsTop + H*0.18f, W, 30),
+        // ⚠ MEASURE THE ROWS, DO NOT GUESS THEM IN FRACTIONS OF H. The first
+        // attempt at this fix gave each row a flat H*0.042 and stacked them on
+        // fixed fractions — which is the same mistake in a new place: on a
+        // SHORT landscape screen 0.042H is less than one line of a 22pt style,
+        // so a row that wrapped was clipped top and bottom and ran into the
+        // one below it. Verified on an iPhone 17 in landscape: the "YOU" rows
+        // collided into a smear while the enemy's rows, being shorter, looked
+        // fine — which is exactly how this class of bug hides.
+        // CalcHeight knows the wrapped height at THIS width, so the stack is
+        // correct on any screen and cannot overlap by construction.
+        float rowW = W - pad * 2f;
+        float y = statsTop;
+        y = StatRow(y, pad, rowW, SideLine("YOU", player));
+        y = StatRow(y, pad, rowW, SideDetail(player));
+        y += H * 0.014f;                                   // breath between the two machines
+        y = StatRow(y, pad, rowW, SideLine(enemy.label, enemy));
+        y = StatRow(y, pad, rowW, SideDetail(enemy));
+        GUI.Label(new Rect(0, y + H * 0.012f, W, 30),
             string.Format("Match time {0}:{1:00}", tsec / 60, tsec % 60), smallStyle);
+        float statsBottom = y + H * 0.012f + 30f;
         // ---------------------------------------------------------- MONEY
         // ROUND-3 FIX (critic CRITICAL 2b) - this was a TRUST bug, not a
         // hierarchy one. The screen printed the gross award with a plus sign
@@ -1308,7 +1332,10 @@ public class FightManager : MonoBehaviour
         // cost the player 160 scrap net was reported to them as "+40". Show
         // the arithmetic: purse, bonus, fee, net. A player must never be told
         // they gained money in a match where they lost money.
-        float my = statsTop + H * 0.21f;   // = 0.585H when statsTop is 0.375H (career/contest unchanged)
+        // Keeps its original position whenever the measured stat stack leaves
+        // room (career/contest at statsTop 0.375H is unchanged), and is pushed
+        // down only when a long wrapped row would otherwise be written over.
+        float my = Mathf.Max(statsTop + H * 0.21f, statsBottom + H * 0.015f);   // = 0.585H when statsTop is 0.375H (career/contest unchanged)
         if (cIsContest)
         {
             // Entry fees are gone (owen, 2026-08-13): the arithmetic line is
