@@ -1270,23 +1270,36 @@ public class FightManager : MonoBehaviour
         // string off the screen edges — see the note on the stat rows below.
         float statsTop;
         float pad = SIDE_PAD(W);
+        // ⚠ MEASURE THE CAUSE BOX TOO. A fixed 68px here was still a magic
+        // number: a layout probe over seven ship sizes found this longest real
+        // cause line needs 96px at 750pt wide (it would clip exactly as
+        // before), and only 3px of slack at iPhone portrait and iPad mini —
+        // fragile enough that one more word of copy would have broken it.
+        // CalcHeight at the real draw width removes the guess entirely, and
+        // everything below is anchored to the result rather than to another
+        // fraction.
+        float causeW = W - pad * 2f;
+        float causeH = medStyle.CalcHeight(new GUIContent(causeLine), causeW);
         if (arenaLive)
         {
-            GUI.Label(new Rect(pad, H * 0.15f + 100f, W - pad * 2f, 68), causeLine, medStyle);
+            float causeTop = H * 0.15f + 100f;
+            GUI.Label(new Rect(pad, causeTop, causeW, causeH), causeLine, medStyle);
             var prov = new GUIStyle(smallStyle);
             prov.normal.textColor = new Color(0.82f, 0.86f, 0.94f);
-            GUI.Label(new Rect(pad, H * 0.15f + 172f, W - pad * 2f, 26),
+            float provTop = causeTop + causeH + 8f;
+            GUI.Label(new Rect(pad, provTop, causeW, 26),
                       "unofficial — the referee is confirming this in MY FIGHTS", prov);
-            statsTop = Mathf.Max(H * 0.375f, H * 0.15f + 206f);
+            statsTop = Mathf.Max(H * 0.375f, provTop + 34f);
         }
         else
         {
             // The career path used to be left byte-identical here on purpose.
             // It carries the SAME defect — a 40px box for a wrapping 26pt
             // style clips the second line — and career cause lines are just as
-            // long, so it gets the same room and the same margins.
-            GUI.Label(new Rect(pad, H * 0.28f, W - pad * 2f, H * 0.075f), causeLine, medStyle);
-            statsTop = H * 0.375f;
+            // long, so it gets the same treatment.
+            float causeTop = H * 0.28f;
+            GUI.Label(new Rect(pad, causeTop, causeW, causeH), causeLine, medStyle);
+            statsTop = Mathf.Max(H * 0.375f, causeTop + causeH + 10f);
         }
 
         int tsec = Mathf.RoundToInt(elapsed);
@@ -1403,12 +1416,18 @@ public class FightManager : MonoBehaviour
         // to go spend the purse or rebuild, never to rematch.
         bool touch = MobileBuilderUI.Active;
         float bw = 264f, bh = 54f;
-        // The arena button follows the stats DOWN on a cramped landscape screen
-        // (where statsTop was pushed below 0.375H): a bare 0.705H fraction sat
-        // ABOVE the pushed-down match-time line and overlapped it. Non-arena
-        // keeps the exact 0.705H + medalDrop it always had.
-        float by = arenaLive ? Mathf.Max(H * 0.705f, statsTop + H * 0.18f + 46f)
-                             : H * 0.705f + medalDrop;
+        // The button follows the stats DOWN. It used to estimate where they
+        // ended as `statsTop + H*0.18 + 46` — a restatement of the same fixed
+        // fractions the rows themselves no longer use, so once the rows were
+        // measured the estimate went stale and the button was drawn straight
+        // over the loser's detail row. Photographed on an iPhone 17: "BACK TO
+        // THE ARENA" sat on top of "seams sheared 2 · flipped 0% …".
+        // statsBottom is the real measured end of the block, so this cannot
+        // drift again. Both paths take it, because a long wrapped row can push
+        // past 0.705H on a short screen whether or not there is a purse.
+        float contentFloor = statsBottom + H * 0.03f;
+        float by = arenaLive ? Mathf.Max(H * 0.705f, contentFloor)
+                             : Mathf.Max(H * 0.705f + medalDrop, contentFloor);
         float cx = W * 0.5f;
         GUI.backgroundColor = new Color(0.30f, 0.62f, 0.88f);
         // A LIVE LADDER MATCH gets one centered button and no REMATCH — the
