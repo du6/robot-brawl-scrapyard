@@ -22,6 +22,7 @@ at "debug-signed .aab + .apk built, no Play Console yet".
 | **Build 12 (TestFlight only)** | `262f6fda-e6a3-4f9a-a9f0-004c16684eda`, 2026-08-19. First client with **no SELL button**. **DELIBERATELY NOT SWAPPED INTO 1.0** — build 11 keeps its place in review. In the Family internal group, compliance answered. ⚠ Apple **auto-adds** builds to an INTERNAL group once processing and compliance are done; an explicit `POST betaGroups/{id}/relationships/builds` is refused 422 "Cannot add internal group to a build". If a build looks absent from the group, wait rather than assign it |
 | **Build 11 delivery UUID** | `829d29a4-0a83-4fb2-8e79-d8bf649c3752` — submitted `2026-08-19T18:05:49Z`, review submission `458395f5-9c3c-41fb-ba96-86e59ea05e8f`. Adds the RETIRE control against the endpoint deployed the same day; still `GUSSET_SEAM_MULT = 4`. **SECOND queue reset of 08-19** — build 10 had waited 5.5 h and that was discarded, owen's call, knowingly. ⚠ **The RETIRE button has never run in a player**: it was driven through its real `onClick` in the editor and both states rendered, and that is the whole of the evidence |
 | **Build 13 delivery UUID** | `b973cd41-f865-460b-a918-7bc470727106` — uploaded `2026-08-19T20:46Z`, build id is the same UUID. Encryption answered via `PATCH /v1/builds/{id} usesNonExemptEncryption=false`; `internalBuildState: IN_BETA_TESTING`, identical to build 12. **TestFlight ONLY — the in-review 1.0 still carries build 11.** Carries the arena-pays-by-season client half (`0eb8729`), the retire fix (`f603610`) and the `[dev]` badge fix (`2256c3a`) |
+| **Build 15 delivery UUID** | `98487c89-fe90-414a-a612-71042fa60cbc` — uploaded `2026-08-21T22:53Z`. Carries the three results-screen fixes (`3eaf1e4`, `166ce54`, `da01ec0`): the loss-cause sentence unhidden, the stat rows MEASURED instead of guessed in fractions, and the arena button + cause box anchored to those measured heights. **TESTFLIGHT ONLY — the in-review 1.0 KEEPS BUILD 11.** owen's call, taken with the cost stated: build 11 had been `WAITING_FOR_REVIEW` for **44 hours**, against the ~5.5h discarded in the two previous swaps, and at that age review can begin at any moment. The fixes ship as 1.0.1 after approval. ⚠ Verified by a layout probe over 8 ship sizes x 4 cause lines (32 cases, all clear; the 750x1334 case FAILED before the change) — **not by a device photo**. TouchSmoke 53/0, PlaytestBench 43/0, career save `12ad5a4e` unchanged |
 | **Build 10 delivery UUID** | `1d6e0c31-ce05-42a3-a53c-0c8de8f68732` — submitted `2026-08-19T05:05:33Z`, review submission `ff88eef4-4343-4de2-999a-52f00191fc9c`. ✅ **The whole §1 swap procedure below can be driven through the ASC API instead of the web UI** — validate/upload with `altool`, `PATCH builds/{id} usesNonExemptEncryption=false`, `PATCH reviewSubmissions/{id} canceled=true`, `PATCH appStoreVersions/{id}/relationships/build`, then POST a new submission + item and `PATCH submitted=true`. Answer encryption BEFORE cancelling; that keeps the no-submission window to seconds. Done once, 08-18 |
 
 **Why build 8 and not 7:** build 7 was originally submitted; it carries the
@@ -195,6 +196,18 @@ the review-swap decision.
    ```
 5. TestFlight: answer encryption for the new build. If it should replace an
    in-review build, §1's swap procedure.
+
+   ⚠ **`EditorApplication.delayCall` DOES NOT SURVIVE THE MCP BRIDGE, and it
+   fails SILENTLY.** Scheduling `BuildIOS.Build()` on `delayCall` to keep the
+   bridge call from blocking looks like it works — the command returns
+   `build scheduled` — but the bridge's dynamic assembly is unloaded once the
+   command returns, taking the lambda's target with it. The build never runs,
+   **nothing appears in the console, and `build/ios` is simply absent**; the
+   only tell is the missing marker log. Measured 2026-08-21 building 15. Call
+   long editor operations SYNCHRONOUSLY from the bridge and let the call
+   block. Note the bridge also reports a successful build as an *error* when
+   the compile emits warnings (407 of them here) — read the last line, which
+   is the real result, not the envelope.
 6. Push commits to the session side branch (never main; never force).
 
 ⚠ **TouchSmoke reads 53, not 55, and the delta was NOT chased to ground.**
