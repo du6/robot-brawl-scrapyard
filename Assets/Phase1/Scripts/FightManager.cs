@@ -191,6 +191,16 @@ public class FightManager : MonoBehaviour
     string cMedal = "";
 
     GUIStyle hudStyle, nameStyle, bigStyle, medStyle, smallStyle, btnStyle, tinyStyle;
+
+    /// <summary>Horizontal breathing room for every full-width string on the
+    /// results screen, in pixels.
+    ///
+    /// It is a FRACTION of the width with a floor, not a constant: this screen
+    /// is drawn on everything from a narrow phone in portrait to an iPad in
+    /// landscape, and a fixed 24px that looks generous on one is invisible on
+    /// the other. The floor keeps a narrow screen from losing its margin
+    /// entirely, which is the state that produced the clipping this fixes.</summary>
+    static float SIDE_PAD(float w) { return Mathf.Max(20f, w * 0.045f); }
     GUIStyle idStyle, hudIdStyle, moneyStyle, moneySmall, medalStyle;
 
     public void Setup(BuilderManager owner, CompoundRobot pBot, RaycastWheelDrive pDrive,
@@ -1233,19 +1243,38 @@ public class FightManager : MonoBehaviour
         // offsets, and push the stats below the note via Max(): an arena fight
         // has no money/medal block, so the lower half is free. The non-arena
         // (career/contest) path is left byte-identical.
+        // ⚠ THE CAUSE LINE IS THE MOST VALUABLE SENTENCE ON THIS SCREEN AND IT
+        // WAS BEING DRAWN UNDERNEATH THE TITLE. Playtest 2026-08-20, an arena
+        // loss: causeLine started at +78 while the 64pt title's own rect runs
+        // +0..+90, so line one rendered THROUGH "DEFEAT"; and its box was 32px
+        // tall, one line of a 26pt style, so when the text wrapped — which it
+        // does, these sentences are long — line two was clipped by the
+        // "unofficial" note at +110. What reached the player was a red smear
+        // where "Counted out — flipped onto its back with nothing aboard to
+        // fight it — fit a gyro, or build an arm that can push you back over"
+        // should have been: a diagnosis and two concrete fixes, unreadable.
+        //
+        // Stack strictly BELOW the title band (which is 96px from H*0.145) and
+        // give the cause room for two wrapped lines. SIDE_PAD keeps every
+        // string off the screen edges — see the note on the stat rows below.
         float statsTop;
+        float pad = SIDE_PAD(W);
         if (arenaLive)
         {
-            GUI.Label(new Rect(0, H * 0.15f + 78f, W, 32), causeLine, medStyle);
+            GUI.Label(new Rect(pad, H * 0.15f + 100f, W - pad * 2f, 68), causeLine, medStyle);
             var prov = new GUIStyle(smallStyle);
             prov.normal.textColor = new Color(0.82f, 0.86f, 0.94f);
-            GUI.Label(new Rect(0, H * 0.15f + 110f, W, 24),
+            GUI.Label(new Rect(pad, H * 0.15f + 172f, W - pad * 2f, 26),
                       "unofficial — the referee is confirming this in MY FIGHTS", prov);
-            statsTop = Mathf.Max(H * 0.375f, H * 0.15f + 140f);
+            statsTop = Mathf.Max(H * 0.375f, H * 0.15f + 206f);
         }
         else
         {
-            GUI.Label(new Rect(0, H * 0.29f, W, 40), causeLine, medStyle);
+            // The career path used to be left byte-identical here on purpose.
+            // It carries the SAME defect — a 40px box for a wrapping 26pt
+            // style clips the second line — and career cause lines are just as
+            // long, so it gets the same room and the same margins.
+            GUI.Label(new Rect(pad, H * 0.28f, W - pad * 2f, H * 0.075f), causeLine, medStyle);
             statsTop = H * 0.375f;
         }
 
@@ -1256,10 +1285,20 @@ public class FightManager : MonoBehaviour
         // because both matches printed the same one-line verdict.
         // Stat rows hang off statsTop (0.375H for career/contest — identical to
         // before — pushed down on a cramped arena screen). Gaps unchanged.
-        GUI.Label(new Rect(0, statsTop,           W, 30), SideLine("YOU", player), smallStyle);
-        GUI.Label(new Rect(0, statsTop + H*0.04f, W, 30), SideDetail(player), smallStyle);
-        GUI.Label(new Rect(0, statsTop + H*0.09f, W, 30), SideLine(enemy.label, enemy), smallStyle);
-        GUI.Label(new Rect(0, statsTop + H*0.13f, W, 30), SideDetail(enemy), smallStyle);
+        // ⚠ THESE RAN OFF BOTH EDGES OF THE SCREEN. smallStyle is centered and
+        // did NOT wrap, and the rect was the full width with no margin, so any
+        // row longer than the screen was sliced at both ends — measured
+        // 2026-08-20, `battery 80%` lost its `%` on an iPhone 17. A centered
+        // non-wrapping label clips symmetrically, so the left end was going too.
+        // Now: inset by SIDE_PAD and let a long row wrap into two lines, with
+        // the row spacing opened just enough to hold the second line (the gaps
+        // move 0.04/0.09/0.13 -> 0.045/0.09/0.135; the match-time row and the
+        // money block below it keep their original offsets).
+        float rowH = H * 0.042f;
+        GUI.Label(new Rect(pad, statsTop,            W - pad*2f, rowH), SideLine("YOU", player), smallStyle);
+        GUI.Label(new Rect(pad, statsTop + H*0.045f, W - pad*2f, rowH), SideDetail(player), smallStyle);
+        GUI.Label(new Rect(pad, statsTop + H*0.09f,  W - pad*2f, rowH), SideLine(enemy.label, enemy), smallStyle);
+        GUI.Label(new Rect(pad, statsTop + H*0.135f, W - pad*2f, rowH), SideDetail(enemy), smallStyle);
         GUI.Label(new Rect(0, statsTop + H*0.18f, W, 30),
             string.Format("Match time {0}:{1:00}", tsec / 60, tsec % 60), smallStyle);
         // ---------------------------------------------------------- MONEY
@@ -1449,7 +1488,11 @@ public class FightManager : MonoBehaviour
         nameStyle = new GUIStyle(GUI.skin.label) { fontSize = 18, fontStyle = FontStyle.Bold };   // R5 finding 2
         bigStyle = new GUIStyle(GUI.skin.label) { fontSize = 64, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
         medStyle = new GUIStyle(GUI.skin.label) { fontSize = 26, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter, wordWrap = true };
-        smallStyle = new GUIStyle(GUI.skin.label) { fontSize = 22, alignment = TextAnchor.MiddleCenter };   // R5 finding 2: the two lines that answer "why did I lose" were the smallest text on the results screen
+        // wordWrap: a stat row longer than the screen used to be SLICED at both
+        // ends rather than wrapped (see the note at the stat rows). Every other
+        // user of this style draws a short single line, so wrapping is inert
+        // for them and load-bearing for the two that overflow.
+        smallStyle = new GUIStyle(GUI.skin.label) { fontSize = 22, alignment = TextAnchor.MiddleCenter, wordWrap = true };   // R5 finding 2: the two lines that answer "why did I lose" were the smallest text on the results screen
         btnStyle = new GUIStyle(GUI.skin.button) { fontSize = 17, fontStyle = FontStyle.Bold };
         tinyStyle = new GUIStyle(GUI.skin.label) { fontSize = 14, fontStyle = FontStyle.Bold };   // R5 finding 2
         // Round-3: the identity and money readouts get their OWN styles, so

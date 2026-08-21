@@ -3545,11 +3545,28 @@ public class BuilderManager : MonoBehaviour
         // Row-sized restatement of the SAME failure. Falls back to the long
         // text, so a new rule added to CareerValidate can never make the button
         // lie - at worst the row label gets verbose.
+        //
+        // ⚠ REPORT EVERY REASON, NOT THE FIRST ONE. This used to be an
+        // if/else chain, so a parts shortfall SWALLOWED the weight-cap reason:
+        // a player who bought exactly what the row asked for fixed the only
+        // problem they had been told about and found the button still dead,
+        // now for a cap nobody had mentioned. Playtest 2026-08-20: hunter_v6
+        // was BOTH missing four part types AND 1407 kg over Scrapyard Open's
+        // 1500 kg cap, and only the parts were named on the row.
+        //
+        // The "YOUR BUILD" prefix is not decoration either. This tag is
+        // APPENDED to a contest row that already reads "SCOUT (Rookie) · 83
+        // scrap", so a bare "needs 5x Tungsten Beam" reads as something the
+        // CONTEST requires - the same playtest misread it exactly that way.
+        var reasons = new List<string>();
         var lack = CareerShortfall();
-        if (lack.Count > 0) shortTag = "needs " + string.Join(", ", lack.ToArray());
-        else if (BuildMassInt > blg.weightCap)
-            shortTag = (BuildMassInt - Mathf.RoundToInt(blg.weightCap)) + " kg over cap";
-        else shortTag = err;
+        if (lack.Count > 0) reasons.Add("needs " + string.Join(", ", lack.ToArray()));
+        if (BuildMassInt > blg.weightCap)
+            reasons.Add("is " + (BuildMassInt - Mathf.RoundToInt(blg.weightCap))
+                        + " kg over the " + Mathf.RoundToInt(blg.weightCap) + " kg cap");
+        shortTag = reasons.Count > 0
+            ? "YOUR BUILD " + string.Join(" · ", reasons.ToArray())
+            : err;
         return err;
     }
 
