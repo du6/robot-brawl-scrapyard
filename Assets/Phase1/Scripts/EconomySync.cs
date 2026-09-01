@@ -31,6 +31,32 @@ public class EconomySync : MonoBehaviour
     public static int lastFlushed, lastSettled, lastReversed;
     public static long lastServerBalance = -1;
 
+    /// <summary>THE ADOPTION RULE, as one function, because the coroutine
+    /// that calls it cannot be run without a live server and this is the part
+    /// that must never be wrong. Adopt unless the account has nothing to say
+    /// AND this device has something to lose.</summary>
+    public static bool ShouldAdopt(bool serverIsFresh, bool localHasProgress)
+    {
+        return !(serverIsFresh && localHasProgress);
+    }
+
+    /// <summary>Has this device's career actually been played? Scrap alone is
+    /// not enough (a new career may start with a stake), so ownership and the
+    /// stable count too.</summary>
+    public static bool LocalHasProgress()
+    {
+        if (Career.Data == null) return false;
+        return Career.Data.scrap != 0
+            || Career.Data.inventory.Count > 0
+            || Career.Data.stable.Count > 0;
+    }
+
+    /// <summary>How many inventory rows the last sync adopted from the server.</summary>
+    public static int lastInventoryAdopted;
+    /// <summary>True when the last sync deliberately adopted NOTHING because the
+    /// account was empty and this device held a played career. See the guard.</summary>
+    public static bool lastAdoptionSkipped;
+
     /// <summary>Has THIS session reached the wallet at least once? The shop's
     /// signed-in gate (owen's offline decision) reads this: browse always,
     /// buy only when the server has answered us this session.</summary>
@@ -63,6 +89,7 @@ public class EconomySync : MonoBehaviour
     IEnumerator Sync()
     {
         lastFlushed = 0; lastSettled = 0; lastReversed = 0; lastResult = "";
+        lastInventoryAdopted = 0; lastAdoptionSkipped = false;
         // Flush oldest-first; stop on the first real error so order is kept
         // and nothing is skipped past a transient failure.
         while (Career.Data.pendingClaims.Count > 0)
@@ -90,25 +117,103 @@ public class EconomySync : MonoBehaviour
             else { Career.ReversePurchase(p, refused); lastReversed++; }
         }
 
-        long bal = -1; string werr = null;
-        yield return LadderClient.GetWallet((b, e) => { bal = b; werr = e; });
+        LadderClient.WalletState wallet = null; string werr = null;
+        yield return LadderClient.GetWalletState((w, e) => { wallet = w; werr = e; });
         if (werr == null)
         {
-            lastServerBalance = bal;
-            // Server wins — recorded as a Txn so the audit stays true. The
-            // delta is usually the rounding gap between the client's optimistic
-            // settle and the server's canonical arithmetic, or the whole
-            // balance on a first sync.
-            long delta = bal - Career.Data.scrap;
-            if (delta != 0) Career.Txn((int)delta, "wallet sync — server balance adopted");
-            if (Career.autosave) Career.Save();
-            lastResult = string.IsNullOrEmpty(lastResult)
-                ? "synced: " + lastSettled + " claims settled, balance " + bal : lastResult;
+            long bal = wallet.balance;
+
+            // ---- THE FRESH-ACCOUNT GUARD -------------------------------
+            // Adoption is server-wins, which is correct when the server has
+            // something to say and CATASTROPHIC when it does not: a brand new
+            // account answers balance 0 / inventory [] / ledger [], and
+            // adopting that over a played career erases it. The shipped iOS
+            // gate made this unreachable (sign-in precedes the career), but
+            // PLAY AS GUEST on the web build does not — a guest can earn
+            // scrap and parts and only then sign in, which is exactly the
+            // shape that cost 6,013 scrap on 2026-08-13.
+            //
+            // So: if the account has never transacted and owns nothing, while
+            // this device holds a career that clearly HAS been played, adopt
+            // nothing this sync and say so. Queued claims and purchases have
+            // already been flushed above and are idempotent, so the server
+            // catches up on its own; nothing is lost by waiting.
+            bool localHasProgress = LocalHasProgress();
+            if (!ShouldAdopt(wallet.IsFresh, localHasProgress))
+            {
+                lastServerBalance = bal;
+                lastAdoptionSkipped = true;
+                lastResult = "wallet sync skipped - this account is empty and this device has a career;"
+                           + " refusing to overwrite it";
+            }
+            else
+            {
+                lastServerBalance = bal;
+                // Server wins — recorded as a Txn so the audit stays true. The
+                // delta is usually the rounding gap between the client's optimistic
+                // settle and the server's canonical arithmetic, or the whole
+                // balance on a first sync.
+                long delta = bal - Career.Data.scrap;
+                if (delta != 0) Career.Txn((int)delta, "wallet sync - server balance adopted");
+
+                // ---- INVENTORY, same rule as the balance -------------------
+                // Ownership is server-truth (docs/Server_Economy_Design_2026-08-13.md:
+                // "the wallet and the inventory move server-side and the client
+                // becomes a cache"). The server already returns it on every
+                // wallet call; until now the client parsed the balance and threw
+                // the rest away, which is why parts did not follow a player to a
+                // second device while their scrap did.
+                lastInventoryAdopted = AdoptInventory(wallet.inventory);
+
+                if (Career.autosave) Career.Save();
+                lastResult = string.IsNullOrEmpty(lastResult)
+                    ? "synced: " + lastSettled + " claims settled, balance " + bal
+                      + ", " + lastInventoryAdopted + " part rows adopted" : lastResult;
+            }
         }
         else if (string.IsNullOrEmpty(lastResult)) lastResult = "wallet: " + werr;
 
         running = null;
         Destroy(gameObject);
+    }
+
+    /// <summary>Replace the local part cache with the server's answer, and
+    /// return how many rows were adopted.
+    ///
+    /// A REPLACE and not a merge, deliberately: the server's row set IS
+    /// ownership (`count > 0` is the rule, enforced by a CHECK constraint),
+    /// so a part the server does not list is a part you do not own. Merging
+    /// would let a local row the server has never heard of survive forever,
+    /// which is precisely the save-editor hole server-side inventory exists
+    /// to close.
+    ///
+    /// The caller has already established the account is not empty, so this
+    /// cannot be the fresh-account wipe.</summary>
+    /// <summary>Bench seam — drives the REAL adopter, not a copy of it.</summary>
+    public static int TestAdoptInventory(System.Collections.Generic.List<CareerItem> server)
+    { return AdoptInventory(server); }
+
+    static int AdoptInventory(System.Collections.Generic.List<CareerItem> server)
+    {
+        if (server == null) return 0;
+        Career.Data.inventory.Clear();
+        foreach (var row in server)
+        {
+            if (row.count <= 0) continue;
+            // ⚠ ADOPTED ROWS MUST GO THROUGH THE SAME NORMALISATION AS LOADED
+            // ONES. Career.Load() applies save migrations to inventory — the
+            // pinned-material move, and the V2.2 edge-sentinel split — and a
+            // row injected here has never seen them. Today the server cannot
+            // actually hold an unpinned row (part_prices is generated from the
+            // editor's defs and pinned mats emit only what they Accept, so a
+            // purchase cannot create one), which makes this belt-and-braces
+            // rather than a live fix; it is here because the day that stops
+            // being true, the failure is silent and looks like lost parts.
+            var d = CareerDB.Def(row.partId);
+            string mat = d != null ? d.EffectiveMat(row.mat) : row.mat;
+            Career.AddItem(row.partId, mat, row.count);   // merges duplicates
+        }
+        return Career.Data.inventory.Count;
     }
 }
 }

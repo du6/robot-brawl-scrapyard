@@ -855,17 +855,72 @@ namespace RobotBrawl.Phase0
         /// server-truth and the local save is a cache.</summary>
         public static IEnumerator GetWallet(Action<long, string> done)
         {
+            yield return GetWalletState((w, err) => done(w != null ? w.balance : 0, err));
+        }
+
+        /// <summary>Everything the local cache needs from one round trip:
+        /// balance, the parts the server says you own, and how many ledger
+        /// entries the account has.
+        ///
+        /// The ledger count exists for ONE reason and it is not cosmetic. The
+        /// wallet is server-truth and the career is a cache, so sync ADOPTS
+        /// the server's answer — and adopting an EMPTY answer over a real
+        /// local career destroys it. That is not hypothetical: on 2026-08-13
+        /// signing into a fresh dev account flattened a 6,513-scrap career to
+        /// 500 (see EconomySync's header). The shipped iOS gate made that
+        /// unreachable because sign-in happens BEFORE a career exists — but
+        /// PLAY AS GUEST on the web build broke that invariant: a guest can
+        /// earn scrap and parts and only then sign in. `IsFresh` is how the
+        /// reconciler tells "this account genuinely owns nothing" apart from
+        /// "this account has never been used", which are identical in a
+        /// balance-only response and must not be treated alike.</summary>
+        public class WalletState
+        {
+            public long balance;
+            public List<CareerItem> inventory = new List<CareerItem>();
+            public int ledgerEntries;
+            /// <summary>Never transacted and owns nothing — i.e. an account
+            /// that has no history to adopt, not an account that spent it.</summary>
+            public bool IsFresh { get { return ledgerEntries == 0 && inventory.Count == 0; } }
+        }
+
+        /// <summary>Pure parse of a /v1/wallet body. Split out from the
+        /// coroutine so a bench can feed it real server-shaped JSON with no
+        /// network — which is the check that matters here, because the bug
+        /// this shipped with was not a broken request but a client that
+        /// received the inventory and silently dropped it. Returns null when
+        /// the body carries no balance.</summary>
+        public static WalletState ParseWallet(string text)
+        {
+            var w = new WalletState();
+            if (!long.TryParse(RobotWorker.Field(text, "balance") ?? "", out w.balance)) return null;
+            w.ledgerEntries = Objects(text, "recent").Count;
+            foreach (string obj in Objects(text, "inventory"))
+            {
+                var it = new CareerItem();
+                it.partId = RobotWorker.Field(obj, "partId") ?? "";
+                it.mat    = RobotWorker.Field(obj, "mat")    ?? "";
+                int.TryParse(RobotWorker.Field(obj, "count"), out it.count);
+                // count > 0 is the server's ownership rule; a zero row is not
+                // ownership and must not become a cache entry.
+                if (!string.IsNullOrEmpty(it.partId) && it.count > 0) w.inventory.Add(it);
+            }
+            return w;
+        }
+
+        public static IEnumerator GetWalletState(Action<WalletState, string> done)
+        {
             using (var req = UnityWebRequest.Get(BaseUrl + "/v1/wallet"))
             {
                 if (!string.IsNullOrEmpty(Token)) req.SetRequestHeader("Authorization", "Bearer " + Token);
                 yield return Send(req);
                 string text = req.downloadHandler != null ? req.downloadHandler.text : "";
                 if (req.result != UnityWebRequest.Result.Success)
-                { done(0, RobotWorker.Field(text, "error") ?? req.error); yield break; }
-                long bal;
-                if (!long.TryParse(RobotWorker.Field(text, "balance") ?? "", out bal))
-                { done(0, "the wallet answered without a balance"); yield break; }
-                done(bal, null);
+                { done(null, RobotWorker.Field(text, "error") ?? req.error); yield break; }
+
+                var w = ParseWallet(text);
+                if (w == null) { done(null, "the wallet answered without a balance"); yield break; }
+                done(w, null);
             }
         }
 
