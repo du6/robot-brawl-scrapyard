@@ -179,15 +179,28 @@ public class LoginGate : MonoBehaviour
         var card = Panel("card", back.transform, new Color(0.055f, 0.06f, 0.078f, 1f));
         var crt = card.GetComponent<RectTransform>();
         crt.anchorMin = crt.anchorMax = new Vector2(0.5f, 0.5f);
-        // 420 -> 500: PLAY AS GUEST is a FOURTH button and this card's
-        // height is fixed, so adding it without this made the new button
-        // overflow the panel and float on the backdrop — caught on the live
-        // web build, 2026-09-01. One button = one row of height plus spacing.
-        crt.sizeDelta = new Vector2(460f, 500f);
+        // Width is fixed; HEIGHT IS NOT OURS TO GUESS. This card had a magic
+        // number that was wrong twice in one day — 420 could not hold PLAY AS
+        // GUEST, and 500 could not hold the un-wrapped rows either. The row
+        // count also differs by platform (devskip is editor-only), so no
+        // constant is right everywhere. A ContentSizeFitter measures instead.
+        crt.sizeDelta = new Vector2(460f, 0f);
+        var fit = card.AddComponent<ContentSizeFitter>();
+        fit.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
         var col = card.AddComponent<VerticalLayoutGroup>();
         col.padding = new RectOffset(24, 24, 20, 20);
         col.spacing = 10f;
         col.childForceExpandHeight = false; col.childForceExpandWidth = true;
+        // ⚠ THESE TWO LINES ARE THE LAYOUT, AND THEY WERE NEVER STATED.
+        // forceExpand only distributes SPARE space; it is childControl* that
+        // lets the group SET a child's size. Without them the group leaves
+        // every child at its default 100x100, so the inputs render ~100 units
+        // wide, "password (10+ characters)" wraps to four lines, the rows grow
+        // tall, and the buttons run off the bottom of a fixed-height card.
+        // It looked fine only because the implicit default happened to suit
+        // the platforms we had looked at — photographed broken on iPad,
+        // 2026-09-01. An implicit default is not a layout.
+        col.childControlWidth = true; col.childControlHeight = true;
 
         title = Label("title", card.transform, "ROBOT BRAWL", 26, TextAnchor.MiddleCenter);
         title.fontStyle = FontStyle.Bold;
