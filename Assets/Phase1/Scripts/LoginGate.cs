@@ -118,6 +118,37 @@ public class LoginGate : MonoBehaviour
 
     void Say(string s) { if (status != null) status.text = s; }
 
+    /// <summary>PLAY AS GUEST (owen, 2026-09-01). The measured reason: 7
+    /// downloads, 0 stranger accounts, 0 sessions — every arrival met this
+    /// wall and left, and a bounce here is INVISIBLE because the client sends
+    /// nothing to the server until a form is submitted.
+    ///
+    /// It is safe because the game already tolerates signed-out play and
+    /// always did — the gate was bolted on top of it. Career state is local,
+    /// EconomySync.Kick() no-ops when signed out, and ArenaScreen draws its
+    /// own sign-in panel rather than assuming a token. So a guest gets the
+    /// whole single-player game and is asked to sign in exactly where the
+    /// server is genuinely needed: the ladder.
+    ///
+    /// No account is created and nothing is sent. Signing in later keeps the
+    /// local career, because Career.Load() does not consult the token — and
+    /// EconomySync's fresh-account guard is what stops that sign-in from
+    /// adopting an empty wallet over the career the guest just built.</summary>
+    public void OnGuest()
+    {
+        RobotBrawl.Phase0.LadderClient.GuestChosen = true;
+        Proceed();
+    }
+
+    /// <summary>Bench seam — fire the BUTTON's behaviour, never a guess at it.</summary>
+    public void TestGuest() { OnGuest(); }
+
+    /// <summary>Build the card without waiting for Start(). Exists because the
+    /// MCP bridge refuses reflection, so a harness cannot reach Build() any
+    /// other way — and the card's LAYOUT is exactly what needed checking after
+    /// PLAY AS GUEST made it a four-button panel of fixed height.</summary>
+    public void TestBuild() { Build(); }
+
     void Proceed()
     {
         var ms = GetComponent<ModeSelect>();
@@ -148,7 +179,11 @@ public class LoginGate : MonoBehaviour
         var card = Panel("card", back.transform, new Color(0.055f, 0.06f, 0.078f, 1f));
         var crt = card.GetComponent<RectTransform>();
         crt.anchorMin = crt.anchorMax = new Vector2(0.5f, 0.5f);
-        crt.sizeDelta = new Vector2(460f, 420f);
+        // 420 -> 500: PLAY AS GUEST is a FOURTH button and this card's
+        // height is fixed, so adding it without this made the new button
+        // overflow the panel and float on the backdrop — caught on the live
+        // web build, 2026-09-01. One button = one row of height plus spacing.
+        crt.sizeDelta = new Vector2(460f, 500f);
         var col = card.AddComponent<VerticalLayoutGroup>();
         col.padding = new RectOffset(24, 24, 20, 20);
         col.spacing = 10f;
@@ -161,7 +196,7 @@ public class LoginGate : MonoBehaviour
         // label CLIPPED its last word — players read "your scrap and parts
         // live on your". Two lines of height, measured against the shots in
         // docs/shots/uxval/.
-        var sub = Label("sub", card.transform, "Sign in to build, fight and earn — your scrap and parts live on your account.", 13, TextAnchor.MiddleCenter);
+        var sub = Label("sub", card.transform, "Play as a guest right now, or sign in so your scrap, parts and ladder rank follow you.", 13, TextAnchor.MiddleCenter);
         sub.gameObject.GetComponent<LayoutElement>().minHeight = 44f;
 
         email       = Input("email", card.transform, "email", InputField.ContentType.EmailAddress);
@@ -170,6 +205,7 @@ public class LoginGate : MonoBehaviour
 
         Btn("login", card.transform, "LOG IN", OnLogin, new Color(0.20f, 0.45f, 0.65f, 1f));
         Btn("create", card.transform, "CREATE ACCOUNT", OnCreate, new Color(0.24f, 0.52f, 0.32f, 1f));
+        Btn("guest", card.transform, "PLAY AS GUEST", OnGuest, new Color(0.30f, 0.26f, 0.36f, 1f));
         if (Application.isEditor)
             Btn("devskip", card.transform, "DEV: SKIP SIGN-IN (sandbox)", OnDevSkip, new Color(0.35f, 0.33f, 0.20f, 1f));
 

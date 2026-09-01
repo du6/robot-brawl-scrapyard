@@ -811,10 +811,26 @@ namespace RobotBrawl.Phase0
             return true;
         }
 
+        /// <summary>Has the player chosen to play WITHOUT an account?
+        /// Persisted, and it lives beside the session because it answers the
+        /// same question the session does — may the boot skip the gate? — and
+        /// a returning guest who has to re-choose every launch reads it as
+        /// lost progress.</summary>
+        public const string PREF_GUEST = "rb_guest";
+        public static bool GuestChosen
+        {
+            get { return PlayerPrefs.GetInt(PREF_GUEST, 0) == 1; }
+            set { PlayerPrefs.SetInt(PREF_GUEST, value ? 1 : 0); PlayerPrefs.Save(); }
+        }
+
         static void ClearSession()
         {
             PlayerPrefs.DeleteKey(PREF_TOK);
             PlayerPrefs.DeleteKey(PREF_NAME);
+            // Signing OUT is a request to be asked again — otherwise a guest
+            // flag set earlier would silently swallow the gate and there would
+            // be no route back to the sign-in screen at all.
+            PlayerPrefs.DeleteKey(PREF_GUEST);
             PlayerPrefs.Save();
         }
 

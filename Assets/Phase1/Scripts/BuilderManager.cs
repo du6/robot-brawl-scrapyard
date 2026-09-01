@@ -7466,7 +7466,12 @@ public class ModeSelect : MonoBehaviour
     void Start()
     {
         string savedName;
-        if (!RobotBrawl.Phase0.LadderClient.RestoreSession(out savedName))
+        // A returning GUEST skips the gate exactly like a player returning
+        // with a session: they already answered the question once. Without
+        // this they meet the wall on every launch and it reads as a lost
+        // career (it is not — career is local and untouched).
+        if (!RobotBrawl.Phase0.LadderClient.RestoreSession(out savedName)
+            && !RobotBrawl.Phase0.LadderClient.GuestChosen)
         {
             gateActive = true;
             gameObject.AddComponent<RobotBrawl.Phase0.LoginGate>();
