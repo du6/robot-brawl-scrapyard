@@ -34,6 +34,7 @@ namespace RobotBrawl.Phase0
         public static string report = "";
         public static bool finished;
         public static int starterWins = -1, controlWins = -1, bouts;
+        public static int[] winsAll = new int[0];
 
         const int N = 10;
 
@@ -90,6 +91,21 @@ namespace RobotBrawl.Phase0
                 P(batt, 0f, 0.975f, 0f, "Aluminum", 0),
                 Spk(spike, 0f, 0.70f, 0.30f),   // core face .15 + spike half .15
             };
+        }
+
+        // ---- SENSORED (owen, 2026-09-03): the starter that HUNTS. STARTER KIT
+        // needs a Compass (EnemyRange/seek), a Wall sensor (EdgeDist) and a
+        // Damage bus (HitRecently). Mounted on the two free core side-faces
+        // and the battery roof - Validate() is the arbiter, this is a
+        // hypothesis. Prediction: closes more fights than the blind ram, so
+        // >= its 6/10 and FEWER dominant draws.
+        static List<BuilderManager.PlacedPart> SensoredParts(P1PartDef[] pal)
+        {
+            var l = StarterParts(pal);
+            var compass = D(pal, "compass"); var wall = D(pal, "wallsensor");
+            l.Add(new BuilderManager.PlacedPart { def = compass, pos = new Vector3(0.25f, 0.70f, 0f), matName = compass.matName });
+            l.Add(new BuilderManager.PlacedPart { def = wall,    pos = new Vector3(-0.25f, 0.70f, 0f), matName = wall.matName });
+            return l;
         }
 
         static P1PartDef D(P1PartDef[] pal, string id)
@@ -152,23 +168,28 @@ namespace RobotBrawl.Phase0
                 Career.AddItem("spike", "Aluminum", 1);
                 Career.AddItem("wedge", "Aluminum", 1);
                 Career.AddItem("plate", "Aluminum", 2);
+                Career.AddItem("compass", "Aluminum", 1);
+                Career.AddItem("wallsensor", "Aluminum", 1);
+                Career.AddItem("dmgbus", "Aluminum", 1);
                 Career.AddItem("gusset", "Steel", 1);   // consumed by the welded seam
 
                 string stamp = bm.SnapshotString().Split('\n')[0];
                 var pal = P1PartDef.Palette();
-                string progJson = RobotProgram.FirstSteps().ToJson();
+                string firstSteps = RobotProgram.FirstSteps().ToJson();
+                string ramHunter = RobotProgram.RamHunter().ToJson();
 
                 var legs = new[] {
-                    new { name = "STARTER", snap = Snap(stamp, StarterParts(pal)) },
-                    new { name = "CONTROL", snap = Snap(stamp, ControlParts(pal)) },
+                    new { name = "SENSORED", snap = Snap(stamp, SensoredParts(pal)), prog = ramHunter },
+                    new { name = "STARTER",  snap = Snap(stamp, StarterParts(pal)),  prog = firstSteps },
+                    new { name = "CONTROL",  snap = Snap(stamp, ControlParts(pal)),  prog = firstSteps },
                 };
-                var winsOut = new int[2];
+                var winsOut = new int[legs.Length];
 
-                for (int L = 0; L < 2; L++)
+                for (int L = 0; L < legs.Length; L++)
                 {
                     Career.Data.stable.Clear();
                     Career.Data.stable.Add(new CareerRobot {
-                        name = legs[L].name, snapshot = legs[L].snap, program = progJson });
+                        name = legs[L].name, snapshot = legs[L].snap, program = legs[L].prog });
                     Career.Data.activeRobot = 0;
 
                     int wins = 0;
@@ -205,7 +226,7 @@ namespace RobotBrawl.Phase0
                     }
                     winsOut[L] = wins;
                 }
-                starterWins = winsOut[0]; controlWins = winsOut[1]; bouts = N;
+                winsAll = winsOut; starterWins = winsOut.Length>1?winsOut[1]:-1; controlWins = winsOut.Length>2?winsOut[2]:-1; bouts = N;
             }
             finally
             {
@@ -214,9 +235,10 @@ namespace RobotBrawl.Phase0
                 hold.Dispose();                        // owner state is sacred
             }
 
-            log.Append("RESULT: STARTER ").Append(starterWins).Append('/').Append(N)
-               .Append("  CONTROL ").Append(controlWins).Append('/').Append(N)
-               .Append("   (prediction: starter >=6, control <=3)\n");
+            log.Append("RESULT: SENSORED ").Append(winsAll.Length>0?winsAll[0]:-1).Append('/').Append(N)
+               .Append("  STARTER ").Append(winsAll.Length>1?winsAll[1]:-1).Append('/').Append(N)
+               .Append("  CONTROL ").Append(winsAll.Length>2?winsAll[2]:-1).Append('/').Append(N)
+               .Append("   (prediction: sensored >= starter's 6, fewer draws)\n");
             report = log.ToString();
             Debug.Log("[StarterBench]\n" + report);
             finished = true;

@@ -687,6 +687,32 @@ public class RobotProgram
         return p;
     }
 
+    /// <summary>RAM HUNTER (owen, 2026-09-03): the SENSORED starter program.
+    /// STARTER KIT turns a POWERED weapon on, which a passive ram spike is
+    /// not - so the sensored SCRAPPER (Compass + Wall sensor) hunts instead:
+    /// steer at the enemy and drive through it, backing off a wall it gets
+    /// too near. Two sensors, no weapon-toggle, no damage bus - the smallest
+    /// program that makes the robot CHASE rather than blind-ram. Measured by
+    /// StarterBench before shipping.</summary>
+    public static RobotProgram RamHunter()
+    {
+        var p = new RobotProgram { title = "Ram Hunter" };
+        var shy = new PHat { name = "WALL!",
+            note = "1. SAFETY - too near a wall? Back away before doing anything else." };
+        shy.when.Add(PCondTerm.Mk(PCond.EdgeDist, PCmp.Less, 1.2f));
+        shy.body.Add(PBlock.MkMoveRel(PTarget.Wall, -80f, 1.5f, 0));
+        p.hats.Add(shy);
+        var hunt = new PHat { name = "HUNT",
+            note = "2. CHASE - steer at the enemy and drive through it. The spike does the rest." };
+        hunt.when.Add(PCondTerm.Always());
+        hunt.body.Add(PBlock.MkMoveRel(PTarget.Enemy, 100f, 0f, 0));
+        hunt.body.Add(PBlock.MkForever());
+        hunt.body.Add(PBlock.MkWait(0.2f));
+        hunt.body.Add(PBlock.MkEnd());
+        p.hats.Add(hunt);
+        return p;
+    }
+
     public static RobotProgram StarterKit()
     {
         var p = new RobotProgram { title = "Starter Kit" };
