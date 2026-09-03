@@ -1,0 +1,195 @@
+# The Rookie Warm-Up — onboarding design (2026-09-03)
+
+**Goal: a stranger who opens the game is still playing five minutes later, and
+comes back once.** Everything below is in service of those two sentences.
+
+## 1. Why now, in numbers
+
+The web funnel (live since 2026-09-01, ephemeral-id sessions, this machine
+excluded) has measured each onboarding wall as it fell:
+
+| wall | measurement | status |
+|---|---|---|
+| 33 MB payload | 40–50% of arrivals never reach a playable game | OPEN (payload cut is separate work) |
+| sign-in gate | 24 shown → 23 walked away (96%) | REMOVED on web 2026-09-02 |
+| empty workshop | 14 workshop arrivals → 1 placed a part → 0 fights | REPLACED by SCRAPPER 2026-09-03 |
+| first fight | starter wins 60% (measured, StarterBench 10-bout legs) | SHIPPED |
+
+The next wall is predictable: **the 40% whose first fight is a loss or draw,
+with 0 scrap, no obvious next move, and advice they cannot follow** (see §3).
+That is what CATS solves with scripted early generosity, and what this design
+addresses with a bounded version that respects this game's economy rules.
+
+Comparable evidence: CATS (ZeptoLab, 200M players, the closest design
+relative) opens with a guided build using animated pointers, scripts the
+first fights to be winnable, and answers every early loss with a crate.
+We adopt the *shape* of that, not the numbers.
+
+## 2. Design principles (each earned by a measurement or an incident)
+
+1. **Fight first, build second.** Shipped. The guided build happens AFTER the
+   player has seen why building matters.
+2. **One action per step, detected by state, never by "OK" dialogs.** The
+   existing tip strip already advances on state (place → save → league). The
+   warm-up extends that; it does not add modal tutorials.
+3. **Show, don't tell.** The two-tap placement ritual and the
+   wheels-need-opposite-faces rule were both silent drop points in playtests.
+   A pulsing target beats a sentence.
+4. **Every grant is BOUNDED and one-time.** owen removed the loss consolation
+   because "a repeatable loss payment was the last unbounded faucet"
+   (server Program.cs, 2026-08-13). Nothing here reopens a faucet: every
+   reward is a once-per-career flag, and the totals (§7) stay under two
+   SCOUT purses.
+5. **Advice the player can act on.** The defeat screen may not recommend a
+   part the catalog does not sell (§3).
+6. **Skippable, always.** SKIP TIPS continues to skip everything; a player
+   who builds before being told to simply completes steps out of order and
+   the checklist marks them done.
+
+## 3. A defect this design surfaced: the gyro advice is dead advice
+
+The most common first-fight loss is the count-out flip, and the result screen
+says: *"fit a gyro, or build an arm that can push you back over."* The gyro
+was retired from the player catalog on 2026-08-12 (rosterOnly — enemies still
+use it; see `docs/Catalog_Cuts_2026-08-12.md` before resurrecting anything).
+A brand-new player is being coached to buy a part that does not exist, at a
+moment when they also have 0 scrap.
+
+**Recommendation: resurrect the gyro as a purchasable part** (shop only, not
+kit), priced around one SCOUT purse (~80 scrap) so the first win funds it.
+It directly answers the #1 death mode, the defeat screen already advertises
+it, and SCOUT itself carries one — players can scout the counter-example.
+**This is owen's catalog call**; if declined, the defeat line must change to
+advice that is followable (wider stance / wedge), and the rescue package (§5)
+leans on gussets and armor instead.
+
+## 4. The warm-up arc, end to end
+
+Phase A is shipped; B–E are this design.
+
+### A. First 60 seconds (SHIPPED 2026-09-03)
+Boot → SCRAPPER assembled and fight-ready → tip 4/7 points at LEAGUE →
+AUTONOMY FIGHT lit (FIRST STEPS pre-armed) → a real fight, 60% win.
+
+### B. The debrief becomes a door (small, high leverage)
+The result screen is the best screen in the game — but it dead-ends into
+BACK TO WORKSHOP. Add ONE context-aware button beside it:
+
+- after a flip loss: **[MAKE IT STABLER]** → workshop with the guided-build
+  sequence (§C) targeted at the wedge/stance step
+- after a disarm/damage loss: **[HIT HARDER]** → same sequence targeted at
+  the gusset/weld step
+- after a win: **[CLAIM PURSE & UPGRADE]** → SHOP with the checklist card up
+
+Detection is trivial (the cause line already knows), and it converts the
+screen players understand into the on-ramp for the screen they don't.
+
+### C. The guided first improvement (the CATS-style step-by-step)
+Runs ONCE, after the first fight (win or lose), in the workshop. Five steps,
+each a single tap, each completed by game state, each skippable:
+
+| # | instruction (status line) | guidance animation | done when |
+|---|---|---|---|
+| 1 | "Tap the **Wedge**" | palette tile pulses (scale 1.0→1.06, ~0.8 s loop) | wedge selected |
+| 2 | "Tap the **glowing face** to aim" | the valid front-low face outline pulses; a drawn arrow arcs tile→face | ghost visible on a valid face |
+| 3 | "Tap **again** to bolt it on" | ghost itself pulses | part count +1 — *this step exists to teach the two-tap ritual, playtest confusion #1* |
+| 4 | "**SAVE** keeps it" | SAVE button pulses | robot saved |
+| 5 | "**REMATCH** — see the difference" | LEAGUE tab pulses | fight 2 starts |
+
+Mechanics: all buildable with existing primitives — a UI pulse component
+(one ~40-line MonoBehaviour animating scale/alpha), the existing face-outline
+renderer for step 2, and the amber status line for text. No new art pipeline,
+no video. The arrow is one UGUI image rotated toward its target.
+
+Guard rails: if the player does anything else (opens SHOP, fights again),
+the guide silently completes whatever steps their actions satisfied and
+resumes at the first unmet one; SKIP TIPS ends it permanently
+(`Data.guideDone = true`).
+
+**Prerequisite bug:** the save-name dialog currently eats first-focus clicks
+and leaks the space key to the game underneath (playtest 2026-09-02, repro:
+type "Spike Cart" → 0 chars land, scene flips to TEST DRIVE). Step 4 walks
+straight into it. Fix ships with or before this phase.
+
+### D. The first-defeat rescue crate (once per career, ever)
+Trigger: first career fight loss or draw (`Data.rescueGranted == false`).
+Not on wins — winners get the purse; the crate exists so a loss is a plot
+point instead of a wall.
+
+Presentation: on the result screen, under the forensics — a crate icon
+(UGUI, simple open animation: lid rotates, contents fly to the status bar
+counter): *"The Yard looks after rookies. One-time salvage: …"*
+
+Contents (proposal — final numbers are owen's):
+- **50 scrap** (below the 83 SCOUT purse: winning must stay better than losing)
+- **2 gussets** (the measured fix for the measured loss mode: unwelded spike
+  sheared 10/10 in StarterBench; welded won 6/10)
+- **1 armor plate** (ABS, the cheap teaching material)
+- if the gyro returns (§3): the crate does NOT contain one — it contains the
+  *hint*: "SCOUT rights itself with a gyro. The SHOP sells them."
+
+Hint line ties the crate to the debrief button (§B): the crate text names the
+specific weakness the fight exposed, reusing the cause line.
+
+Economy audit trail: granted via `Career.Txn(+50, "rookie salvage — one-time")`
+so the ledger audit (TxnSum == scrap) stays true, exactly like the kit grant.
+
+### E. The Rookie Checklist (the visible warm-up card)
+A card at the top of the LEAGUE tab until completed (then it collapses to the
+trophy case line). Six tasks, each once-per-career, each paying a small
+bounded reward on completion. Detection points all exist already as telemetry
+hooks or career flags:
+
+| task | detection (existing seam) | reward |
+|---|---|---|
+| Fight a bout | first `result` (any outcome) | 10 scrap |
+| Bolt on a part | first player `AddPart` commit | 10 scrap |
+| Weld a seam | first `ApplyGusset` | 10 scrap |
+| Buy a part | first shop purchase | 10 scrap |
+| Win a contest | existing first-win purse | (purse itself) |
+| Beat both Rookies | existing league-sweep medal | (medal itself) |
+
+New money introduced: max 40 scrap. Combined with the crate (50) the total
+one-time generosity is 90 — just above one SCOUT purse, less than two, and
+none of it repeatable. The checklist's real job is not the scrap; it is that
+each line names a verb the player hasn't tried yet.
+
+## 5. What we are deliberately NOT copying from CATS
+- **Gacha crates / random rewards** — collides with "no dark patterns" on the
+  website and adds an economy surface nobody needs yet.
+- **Scripted fake opponents for guaranteed wins** — the 60% measured rate is
+  honest; if it needs to rise, tune SCOUT or resurrect the gyro rather than
+  rigging outcomes. The result screen's credibility is this game's crown
+  jewel; a rigged fight would poison it.
+- **Energy timers, daily-login streaks** — not at 22 sessions/day.
+
+## 6. Instrumentation (web, same beacon, once-per-session)
+- `rescue` — crate granted (fires at most once per career anyway)
+- `guide` with `&s=1..5` on each guided step completion, `&s=done`/`&s=skip`
+- `fight2` — second fight started (the retention-in-miniature number)
+The question the funnel should answer in week one: **does a first-fight loser
+with the crate fight again?** Today the answer is unmeasurable; after this it
+is `result(w=0) → fight2` conversion.
+
+## 7. Effort and order
+1. Debrief buttons (§B) + scout-card AUTONOMY option — ~half a day, ships alone.
+2. Rescue crate (§D) — ~a day incl. the crate animation and flags.
+3. Guided improvement (§C) — ~2 days incl. the pulse/arrow components and
+   the save-dialog bug fix.
+4. Checklist card (§E) — ~a day.
+5. Gyro resurrection (§3) — an hour of code, but it is a CATALOG decision.
+
+Web-first (the clone), iOS in the consolidation pass after build 17 —
+the parity ledger already carries: no-wall boot, aluminum kit, one-core rule,
+SCRAPPER, pre-armed FIRST STEPS, telemetry, glyph substitutions.
+
+## 8. Open decisions (owen)
+1. **Gyro back in the shop?** (recommended; §3)
+2. Crate contents and the 50/10×4 numbers (§4D, §4E)
+3. Should the checklist card also appear on iOS build 18, or web-proves-first?
+4. Guided-build art ambition: the pulse+arrow spec above, or invest in a
+   hand/mascot animation later once the funnel proves the flow works?
+
+---
+⚠ `docs/` is the source of truth but is mirrored from the claude.ai Project —
+this file is NEW here; add it to the Project so Cowork sessions see it.
