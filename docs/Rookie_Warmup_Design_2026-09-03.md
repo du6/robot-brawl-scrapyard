@@ -55,13 +55,11 @@ use it; see `docs/Catalog_Cuts_2026-08-12.md` before resurrecting anything).
 A brand-new player is being coached to buy a part that does not exist, at a
 moment when they also have 0 scrap.
 
-**Recommendation: resurrect the gyro as a purchasable part** (shop only, not
-kit), priced around one SCOUT purse (~80 scrap) so the first win funds it.
-It directly answers the #1 death mode, the defeat screen already advertises
-it, and SCOUT itself carries one — players can scout the counter-example.
-**This is owen's catalog call**; if declined, the defeat line must change to
-advice that is followable (wider stance / wedge), and the rescue package (§5)
-leans on gussets and armor instead.
+**RESOLVED (owen, 2026-09-03): the gyro STAYS retired.** The confusing
+advice goes instead: the count-out cause line drops "fit a gyro" for
+followable physics advice (build low and wide, heavy parts down), and the
+rescue crate carries a HEAVY ballast component with a hint to mount it low —
+the anti-flip answer a player can actually act on.
 
 ## 4. The warm-up arc, end to end
 
@@ -120,13 +118,13 @@ Presentation: on the result screen, under the forensics — a crate icon
 (UGUI, simple open animation: lid rotates, contents fly to the status bar
 counter): *"The Yard looks after rookies. One-time salvage: …"*
 
-Contents (proposal — final numbers are owen's):
+Contents (RESOLVED, owen 2026-09-03):
 - **50 scrap** (below the 83 SCOUT purse: winning must stay better than losing)
 - **2 gussets** (the measured fix for the measured loss mode: unwelded spike
   sheared 10/10 in StarterBench; welded won 6/10)
-- **1 armor plate** (ABS, the cheap teaching material)
-- if the gyro returns (§3): the crate does NOT contain one — it contains the
-  *hint*: "SCOUT rights itself with a gyro. The SHOP sells them."
+- **1 STEEL armor plate** — the ballast. Steel because heavy is the point:
+  mounted LOW it drops the CoM, which is the anti-flip lever that remains
+  with the gyro retired (§3). The crate hint says exactly that.
 
 Hint line ties the crate to the debrief button (§B): the crate text names the
 specific weakness the fight exposed, reusing the cause line.
@@ -183,12 +181,15 @@ Web-first (the clone), iOS in the consolidation pass after build 17 —
 the parity ledger already carries: no-wall boot, aluminum kit, one-core rule,
 SCRAPPER, pre-armed FIRST STEPS, telemetry, glyph substitutions.
 
-## 8. Open decisions (owen)
-1. **Gyro back in the shop?** (recommended; §3)
-2. Crate contents and the 50/10×4 numbers (§4D, §4E)
-3. Should the checklist card also appear on iOS build 18, or web-proves-first?
-4. Guided-build art ambition: the pulse+arrow spec above, or invest in a
-   hand/mascot animation later once the funnel proves the flow works?
+## 8. Decisions (RESOLVED by owen, 2026-09-03)
+1. **Gyro stays retired**; defeat advice rewritten to followable physics, and
+   the crate carries a heavy ballast plate with a mount-it-low hint (§3).
+2. **Crate: 50 scrap + 2 gussets + 1 STEEL plate** (§4D); checklist 4×10 (§4E).
+3. **Web first**; iOS in the consolidation pass after build 17.
+4. **Invest in richer animation now**: an animated ghost-hand that GLIDES from
+   the palette tile to the target face and demonstrates the tap-tap gesture
+   (glide → tap ripple → glide → tap ripple), looping until the player acts —
+   procedural UGUI, no asset pipeline, synchronized with the pulse highlights.
 
 ---
 ⚠ `docs/` is the source of truth but is mirrored from the claude.ai Project —
