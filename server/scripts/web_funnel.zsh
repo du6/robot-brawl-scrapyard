@@ -45,7 +45,7 @@ def dev(ua):
     return "other"
 
 STEPS = [("open","opened the page"), ("ready","game became playable"),
-         ("boot","scene reached first frame"),
+         ("boot","scene first frame"),
          ("door","chose a door"), ("build","placed a part"),
          ("saved","founded a robot"), ("fight","started a fight"),
          ("result","finished a fight"), ("return","came back later")]
