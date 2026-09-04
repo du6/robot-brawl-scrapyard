@@ -169,6 +169,31 @@ hand yielding while one is up. Web-only like the rest of the warm-up:
 `QueueReward` compiles to a no-op outside the WebGL player, so benches and iOS
 never see one. Telemetry: `reward&o=1` on the first open.
 
+### G. The kit is exactly SCRAPPER; the spares are rewards (SHIPPED 2026-09-04)
+owen: "Should the starter kit include the initial robot only and leave
+everything else as rewards?" Yes. The boot shelf now shows only the eight part
+types on the machine (all "0 free" - they are on the robot) plus MORE IN SHOP,
+and every spare the kit used to hand over greyed-out arrives as a box with
+something in it, mapped so each reward is what the next step needs:
+
+| moment | box contents |
+|---|---|
+| FIRST BOUT (win or lose) | +10 scrap · 1 wedge · 1 gusset |
+| rescue crate (first loss/draw) | 50 scrap · 2 gussets · 1 steel plate |
+| FIRST PART BOLTED | +10 scrap · 2 beams · 2 armor plates |
+| FIRST WELD | +10 scrap · 1 long beam · 1 spindle |
+| FIRST PURCHASE | +10 scrap · 1 cube |
+
+Two things this fixed on the way: the win-path guide coaches the wedge, so the
+wedge MUST arrive before the guide runs - the first-bout box hands it over and
+the guide yields to the box, so the hand points at a tile that now exists; and
+the checklist's "weld a seam" was unreachable for a WINNER (SCRAPPER's welded
+spike consumes the kit gusset, the crate only gives gussets on a loss, the shop
+wants 200) - the first-bout gusset closes it. A part type granted by a box
+makes its tile appear on the next repaint (`ArrangePalette` on `uiDirtySeq`).
+Same parts, same bounded total, deferred. Verified live on a fresh profile:
+boot shelf → draw vs TIPPER → FIRST BOUT box (3 lines) → crate box (3 lines).
+
 ## 5. What we are deliberately NOT copying from CATS
 - **Gacha crates / random rewards** — collides with "no dark patterns" on the
   website and adds an economy surface nobody needs yet.
