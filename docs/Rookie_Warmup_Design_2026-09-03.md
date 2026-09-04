@@ -152,6 +152,23 @@ one-time generosity is 90 — just above one SCOUT purse, less than two, and
 none of it repeatable. The checklist's real job is not the scrap; it is that
 each line names a verb the player hasn't tried yet.
 
+### F. The reward box (SHIPPED 2026-09-04, owen's ask)
+Every once-per-career grant - the four checklist +10s and the rescue crate -
+now arrives as a CEREMONY, not a silent ledger line: the screen dims, a
+confetti burst, a title ("FIRST BOUT", "FIRST WELD", "THE YARD LOOKS AFTER
+ROOKIES"), and a riveted crate that pulses "TAP THE BOX TO OPEN". The tap
+flips the lid over the back edge (fake-3D scale-Y, not a 2-D sweep - measured,
+the sweep cut through the body), the reward lines rise out of it, and CLAIM
+(or 9 s) dismisses. `RewardBox.cs`, procedural UGUI, the RookieGuide pattern.
+
+Two rules that keep it safe: the grant is ledgered by `Career` BEFORE the box
+is queued (`Career.QueueReward`), so a skipped, reloaded or crashed box loses
+nothing - it is the handover moment, not the transaction; and boxes drain one
+at a time from `MobileBuilderUI.Update`, never during a fight, with the ghost
+hand yielding while one is up. Web-only like the rest of the warm-up:
+`QueueReward` compiles to a no-op outside the WebGL player, so benches and iOS
+never see one. Telemetry: `reward&o=1` on the first open.
+
 ## 5. What we are deliberately NOT copying from CATS
 - **Gacha crates / random rewards** — collides with "no dark patterns" on the
   website and adds an economy surface nobody needs yet.
