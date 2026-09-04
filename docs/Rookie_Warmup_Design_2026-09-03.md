@@ -194,6 +194,23 @@ makes its tile appear on the next repaint (`ArrangePalette` on `uiDirtySeq`).
 Same parts, same bounded total, deferred. Verified live on a fresh profile:
 boot shelf → draw vs TIPPER → FIRST BOUT box (3 lines) → crate box (3 lines).
 
+### H. The starter must be buildable from what the career owns (2026-09-04)
+owen's phone: a career created under an older kit was later handed SCRAPPER
+(injected into any career with no robots and no fights), so the fight gate
+greyed AUTONOMY FIGHT — "needs 1× Ram spike, 1× Compass tracker, 1× Wall
+sensor, 1× Gusset" — while the ghost hand pointed straight at it. The kit is
+granted once at creation; the starter changes between builds. Fix on the
+robot's side: `Career.TopUpForSnapshot` grants whatever the starter's snapshot
+uses that the inventory lacks (gusset marks count as Steel gussets, the core
+is exempt), at injection and on every web boot until the first fight — after
+that never, so stripping the robot cannot be farmed. Reproduced by editing a
+save to the phone's state and reloading: parts restored, button lit.
+
+Two things that screenshot also showed and are NOT fixed here: the guide
+pointed at a greyed button (with the top-up the state cannot recur for the
+starter, but the guide has no notion of a gated target), and a long amber
+refusal line on a phone-width row overflows into the row below.
+
 ## 5. What we are deliberately NOT copying from CATS
 - **Gacha crates / random rewards** — collides with "no dark patterns" on the
   website and adds an economy surface nobody needs yet.
