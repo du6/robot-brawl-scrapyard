@@ -48,6 +48,7 @@ public class FightManager : MonoBehaviour
         public AIController ai;          // player side: null
         public float incapTimer;         // continuous flipped/immobile time
         public float countOut = -1f;     // <0 = not counting
+        public float recoverTimer;       // sustained-recovery accumulator (2026-09-04)
         public bool koDead;
         // Cached stats (survive the bot GameObject's destruction).
         public float dealt, taken;
@@ -96,6 +97,7 @@ public class FightManager : MonoBehaviour
 
     public static float INCAP_GRACE = 2f;   // s flipped/immobile before the count starts
     public static float COUNT_OUT = 10f;    // s of visible count-out
+    public static float RECOVER_CANCEL = 0.6f;  // s of continuous recovery before a running count is cancelled
     public static float DEFAULT_MATCH_TIME = 90f;
 
     /// <summary>========== END A BOUT THAT IS OVER (owen, 2026-08-08) =======
@@ -353,6 +355,7 @@ public class FightManager : MonoBehaviour
         s.storedKJ = s.power != null ? s.power.storedKJ : 0f;
         s.pwrFrac = 1f; s.pwrFlat = false; s.pwrStrained = false;
         s.flippedTime = s.immobileTime = 0f;
+        s.recoverTimer = 0f;
         s.incapReason = "";
         s.structFrac = 1f;
     }
@@ -594,12 +597,20 @@ public class FightManager : MonoBehaviour
         string why;
         if (!Incap(s, out why))
         {
-            // Self-recovery cancels the count.
-            s.incapTimer = 0f;
-            s.countOut = -1f;
-            s.incapReason = "";
-            return false;
+            if (s.countOut < 0f)
+            { s.incapTimer = 0f; s.incapReason = ""; s.recoverTimer = 0f; return false; }
+            // A running count cancels only on SUSTAINED recovery. The winner's
+            // own hit gives the downed enemy a frame of velocity, read as
+            // "moving again", which used to reset the count on every blow so a
+            // dominant player never finished (owen, 2026-09-04). Real recovery
+            // lasts longer than RECOVER_CANCEL; an imposed knock does not.
+            s.recoverTimer += dt;
+            if (s.recoverTimer >= RECOVER_CANCEL)
+            { s.incapTimer = 0f; s.countOut = -1f; s.incapReason = ""; s.recoverTimer = 0f; return false; }
+            s.countOut -= dt;   // count DOWN through the blip - never restart
+            return s.countOut <= 0f;
         }
+        s.recoverTimer = 0f;
 
         s.incapTimer += dt;
         if (s.incapTimer < INCAP_GRACE) return false;
@@ -637,7 +648,12 @@ public class FightManager : MonoBehaviour
         float speed = VelUtil.GetLinearVelocity(bot.rb).magnitude;
         bool flipped = Vector3.Dot(bot.transform.up, Vector3.up) < 0.2f;
 
-        if (flipped && speed < 1.0f)
+        // No speed gate on the flip (owen, 2026-09-04): ramming a downed enemy
+        // sends it sliding on its back at speed>1, which "flipped && speed<1"
+        // read as recovered and cancelled the count. A machine on its back is
+        // helpless whether still or sliding; it un-flips only when its UP
+        // vector recovers, which the `flipped` test already catches.
+        if (flipped)
         {
             // Round-5 fix 3b: a bot that is flipped but DECISIVELY AHEAD is not
             // out of the fight, it is winning one it cannot defend from its
