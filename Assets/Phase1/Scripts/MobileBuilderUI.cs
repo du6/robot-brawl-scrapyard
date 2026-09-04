@@ -361,8 +361,20 @@ public class MobileBuilderUI : MonoBehaviour
         //
         // Outside the simulator UnityEngine.Device.* forwards to the real
         // values, so this is the same answer everywhere else.
+#if UNITY_WEBGL && !UNITY_EDITOR
+        // ! SPIKE CHANGE (WebGL_Design_2026-08-31 §3.9). WebGL reports
+        // isMobilePlatform=false and deviceType=Desktop even in a phone
+        // browser, so without this the web build hands a PUBLIC VISITOR the
+        // legacy IMGUI dev builder - "DEV unlock-all", save slots, build
+        // hashes - instead of the shipped touch UI. The parity decision
+        // (§6) makes that a defect by definition: the web version must be
+        // the same game. The web build IS the phone game, so it takes the
+        // touch branch unconditionally.
+        return true;
+#else
         return UnityEngine.Device.Application.isMobilePlatform
             || UnityEngine.Device.SystemInfo.deviceType == DeviceType.Handheld;
+#endif
     }
 
     public static bool ShouldActivate()
@@ -495,6 +507,7 @@ public class MobileBuilderUI : MonoBehaviour
         tipText.verticalOverflow = VerticalWrapMode.Truncate;
         var tskip = MkButton("tipskip", tipBar.transform, "SKIP TIPS", 14, () =>
         {
+            RookieGuide.Cancel();   // one skip gesture ends everything scripted
             // Was tutorialStep = 3, which silenced the row by CLAIMING you had
             // finished onboarding - and now that the tips run past step 3 it
             // would not even have silenced it. A skip should turn tips off,
@@ -518,12 +531,12 @@ public class MobileBuilderUI : MonoBehaviour
         // player having done any of it, and tapping it once at step 2 would
         // silently claim a contest had been fought. Reading ahead must not
         // count as doing.
-        tipPrev = MkButton("tipprev", tipBar.transform, "\u2039", 20, () => { TipStep(-1); });
+        tipPrev = MkButton("tipprev", tipBar.transform, "<", 20, () => { TipStep(-1); });
         var tprt = tipPrev.GetComponent<RectTransform>();
         tprt.anchorMin = new Vector2(1f, 0.5f); tprt.anchorMax = new Vector2(1f, 0.5f);
         tprt.pivot = new Vector2(1f, 0.5f); tprt.sizeDelta = new Vector2(32f, 26f);
         tprt.anchoredPosition = new Vector2(-166f, 0f);
-        tipNext = MkButton("tipnext", tipBar.transform, "\u203a", 20, () => { TipStep(1); });
+        tipNext = MkButton("tipnext", tipBar.transform, ">", 20, () => { TipStep(1); });
         var tnrt = tipNext.GetComponent<RectTransform>();
         tnrt.anchorMin = new Vector2(1f, 0.5f); tnrt.anchorMax = new Vector2(1f, 0.5f);
         tnrt.pivot = new Vector2(1f, 0.5f); tnrt.sizeDelta = new Vector2(32f, 26f);
@@ -652,7 +665,7 @@ public class MobileBuilderUI : MonoBehaviour
         // MkInput's placeholder says "robot name" - but this window makes a
         // draft just as often, and the note right under it may be saying so.
         var phT = saveDlgName.placeholder as Text;
-        if (phT != null) phT.text = "name this build\u2026";
+        if (phT != null) phT.text = "name this build...";
         var nrt = saveDlgName.GetComponent<RectTransform>();
         nrt.anchorMin = new Vector2(0f, 1f); nrt.anchorMax = new Vector2(1f, 1f);
         nrt.pivot = new Vector2(0.5f, 1f); nrt.sizeDelta = new Vector2(-40f, 40f);
@@ -708,8 +721,8 @@ public class MobileBuilderUI : MonoBehaviour
         ovrt.pivot = new Vector2(0f, 0f); ovrt.sizeDelta = new Vector2(250f, 42f);
         ovrt.anchoredPosition = new Vector2(20f, 70f);
 
-        saveDlgNew = MkButton("savedlg_new", card.transform, "SAVE AS NEW\u2026", 16,
-                              () => OpenSaveDialog("SAVE AS \u2014 NEW COPY"));
+        saveDlgNew = MkButton("savedlg_new", card.transform, "SAVE AS NEW...", 16,
+                              () => OpenSaveDialog("SAVE AS - NEW COPY"));
         var nwrt = saveDlgNew.GetComponent<RectTransform>();
         nwrt.anchorMin = new Vector2(0f, 0f); nwrt.anchorMax = new Vector2(0f, 0f);
         nwrt.pivot = new Vector2(0f, 0f); nwrt.sizeDelta = new Vector2(250f, 42f);
@@ -741,6 +754,20 @@ public class MobileBuilderUI : MonoBehaviour
         saveDlg.SetActive(true);
         saveDlg.transform.SetAsLastSibling();
         CentreSaveDlgCard();
+        FocusSaveDlgName();
+    }
+
+    /// <summary>First-focus fix (playtest 2026-09-02): the first click on the
+    /// name field did not focus it, so keystrokes fell through to the game -
+    /// "Spike Cart" typed zero characters and its T launched TEST DRIVE under
+    /// the modal (see BuilderManager.UiTyping, the other half of the fix).
+    /// Focus the field ON OPEN; skipped when the current face hides it.</summary>
+    void FocusSaveDlgName()
+    {
+        if (saveDlgName == null || !saveDlgName.gameObject.activeInHierarchy) return;
+        var es = UnityEngine.EventSystems.EventSystem.current;
+        if (es != null) es.SetSelectedGameObject(saveDlgName.gameObject);
+        saveDlgName.ActivateInputField();
     }
 
     /// <summary>One place decides which controls belong to which face, so a
@@ -794,6 +821,7 @@ public class MobileBuilderUI : MonoBehaviour
         SetSaveDlgErr("");
         if (saveDlgNote != null) saveDlgNote.text = bm.SaveAsNewNote();
         saveDlg.SetActive(true);
+        FocusSaveDlgName();
         saveDlg.transform.SetAsLastSibling();
         // Centre in the space the player can actually SEE, not in the canvas.
         // Dead centre put the card's bottom 18.5px under the dock (measured) -
@@ -1014,7 +1042,7 @@ public class MobileBuilderUI : MonoBehaviour
         var ert2 = edge.GetComponent<RectTransform>();
         ert2.anchorMin = new Vector2(1f,0f); ert2.anchorMax = new Vector2(1f,1f); ert2.pivot = new Vector2(1f,0.5f);
         ert2.sizeDelta = new Vector2(26f, -10f); ert2.anchoredPosition = new Vector2(0f, 5f);
-        var chev = MkText("chev", edge.transform, "\u203a", 26, TextAnchor.MiddleCenter);
+        var chev = MkText("chev", edge.transform, ">", 26, TextAnchor.MiddleCenter);
         Stretch(chev.rectTransform);
         chev.color = new Color(0.55f, 0.75f, 0.95f, 1f);
         partScroll = scroll; partEdge = edge; edge.SetActive(false);
@@ -1069,7 +1097,7 @@ public class MobileBuilderUI : MonoBehaviour
         // is NOT in partButtons, so the refresh/highlight loops never touch it;
         // ArrangePalette parks it last and shows it only when the palette is
         // filtered (career, non-draft).
-        shopHintTile = MkButton("part_shophint", content.transform, "MORE\nIN SHOP ▸", 12, () => ShowTab(3));
+        shopHintTile = MkButton("part_shophint", content.transform, "MORE\nIN SHOP >", 12, () => ShowTab(3));
         {
             var hi = shopHintTile.GetComponent<Image>(); if (hi != null) hi.color = new Color(0.30f, 0.24f, 0.10f, 0.96f);
             var ht = shopHintTile.GetComponentInChildren<Text>();
@@ -1143,7 +1171,7 @@ public class MobileBuilderUI : MonoBehaviour
             t.raycastTarget = false;
         }
 
-        scoutFight = MkButton("scoutfight", scoutCard.transform, "FIGHT \u25b8", 18, () =>
+        scoutFight = MkButton("scoutfight", scoutCard.transform, "FIGHT >", 18, () =>
         {
             if (bm == null) return;
             int li = bm.ScoutLeague, ci = bm.ScoutContest;
@@ -1541,7 +1569,7 @@ public class MobileBuilderUI : MonoBehaviour
             var bt = matBtn.GetComponentInChildren<Text>();
             if (bt != null)
                 bt.text = MatDB.Get(cur).name.ToUpper()
-                        + (MatSheetOpen ? "  \u25be" : "  \u25b4");
+                        + (MatSheetOpen ? "  v" : "  ^");
             // C19: the label just changed — keep its width honest, or a
             // long material name re-clips until the next scale re-apply.
             if (bt != null)
@@ -1691,7 +1719,7 @@ public class MobileBuilderUI : MonoBehaviour
         var r = Progression.CurrentRung();
         string next = r != null
             ? string.Format("NEXT RUNG: {0}   \u00b7   win +{1} scrap", r.label, r.reward)
-            : "LADDER COMPLETE \u2014 title defense pays out again";
+            : "LADDER COMPLETE - title defense pays out again";
         fightInfo.text = string.Format("SCRAP {0}   \u00b7   RECORD {1}-{2}\n{3}",
             d.scrap, d.fightsWon, Mathf.Max(0, d.fightsFought - d.fightsWon), next);
     }
@@ -1769,34 +1797,56 @@ public class MobileBuilderUI : MonoBehaviour
 
         // ---- THE TROPHY CASE LIVES HERE NOW (owen, 2026-08-10) -------------
         // It had its own tab until ARENA took index 4. Moving it here rather
-        // than deleting it, because a medal is the LEAGUE's reward \u2014 "win
-        // every contest in a league and its champion medal lands here" \u2014 and
+        // than deleting it, because a medal is the LEAGUE's reward - "win
+        // every contest in a league and its champion medal lands here" - and
         // a trophy case on its own tab is a room you visit to be told nothing
         // has changed. On the board it is read on the way past, next to the
         // contests that are still owed.
         int medalsWon = Career.Data.medals.Count;
         var tcase = MkText("trophycase", careerBoardContent,
             medalsWon > 0
-                ? "\u2605 TROPHY CASE  \u00b7  " + medalsWon + " of " + CareerDB.Leagues.Length
+                ? "* TROPHY CASE  \u00b7  " + medalsWon + " of " + CareerDB.Leagues.Length
                   + " league campaigns won"
-                : "TROPHY CASE  \u00b7  no medals yet \u2014 sweep every contest in a league "
+                : "TROPHY CASE  \u00b7  no medals yet - sweep every contest in a league "
                   + "to win its champion medal",
             14, TextAnchor.MiddleLeft);
         tcase.color = medalsWon > 0 ? new Color(1f, 0.87f, 0.46f) : new Color(0.72f, 0.78f, 0.88f);
         tcase.gameObject.AddComponent<LayoutElement>().minHeight = 22f;
+
+        // ---- ROOKIE CHECKLIST (design 2026-09-03 §4E) ----------------------
+        // Six verbs, each once per career, four paying a fixed 10. It sits
+        // here until every line is done, then vanishes for good - its real
+        // job is not the scrap, it is that each line NAMES a verb the player
+        // has not tried yet. All state is CareerData flags; nothing repeats.
+        var ckd = Career.Data;
+        bool ckAll = ckd.taskFight && ckd.taskBolt && ckd.taskWeld && ckd.taskBuy
+                     && ckd.fightWins > 0 && ckd.medals.Count > 0;
+        if (!ckAll)
+        {
+            var ckSb = new System.Text.StringBuilder("ROOKIE CHECKLIST - earn while you learn");
+            ckSb.Append(ckd.taskFight ? "\n + fight a bout" : "\n o fight a bout  (+10 scrap)");
+            ckSb.Append(ckd.taskBolt  ? "\n + bolt on a part" : "\n o bolt on a part  (+10 scrap)");
+            ckSb.Append(ckd.taskWeld  ? "\n + weld a seam with a gusset" : "\n o weld a seam with a gusset  (+10 scrap)");
+            ckSb.Append(ckd.taskBuy   ? "\n + buy a part in the SHOP" : "\n o buy a part in the SHOP  (+10 scrap)");
+            ckSb.Append(ckd.fightWins > 0 ? "\n + win a contest" : "\n o win a contest  (the purse)");
+            ckSb.Append(ckd.medals.Count > 0 ? "\n + sweep the league" : "\n o sweep the league  (champion medal)");
+            var ck = MkText("rookiechecklist", careerBoardContent, ckSb.ToString(), 13, TextAnchor.UpperLeft);
+            ck.color = new Color(1f, 0.84f, 0.40f);
+            ck.gameObject.AddComponent<LayoutElement>().minHeight = 7 * 20f;
+        }
 
         for (int li = 0; li < CareerDB.Leagues.Length; li++)
         {
             var lg = CareerDB.Leagues[li];
             bool open = Career.LeagueUnlocked(li);
             // The medal rides on its own league's header. Everything the old
-            // trophy row said that is not already on this line \u2014 who won it,
-            // their record, when \u2014 goes in the second line, and only when
+            // trophy row said that is not already on this line - who won it,
+            // their record, when - goes in the second line, and only when
             // there is a medal to describe.
             var medal = Career.MedalFor(li);
             var hdr = MkText("lg_" + li, careerBoardContent,
                 string.Format("{0}{1}{2} \u00b7 {3} \u00b7 cap {4} kg \u00b7 {5}{6}",
-                    open ? "" : "[locked] ", medal != null ? "\u2605 " : "",
+                    open ? "" : "[locked] ", medal != null ? "* " : "",
                     lg.name, lg.arenaName, Mathf.RoundToInt(lg.weightCap),
                     ArenaHazards.Summary(lg.arenaId),
                     medal != null
@@ -1815,20 +1865,20 @@ public class MobileBuilderUI : MonoBehaviour
                 int lidx = li, cidx = ci;
                 var c = lg.contests[ci];
                 bool done = Career.Data.doneContests.Contains(c.id);
-                // P4: \u2699 = ever won this contest AUTONOMOUSLY (owen's "shared
-                // contests, tracked separately" \u2014 the mark is the record).
+                // P4: * = ever won this contest AUTONOMOUSLY (owen's "shared
+                // contests, tracked separately" - the mark is the record).
                 bool autoDone = Career.Data.autoDoneContests.Contains(c.id);
                 var row = MkPanel("contest_" + c.id, careerBoardContent, new Color(0.10f,0.11f,0.14f,1f));
                 var rle = row.AddComponent<LayoutElement>(); rle.minHeight = TouchRow(); rle.preferredHeight = TouchRow();
                 var rh = row.AddComponent<HorizontalLayoutGroup>(); rh.spacing = 4f; rh.childForceExpandHeight = true; rh.childForceExpandWidth = false; rh.padding = new RectOffset(6,4,2,2);
                 if (autoDone) AutoMark(row.transform, c.id);
                 // First-win rule (owen, 2026-08-13): a beaten contest is a
-                // practice bout \u2014 the row says so instead of quoting a purse
+                // practice bout - the row says so instead of quoting a purse
                 // that will not be paid. Entry fees no longer exist anywhere
                 // (owen, same day), so no row mentions one.
                 var lbl = MkText("lbl", row.transform,
                     done
-                        ? string.Format("\u2713 {0} ({1}) \u00b7 practice \u2014 no purse",
+                        ? string.Format("+ {0} ({1}) \u00b7 practice - no purse",
                             EnemyRoster.Find(c.oppId).label, c.tier)
                         : string.Format("{0} ({1}) \u00b7 {2} scrap",
                             EnemyRoster.Find(c.oppId).label, c.tier, c.purse),
@@ -2591,7 +2641,7 @@ public class MobileBuilderUI : MonoBehaviour
             handleRt.anchoredPosition = new Vector2(0f, dh);
             var ht = dockHandle.GetComponentInChildren<UnityEngine.UI.Text>();
             if (ht != null)
-                ht.text = dockOpen ? "\u25bc  HIDE PANEL" : "\u25b2  SHOW PANEL";
+                ht.text = dockOpen ? "v  HIDE PANEL" : "^  SHOW PANEL";
         }
 
         PublishCover(dh + (handleRt != null ? HANDLE_H : 0f));
@@ -2823,7 +2873,7 @@ public class MobileBuilderUI : MonoBehaviour
                 mr.buy = MkButton("buy_" + bm.PartId(i) + "_" + mat, row.transform, "BUY", 13, () => ShopBuy(idx, mat));
                 mr.buy.gameObject.AddComponent<LayoutElement>().minWidth = 62f;
                 mr.buyT = mr.buy.GetComponentInChildren<Text>();
-                // ⛔ NO SELL BUTTON (owen, 2026-08-19: "disallow users from
+                // ! NO SELL BUTTON (owen, 2026-08-19: "disallow users from
                 // selling parts back"). Deliberately NOT a disabled-but-visible
                 // control: the 2026-08-03 rule that a dead button must say why
                 // is about a gate the player can OPEN — own none, cannot afford
@@ -2839,7 +2889,7 @@ public class MobileBuilderUI : MonoBehaviour
                     if (bm == null || !Career.active || Career.Data == null) return null;
                     int pr = CareerDB.PartPrice(bm.PartId(idx), mat);
                     return Career.Data.scrap >= pr ? null
-                         : "Not enough scrap \u2014 " + MatDB.Get(mat).name + " " + bm.PartLabel(idx)
+                         : "Not enough scrap - " + MatDB.Get(mat).name + " " + bm.PartLabel(idx)
                            + " costs " + pr + ", you hold " + Career.Data.scrap + ".";
                 });
                 shopMats.Add(mr);
@@ -3332,7 +3382,7 @@ public class MobileBuilderUI : MonoBehaviour
                 + "re-enlisting under the same name brings it back at a fresh placement."
                 + (retiredCount > 0
                     ? "\n" + retiredCount + " retired robot" + (retiredCount == 1 ? " is" : "s are")
-                      + " not shown \u2014 enlist that name again to bring it back."
+                      + " not shown - enlist that name again to bring it back."
                     : ""),
                 11, TextAnchor.UpperLeft);
             retirenote.color = new Color(0.62f, 0.68f, 0.78f);
@@ -3605,7 +3655,7 @@ public class MobileBuilderUI : MonoBehaviour
             string pickedName = eligible.Count > 0 ? eligible[picked].name : "none";
 
             var headGO = MkButton("cardpickhead", arenaCardContent,
-                (arenaPickOpen ? "▾  " : "▸  ") + "fielding: " + pickedName
+                (arenaPickOpen ? "v  " : ">  ") + "fielding: " + pickedName
                 + (eligible.Count > 1 ? "   ·   " + eligible.Count + " eligible" : ""), 13,
                 () => { arenaPickOpen = !arenaPickOpen; arenaCardStamp = ""; });
             var hle = headGO.gameObject.AddComponent<LayoutElement>();
@@ -3622,7 +3672,7 @@ public class MobileBuilderUI : MonoBehaviour
                     int idx = i;
                     bool on = i == picked;
                     var pb = MkButton("cardpick_" + i, arenaCardContent,
-                                      (on ? "✓  " : "     ") + eligible[i].name
+                                      (on ? "+  " : "     ") + eligible[i].name
                                       + "   ·   " + eligible[i].category, 13,
                                       () => {
                                           if (arenaScreen != null) arenaScreen.SetPick(idx);
@@ -3865,7 +3915,7 @@ public class MobileBuilderUI : MonoBehaviour
             // "· offline" when a secondary fetch (inbox/robots/wallet) failed
             // this refresh — the board rendered but the rest is last-known, and
             // a stale wallet must not read as current. UX validation, 2026-08-15.
-            string stale = arenaScreen.LastRefreshStale ? " · offline — showing last known" : "";
+            string stale = arenaScreen.LastRefreshStale ? " · offline - showing last known" : "";
             SetArenaStatus(ownStatus ? arenaScreen.Status
                 : arenaScreen.CategoryLabel + " · " + arenaScreen.Board.Count + " ranked"
                   + (seas.Length > 0 ? " · " + seas : "") + stale);
@@ -4190,17 +4240,23 @@ public class MobileBuilderUI : MonoBehaviour
     // Every action now names the material it acts on. Nothing in the shop
     // reads bm.ActiveMatKey any more, which is the whole point: the BUILD tab's
     // chips choose what you BUILD with, the shop chooses what you BUY.
+    float lastShopBuyAt = -99f;
     void ShopBuy(int i, string mat)
     {
         if (bm == null) return;
+        // (A 350 ms debounce lived here for a day. It guarded a "second
+        // purchase" that turned out to be the Steel row's HOVER HINT firing
+        // after the list rebuilt under the cursor - no scrap ever moved twice -
+        // and it ate CareerSmoke's back-to-back taps. The real fix is the
+        // hover mute in Gated() and the release-gated rebuild below.)
         armSell = -1; armSellMat = "";
         string id = bm.PartId(i);
         if (Career.TryBuy(id, mat))
-            ShopFeedback(MatDB.Get(mat).name + " " + bm.PartLabel(i) + " bought \u2014 " + Career.CountOf(id, mat) + " owned.", false);
+            ShopFeedback(MatDB.Get(mat).name + " " + bm.PartLabel(i) + " bought - " + Career.CountOf(id, mat) + " owned.", false);
         else ShopFeedback(Career.shopMsg, true);
     }
 
-    // ⛔ ShopSell and its armed-tap guard are GONE (owen, 2026-08-19). The
+    // ! ShopSell and its armed-tap guard are GONE (owen, 2026-08-19). The
     // arm existed because selling the last unit of a part that was bolted to
     // the current build needed a second, deliberate tap. With no way to sell,
     // there is nothing to arm and nothing to confirm. `armSell` is kept as a
@@ -4208,12 +4264,31 @@ public class MobileBuilderUI : MonoBehaviour
 
     /// <summary>Doc 7: a material swap on an OWNED part costs the price
 
+    bool shopRefreshQueued;
+    static bool PointerHeld()
+    {
+#if ENABLE_INPUT_SYSTEM
+        var mo = UnityEngine.InputSystem.Mouse.current;
+        if (mo != null && mo.leftButton.isPressed) return true;
+        var ts = UnityEngine.InputSystem.Touchscreen.current;
+        if (ts != null && ts.primaryTouch.press.isPressed) return true;
+        return false;
+#else
+        return Input.GetMouseButton(0) || Input.touchCount > 0;
+#endif
+    }
     void ShopFeedback(string msg, bool bad)
     {
         shopNote = msg; shopNoteBad = bad;
         if (bad) SfxSynth.Deny(); else SfxSynth.Place();
-        RefreshShop(); RefreshPartLabels(); RefreshHighlight();
-        ArrangePalette();   // buying a new part TYPE makes its tile appear; selling the last hides it
+        // ⚠ DEFERRED ON PURPOSE (warm-up QA 2026-09-03). This used to rebuild
+        // the shop list synchronously INSIDE the BUY button's onClick - so the
+        // press's own click event could land on whatever NEW button the
+        // rebuild put at the same coordinates: one click bought an ABS plate
+        // AND immediately attempted the Steel cube behind it. Only an
+        // insufficient-funds refusal stopped a double-spend in a shop with no
+        // selling back. Rebuild next frame, after the click is fully over.
+        shopRefreshQueued = true;
     }
 
     /// <summary>One catalog. Prices no longer ride the BUILD tab's chips: each
@@ -4226,19 +4301,19 @@ public class MobileBuilderUI : MonoBehaviour
     {
         if (bm == null || shopHeader == null) return;
 
-        // \u26a0 THE HEADER NAMES THE CURRENCY OF THE SHELF YOU ARE ON. Two
+        // ! THE HEADER NAMES THE CURRENCY OF THE SHELF YOU ARE ON. Two
         // balances in one tab is only safe while it is never ambiguous which
-        // one a price is in \u2014 the cosmetics shelf must never read "SCRAP N"
+        // one a price is in - the cosmetics shelf must never read "SCRAP N"
         // and charge the ladder wallet.
         if (shopSection == 1)
         {
             string bal = !LadderClient.SignedIn ? "not signed in"
-                       : ladderBalance < 0      ? "reading\u2026"
+                       : ladderBalance < 0      ? "reading..."
                                                 : "LADDER " + ladderBalance;
             shopHeader.text = !string.IsNullOrEmpty(shopNote)
                 ? (shopNoteBad ? "\u26a0 " : "") + shopNote + "   \u00b7   " + bal
-                : bal + (cosmeticsBusy ? "   \u00b7   loading\u2026" : "")
-                      + "   \u00b7   cosmetic only \u2014 nothing here touches a fight";
+                : bal + (cosmeticsBusy ? "   \u00b7   loading..." : "")
+                      + "   \u00b7   cosmetic only - nothing here touches a fight";
         }
         else
         {
@@ -4246,7 +4321,7 @@ public class MobileBuilderUI : MonoBehaviour
                 ? (shopNoteBad ? "\u26a0 " : "") + shopNote + "   \u00b7   SCRAP " + Career.Data.scrap
                 : "SCRAP " + Career.Data.scrap
                   + "   \u00b7   tap a part to compare its materials   \u00b7   HP/kg is what a weight cap buys"
-                  + "   \u00b7   a part you buy is yours for good \u2014 there is no selling back";
+                  + "   \u00b7   a part you buy is yours for good - there is no selling back";
         }
         shopHeader.color = shopNoteBad ? new Color(1f, 0.82f, 0.25f) : new Color(0.80f, 0.88f, 1f);
 
@@ -4267,8 +4342,8 @@ public class MobileBuilderUI : MonoBehaviour
             if (lo == int.MaxValue) lo = 0;
             string range = bm.PartMatFixed(i)
                 ? MatDB.Get(mats[0]).name + " (fixed) \u00b7 " + hi + " scrap"
-                : mats.Length + " materials \u00b7 " + lo + "\u2013" + hi + " scrap";
-            pr.lbl.text = (pr.open ? "\u25be  " : "\u25b8  ") + bm.PartLabel(i)
+                : mats.Length + " materials \u00b7 " + lo + "-" + hi + " scrap";
+            pr.lbl.text = (pr.open ? "v  " : ">  ") + bm.PartLabel(i)
                         + "   \u00b7   " + range + "   \u00b7   own " + own;
             pr.lbl.color = Color.white;
             pr.lbl.fontStyle = pr.open ? FontStyle.Bold : FontStyle.Normal;
@@ -4372,9 +4447,9 @@ public class MobileBuilderUI : MonoBehaviour
     // BORDER, which is the thing the 3:1 rule is actually about:
     //
     //     border (0.42,0.44,0.50)              relative luminance 0.16311
-    //     vs the dock behind it                                 = 3.89:1  ✓
-    //     vs the fill inside it                                 = 3.15:1  ✓
-    //     vs the SHOP's green deposit row (0.098,0.155,0.127)   = 3.13:1  ✓
+    //     vs the dock behind it                                 = 3.89:1  +
+    //     vs the fill inside it                                 = 3.15:1  +
+    //     vs the SHOP's green deposit row (0.098,0.155,0.127)   = 3.13:1  +
     //
     // Both adjacent colours clear the floor at both sites, which is what the
     // rule asks and what a single lifted fill could not have given. The fill
@@ -4413,7 +4488,7 @@ public class MobileBuilderUI : MonoBehaviour
         Stretch(txt.rectTransform);
         txt.rectTransform.offsetMin = new Vector2(8f, 2f); txt.rectTransform.offsetMax = new Vector2(-8f, -2f);
         txt.supportRichText = false;
-        var ph = MkText("ph", go.transform, "robot name\u2026", 15, TextAnchor.MiddleLeft);
+        var ph = MkText("ph", go.transform, "robot name...", 15, TextAnchor.MiddleLeft);
         Stretch(ph.rectTransform);
         ph.rectTransform.offsetMin = new Vector2(8f, 2f); ph.rectTransform.offsetMax = new Vector2(-8f, -2f);
         ph.color = new Color(1f, 1f, 1f, 0.35f);
@@ -4421,7 +4496,16 @@ public class MobileBuilderUI : MonoBehaviour
         return inp;
     }
 
-    void Feedback(string err) { if (err != null && bm != null) bm.Toast(err); }
+    void Feedback(string err)
+    {
+        // A hint arriving during a layout rebuild is the LAYOUT hovering the
+        // player, not the reverse (final QA 2026-09-03: buying ABS reflowed
+        // the Steel row under the cursor, which shouted its can't-afford hint
+        // - misread as a double-purchase and chased through three builds).
+        // Muting here rather than only in the PointerEnter callback makes it
+        // path-independent.
+        if (err != null && bm != null) bm.Toast(err);
+    }
 
     void BuildRobotsTab()
     {
@@ -4538,7 +4622,15 @@ public class MobileBuilderUI : MonoBehaviour
         var trig = b.gameObject.GetComponent<EventTrigger>();
         if (trig == null) trig = b.gameObject.AddComponent<EventTrigger>();
         var en = new EventTrigger.Entry { eventID = EventTriggerType.PointerEnter };
-        en.callback.AddListener(delegate { string r = why(); if (r != null) Feedback(r); });
+        // Mute lives in Feedback() now (path-independent); this just forwards.
+        // The mute is HOVER-ONLY: a list rebuilt under a stationary pointer
+        // fires PointerEnter on whatever lands beneath it (the Steel row's
+        // can't-afford hint after buying ABS - chased as a double-purchase for
+        // three builds). A TAP on a dead button must still answer in words,
+        // so Feedback() itself is never muted.
+        en.callback.AddListener(delegate {
+            if (Time.unscaledTime < hoverHintMuteUntil) return;
+            string r = why(); if (r != null) Feedback(r); });
         trig.triggers.Add(en);
         return b;
     }
@@ -4595,7 +4687,7 @@ public class MobileBuilderUI : MonoBehaviour
             // R2 critic: a new player's ROBOTS tab was an input row over a void.
             var erow = MkPanel("emptyrow", robotsContent, new Color(0f,0f,0f,0f));
             var ele = erow.AddComponent<LayoutElement>(); ele.minHeight = 30f; ele.preferredHeight = 30f;
-            var et = MkText("lbl", erow.transform, "Your stable is empty \u2014 type a name above, then tap NEW ROBOT.", 14, TextAnchor.MiddleLeft);
+            var et = MkText("lbl", erow.transform, "Your stable is empty - type a name above, then tap NEW ROBOT.", 14, TextAnchor.MiddleLeft);
             et.color = new Color(0.65f, 0.75f, 0.9f);
             var ert = et.rectTransform; ert.anchorMin = Vector2.zero; ert.anchorMax = Vector2.one; ert.offsetMin = new Vector2(8f, 0f); ert.offsetMax = Vector2.zero;
         }
@@ -4604,7 +4696,7 @@ public class MobileBuilderUI : MonoBehaviour
             var drow = MkPanel("draftrow", robotsContent, new Color(0.25f,0.16f,0.05f,0.9f));
             var dle = drow.AddComponent<LayoutElement>(); dle.minHeight = TouchRow(); dle.preferredHeight = TouchRow();
             var dh = drow.AddComponent<HorizontalLayoutGroup>(); dh.spacing = 4f; dh.childForceExpandHeight = true; dh.childForceExpandWidth = false; dh.padding = new RectOffset(6,4,2,2);
-            var dl = MkText("lbl", drow.transform, "DRAFT MODE \u2014 everything unlocked", 13, TextAnchor.MiddleLeft);
+            var dl = MkText("lbl", drow.transform, "DRAFT MODE - everything unlocked", 13, TextAnchor.MiddleLeft);
             dl.color = new Color(1f, 0.82f, 0.25f);
             dl.gameObject.AddComponent<LayoutElement>().flexibleWidth = 1f;
             MkButton("bpconv", drow.transform, "CONVERT " + bm.ConvertQuote() + " scrap", 13, () => { Feedback(bm.ConvertDraft()); RefreshRobots(); RefreshPartLabels(); RefreshHighlight(); })
@@ -4635,12 +4727,12 @@ public class MobileBuilderUI : MonoBehaviour
             // the 2026-08-02 FIGHT-button fix existed to remove.
             var lackM = Career.SnapshotShortfall(rob.snapshot);
             string ready = lackM.Count > 0
-                         ? "\n\u26a0 needs " + Career.ShortfallText(lackM)
-                         : "\n\u2713 ready to field";
+                         ? "\n! needs " + Career.ShortfallText(lackM)
+                         : "\n+ ready to field";
             var lbl = MkText("lbl", row.transform, string.Format("{0}{1} \u00b7 {2}-{3}{4}{5}{6}",
-                ri == Career.Data.activeRobot ? "\u25b8 " : "", rob.name, rob.wins, rob.losses,
-                rob.titles > 0 ? "  \u00b7  \u2605\u00d7" + rob.titles : "",
-                champ.Length > 0 ? "\n\u2605 " + champ + " champion" : "",
+                ri == Career.Data.activeRobot ? "> " : "", rob.name, rob.wins, rob.losses,
+                rob.titles > 0 ? "  \u00b7  *\u00d7" + rob.titles : "",
+                champ.Length > 0 ? "\n* " + champ + " champion" : "",
                 ready), 14, TextAnchor.MiddleLeft);
             if (rob.titles > 0) lbl.color = new Color(1f, 0.87f, 0.46f);
             // Amber wins over champion gold: a title you cannot bolt together
@@ -4677,9 +4769,9 @@ public class MobileBuilderUI : MonoBehaviour
             renBtn.gameObject.AddComponent<LayoutElement>().minWidth = 74f;
             RegisterNameGated(renBtn);
             bool armedR = retireArmM == ri;
-            var rtb = MkButton("stret_" + i2, row.transform, armedR ? "CONFIRM \u2715" : "RETIRE", 13, () => {
+            var rtb = MkButton("stret_" + i2, row.transform, armedR ? "CONFIRM X" : "RETIRE", 13, () => {
                 if (retireArmM == ri) { retireArmM = -1; Feedback(bm.StableRetire(ri)); RefreshRobots(); }
-                else { retireArmM = ri; Feedback("Retire " + rob.name + "? This cannot be undone \u2014 tap CONFIRM."); RefreshRobots(); }
+                else { retireArmM = ri; Feedback("Retire " + rob.name + "? This cannot be undone - tap CONFIRM."); RefreshRobots(); }
             });
             rtb.gameObject.AddComponent<LayoutElement>().minWidth = 86f;
             rtb.GetComponent<Image>().color = armedR ? new Color(0.78f,0.18f,0.13f,1f) : new Color(0.34f,0.13f,0.12f,1f);
@@ -4692,7 +4784,7 @@ public class MobileBuilderUI : MonoBehaviour
             var row = MkPanel("bp_" + i3, robotsContent, new Color(0.12f,0.10f,0.16f,1f));
             var rle = row.AddComponent<LayoutElement>(); rle.minHeight = 30f; rle.preferredHeight = 30f;
             var rh = row.AddComponent<HorizontalLayoutGroup>(); rh.spacing = 4f; rh.childForceExpandHeight = true; rh.childForceExpandWidth = false; rh.padding = new RectOffset(6,4,2,2);
-            var lbl = MkText("lbl", row.transform, "\u270e " + bp.name + " (blueprint)", 13, TextAnchor.MiddleLeft);
+            var lbl = MkText("lbl", row.transform, "* " + bp.name + " (blueprint)", 13, TextAnchor.MiddleLeft);
             lbl.gameObject.AddComponent<LayoutElement>().flexibleWidth = 1f;
             // OWEN 2026-08-02: "what does 'Draft it' button mean?" - it read as
             // "turn this into a draft", but the thing already IS a draft. It
@@ -4707,9 +4799,9 @@ public class MobileBuilderUI : MonoBehaviour
             // the only two irreversible actions on this tab look and behave
             // alike instead of one of them simply not existing.
             bool armedB = bpDelArmM == i3;
-            var bdb = MkButton("bpdel_" + i3, row.transform, armedB ? "CONFIRM \u2715" : "DELETE", 13, () => {
+            var bdb = MkButton("bpdel_" + i3, row.transform, armedB ? "CONFIRM X" : "DELETE", 13, () => {
                 if (bpDelArmM == bi) { bpDelArmM = -1; Feedback(bm.BlueprintDelete(bi)); RefreshRobots(); }
-                else { bpDelArmM = bi; Feedback("Delete blueprint " + bp.name + "? This cannot be undone \u2014 tap CONFIRM."); RefreshRobots(); }
+                else { bpDelArmM = bi; Feedback("Delete blueprint " + bp.name + "? This cannot be undone - tap CONFIRM."); RefreshRobots(); }
             });
             bdb.gameObject.AddComponent<LayoutElement>().minWidth = 86f;
             bdb.GetComponent<Image>().color = armedB ? new Color(0.78f,0.18f,0.13f,1f) : new Color(0.34f,0.13f,0.12f,1f);
@@ -4739,6 +4831,22 @@ public class MobileBuilderUI : MonoBehaviour
     /// layout, which is how UI harnesses end up testing their own maths
     /// instead of the screen.</summary>
     public void TestShowTab(int i) { ShowTab(i); }
+
+    /// <summary>Cross-screen tab request (the debrief buttons live on the
+    /// IMGUI results screen, which cannot touch the dock directly). Consumed
+    /// in Update once the build UI is alive again. Opens the dock too - the
+    /// WATCH incident taught that a switched tab under a closed dock shows
+    /// nothing.</summary>
+    static int pendingTab = -1;
+    public static void RequestTab(int i) { pendingTab = i; }
+    public int CurrentTab { get { return tab; } }
+    void ConsumePendingTab()
+    {
+        if (pendingTab < 0 || bm == null || careerBoardContent == null) return;
+        int t = pendingTab; pendingTab = -1;
+        SetDockOpen(true);
+        ShowTab(t);
+    }
     public int TestTab { get { return tab; } }
     /// <summary>The ladder model behind the ARENA tab, or null before the tab
     /// has ever been opened. A seam, not a shortcut: whether re-entering the
@@ -4904,10 +5012,39 @@ public class MobileBuilderUI : MonoBehaviour
     }
 
     int lastShopReversalSeq;
+    int lastUiDirtySeq;
+    float hoverHintMuteUntil;
 
     void Update()
     {
         if (bm == null) { bm = Object.FindFirstObjectByType<BuilderManager>(); if (bm == null) return; }
+        ConsumePendingTab();
+        RewardBox.Tick();            // hand over anything earned, one box at a time
+        RookieGuide.Tick(this, bm);
+        if (shopRefreshQueued && !PointerHeld())
+        {
+            // Regression pass 2026-09-03: next-FRAME was not enough - a press
+            // held across frames still had the list rebuilt underneath it, and
+            // the release landed on whichever row moved in. The rebuild now
+            // waits for the pointer to actually come UP.
+            shopRefreshQueued = false;
+            hoverHintMuteUntil = Time.unscaledTime + 0.6f;   // see Gated(): the rebuild must not hover the player
+            RefreshShop(); RefreshPartLabels(); RefreshHighlight();
+            ArrangePalette();   // buying a new part TYPE makes its tile appear
+        }
+        if (Career.uiDirtySeq != lastUiDirtySeq)
+        {
+            // A grant (crate, checklist reward) changed what the shelf and the
+            // league board should show, with no user gesture to repaint on.
+            lastUiDirtySeq = Career.uiDirtySeq;
+            RefreshPartLabels();
+            ArrangePalette();     // a reward can grant a part TYPE the shelf has never shown
+            // Unconditional: the tab==1 gate meant a purchase made on the SHOP
+            // tab never repainted the league board, which then showed stale
+            // scrap and unticked checklist lines until reload (final QA pass).
+            RefreshFightTab();
+            RefreshFightInfo();   // the "CAREER · SCRAP n" header is a separate reader
+        }
         // Deferred arena return (see ReturnToArena): fire on the first frame
         // the career isolation has lifted and the fight is fully gone.
         if (pendingArenaReturn && Career.active && FightManager.current == null)
@@ -5001,6 +5138,7 @@ public class MobileBuilderUI : MonoBehaviour
             careerSeenPlaced = bm.PlacedCount;
             careerSeenMat = bm.ActiveMatKey;
             RefreshPartLabels(); RefreshHighlight();
+            RefreshMats();      // the material BUTTON must track the active material too - it read "ALUMINUM" while Steel was active (2026-09-03)
             ArrangePalette();   // a draft commit / grant can shift ownership with the placed count
             LayoutTabs();
             RefreshFightTab();
@@ -5033,9 +5171,9 @@ public class MobileBuilderUI : MonoBehaviour
             statsText.color = Color.white;
             statsText.text = bm.HasSelection
                 ? string.Format(bm.SelectedApplique
-                      ? "HOLDING {0} — tap a surface to weld it; parts bolted there hold ×"
+                      ? "HOLDING {0} - tap a surface to weld it; parts bolted there hold ×"
                         + BuilderManager.GUSSET_SEAM_MULT.ToString("0.#") + " (+10 kg)  ·  {1} kg · {2} part{3}"
-                      : "HOLDING {0} — tap the robot to place  ·  {1} kg · {2} part{3}",
+                      : "HOLDING {0} - tap the robot to place  ·  {1} kg · {2} part{3}",
                       bm.PartLabel(bm.SelectedPart), bm.BuildMassInt, bm.PlacedCount, bm.PlacedCount == 1 ? "" : "s")
                 : string.Format("{0} kg · {1} part{2}  ·  {3}", bm.BuildMassInt, bm.PlacedCount, bm.PlacedCount == 1 ? "" : "s", TabHint());
             // C3: live weight-cap readout against the targeted league
@@ -5047,7 +5185,7 @@ public class MobileBuilderUI : MonoBehaviour
                 // button becomes something you tap superstitiously.
                 if (rn != null)
                     statsText.text = "[" + (bm.ActiveEditIsDraft ? "draft: " : "") + rn
-                                   + (buildDirty ? " \u25cf" : "") + "]  " + statsText.text;
+                                   + (buildDirty ? " *" : "") + "]  " + statsText.text;
                 var tlg = CareerDB.Leagues[Mathf.Clamp(Career.targetLeagueIdx, 0, CareerDB.Leagues.Length - 1)];
                 bool over = bm.BuildMassInt > tlg.weightCap;
                 statsText.text += string.Format("  \u00b7  {0}/{1} kg {2}{3}",
@@ -5198,6 +5336,43 @@ public class MobileBuilderUI : MonoBehaviour
         }
         dragging = false;
         BuilderManager.uiPointerBlocked = false;
+
+        // ! A MOUSE HOVERS; A FINGER CANNOT - and this UI was written for
+        // fingers only. Pointers() reports a pointer ONLY while it is
+        // PRESSED, and the line below forces debugPointer=true whenever a
+        // part is held, which makes Phase0Input.MousePos() return the frozen
+        // debugMousePos instead of the real cursor. On touch that is exactly
+        // right (there is no hover to track). With a mouse the held part's
+        // ghost preview simply stops following the cursor - reported on the
+        // web build, owen 2026-09-01.
+        //
+        // Guarded on the HARDWARE, not on the platform: iOS has no
+        // Mouse.current, so this is inert there and parity is preserved. The
+        // dock is excluded so moving the cursor over the palette does not
+        // drag the preview across the build room behind it.
+        if (bm.HasSelection || removeArmed)
+        {
+#if ENABLE_INPUT_SYSTEM
+            var hoverMouse = Mouse.current;
+            if (hoverMouse != null)
+            {
+                Vector2 hp = hoverMouse.position.ReadValue();
+                if (!OverUI(hp))
+                {
+                    Phase0Input.debugMousePos = new Vector3(hp.x, hp.y, 0f);
+                    lastP = hp;
+                }
+            }
+#else
+            Vector2 hp = Input.mousePosition;
+            if (!OverUI(hp))
+            {
+                Phase0Input.debugMousePos = new Vector3(hp.x, hp.y, 0f);
+                lastP = hp;
+            }
+#endif
+        }
+
         if (clickHold > 0) { clickHold--; Phase0Input.debugPointer = true; }
         else Phase0Input.debugPointer = bm.HasSelection || removeArmed;
     }
@@ -5219,10 +5394,10 @@ public class MobileBuilderUI : MonoBehaviour
             case 1:  return "pick a contest \u00b7 SCOUT first, then FIGHT";
             case 2:  return "your stable \u00b7 EDIT loads a robot into the builder";
             case 3:  return "tap a part to see every material and price \u00b7 then BUY";
-            // \u26a0 4 and 5 were BOTH WRONG until 2026-08-10. The PARTS removal on
+            // ! 4 and 5 were BOTH WRONG until 2026-08-10. The PARTS removal on
             // 08-05 renumbered the names array, LayoutTabs and ShowTab and
             // missed this switch, so case 4 answered with the deleted PARTS
-            // tab's hint and case 5 with the trophy case's \u2014 every tab from
+            // tab's hint and case 5 with the trophy case's - every tab from
             // here down described its predecessor. Nothing failed, because a
             // wrong sentence is not an exception.
             case 4:  return "the ladder \u00b7 ENLIST your saved robot, then scout and challenge";
@@ -5333,7 +5508,7 @@ public class MobileBuilderUI : MonoBehaviour
             // Reading ahead or back is marked, so a previewed tip is never
             // mistaken for the thing the game is currently waiting on.
             tipText.text = TutorialTip(view)
-                         + (view == ts ? "" : "   \u00b7   (reading ahead \u2014 you are on " + (ts + 1) + "/" + BuilderManager.TIP_COUNT + ")");
+                         + (view == ts ? "" : "   \u00b7   (reading ahead - you are on " + (ts + 1) + "/" + BuilderManager.TIP_COUNT + ")");
             tipText.color = view == ts ? new Color(0.62f, 0.84f, 1f) : new Color(0.72f, 0.72f, 0.80f);
             tipViewNow = view;
             SetArrow(tipPrev, view > 0);
@@ -5351,8 +5526,8 @@ public class MobileBuilderUI : MonoBehaviour
     /// a control that disappears moves everything next to it, and the row would
     /// reflow under the thumb mid-tap.</summary>
     int tipViewNow;
-    const string TIP_FIRST = "This is the first tip \u2014 there is nothing before it.";
-    const string TIP_LAST  = "This is the last tip \u2014 SKIP TIPS clears the row.";
+    const string TIP_FIRST = "This is the first tip - there is nothing before it.";
+    const string TIP_LAST  = "This is the last tip - SKIP TIPS clears the row.";
 
     static void SetArrow(Button b, bool live)
     {
@@ -5440,7 +5615,7 @@ public class MobileBuilderUI : MonoBehaviour
             // P4: the autonomy button carries its OWN gate on top of the
             // manual one. One AutonomyBlocker call covers all rows (it reads
             // the active robot + bay, not the contest), so hoisting it out of
-            // the loop would be nicer \u2014 but the 0.25 s pump timer already
+            // the loop would be nicer - but the 0.25 s pump timer already
             // bounds the cost and per-row keeps the code shaped like the
             // manual gate beside it.
             // V2.8 (critic loop 7, F2): the autonomy gate now speaks on its
@@ -5456,14 +5631,14 @@ public class MobileBuilderUI : MonoBehaviour
             bool aOwn = bm.AutonomyBlocker(out aTag) != null;   // autonomy's OWN refusal
             bool aBlocked = aOwn || blocked;
             string want = g.baseLabel;
-            if (blocked) want += "   \u2014   " + tag;
+            if (blocked) want += "   -   " + tag;
             // V2.8b (critic loop 7 R2, finding 6): ELSE, not a second clause.
             // AutonomyBlocker reads the bay, not the contest, so its sentence
             // is identical on all nine rows; appending it alongside the manual
             // one pushed every label onto two lines in a one-line box and
             // clipped both. The autonomy reason now shows exactly when it is
             // the ONLY thing in the way - which is when it is actionable.
-            else if (aOwn) want += "   \u2014   auto: " + aTag;
+            else if (aOwn) want += "   -   auto: " + aTag;
             if (g.lbl.text != want) g.lbl.text = want;
             // amber for EITHER refusal - a row only autonomy refuses used to
             // print its refusal in ready-white.
@@ -5480,13 +5655,19 @@ public class MobileBuilderUI : MonoBehaviour
         }
     }
 
+    /// <summary>Re-arm the transient message bar's lifetime WITHOUT changing
+    /// its text. PumpMessage keys on text CHANGE, so a coaching line re-issued
+    /// verbatim (RookieGuide's 5 s re-assert) never revived the bar - the
+    /// step-1 instruction showed exactly once per career (final QA pass).</summary>
+    public void RepumpMessage() { msgAt = Time.unscaledTime; }
+
     void PumpMessage(string msg)
     {
         if (msgBar == null || msgText == null) return;
         if (removeArmed)
         {
             msgText.color = new Color(1f, 0.52f, 0.42f);
-            msgText.text = "REMOVE armed \u2014 tap a part on the robot to delete it (parts attached to it go too)";
+            msgText.text = "REMOVE armed - tap a part on the robot to delete it (parts attached to it go too)";
             if (!msgBar.activeSelf) { msgBar.SetActive(true); ApplyDockH(); }
             FitMsgBar();
             return;
@@ -5531,7 +5712,7 @@ public class MobileBuilderUI : MonoBehaviour
         var frt = fade.GetComponent<RectTransform>();
         frt.anchorMin = new Vector2(0f,0f); frt.anchorMax = new Vector2(1f,0f); frt.pivot = new Vector2(0.5f,0f);
         frt.sizeDelta = new Vector2(-10f, 22f); frt.anchoredPosition = Vector2.zero;
-        var chev = MkText("chev", fade.transform, "\u2304  more below", 15, TextAnchor.MiddleCenter);
+        var chev = MkText("chev", fade.transform, "v  more below", 15, TextAnchor.MiddleCenter);
         Stretch(chev.rectTransform);
         chev.color = new Color(0.62f, 0.80f, 0.98f, 1f);
         chev.raycastTarget = false;

@@ -3,7 +3,7 @@ using UnityEngine;
 namespace RobotBrawl.Phase0
 {
 /// <summary>
-/// Phase 2B — match flow and win/lose (design doc §7, §7.1, §8, §12).
+/// Phase 2B - match flow and win/lose (design doc §7, §7.1, §8, §12).
 ///
 /// Owns the 90 s match: HUD (timer + both bots' HP bars), the three win
 /// conditions applied symmetrically to BOTH bots, and the full-screen results
@@ -102,7 +102,7 @@ public class FightManager : MonoBehaviour
 
     /// <summary>========== END A BOUT THAT IS OVER (owen, 2026-08-08) =======
     /// The ladder sweep measured a mean of 53.0 s of dead air in a 66.8 s bout
-    /// — 79% of what §1.1 of the multiplayer design doc asks players to watch.
+    /// - 79% of what §1.1 of the multiplayer design doc asks players to watch.
     ///
     /// This rule is NOT "it looks boring". It is stricter than that, and that
     /// is what makes it safe: STRUCT_RAM_DMG is 0, so a part with no weapon
@@ -258,26 +258,27 @@ public class FightManager : MonoBehaviour
         // Battle_Music_ChromeWar_2026-08-02.md, "NOT done - the wiring"), so
         // this is the commit that actually puts it in the game.
         string pick = FIGHT_THEMES[UnityEngine.Random.Range(0, FIGHT_THEMES.Length)];
-        var musicClip = Resources.Load<AudioClip>(pick);
-        // One missing file must not mean SILENCE while the other two are
-        // sitting there - fall through the list rather than trusting one Load.
-        if (musicClip == null)
-            foreach (var alt in FIGHT_THEMES)
-            {
-                musicClip = Resources.Load<AudioClip>(alt);
-                if (musicClip != null) { pick = alt; break; }
-            }
-        lastFightTheme = musicClip != null ? pick : "";
-        if (musicClip != null)
+        // 2026-09-04: on the WEB the tracks are no longer packed - 21 MB of the
+        // 33 MB payload was music, and half of phone arrivals never finished the
+        // download. MusicLoader streams them from the site AFTER boot (and hands
+        // back Resources synchronously everywhere else), so a fight starts now
+        // and its music arrives a second or two in. One missing file must not
+        // mean SILENCE while the others are there - fall through the list.
+        MusicLoader.Load(this, pick, FIGHT_THEMES, (musicClip, got) =>
         {
-            music = gameObject.AddComponent<AudioSource>();
-            music.clip = musicClip;
-            music.loop = true;
-            music.volume = 0.55f;
-            music.spatialBlend = 0f;   // 2D: same in both ears, everywhere
-            music.Play();
-        }
-        else CompoundRobot.Log("no fight theme found in Resources - fight is silent");
+            if (this == null || state == State.Ended) return;
+            lastFightTheme = musicClip != null ? got : "";
+            if (musicClip != null)
+            {
+                music = gameObject.AddComponent<AudioSource>();
+                music.clip = musicClip;
+                music.loop = true;
+                music.volume = 0.55f;
+                music.spatialBlend = 0f;   // 2D: same in both ears, everywhere
+                music.Play();
+            }
+            else CompoundRobot.Log("no fight theme found - fight is silent");
+        });
     }
 
     /// <summary>The three fight tracks, by Resources name. A harness can assert
@@ -334,7 +335,7 @@ public class FightManager : MonoBehaviour
         state = State.Fighting;
         bellFlash = 1.0f;
         CompoundRobot.Log(string.Format(
-            "BELL — fight live. YOU parts {0} hp {1:F0}% · MAULER parts {2} hp {3:F0}%",
+            "BELL - fight live. YOU parts {0} hp {1:F0}% · MAULER parts {2} hp {3:F0}%",
             player.partsNow, player.hpFrac * 100f, enemy.partsNow, enemy.hpFrac * 100f));
     }
 
@@ -598,19 +599,28 @@ public class FightManager : MonoBehaviour
         if (!Incap(s, out why))
         {
             if (s.countOut < 0f)
-            { s.incapTimer = 0f; s.incapReason = ""; s.recoverTimer = 0f; return false; }
-            // A running count cancels only on SUSTAINED recovery. The winner's
-            // own hit gives the downed enemy a frame of velocity, read as
-            // "moving again", which used to reset the count on every blow so a
-            // dominant player never finished (owen, 2026-09-04). Real recovery
-            // lasts longer than RECOVER_CANCEL; an imposed knock does not.
+            {
+                // no count running - a clean, normal reset
+                s.incapTimer = 0f; s.incapReason = ""; s.recoverTimer = 0f;
+                return false;
+            }
+            // ⚠ A COUNT ALREADY RUNNING CANCELS ONLY ON SUSTAINED RECOVERY.
+            // The winner's own hit gives the downed enemy a frame or two of
+            // velocity, which the incap tests read as "moving again" - and that
+            // used to reset the count on every blow, so a dominant player could
+            // never finish (owen, 2026-09-04: "count restarts whenever my robot
+            // hits the enemy, repeated several times"). Real self-recovery lasts
+            // longer than RECOVER_CANCEL; an imposed knock does not.
             s.recoverTimer += dt;
             if (s.recoverTimer >= RECOVER_CANCEL)
-            { s.incapTimer = 0f; s.countOut = -1f; s.incapReason = ""; s.recoverTimer = 0f; return false; }
-            s.countOut -= dt;   // count DOWN through the blip - never restart
+            {
+                s.incapTimer = 0f; s.countOut = -1f; s.incapReason = ""; s.recoverTimer = 0f;
+                return false;
+            }
+            s.countOut -= dt;               // keep counting DOWN through the blip - never restart
             return s.countOut <= 0f;
         }
-        s.recoverTimer = 0f;
+        s.recoverTimer = 0f;                // still incap - forget any partial recovery
 
         s.incapTimer += dt;
         if (s.incapTimer < INCAP_GRACE) return false;
@@ -636,7 +646,7 @@ public class FightManager : MonoBehaviour
     /// upright, had every wheel on the ground and was AHEAD on damage. A robot
     /// is incapacitated only when it has no way left to influence the match:
     ///   · upside down and not rolling back out of it,
-    ///   · beached — not one wheel touching, so the drive does nothing,
+    ///   · beached - not one wheel touching, so the drive does nothing,
     ///   · immobile at full throttle while touching NOTHING, i.e. no wall,
     ///     debris or opponent explains the stall.
     /// Pushing a wall or the opponent is legitimate and winnable; a mutual
@@ -648,11 +658,12 @@ public class FightManager : MonoBehaviour
         float speed = VelUtil.GetLinearVelocity(bot.rb).magnitude;
         bool flipped = Vector3.Dot(bot.transform.up, Vector3.up) < 0.2f;
 
-        // No speed gate on the flip (owen, 2026-09-04): ramming a downed enemy
-        // sends it sliding on its back at speed>1, which "flipped && speed<1"
-        // read as recovered and cancelled the count. A machine on its back is
-        // helpless whether still or sliding; it un-flips only when its UP
-        // vector recovers, which the `flipped` test already catches.
+        // ⚠ NO SPEED GATE ON THE FLIP (owen, 2026-09-04). "flipped && speed<1"
+        // meant that RAMMING a downed enemy - which sends it sliding on its
+        // back at speed>1 - read as "not flipped any more" and cancelled the
+        // count. A machine on its back is helpless whether it is still or
+        // sliding; it stops being flipped only when its UP vector recovers,
+        // which the `flipped` test itself already catches.
         if (flipped)
         {
             // Round-5 fix 3b: a bot that is flipped but DECISIVELY AHEAD is not
@@ -664,7 +675,7 @@ public class FightManager : MonoBehaviour
             int live = s.gyro != null ? s.gyro.LiveGyros() : 0;
             bool fitted = s.gyro != null && s.gyro.gyroParts.Length > 0;
             why = !fitted
-                ? "flipped onto its back with nothing aboard to right it — fit a gyro, or build an arm that can push you back over"
+                ? "flipped onto its back with nothing aboard to right it - heavy parts mounted LOW keep a machine on its wheels"
                 : (live == 0
                     ? "flipped onto its back — its gyro had already been sheared off, leaving only the slow emergency struts"
                     : string.Format("flipped onto its back — {0} gyro(s) still live, but not enough righting torque for a hull this shape", live));
@@ -842,7 +853,7 @@ public class FightManager : MonoBehaviour
     /// when being flipped is its actual strategy.</summary>
     public static float CONTROL_BAND = 0.10f;
     /// <summary>R1-CRITIC FIX (2026-07-29, finding 1): how different the two
-    /// sides' mobility shares (1 − immobile/elapsed) must be before the
+    /// sides' mobility shares (1 - immobile/elapsed) must be before the
     /// judges decide a damage-even match on AGGRESSION. Measured trigger: a
     /// bot 88% immobile vs an opponent 12% immobile is a 0.76 gap — far past
     /// this band; two normal brawlers within ~20% of each other never are.</summary>
@@ -900,7 +911,7 @@ public class FightManager : MonoBehaviour
         float pMob = 1f - Mathf.Clamp01(player.immobileTime / span);
         float eMob = 1f - Mathf.Clamp01(enemy.immobileTime / span);
         string cmp = string.Format(
-            "Judges' decision — damage {0:F0} vs {1:F0} ({2:F1}% margin {9}) · pieces {3}/{4} vs {5}/{6}"
+            "Judges' decision - damage {0:F0} vs {1:F0} ({2:F1}% margin {9}) · pieces {3}/{4} vs {5}/{6}"
             + " · aggression {10:F0}% vs {11:F0}% · on its back {7:F0}% vs {8:F0}%",
             player.dealt, enemy.dealt, pct,
             player.partsNow, player.startParts, enemy.partsNow, enemy.startParts,
@@ -998,6 +1009,12 @@ public class FightManager : MonoBehaviour
         Career.lastSettled = false;
         Career.lastMedal = null; cMedal = "";
         // Phase 4: settle scrap + ladder advancement, exactly once per fight.
+        // Funnel: a fight actually FINISHED, and how it went. This is the
+        // event that answers "has anyone completed a league fight" — which
+        // nothing could answer on 2026-09-01, because career play is local
+        // and every web player is a guest with no account.
+        RobotBrawl.Phase0.RBTelemetry.Once(RobotBrawl.Phase0.RBTelemetry.RESULT,
+                                          o == Outcome.PlayerWin ? "&w=1" : "&w=0");
         Progression.OnMatchEnd(o == Outcome.PlayerWin, player.dealt);
         // ...and what the settlement actually paid. If it did not run as a
         // contest (already rewarded, exhibition), drop the contest framing
@@ -1006,7 +1023,7 @@ public class FightManager : MonoBehaviour
         // MEDALS: SettleFight mints at most one per settle and nulls the field
         // on every settle, so this is never a stale championship.
         if (Career.lastMedal != null)
-            cMedal = "\u2605  " + Career.lastMedal.leagueName.ToUpper() + " CHAMPION  \u2605";
+            cMedal = "*  " + Career.lastMedal.leagueName.ToUpper() + " CHAMPION  *";
         // Round-2 fix 3: cut to the fixed safe overview BEFORE the results
         // overlay draws — the chase camera could end a count-out wedged in a
         // wall corner and render the results screen into wall geometry.
@@ -1079,7 +1096,7 @@ public class FightManager : MonoBehaviour
         DrawBar(x + 16, 40 + dy, 482, player);
         DrawBar(x + w - 498, 40 + dy, 482, enemy);
 
-        // P3c: the armed banner (design §6) — a fight the autopilot drives
+        // P3c: the armed banner (design §6) - a fight the autopilot drives
         // says so, loudly, for the WHOLE fight (persistent mode banner, the
         // ModeBanner pattern): the player's hands are off the sticks and the
         // screen must never let them forget why. playerSource is the single
@@ -1373,7 +1390,7 @@ public class FightManager : MonoBehaviour
             int net = cPay;
             string line1 = outcome == Outcome.PlayerWin
                 ? string.Format("PURSE {0}      BONUS {1}{2}",
-                                cPurse, cPay - cPurse < 0 ? "−" : "+", Mathf.Abs(cPay - cPurse))
+                                cPurse, cPay - cPurse < 0 ? "-" : "+", Mathf.Abs(cPay - cPurse))
                 : string.Format("PURSE {0} NOT WON — the league pays wins only", cPurse);
             moneySmall.normal.textColor = new Color(0.72f, 0.74f, 0.80f);
             GUI.Label(new Rect(0, my, W, 26), line1, moneySmall);
@@ -1381,8 +1398,19 @@ public class FightManager : MonoBehaviour
                                                    : new Color(1f, 0.42f, 0.34f);
             GUI.Label(new Rect(0, my + 27f, W, 36),
                 string.Format("NET {0}{1} SCRAP          BALANCE {2}",
-                              net >= 0 ? "+" : "−", Mathf.Abs(net), Career.Data.scrap),
+                              net >= 0 ? "+" : "-", Mathf.Abs(net), Career.Data.scrap),
                 moneyStyle);
+            if (Career.lastRescue)
+            {
+                // The rescue crate (design 2026-09-03 §4D): shown exactly on
+                // the settle that granted it. One line, sized to sit between
+                // the NET row and the buttons at 0.705H without collision.
+                var salv = new GUIStyle(moneySmall);
+                salv.normal.textColor = new Color(1f, 0.84f, 0.40f);
+                GUI.Label(new Rect(0, my + 64f, W, 24),
+                    "THE YARD LOOKS AFTER ROOKIES - salvage: +50 scrap · 2 gussets · 1 steel plate. Bolt the heavy plate LOW to stay off your back.",
+                    salv);
+            }
         }
         else if (Progression.lastRewardLine.Length > 0)
         {
@@ -1437,7 +1465,7 @@ public class FightManager : MonoBehaviour
         // fractions the rows themselves no longer use, so once the rows were
         // measured the estimate went stale and the button was drawn straight
         // over the loser's detail row. Photographed on an iPhone 17: "BACK TO
-        // THE ARENA" sat on top of "seams sheared 2 · flipped 0% …".
+        // THE ARENA" sat on top of "seams sheared 2 · flipped 0% ...".
         // statsBottom is the real measured end of the block, so this cannot
         // drift again. Both paths take it, because a long wrapped row can push
         // past 0.705H on a short screen whether or not there is a purse.
@@ -1457,6 +1485,20 @@ public class FightManager : MonoBehaviour
             if (ldone) resultsDismissed = true;   // MatchRunner owns teardown
             return;
         }
+        // Rookie debrief (design 2026-09-03 §4B): the screen players
+        // understand becomes the door to the screen they don't. One
+        // context-aware button, labeled by what the fight just proved.
+        bool improve = false; string improveTab = null;
+        if (cIsContest)
+        {
+            GUI.backgroundColor = new Color(1f, 0.62f, 0.24f);
+            string dLabel;
+            if (outcome == Outcome.PlayerWin) { dLabel = "CLAIM & UPGRADE >"; improveTab = "shop"; }
+            else if (causeLine != null && causeLine.Contains("flipped")) { dLabel = "MAKE IT STABLER >"; improveTab = "stability"; }
+            else { dLabel = "HIT HARDER >"; improveTab = "damage"; }
+            improve = GUI.Button(new Rect(cx - bw - 10f, by + bh + 12f, bw * 2f + 20f, bh), dLabel, btnStyle);   // BELOW back/rematch - above them it sat on the NET line (seen 2026-09-03)
+            GUI.backgroundColor = new Color(0.30f, 0.62f, 0.88f);
+        }
         bool back = GUI.Button(new Rect(cx - bw - 10f, by, bw, bh),
                                touch ? "BACK TO WORKSHOP" : "BACK TO WORKSHOP  (B)", btnStyle);
         GUI.backgroundColor = Color.white;
@@ -1467,6 +1509,23 @@ public class FightManager : MonoBehaviour
         bool again = GUI.Button(new Rect(cx + 10f, by, bw, bh),
                                 cIsContest ? (touch ? "REMATCH · EXHIBITION" : "REMATCH · EXHIBITION  (R)")
                                            : (touch ? "REMATCH" : "REMATCH  (R)"), btnStyle);
+        if (improve && bm != null)
+        {
+            bm.BackToBuild();
+            if (improveTab == "shop")
+            {
+                MobileBuilderUI.RequestTab(3);   // SHOP
+                bm.Coach("Purse claimed - spend it. HP/kg is what a weight cap buys.");
+            }
+            else
+            {
+                MobileBuilderUI.RequestTab(0);   // BUILD
+                bm.Coach(improveTab == "stability"
+                    ? "Bolt the heavy steel plate LOW - a low centre of mass keeps you off your back."
+                    : "Weld the spike's seam with a gusset - welded seams hold x4.");
+            }
+            return;
+        }
         if (back) { if (bm != null) bm.BackToBuild(); return; }
         if (again && bm != null) bm.ResetFight();
     }
@@ -1477,7 +1536,7 @@ public class FightManager : MonoBehaviour
         // "taken 170" and the two lines flatly contradicted each other. `dealt`
         // has always counted WEAPON damage only; `taken` includes hazards and
         // impacts. Say which is which instead of making the player guess.
-        return string.Format("{0} — weapon dmg {1:F0} ({2:F1}/s) · total taken {3:F0} · HP {4:F0}% · parts {5}/{6} · wheels {7}/{8}",
+        return string.Format("{0} - weapon dmg {1:F0} ({2:F1}/s) · total taken {3:F0} · HP {4:F0}% · parts {5}/{6} · wheels {7}/{8}",
             label, s.dealt, s.dealt / Mathf.Max(1f, elapsed), s.taken,
             s.hpFrac * 100f, s.bodyNow, s.startBody, s.wheelsNow, s.startWheels);
     }
@@ -1585,7 +1644,7 @@ public class FightManager : MonoBehaviour
         // fees no longer exist (owen, same day), so the line says nothing
         // about them.
         if (re) return lg.name.ToUpper() + "   ·   " + lg.arenaName.ToUpper()
-                     + "   ·   PRACTICE — PURSE ALREADY WON";
+                     + "   ·   PRACTICE - PURSE ALREADY WON";
         return lg.name.ToUpper() + "   ·   " + lg.arenaName.ToUpper()
              + "   ·   PURSE " + c.purse;
     }

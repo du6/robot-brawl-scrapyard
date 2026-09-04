@@ -16,7 +16,7 @@ public static class CareerDB
     public const float UNDERDOG_K = 0.6f;      // bonus slope vs value gap
     public const float UNDERDOG_CAP = 1.6f;    // never above 1.6x (owen, resolved)
     // REENTRY_FRAC (0.4) lived here until 2026-08-13 and is GONE, deliberately:
-    // owen's first-win rule (docs/Server_Economy_Design_2026-08-13.md §5) —
+    // owen's first-win rule (docs/Server_Economy_Design_2026-08-13.md §5) -
     // a contest pays on the FIRST win only. Re-entering a beaten contest is a
     // PRACTICE BOUT: no entry fee, no purse, no damage bonus, no consolation.
     // This is what hard-caps the league economy at the purse-table ceiling
@@ -49,7 +49,7 @@ public static class CareerDB
     // payment was the last unbounded faucet in the league: lose on purpose,
     // collect 40-150, forever. The league now pays WINS ONLY, once each,
     // and the entire league exposure is the win-path ceiling (13,850 per
-    // account — docs/Server_Economy_Design_2026-08-13.md §5). Do not
+    // account - docs/Server_Economy_Design_2026-08-13.md §5). Do not
     // resurrect a payment on the loss path.
 
     public class Contest
@@ -62,7 +62,7 @@ public static class CareerDB
         public int purse;
         /// <summary>HARDENED (owen, 2026-08-12: "make higher level league
         /// robots harder to beat"). The opponent spawns with every part
-        /// except core and wheels GUSSETED (seams ×1.5) — the same measured
+        /// except core and wheels GUSSETED (seams ×1.5) - the same measured
         /// lever players got this evening. Set SURGICALLY: CareerBench's
         /// 3x-sample verdicts say the CEILING fails at the FLAGSHIPS (a
         /// two-below robot beat L4's BASTION 22/24 by SHEDDING its parts —
@@ -158,8 +158,14 @@ public static class CareerDB
     {
         return new[]
         {
-            new KitItem("beam",     "Aluminum", 6),
-            new KitItem("beamlong", "Aluminum", 1),
+            // THE KIT IS EXACTLY SCRAPPER (owen, 2026-09-04). Every spare that
+            // used to sit greyed on the shelf now arrives as a REWARD BOX with
+            // something in it: wedge + gusset for the first bout, beams and
+            // plates for the first bolt, long beam + spindle for the first
+            // weld, the cube for the first purchase (Career.QueueReward sites).
+            // Same parts, same bounded total, deferred - and the boot shelf
+            // says one thing: here is your machine, go fight.
+            new KitItem("beam",     "Aluminum", 2),   // the two axles
             // bracket x4 removed with the part (2026-08-12). What, if
             // anything, replaces the ~88 kg of kit budget is the register's
             // tutorial-assembly decision, not this line's.
@@ -167,7 +173,19 @@ public static class CareerDB
             // retirement (owen, 2026-08-12) — the block still exists, but only
             // under enemy robots. Kit composition overall remains the
             // register's tutorial-assembly decision.
-            new KitItem("plate",    "ABS",      2),
+            // ONE MATERIAL FOR THE WHOLE KIT (owen, 2026-09-02). The chips
+            // default to Aluminum, so the kit's Steel wedge/spike and ABS
+            // plates rendered as "0 free · 1 in Steel" - which reads as "you
+            // don't own this". The 2026-09-01 playtest hit it verbatim
+            // ("palette labels read as unavailable when they aren't - I
+            // nearly skipped weapons entirely"). Everything the kit grants
+            // is now visible and placeable under the default chip on minute
+            // one. The wheel stays Rubber: it is PINNED (materialChoice =
+            // false) and its tile names its material, so it never lied.
+            // Cost accepted: an aluminum starter wedge/spike is lighter and
+            // less durable than steel - and a lighter nose on a machine
+            // whose measured loss mode is TIPPING is, if anything, a help.
+            // Existing careers keep their Steel/ABS parts; no migration.
             new KitItem("wheel",    "Rubber",   4),   // R2: the wheel def PINS itself to Rubber
                                                       // (materialChoice=false) and Rubber is deliberately
                                                       // absent from MatDB.Order, so an "Aluminum" grant was
@@ -175,10 +193,19 @@ public static class CareerDB
             new KitItem("battery",  "Aluminum", 1),
             // gyro x1 removed with its player-side retirement (owen, 2026-08-12);
             // a Cube x1 takes the slot so the crate keeps a small block.
-            new KitItem("cube",     "Aluminum", 1),
-            new KitItem("spindle",  "Aluminum", 1),
-            new KitItem("wedge",    "Steel",    1),
-            new KitItem("spike",    "Steel",    1),
+            new KitItem("spike",    "Aluminum", 1),
+            // SCRAPPER carries a Compass tracker and a Wall sensor so its
+            // autopilot HUNTS (RamHunter, StarterBench 9/10 vs SCOUT). Granted
+            // so the pre-built machine is fully owned on a fresh career.
+            new KitItem("compass",  "Aluminum", 1),
+            new KitItem("wallsensor","Aluminum", 1),
+            // The starter robot ships with its spike seam WELDED (StarterBench,
+            // 2026-09-03: unwelded, the aluminum spike sheared in 10/10 bouts
+            // and every fight ended in a mutual-disarm draw; welded, 6/10 wins).
+            // The weld consumes one gusset, so the kit must grant one - and a
+            // player who removes the spike gets a free weld to re-spend, which
+            // is the gusset's own tutorial.
+            new KitItem("gusset",   "Steel",    1),
         };
     }
 
@@ -348,6 +375,13 @@ public static class CareerDB
     /// <summary>V2.5: the program library. JsonUtility hands every older
     /// save an empty list, which IS the migration (the medals precedent).</summary>
     public List<SavedProgram> programs = new List<SavedProgram>();
+    /// <summary>Rookie warm-up flags (docs/Rookie_Warmup_Design_2026-09-03.md).
+    /// All once-per-career, all bounded - honoring the 2026-08-13 no-faucet
+    /// rule. JsonUtility hands every older save `false`, which IS the
+    /// migration (the medals precedent).</summary>
+    public bool rescueGranted;
+    public bool taskFight, taskBolt, taskWeld, taskBuy;
+    public bool guideDone;
     public int fights; public int fightWins; public int sessions;   // telemetry
     public int tutorialStep;
     /// <summary>C4: index into stable of the robot being edited; -1 = none.</summary>
@@ -545,6 +579,56 @@ public static class Career
     public static void Save()
     { System.IO.File.WriteAllText(PathFile, JsonUtility.ToJson(Data)); }
 
+    /// <summary>Rookie checklist grants - each fires once per career and pays
+    /// a fixed 10, so the whole checklist is bounded at +40 total. Quiet on
+    /// re-fire by design.</summary>
+    public static void RookieTaskBolt()
+    { if (!active || Data == null || Data.taskBolt) return; Data.taskBolt = true; Txn(10, "rookie checklist - first part bolted"); AddItem("beam", "Aluminum", 2); AddItem("plate", "Aluminum", 2); uiDirtySeq++; QueueReward("FIRST PART BOLTED", "Every machine starts with one bolt.", "+10 SCRAP", "2 BEAMS", "2 ARMOR PLATES"); if (autosave) Save(); }
+    public static void RookieTaskWeld()
+    { if (!active || Data == null || Data.taskWeld) return; Data.taskWeld = true; Txn(10, "rookie checklist - first seam welded"); AddItem("beamlong", "Aluminum", 1); AddItem("spindle", "Aluminum", 1); uiDirtySeq++; QueueReward("FIRST WELD", "Welded seams hold x4. Your spike will thank you.", "+10 SCRAP", "1 LONG BEAM", "1 SPINDLE (axle)"); if (autosave) Save(); }
+
+    /// <summary>Make sure the inventory can BUILD `snapshot` - grant whatever is
+    /// short. owen's phone, 2026-09-04: a career created before the compass,
+    /// wall sensor and gusset joined the kit later received SCRAPPER (injected
+    /// into any career with no robots and no fights), so the fight gate greyed
+    /// AUTONOMY FIGHT with "needs 1x Ram spike, 1x Compass tracker, 1x Wall
+    /// sensor, 1x Gusset" while the guide pointed straight at it. The kit is
+    /// granted once at creation; the starter can change between builds; this
+    /// closes the gap from the robot's side. Parses the snapshot format
+    /// (id|pos|yaw|axis|Mat[|G:mask]); the core is exempt from stock, and every
+    /// gusset mark consumes one Steel gusset. Returns how many parts it added.</summary>
+    public static int TopUpForSnapshot(string snapshot)
+    {
+        if (Data == null || string.IsNullOrEmpty(snapshot)) return 0;
+        var need = new Dictionary<string, int>();
+        foreach (var raw in snapshot.Split('\n'))
+        {
+            var line = raw.Trim();
+            if (line.Length == 0 || line[0] == '#') continue;
+            var f = line.Split('|');
+            if (f.Length < 5 || f[0] == "core") continue;
+            string key = f[0] + "|" + f[4];
+            need[key] = need.TryGetValue(key, out var n) ? n + 1 : 1;
+            for (int i = 5; i < f.Length; i++)
+                if (f[i].StartsWith("G:") && int.TryParse(f[i].Substring(2), out var mask))
+                {
+                    int bits = 0; for (int m = mask & 63; m != 0; m >>= 1) bits += m & 1;
+                    string gk = "gusset|Steel";
+                    need[gk] = need.TryGetValue(gk, out var g) ? g + bits : bits;
+                }
+        }
+        int added = 0;
+        foreach (var kv in need)
+        {
+            int bar = kv.Key.IndexOf('|');
+            string id = kv.Key.Substring(0, bar), mat = kv.Key.Substring(bar + 1);
+            int have = CountOf(id, mat);
+            if (have < kv.Value) { AddItem(id, mat, kv.Value - have); added += kv.Value - have; }
+        }
+        if (added > 0) { uiDirtySeq++; if (autosave) Save(); }
+        return added;
+    }
+
     public static void GrantStarterKit()
     {
         foreach (var k in CareerDB.StarterKit())
@@ -653,7 +737,7 @@ public static class Career
     public static bool fightAutonomous;
 
     /// <summary>Client B: signed in, the shop needs the server (owen's
-    /// offline-shop decision \u2014 browse, no buying). "Online" means this
+    /// offline-shop decision - browse, no buying). "Online" means this
     /// session has reached the wallet at least once; a purchase then applies
     /// OPTIMISTICALLY and queues for the flusher, which reverses it if the
     /// server refuses. Signed out (benches, dev door, a career that never
@@ -663,7 +747,7 @@ public static class Career
         msg = null;
         if (!LadderClient.SignedIn) return false;
         if (EconomySync.SessionOnline) return false;
-        msg = "OFFLINE \u2014 buying needs a connection. Your parts and scrap are safe.";
+        msg = "OFFLINE - buying needs a connection. Your parts and scrap are safe.";
         return true;
     }
 
@@ -682,15 +766,24 @@ public static class Career
         string off; if (ShopOffline(out off)) { shopMsg = off; return false; }
         int price = CareerDB.PartPrice(partId, mat);
         if (Data.scrap < price)
-        { shopMsg = "Not enough scrap \u2014 " + price + " needed, " + Data.scrap + " held."; return false; }
+        { shopMsg = "Not enough scrap - " + price + " needed, " + Data.scrap + " held."; return false; }
         AddItem(partId, mat, 1);
         Txn(-price, "buy " + partId + " " + mat);
+        if (!Data.taskBuy)
+        {
+            Data.taskBuy = true;
+            Txn(10, "rookie checklist - first purchase");
+            uiDirtySeq++;
+            AddItem("cube", "Aluminum", 1);
+            QueueReward("FIRST PURCHASE", "The shop pays you back for shopping. Once.", "+10 SCRAP", "1 CUBE");
+        }
         QueuePurchase("buy", partId, mat);
+        uiDirtySeq++;   // regression pass: the league board showed stale scrap after purchases
         if (autosave) Save();
         return true;
     }
 
-    /// <summary>⛔ SELLING IS CLOSED (owen, 2026-08-19): "disallow users from
+    /// <summary>! SELLING IS CLOSED (owen, 2026-08-19): "disallow users from
     /// selling parts back." Kept as a function that always refuses rather than
     /// deleted, so any caller left anywhere gets a REASON instead of a compile
     /// error that tempts someone into re-adding the path.
@@ -713,7 +806,7 @@ public static class Career
     }
 
     /// <summary>Compensation (EconomySync): the server REFUSED a purchase the
-    /// till applied optimistically \u2014 undo it and say so. This is what keeps
+    /// till applied optimistically - undo it and say so. This is what keeps
     /// local inventory from drifting from what the server actually charged.</summary>
     public static void ReversePurchase(CareerPurchase p, string why)
     {
@@ -727,9 +820,9 @@ public static class Career
             AddItem(p.partId, p.mat, 1);
             Txn(-CareerDB.SellPrice(p.partId, p.mat), "sell reversed (" + why + ") " + p.partId);
         }
-        shopMsg = "The shop could not complete a " + p.op + " \u2014 " + why;
+        shopMsg = "The shop could not complete a " + p.op + " - " + why;
         // Bump so the dock REPAINTS: this reversal happens in EconomySync's
-        // background flush, and nothing was re-drawing the shop/palette \u2014 a part
+        // background flush, and nothing was re-drawing the shop/palette - a part
         // the player saw "bought" (and maybe bolted on) silently vanished and
         // the amber reason above never showed. The UI polls this counter. Found
         // by the UX validation round, 2026-08-15.
@@ -738,7 +831,7 @@ public static class Career
 
     /// <summary>Incremented every time a queued purchase/sale is reversed
     /// server-side (EconomySync flush). The dock watches it to repaint the shop
-    /// and surface shopMsg \u2014 a background reversal has no user gesture to hang a
+    /// and surface shopMsg - a background reversal has no user gesture to hang a
     /// redraw on.</summary>
     public static int shopReversalSeq;
 
@@ -785,6 +878,37 @@ public static class Career
     /// Progression.OnMatchEnd, so a stale contest can never leak onto an
     /// exhibition result.</summary>
     public static bool lastSettled;
+    /// <summary>The rescue crate landed on THIS settle - the results screen
+    /// reads it to show the salvage line, exactly once.</summary>
+    public static bool lastRescue;
+    /// <summary>Bumped by every grant that changes what the shelf/league board
+    /// should show (crate, checklist rewards). MobileBuilderUI polls it - the
+    /// shopReversalSeq precedent - because a grant has no user gesture to hang
+    /// a repaint on, and warm-up QA caught the gusset tile reading "0 free"
+    /// AFTER the crate had granted two.</summary>
+    public static int uiDirtySeq;
+
+    /// <summary>A reward the player has EARNED but not yet SEEN handed over
+    /// (owen, 2026-09-04: "congrats animation whenever the user completes a
+    /// guided task, rewards in a box they can open"). The grant itself is
+    /// already ledgered by the time this is queued - the box is the
+    /// ceremony, not the transaction, so a skipped or crashed box loses
+    /// nothing. Drained by MobileBuilderUI into RewardBox, one at a time.</summary>
+    public class RewardPop
+    {
+        public string title;                       // "FIRST BOUT"
+        public string caption;                     // one line under the title
+        public List<string> lines = new List<string>();   // "+10 SCRAP", "2 gussets"
+    }
+    public static readonly List<RewardPop> rewardQueue = new List<RewardPop>();
+    public static void QueueReward(string title, string caption, params string[] lines)
+    {
+#if !UNITY_EDITOR   // device builds (iOS + web); the editor bench suite must never see a box
+        var r = new RewardPop { title = title, caption = caption };
+        r.lines.AddRange(lines);
+        rewardQueue.Add(r);
+#endif
+    }
     public static int lastPay;
     /// <summary>The medal SettleFight just minted, or null. Same one-shot
     /// handoff contract as lastSettled/lastPay: FightManager.End() clears it
@@ -971,7 +1095,7 @@ public static class Career
         Data.medals.Add(m);
         // Ledger it the way the starter kit grant does: 0 scrap, but the audit
         // trail is where "when did this happen" is answered.
-        Txn(0, "medal \u2605 " + lg.name + " champion \u00b7 " + m.robot);
+        Txn(0, "medal * " + lg.name + " champion \u00b7 " + m.robot);
         return m;
     }
 
@@ -994,6 +1118,41 @@ public static class Career
         int pay = win ? CareerDB.WinPay(c, dealt, fightBuildValue, fightOppValue, reEntry, !reEntry) : 0;
         lastSettled = true; lastPay = pay; lastMedal = null;   // round-3: see the field comment
         Txn(pay, (win ? "win " : "loss ") + c.id);
+        // ---- rookie warm-up (design 2026-09-03) ---------------------------
+        lastRescue = false;
+        if (!Data.taskFight)
+        {
+            Data.taskFight = true;
+            Txn(10, "rookie checklist - first bout fought");
+            uiDirtySeq++;
+            // The wedge is what the win-path guide coaches next, and the gusset
+            // makes the checklist's "weld a seam" reachable for a WINNER (the
+            // crate only gives gussets on a loss; the shop wants 200).
+            AddItem("wedge", "Aluminum", 1);
+            AddItem("gusset", "Steel", 1);
+            QueueReward("FIRST BOUT", win ? "You fought. You won. Keep going." : "You fought. That is the part that counts.",
+                        "+10 SCRAP", "1 WEDGE", "1 GUSSET (weld kit)");
+        }
+        if (!win && !Data.rescueGranted)
+        {
+            // THE RESCUE CRATE: once per career, EVER, and only on a non-win
+            // - winners get the purse, and this exists so a first loss is a
+            // plot point instead of a wall (40% of measured first fights).
+            // Contents are owen's 2026-09-03 numbers; the STEEL plate is the
+            // ballast - with the gyro retired, low heavy mass is the anti-flip
+            // lever a player can actually buy into. Ledgered like the kit so
+            // the TxnSum == scrap audit stays true. NOT a faucet: this flag
+            // never resets.
+            Data.rescueGranted = true;
+            Txn(50, "rookie salvage - one-time");
+            AddItem("gusset", "Steel", 2);
+            AddItem("plate", "Steel", 1);
+            lastRescue = true;
+            uiDirtySeq++;
+            QueueReward("THE YARD LOOKS AFTER ROOKIES", "One-time salvage. Bolt the heavy plate LOW to stay off your back.",
+                        "+50 SCRAP", "2 GUSSETS (weld kit)", "1 STEEL ARMOR PLATE");
+            RBTelemetry.Once(RBTelemetry.RESCUE);
+        }
         Data.fights++;
         Data.lastContest = c.id;
         Data.scrapCurve.Add(Data.scrap);
@@ -1050,10 +1209,10 @@ public static class Career
             lastMedal = AwardLeagueMedal(li);
         }
         if (Data.tutorialStep < 3) Data.tutorialStep = 3;
-        string tag = reEntry ? "practice bout \u2014 purse already won"
-                   : win     ? "contest win" : "loss \u2014 the league pays wins only";
+        string tag = reEntry ? "practice bout - purse already won"
+                   : win     ? "contest win" : "loss - the league pays wins only";
         if (fightAutonomous) tag += " \u00b7 autonomous";
-        fightAutonomous = false;   // one fight, one mark \u2014 never carries over
+        fightAutonomous = false;   // one fight, one mark - never carries over
         lastResultLine = (reEntry || !win)
             ? string.Format("{0} \u00b7 career scrap {1}", tag, Data.scrap)
             : string.Format("+{0} scrap ({1}) \u00b7 career scrap {2}", pay, tag, Data.scrap);
