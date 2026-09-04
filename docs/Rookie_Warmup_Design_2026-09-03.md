@@ -10,7 +10,7 @@ excluded) has measured each onboarding wall as it fell:
 
 | wall | measurement | status |
 |---|---|---|
-| 33 MB payload | 40–50% of arrivals never reach a playable game | OPEN (payload cut is separate work) |
+| 33 MB payload | 40–50% of arrivals never reach a playable game | CUT to 8 MB 2026-09-04 — `docs/Phone_Load_Cut_2026-09-04.md` |
 | sign-in gate | 24 shown → 23 walked away (96%) | REMOVED on web 2026-09-02 |
 | empty workshop | 14 workshop arrivals → 1 placed a part → 0 fights | REPLACED by SCRAPPER 2026-09-03 |
 | first fight | starter wins 60% (measured, StarterBench 10-bout legs) | SHIPPED |
