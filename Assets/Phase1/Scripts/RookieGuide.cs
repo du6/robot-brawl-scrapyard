@@ -99,7 +99,10 @@ namespace RobotBrawl.Phase0
             handImg.raycastTarget = false;      // the hand must never EAT the tap it teaches
             hand = hgo.GetComponent<RectTransform>();
             hand.sizeDelta = new Vector2(46f, 46f);
-            step = Career.Data.fights < 1 ? STEP_LEAGUE : 1;
+            // A refresh after the fight lands HERE, not at the crossing below
+            // - so the already-on check has to decide the first step too
+            // (owen's phone, 2026-09-05: the fix only covered the crossing).
+            step = Career.Data.fights < 1 ? STEP_LEAGUE : (alreadyOn ? 5 : 1);
             Say();
         }
 
