@@ -1458,6 +1458,9 @@ public class CareerSmoke : MonoBehaviour
             Check(gTarget != null && gTarget.reinforced, "GUSSET: one granted, one applied");
             Check(bm.CareerRemaining(gIdx) == 0, "GUSSET: …and the shelf reads zero");
             yield return new WaitForSecondsRealtime(0.1f);
+            // The last gusset PUTS THE TOOL DOWN now (auto-done, web QA
+            // 2026-09-05), so pick it up again to probe the refusal path.
+            bm.selected = gIdx;
             bm.ApplyGusset(bm.placed.Count > 2 ? bm.placed[2] : gTarget);
             Check(bm.LastMessage != null
                   && (bm.LastMessage.Contains("No Gusset") || bm.LastMessage.Contains("already")),

@@ -57,7 +57,10 @@ namespace RobotBrawl.Phase0
         Font font;
         static Sprite white;
 
-        const float APPEAR = 0.45f, OPEN = 0.5f, REVEAL = 0.6f, DISMISS = 0.3f, AUTO = 9f;
+        // AUTO was 9 s: a box that vanished under a slow finger put the tap on
+        // whatever sat beneath (web QA 2026-09-05: it collapsed the dock). A
+        // reward waits for its player.
+        const float APPEAR = 0.45f, OPEN = 0.5f, REVEAL = 0.6f, DISMISS = 0.3f, AUTO = 30f;
 
         static readonly Color[] PALETTE = {
             new Color(1f, 0.84f, 0.40f), new Color(0.40f, 0.80f, 1f), new Color(1f, 0.45f, 0.45f),

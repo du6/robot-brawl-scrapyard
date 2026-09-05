@@ -1065,6 +1065,7 @@ public class FightManager : MonoBehaviour
     {
         // The results screen shrinks these on a short screen; the HUD does not.
         smallStyle.fontSize = 22; moneySmall.fontSize = 19; moneyStyle.fontSize = 28;
+        bigStyle.fontSize = 64; medStyle.fontSize = 26; idStyle.fontSize = 21;
         // Critic round 1 (mobile): no touch way to leave a running fight
         // (B is a keyboard key). Small corner button, far from the pads.
         if (MobileBuilderUI.Active && bm != null)
@@ -1251,9 +1252,22 @@ public class FightManager : MonoBehaviour
         // steps down, the money block is one line, and the buttons share a
         // single row pinned to the bottom edge.
         bool shortH = H < 560f;
-        smallStyle.fontSize = shortH ? 16 : 22;
+        // Build-20 re-test on the simulator (2026-09-05): shrinking the stat
+        // text alone was NOT enough - a wrapped cause line plus a "(pack
+        // damaged)" third row still reached the bottom edge, and the clamp
+        // then put the whole button row BELOW the screen: a stranger stuck on
+        // VICTORY with nothing to tap. So on a short screen everything above
+        // the buttons steps down (title, band, contest id, cause line, rows),
+        // and the button row is PINNED on screen no matter what - if content
+        // still overruns, the buttons draw over it; a way out beats a purse
+        // line.
+        smallStyle.fontSize = shortH ? 14 : 22;
         moneySmall.fontSize = shortH ? 15 : 19;
         moneyStyle.fontSize = shortH ? 20 : 28;
+        bigStyle.fontSize = shortH ? 40 : 64;
+        medStyle.fontSize = shortH ? 17 : 26;
+        idStyle.fontSize = shortH ? 15 : 21;
+        float bandH = shortH ? 56f : 96f;
         Color accent = outcome == Outcome.PlayerWin  ? new Color(0.35f, 1f, 0.45f)
                      : outcome == Outcome.PlayerLoss ? new Color(1f, 0.32f, 0.26f)
                      :                                 new Color(1f, 0.85f, 0.30f);
@@ -1277,23 +1291,23 @@ public class FightManager : MonoBehaviour
                   :                                 new Color(0.0100f, 0.0070f, 0.0006f, 0.985f);
         GUI.DrawTexture(new Rect(0, 0, Screen.width, Screen.height), Texture2D.whiteTexture);
         GUI.color = new Color(accent.r, accent.g, accent.b, 0.20f);
-        GUI.DrawTexture(new Rect(0, H * 0.145f, W, 96f), Texture2D.whiteTexture);
+        GUI.DrawTexture(new Rect(0, H * 0.145f, W, bandH), Texture2D.whiteTexture);
         GUI.color = accent;
         GUI.DrawTexture(new Rect(0, H * 0.145f, W, 4f), Texture2D.whiteTexture);
-        GUI.DrawTexture(new Rect(0, H * 0.145f + 92f, W, 4f), Texture2D.whiteTexture);
+        GUI.DrawTexture(new Rect(0, H * 0.145f + bandH - 4f, W, 4f), Texture2D.whiteTexture);
         GUI.color = old;
 
         // (2c) The contest gets a name. Cached in End(); see the field comment.
         if (cIsContest)
         {
             idStyle.normal.textColor = new Color(0.88f, 0.90f, 0.95f);
-            GUI.Label(new Rect(0, H * 0.095f, W, 30), cLeague + "   ·   " + cArena, idStyle);
+            GUI.Label(new Rect(0, H * (shortH ? 0.06f : 0.095f), W, 30), cLeague + "   ·   " + cArena, idStyle);
         }
 
         string title = outcome == Outcome.PlayerWin ? "VICTORY"
                      : outcome == Outcome.PlayerLoss ? "DEFEAT" : "DRAW";
         bigStyle.normal.textColor = accent;
-        GUI.Label(new Rect(0, H * 0.15f, W, 90), title, bigStyle);
+        GUI.Label(new Rect(0, H * 0.145f, W, bandH), title, bigStyle);
         // ⚠ A LIVE LADDER MATCH IS NOT OURS TO CALL — launch audit 2026-08-14.
         // The cloud referee owns the official result and the purse; this
         // screen shows what happened HERE. Cross-platform physics can still
@@ -1358,7 +1372,7 @@ public class FightManager : MonoBehaviour
             // It carries the SAME defect — a 40px box for a wrapping 26pt
             // style clips the second line — and career cause lines are just as
             // long, so it gets the same treatment.
-            float causeTop = H * 0.28f;
+            float causeTop = shortH ? H * 0.145f + bandH + 6f : H * 0.28f;
             GUI.Label(new Rect(pad, causeTop, causeW, causeH), causeLine, medStyle);
             statsTop = Mathf.Max(H * (shortH ? 0.31f : 0.375f), causeTop + causeH + 10f);
         }
@@ -1523,9 +1537,11 @@ public class FightManager : MonoBehaviour
         float contentFloor = Mathf.Max(statsBottom + H * 0.03f, moneyBottom + H * 0.02f);
         float by = arenaLive ? Mathf.Max(H * 0.705f, contentFloor)
                              : Mathf.Max(H * 0.705f + medalDrop, contentFloor);
-        // A short screen: keep the whole button stack on it, as low as it goes.
+        // The button row is ALWAYS on screen. On a short screen it is pinned
+        // to the bottom edge outright (content above has been compacted; if it
+        // still overruns, the buttons draw on top of it - they are drawn last).
         float stackH = (cIsContest && !arenaLive && !oneRow ? 2f * bh + 12f : bh) + 10f;
-        if (by + stackH > H) by = Mathf.Max(contentFloor - H * 0.02f, H - stackH);
+        if (by + stackH > H) by = H - stackH;
         float cx = W * 0.5f;
         GUI.backgroundColor = new Color(0.30f, 0.62f, 0.88f);
         // A LIVE LADDER MATCH gets one centered button and no REMATCH — the

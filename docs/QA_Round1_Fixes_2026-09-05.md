@@ -130,6 +130,48 @@ submission `cbb856d4-3662-4c1d-a17d-02c7a88a3ec5`, **WAITING_FOR_REVIEW**,
 back at the end of the queue. Worth weighing before the next swap: a
 cosmetic round is not worth a lost review slot.
 
+## 4e. Round 3 — the build-20 re-test and the web first-run pass (2026-09-05)
+
+**The iOS re-test of build 20 found my debrief clamp WORSE than build 18:**
+the purse lines were legible but the whole button row was below the 402 pt
+screen - a stranger stuck on VICTORY with nothing to tap, exit only by
+killing the app (the FIRST BOUT box was then lost; its grant was ledgered).
+The tester's diagnosis: the wrapped cause line + two stat rows per side + a
+"(pack damaged)" third line + the money block already reach the bottom, so
+a clamp cannot help - something above must shrink, or the buttons must
+overlay. Round 3 does both: on a short screen the title is 40 pt in a 56
+band, the contest id and cause line 17 pt, stat rows 14 pt, the money block
+one line, and the button row is PINNED to the bottom edge unconditionally
+and drawn last. ⚠ Build 21 (in review) carries the round-2 layout, which
+was NOT re-tested on the simulator before it went in; the round-3 layout is
+being verified there now and goes in as build 22 if it passes.
+
+Confirmed fixed by the same re-test: no DRIVE/FIRE pads in autonomy
+fights; the LEAGUE dock no longer shifts when the coach line fades (byte-
+identical frames 1 s and 6 s in); the post-fight coach line is no longer
+stale; check-mark glyphs.
+
+**The web first-run pass** (fresh IndexedDB, new build): no sign-in wall on
+web by design; SCRAPPER present and active; the hand leads LEAGUE →
+enabled AUTONOMY FIGHT → wedge → SAVE; FIRST BOUT / FIRST PART BOLTED /
+FIRST WELD boxes all opened and credited at claim time (the deferred grant
+works). New findings, fixed in round 3: the box auto-dismissed after 9 s so
+a slow tap landed on the HIDE PANEL bar beneath it (now 30 s); the first
+SAVE asks OVERWRITE vs SAVE AS NEW with no steer (the guide now says
+"Tap OVERWRITE"); the empty weld kit stayed HELD so stray taps said "No
+Gusset left" (put down on the last weld, like a part's auto-done); a fresh
+start showed "[SCRAPPER *]" (the hand-written starter snapshot re-serialises
+differently; the untouched starter is canonicalised once at boot). Noted,
+not changed: a fresh player has 0 scrap and 0 free parts until the first
+purse - the bolt/weld/buy checklist items are reachable only after the
+first fight (design: kit = exactly SCRAPPER, spares as rewards). Owen's
+browser career was backed up, cleared, and restored byte-for-byte (verified
+by hash before and after boot).
+
+**Measured, round 3:** TouchSmoke 55/0; CareerSmoke 136/7 = the control's
+fail set (one bench line updated: the gusset probe re-selects the tool the
+product now puts down). Web published as `?v=0c5a4e815a`.
+
 ## 5. Still open
 
 - The web tester's first-run pass (sign-in wall, ghost hand, first boxes,

@@ -138,6 +138,7 @@ namespace RobotBrawl.Phase0
             return true;
         }
         bool alreadyOn;
+        bool saidOverwrite;
 
         void Update()
         {
@@ -184,7 +185,14 @@ namespace RobotBrawl.Phase0
                     break;
                 case 4:
                     if (!bm.ActiveEditDirty()) { step = 5; Say(); }
-                    if (ui.SaveDialogOpen) { Hide(); return; }   // the dialog has the floor; no hand pulsing behind it
+                    if (ui.SaveDialogOpen)
+                    {
+                        Hide();   // the dialog has the floor; no hand pulsing behind it
+                        // ...and a first-timer is asked OVERWRITE vs SAVE AS NEW with
+                        // no steer (web QA 2026-09-05). Say which one this lesson means.
+                        if (!saidOverwrite) { saidOverwrite = true; bm.Coach("Tap OVERWRITE - this is your machine; keep the change on it"); }
+                        return;
+                    }
                     break;
                 case 5:
                     if (Career.Data.fights >= 2 || FightManager.current != null)

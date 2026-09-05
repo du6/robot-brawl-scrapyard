@@ -426,7 +426,22 @@ public class BuilderManager : MonoBehaviour
             && Career.Data.activeRobot < Career.Data.stable.Count)
         {
             var bootRobot = Career.Data.stable[Career.Data.activeRobot];
-            if (!string.IsNullOrEmpty(bootRobot.snapshot)) LoadSnapshot(bootRobot.snapshot);
+            if (!string.IsNullOrEmpty(bootRobot.snapshot))
+            {
+                int got = LoadSnapshot(bootRobot.snapshot);
+                // The injected starter is a hand-written constant; the builder
+                // re-serialises the same machine a little differently, so a
+                // brand-new player saw "[SCRAPPER *]" - "unsaved" - before
+                // touching anything (web QA 2026-09-05). Canonicalise ONLY the
+                // untouched starter (no fights, one robot); a veteran's save
+                // is never rewritten at boot.
+                if (got > 0 && Career.Data.fights == 0 && Career.Data.stable.Count == 1
+                    && bootRobot.snapshot != SnapshotString())
+                {
+                    bootRobot.snapshot = SnapshotString();
+                    if (Career.autosave) Career.Save();
+                }
+            }
         }
         RefreshOverlay();
     }
@@ -1539,6 +1554,10 @@ public class BuilderManager : MonoBehaviour
         hit.gussetFaces |= 1 << bit;
         Career.RookieTaskWeld();
         RefreshGussetFaces(hit);
+        // Last gusset used: put the tool down, like a part's auto-done - a
+        // HELD empty weld kit turned every stray tap into "No Gusset left"
+        // (web QA 2026-09-05).
+        if (Career.active && !Career.FreeParts && CareerRemaining(selected) <= 0) Deselect();
         message = hit.def.label + " surface welded · parts bolted here hold ×"
                   + GUSSET_SEAM_MULT.ToString("0.#") + " · +"
                 + Mathf.RoundToInt(GUSSET_KG) + " kg";
