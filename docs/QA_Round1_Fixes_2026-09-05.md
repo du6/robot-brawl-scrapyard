@@ -121,6 +121,15 @@ during the first failing run, and the value stayed flipped afterwards. On a
 real phone (dpi 460, scale ~1.13) the same clamp is exactly 44.0 pt. The
 web was published from this code (`?v=bc092dd18b`); build 21 carries it.
 
+## 4d. Build 21 swaps for 20 (2026-09-05 10:33 PDT)
+
+Build 21 (`98fc3e2`), same chain; delivery `b1f8fe20-f40f-43d7-8bb0-ae39c6bd0806`,
+VALID in ~3 min. ⚠ Build 20 had reached **IN_REVIEW** — Apple was already
+looking at it — and the swap cancelled that; 2.2.0 now carries 21 under
+submission `cbb856d4-3662-4c1d-a17d-02c7a88a3ec5`, **WAITING_FOR_REVIEW**,
+back at the end of the queue. Worth weighing before the next swap: a
+cosmetic round is not worth a lost review slot.
+
 ## 5. Still open
 
 - The web tester's first-run pass (sign-in wall, ghost hand, first boxes,
