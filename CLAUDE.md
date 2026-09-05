@@ -38,6 +38,7 @@ The records, most recent first:
 
 | doc | what |
 |---|---|
+| `docs/Build18_iOS_Port_2026-09-04.md` | **build 18 / 2.2.0 — the web warm-up ported to iOS, sign-in wall kept.** Cut, archived, exported, NOT uploaded (owen's three commands are in `server/scripts/release_ios_build18.zsh`). Also: **headless TouchSmoke overwrote the career save** (rookie rewards call Save; TouchSmoke now holds autosave) — restore command in §3; and every headless raycast bench was racing physics at 3-4k fps until `BatchSmoke` capped the loop |
 | `docs/Gusset_x4_2026-08-18.md` | the gusset holds **×4**, measured with its control leg — and the finding that fell out of it: **`Main.unity` has no `BuilderManager`**, so every fight-running bench is unrunnable without a human clicking Start. Also: the ladder is at ×4 while build 9 in review is at ×1.5 |
 | `docs/HANDOVER_iOS_Launch_2026-08-16.md` | **THE LAUNCH OPERATING MANUAL** — 1.0 submitted (build 8 then, **build 10** now); production topology, the four alerts and the regex trap that silences them, the 5-min health check, symptom→subsystem playbook, the build-9 ritual, the in-review build-swap procedure, open items in bite order |
 | `docs/Launch_Check_2026-08-19.md` | **READ BEFORE RELEASING** — the DB accepts ~25 connections while the API fleet can open 400; unsubscribe is blockable by signup traffic (proven); and five documented facts are now false, incl. PITR being ON |
@@ -314,6 +315,23 @@ hits that matter.**
   at the pass COUNT, not just the fail count.
 - ⚠ **CareerSmoke is not isolated.** Run it first or in its own play
   session, or it reports 115/128.
+- ✅ **HEADLESS RUNS: `Assets/Editor/BatchSmoke.cs`** (`BatchSmoke.Career` /
+  `.Touch`, `-batchmode -nographics`, no `-quit`) — the way to bench when the
+  live editor is busy or has the Device Simulator open (a bench run under the
+  simulator is NOT comparable: 119/24 on 2026-09-04 for geometry reasons). Run
+  it from a **git worktree**, never a second instance on owen's project.
+  ⚠ **`-batchmode` runs at 3,000-4,000 fps and `targetFrameRate` is ignored**,
+  so "yield two frames" passes inside one physics step and every tap that
+  raycasts (REMOVE, the gusset applique) is silently eaten — TouchSmoke read
+  39/14 on BOTH legs of a control for that reason alone. `BatchSmoke.Tick`
+  sleeps 16 ms a frame; with it, both legs are 53/53 and CareerSmoke is 141/2.
+  The headless floor is 2 fails (DRAFT banner, the 640×480 label sweep).
+- ⚠ **A BENCH THAT SWAPS `Career.Data` MUST HOLD `Career.SuspendAutosave()`.**
+  "Nothing here calls Save()" stops being true whenever product code grows a
+  save — the rookie checklist did (`RookieTaskBolt` → `Save()`), and on
+  2026-09-04 headless TouchSmoke overwrote owen's career with a 10-scrap
+  bench career; the 2026-08-20 state is unrecoverable byte-exact. TouchSmoke
+  holds it now. `docs/Build18_iOS_Port_2026-09-04.md` §3 has the restore.
 - ⚠ **`LadderSweepBench` and `OpeningBench` are MEASUREMENT benches** —
   no pass/fail by design. `OpeningBench`'s `CUTOFF` is per-subject and its
   point estimate wanders ±~17 points at N=12; keep controls inside the

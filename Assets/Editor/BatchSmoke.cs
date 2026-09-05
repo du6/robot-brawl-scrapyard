@@ -41,6 +41,11 @@ namespace RobotBrawl.EditorTools
         }
         static void Tick()
         {
+            // The cap that -batchmode honours: hold each editor-loop frame to
+            // ~16 ms while the bench runs, so "yield return null" means what
+            // it means on a phone and the 20 ms physics step actually happens
+            // between a placement and the tap that raycasts at it.
+            if (launched && Application.isPlaying) System.Threading.Thread.Sleep(16);
             if (Application.isPlaying && !launched)
             {
                 launched = true;
@@ -51,6 +56,15 @@ namespace RobotBrawl.EditorTools
                 // instead of drawing the desktop chooser and waiting for a click
                 // that never comes in -batchmode. TouchSmoke builds its own world.
                 RobotBrawl.Phase0.MobileBuilderUI.forceMobileUI = true;
+                // A DEVICE-LIKE FRAME RATE. -nographics has no vsync and runs
+                // frames as fast as the CPU allows, so a bench's "yield two
+                // frames" can pass in under a physics step (20 ms) - a part
+                // placed on frame N has no collider the raycast can see on
+                // frame N+2, and every tap that raycasts (REMOVE, the gusset
+                // applique) is silently eaten. Measured 2026-09-04: the
+                // applique tap landed on the beam's exact screen centre and
+                // RaycastAll saw only the floor. Real devices run at 60.
+                Application.targetFrameRate = 60;   // ignored in -batchmode (measured 3-4k fps); the Sleep below is what caps
                 // -batchmode -nographics has no Device Simulator, so the editor's
                 // DeviceWantsTouch() says no and ModeSelect draws the desktop
                 // chooser forever. Take the exact path the touch button takes.

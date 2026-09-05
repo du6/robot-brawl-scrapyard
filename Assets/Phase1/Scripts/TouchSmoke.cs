@@ -64,6 +64,13 @@ public class TouchSmoke : MonoBehaviour
 
     IEnumerator Start()
     {
+        // OWNER STATE IS SACRED. The C1 section swaps Career.Data in memory
+        // and used to rely on "nothing here calls Save()" - which stopped
+        // being true the day the rookie checklist started paying rewards
+        // (RookieTaskBolt -> Save). Measured 2026-09-04: a headless TouchSmoke
+        // overwrote owen's career file with a 10-scrap bench career. Hold
+        // autosave for the whole run, the way CareerSmoke does.
+        var autosaveHold = Career.SuspendAutosave();
         var ms = GameObject.Find("ModeSelect");
         if (ms != null) Destroy(ms);
         MobileBuilderUI.forceMobileUI = true;
@@ -265,6 +272,7 @@ public class TouchSmoke : MonoBehaviour
         Check(bm.TestGhostShown == false, "an applique shows no ghost");
 
         Vector3 gBeamPos = giBeam > 0 ? Camera.main.WorldToScreenPoint(bm.placed[giBeam].go.transform.position) : Vector3.zero;
+        Debug.Log("[TouchSmoke][diag-gusset-capture] cam=" + Camera.main.transform.position + " gBeamPos=" + gBeamPos + " dockOpen=" + ui.DockOpen);
         int massBefore = bm.BuildMassInt;
         // This suite runs FREE BUILD, where every part is unlimited — the
         // career "No Gusset left" refusal is CareerSmoke's to check, in the
@@ -274,6 +282,9 @@ public class TouchSmoke : MonoBehaviour
         yield return null;
         Phase0Input.DebugClick(0);
         yield return null; yield return null;
+        Debug.Log("[TouchSmoke][diag-gusset] giBeam=" + giBeam + " reinforced=" + (giBeam > 0 && bm.placed[giBeam].reinforced)
+                  + " hasSel=" + bm.HasSelection + " applique=" + bm.SelectedApplique + " msg='" + bm.LastMessage
+                  + "' pos=" + gBeamPos + " screen=" + Screen.width + "x" + Screen.height);
         Check(giBeam > 0 && bm.placed[giBeam].reinforced, "the tap reinforces the beam (free build: unlimited, like every part)");
         Check(bm.BuildMassInt == massBefore + 10, "…and the machine weighs +10 kg (" + massBefore + " -> " + bm.BuildMassInt + ")");
         bool gPlate = false;
@@ -364,6 +375,11 @@ public class TouchSmoke : MonoBehaviour
         // never called, so the owner's career file is untouched.
         var savedCareer = Career.Data;
         Career.Data = new CareerData();
+        // The rookie checklist pays PARTS for a first bolt (+2 beams) and
+        // would refill the very shelf this section empties on purpose. Mark
+        // the checklist done: this measures the stock gate, not the warm-up.
+        Career.Data.taskFight = Career.Data.taskBolt = Career.Data.taskWeld = Career.Data.taskBuy = true;
+        Career.Data.rescueGranted = true; Career.Data.guideDone = true;
         Career.AddItem("beam", "Aluminum", 1);
         Career.active = true;
         bm.ActiveMatKey = "Aluminum";
@@ -511,6 +527,7 @@ public class TouchSmoke : MonoBehaviour
         MobileBuilderUI.autoHidePanelOnPick = true;
         MobileBuilderUI.autoHideForcePhone = null;   // back to the real-screen rule
 
+        autosaveHold.Dispose();
         foreach (var l in log) Debug.Log("[TouchSmoke] " + l);
         Debug.Log(string.Format("[TouchSmoke] RESULT: {0} pass, {1} fail{2}",
                   passed, failed, failed == 0 ? " - ALL GREEN" : " - FIX NEEDED"));
