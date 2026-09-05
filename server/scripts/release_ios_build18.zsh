@@ -97,7 +97,20 @@ case "${1:-}" in
     for S in $(get "reviewSubmissions?filter[app]=$ASC_APP_ID&filter[state]=READY_FOR_REVIEW,WAITING_FOR_REVIEW,IN_REVIEW,UNRESOLVED_ISSUES" | jq_ 'print("\n".join(x["id"] for x in d["data"]))'); do
       patch "reviewSubmissions/$S" "{\"data\":{\"type\":\"reviewSubmissions\",\"id\":\"$S\",\"attributes\":{\"canceled\":true}}}" | jq_ 'print("canceled", d["data"]["id"], d["data"]["attributes"]["state"])'
     done
-    patch "appStoreVersions/$V/relationships/build" "{\"data\":{\"type\":\"builds\",\"id\":\"$B\"}}" >/dev/null
+    # Cancelling DEVELOPER_REJECTS the version for a moment; an attach fired
+    # inside that moment is dropped without an error (measured 2026-09-05:
+    # the first swap left 18 attached and a new submission with no items).
+    # Attach, read back, and do not submit until the version says the new build.
+    ok=""
+    for try in 1 2 3 4 5 6 7 8; do
+      patch "appStoreVersions/$V/relationships/build" "{\"data\":{\"type\":\"builds\",\"id\":\"$B\"}}" >/dev/null
+      have=$(get "appStoreVersions/$V?include=build&fields[builds]=version&fields[appStoreVersions]=appStoreState" \
+             | jq_ 'print(",".join(i["attributes"]["version"] for i in d.get("included",[])) + " " + d["data"]["attributes"]["appStoreState"])')
+      echo "  attach try $try: version carries build [$have]"
+      [[ "$have" == "$BUILD_NO "* ]] && { ok=1; break; }
+      sleep 5
+    done
+    [[ -n "$ok" ]] || { echo "could not attach build $BUILD_NO to $VERSION - stopping before submit"; exit 1; }
     echo "version $VERSION now carries build $BUILD_NO ($B); submitting..."
     exec zsh "$0" submit
     ;;
@@ -107,9 +120,10 @@ case "${1:-}" in
     V=$(version_id); [[ -n "$V" ]] || { echo "no $VERSION version - run 'version' first"; exit 1; }
     S=$(post "reviewSubmissions" "{\"data\":{\"type\":\"reviewSubmissions\",\"attributes\":{\"platform\":\"IOS\"},\"relationships\":{\"app\":{\"data\":{\"type\":\"apps\",\"id\":\"$ASC_APP_ID\"}}}}}" \
       | jq_ 'print(d["data"]["id"])')
-    post "reviewSubmissionItems" "{\"data\":{\"type\":\"reviewSubmissionItems\",\"relationships\":{\"reviewSubmission\":{\"data\":{\"type\":\"reviewSubmissions\",\"id\":\"$S\"}},\"appStoreVersion\":{\"data\":{\"type\":\"appStoreVersions\",\"id\":\"$V\"}}}}}" >/dev/null
+    post "reviewSubmissionItems" "{\"data\":{\"type\":\"reviewSubmissionItems\",\"relationships\":{\"reviewSubmission\":{\"data\":{\"type\":\"reviewSubmissions\",\"id\":\"$S\"}},\"appStoreVersion\":{\"data\":{\"type\":\"appStoreVersions\",\"id\":\"$V\"}}}}}" \
+      | jq_ 'print("item", d["data"]["attributes"]["state"]) if "data" in d else print("ITEM FAILED:", json.dumps(d)[:400])'
     patch "reviewSubmissions/$S" "{\"data\":{\"type\":\"reviewSubmissions\",\"id\":\"$S\",\"attributes\":{\"submitted\":true}}}" \
-      | jq_ 'print("submission", d["data"]["id"], d["data"]["attributes"]["state"])'
+      | jq_ 'print("submission", d["data"]["id"], d["data"]["attributes"]["state"]) if "data" in d else print("SUBMIT FAILED:", json.dumps(d)[:400])'
     ;;
 
   *)

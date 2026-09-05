@@ -64,7 +64,20 @@ and the wasm at 6,654,034 bytes.
 `BuildIOS.Build` headless from the worktree pinned to that commit: Succeeded,
 0 errors, Info.plist 2.2.0 / 19. Archive → export → `altool` upload →
 `release_ios_build18.zsh swap` (new stage: encryption=no on 19, cancel the
-open submission, re-point 2.2.0 at 19, submit). Result recorded below.
+open submission, re-point 2.2.0 at 19, submit).
+
+**Result, 2026-09-05 08:05 PDT:** upload delivery
+`7bb27462-1dad-4f34-9e0d-652335d8d0cb`, VALID in ~3 min. Submission
+`cfa14a1d…` (build 18) cancelled; version 2.2.0 `2531b692…` now carries
+**build 19**; new submission `3ceb637b-5fb4-4e2d-b216-566b0d84af00` →
+**WAITING_FOR_REVIEW** (submitted 15:05:32Z). Release type still MANUAL.
+
+⚠ The first `swap` run left build 18 attached and a new submission with NO
+items: cancelling DEVELOPER_REJECTS the version for a moment and an attach
+fired inside it is dropped silently (HTTP 204, no change). Finished by hand
+(attach again → 204 and the read-back said 19 → add item → submitted=true);
+the script now reads the version back until it carries the new build and
+prints the API's error bodies instead of assuming success.
 
 ## 5. Still open
 
