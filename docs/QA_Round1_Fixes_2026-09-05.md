@@ -16,7 +16,7 @@ Reached a fight in ~4 taps; first load ~22 s, cached ~10 s; fight to VICTORY;
 | 1 | gameplay | count-out resets while SCRAPPER rams the flipped TIPPER; bout goes to judges | already fixed on the branch (`e0a5f11`); **web republished** |
 | 2 | layout | debrief money/medal lines drawn under the buttons at phone width | **fixed**: button row clears the measured money + medal block; buttons shrink to the width |
 | 3 | layout | fight HUD: QUIT overprinted by the title, names clipped both sides, banner see-through | **fixed**: HUD box fits the screen; narrow mode drops side lines to name + HP; banner narrows; title clears QUIT |
-| 4 | confusing | a "DRIVE joystick" on screen during an autonomy fight | **open** — no control by that name exists in either lineage (throttle/steer are keyboard-only); tester asked for a screenshot |
+| 4 | confusing | a "DRIVE joystick" on screen during an autonomy fight | **fixed** (owen's phone, 2026-09-05): it is `Phase5Mobile.TouchControls` — the floating DRIVE stick + FIRE pad that give touch players their steering in MANUAL fights (`Phase0Input.debugThrottle/Steer`). It drew in autonomy fights too; both pads now release and draw nothing while `playerSource == Program`. ⚠ Two earlier records said "no touch steering exists" — that was a grep of the wrong files; TEST DRIVE's hide stands on owen's ask, not on that claim |
 | 5 | confusing | a bought+welded gusset, fought with and rewarded, was lost on reload (never SAVEd) | **fixed**: a career fight saves the build it fights with (the fight gate already proves ownership + legality) |
 | 6 | confusing | reward boxes pre-credit scrap/parts before opening; opening changes nothing | **fixed**: grants are deferred to the box opening (`CareerData.pendingRewards`, granted on Load if a box was lost) |
 | 7 | confusing | sweeping the league grants the medal with no celebration | **fixed**: a LEAGUE SWEPT box |
@@ -81,7 +81,6 @@ prints the API's error bodies instead of assuming success.
 
 ## 5. Still open
 
-- Defect 4 (the "DRIVE joystick") — waiting on the tester's screenshot.
 - The web tester's first-run pass (sign-in wall, ghost hand, first boxes,
   rescue crate) and the iOS Simulator report.
 - Owen's career save restore (one `cp`, in the build-18 record).

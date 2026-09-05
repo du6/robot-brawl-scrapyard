@@ -145,6 +145,11 @@ public class TouchControls : MonoBehaviour
         if (!fightActive || (!HasTouch && !mouseTest)) { Release(); return; }
         if (fm == null) fm = Object.FindFirstObjectByType<FightManager>();
         if (fm != null && fm.state == FightManager.State.Ended) { Release(); return; }
+        // AUTONOMY FIGHT (owen, 2026-09-05): the program drives, so the pads
+        // are not just useless, they are a lie under the "autopilot drives
+        // this fight" banner - a rookie will try the stick. Draw nothing and
+        // feed nothing while the player's side is program-controlled.
+        if (fm != null && fm.playerSource == ControlSource.Program) { Release(); return; }
         int c = Points(pts);
         bool sHeld = false, fHeld = false;
         float thr = 0f, str = 0f;
@@ -213,6 +218,7 @@ public class TouchControls : MonoBehaviour
     {
         if (!fightActive || (!HasTouch && !mouseTest)) return;
         if (fm != null && fm.state == FightManager.State.Ended) return;   // results card owns the screen
+        if (fm != null && fm.playerSource == ControlSource.Program) return; // autonomy: no pads (see Update)
         if (ringTex == null) ringTex = MakeCircle(128, 0.86f);
         if (discTex == null) discTex = MakeCircle(128, 0f);
         if (padLbl == null)
