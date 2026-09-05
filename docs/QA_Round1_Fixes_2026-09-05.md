@@ -79,6 +79,16 @@ fired inside it is dropped silently (HTTP 204, no change). Finished by hand
 the script now reads the version back until it carries the new build and
 prints the API's error bodies instead of assuming success.
 
+## 4b. Build 20 swaps for 19 (2026-09-05 09:08 PDT)
+
+Three fixes landed after 19 went in: the guide no longer coaches mounting a
+part already on the machine (both the fight-crossing and the refresh path),
+and the DRIVE/FIRE touch pads stay hidden in autonomy fights. Build 20
+(`d3f6d64`), same chain; delivery `e42cc69e-a7f1-460b-9e6a-21d1cd869377`,
+VALID in ~3 min. The hardened `swap` stage did it in one command: cancelled
+`3ceb637b…`, read the version back until it carried 20 (try 2), new
+submission `6766e42f-4789-406e-8743-f4da446f30c6` → **WAITING_FOR_REVIEW**.
+
 ## 5. Still open
 
 - The web tester's first-run pass (sign-in wall, ghost hand, first boxes,
