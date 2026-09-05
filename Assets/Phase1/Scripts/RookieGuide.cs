@@ -119,8 +119,22 @@ namespace RobotBrawl.Phase0
             if (targetTile < 0) return false;
             startParts = bm.PlacedCount;
             if (targetPartId == "plate") bm.ActiveMatKey = "Steel";
+            // ALREADY DONE (owen's phone, 2026-09-05): the guide said "tap the
+            // glowing WEDGE" over a tile reading "0 free" while a wedge sat
+            // bolted to the nose. The mounting lesson is moot once the part is
+            // on the machine - go straight to the last step and say why.
+            alreadyOn = false;
+            foreach (var pp in bm.placed) if (pp.def != null && pp.def.id == targetPartId) { alreadyOn = true; break; }
+            if (alreadyOn) return true;
+            // Nothing free in the chip's material but stock in another: switch
+            // the chip, or the coached tile dispenses nothing (the "0 free ·
+            // 1 in Steel" case).
+            if (bm.CareerRemaining(targetTile) < 1)
+                foreach (var mat in new[] { "Aluminum", "Steel", "ABS", "Titanium", "Tungsten", "CarbonFiber", "Rubber" })
+                    if (bm.CareerRemainingMat(targetTile, mat) >= 1) { bm.ActiveMatKey = mat; break; }
             return true;
         }
+        bool alreadyOn;
 
         void Update()
         {
@@ -143,7 +157,7 @@ namespace RobotBrawl.Phase0
             if (step < 1)
             {
                 if (!PickLesson()) { Cancel(); return; }
-                step = 1; Say(); lastSayAt = Time.unscaledTime;
+                step = alreadyOn ? 5 : 1; Say(); lastSayAt = Time.unscaledTime;
             }
 
             // ---- POST-FIGHT: advance on state, tolerating out-of-order play ----
@@ -234,6 +248,8 @@ namespace RobotBrawl.Phase0
                 case 4: bm.Coach("SAVE keeps the change on " + (bm.PlacedCount > startParts ? "your machine" : "it")); break;
                 case 5: bm.Coach(ui != null && ui.CurrentTab == 1
                             ? "AUTONOMY FIGHT - your program does the driving"
+                            : alreadyOn
+                            ? "Your " + (targetPartId == "plate" ? "STEEL PLATE" : "WEDGE") + " is already on. Back to the LEAGUE - see what it is worth"
                             : "Back to the LEAGUE - see what the change is worth"); break;
             }
         }
