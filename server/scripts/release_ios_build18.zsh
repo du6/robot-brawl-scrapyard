@@ -8,6 +8,7 @@
 #   zsh server/scripts/release_ios_build18.zsh upload    # altool → TestFlight (10-20 min processing)
 #   zsh server/scripts/release_ios_build18.zsh version   # encryption=no, create 2.2.0, What's New, attach build 18
 #   zsh server/scripts/release_ios_build18.zsh submit    # POST review submission + item, submitted=true
+#   zsh server/scripts/release_ios_build18.zsh swap      # build 19+: cancel the open submission, attach the new build, resubmit
 #
 # The IPA is where the headless build left it (a git worktree of
 # release/ios-build18, commit 61000cf + bench reconciliation), archived and
@@ -20,7 +21,7 @@ source "$HERE/asc_jwt_env.sh"
 IPA="${IPA:-/tmp/rb_b18/build/export/RobotBrawlBoltBlade.ipa}"
 API="https://api.appstoreconnect.apple.com/v1"
 VERSION="2.2.0"
-BUILD_NO="18"
+BUILD_NO="${BUILD_NO:-19}"   # 18 shipped to review 2026-09-04; 19 swaps it in with the QA round-1 fixes
 read -r -d '' WHATS_NEW <<'EOF' || true
 The Rookie Warm-Up: a pre-built starter robot (SCRAPPER) that is ready to fight the moment you open the game, a step-by-step guide with a ghost hand that shows you where to tap, and reward boxes for your first bolt, first weld, first purchase and first fight. Lose your first fight and a rescue crate arrives with the parts to fix what went wrong. Plus: the build now loads your active robot at boot, and the workshop opens faster.
 EOF
@@ -85,6 +86,22 @@ case "${1:-}" in
     echo "version $VERSION: What's New set, build $BUILD_NO attached. Now 'submit'."
     ;;
 
+  swap)
+    # The in-review swap (HANDOVER_iOS_Launch §1, API form): answer encryption
+    # on the NEW build first, cancel the open submission, re-point the version
+    # at the new build, then submit again - the no-submission window is seconds.
+    auth
+    B=$(build_id); [[ -n "$B" ]] || { echo "build $BUILD_NO ($VERSION) not in ASC yet - upload first / wait for processing"; exit 1; }
+    V=$(version_id); [[ -n "$V" ]] || { echo "no $VERSION version"; exit 1; }
+    patch "builds/$B" "{\"data\":{\"type\":\"builds\",\"id\":\"$B\",\"attributes\":{\"usesNonExemptEncryption\":false}}}" >/dev/null
+    for S in $(get "reviewSubmissions?filter[app]=$ASC_APP_ID&filter[state]=READY_FOR_REVIEW,WAITING_FOR_REVIEW,IN_REVIEW,UNRESOLVED_ISSUES" | jq_ 'print("\n".join(x["id"] for x in d["data"]))'); do
+      patch "reviewSubmissions/$S" "{\"data\":{\"type\":\"reviewSubmissions\",\"id\":\"$S\",\"attributes\":{\"canceled\":true}}}" | jq_ 'print("canceled", d["data"]["id"], d["data"]["attributes"]["state"])'
+    done
+    patch "appStoreVersions/$V/relationships/build" "{\"data\":{\"type\":\"builds\",\"id\":\"$B\"}}" >/dev/null
+    echo "version $VERSION now carries build $BUILD_NO ($B); submitting..."
+    exec zsh "$0" submit
+    ;;
+
   submit)
     auth
     V=$(version_id); [[ -n "$V" ]] || { echo "no $VERSION version - run 'version' first"; exit 1; }
@@ -96,5 +113,5 @@ case "${1:-}" in
     ;;
 
   *)
-    echo "usage: $0 status|upload|version|submit"; exit 2 ;;
+    echo "usage: $0 status|upload|version|submit|swap"; exit 2 ;;
 esac
