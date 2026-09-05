@@ -4796,6 +4796,24 @@ public class BuilderManager : MonoBehaviour
         // P4: the autonomy gate stacks ON TOP of the manual gate, and it
         // refuses BEFORE the entry fee is debited — a fee taken for a fight
         // the program can't start is a refund bug waiting to happen.
+        // The build that FIGHTS is the build that gets SAVED (web QA
+        // 2026-09-04): a gusset bought, welded and fought with - and rewarded
+        // for - vanished on reload because nobody tapped SAVE. The fight gate
+        // has just proven every part is owned and the machine is legal, which
+        // is exactly SAVE's own precondition, so the active robot takes the
+        // snapshot here. Drafts (unowned parts) still cannot reach this line.
+        {
+            int ar = Career.Data.activeRobot;
+            if (ar >= 0 && ar < Career.Data.stable.Count && !SaveWouldDraft)
+            {
+                string snapNow = SnapshotString();
+                if (Career.Data.stable[ar].snapshot != snapNow)
+                {
+                    Career.Data.stable[ar].snapshot = snapNow;
+                    if (Career.autosave) Career.Save();
+                }
+            }
+        }
         RobotProgram autoProg = null;
         if (autonomy)
         {

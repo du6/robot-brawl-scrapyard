@@ -938,6 +938,13 @@ public class ProgramCanvas : MonoBehaviour
     /// "what would unlock MORE BLOCKS to choose from" — over a fixed sensor
     /// list, regardless of what the current program uses. Same split, same
     /// vocabulary, different question.</summary>
+    /// <summary>Part ids are for code; the footer is for a player (web QA
+    /// 2026-09-04: "rangefinder, tiltsensor, dmgbus" read as debug output).</summary>
+    static string PartName(string id)
+    {
+        foreach (var d in P1PartDef.Palette()) if (d.id == id) return d.label;
+        return id;
+    }
     void RefreshLockedHint()
     {
         var ids = BuildIds();
@@ -950,9 +957,9 @@ public class ProgramCanvas : MonoBehaviour
             if (owned != null && owned.Contains(sid)) bolt.Add(sid); else buy.Add(sid);
         }
         string s = "";
-        if (bolt.Count > 0) s = "more blocks with: " + string.Join(", ", bolt) + " — BUILD tab";
+        if (bolt.Count > 0) s = "more blocks with: " + string.Join(", ", bolt.ConvertAll(PartName)) + " — BUILD tab";
         if (buy.Count > 0)
-            s += (s.Length > 0 ? "; " : "") + "more blocks with: " + string.Join(", ", buy) + " — SHOP";
+            s += (s.Length > 0 ? "; " : "") + "more blocks with: " + string.Join(", ", buy.ConvertAll(PartName)) + " — SHOP";
         lockedHint.text = s;
     }
 

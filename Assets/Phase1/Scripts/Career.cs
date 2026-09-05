@@ -382,6 +382,13 @@ public static class CareerDB
     public bool rescueGranted;
     public bool taskFight, taskBolt, taskWeld, taskBuy;
     public bool guideDone;
+    /// <summary>Rewards QUEUED but not yet OPENED (web QA 2026-09-04: the
+    /// scrap and parts used to land the moment a task completed, so the
+    /// header spoiled the box and opening it changed nothing). The grant
+    /// now happens when the box opens - and, because a box can be skipped,
+    /// auto-dismissed or lost to a closed tab, any id still here at the next
+    /// boot is granted on Load. Nothing is ever lost; only the reveal moves.</summary>
+    public List<string> pendingRewards = new List<string>();
     public int fights; public int fightWins; public int sessions;   // telemetry
     public int tutorialStep;
     /// <summary>C4: index into stable of the robot being edited; -1 = none.</summary>
@@ -480,6 +487,7 @@ public static class Career
         catch (System.Exception e) { Debug.LogWarning("Career.Load failed: " + e.Message); Data = new CareerData(); }
         if (!Data.kitGranted) GrantStarterKit();
         MigrateInventory();
+        GrantPendingRewards();   // boxes that never got opened last session
     }
 
     /// <summary>R2 (critic finding 2). Runs on EVERY load, OUTSIDE the
@@ -583,9 +591,9 @@ public static class Career
     /// a fixed 10, so the whole checklist is bounded at +40 total. Quiet on
     /// re-fire by design.</summary>
     public static void RookieTaskBolt()
-    { if (!active || Data == null || Data.taskBolt) return; Data.taskBolt = true; Txn(10, "rookie checklist - first part bolted"); AddItem("beam", "Aluminum", 2); AddItem("plate", "Aluminum", 2); uiDirtySeq++; QueueReward("FIRST PART BOLTED", "Every machine starts with one bolt.", "+10 SCRAP", "2 BEAMS", "2 ARMOR PLATES"); if (autosave) Save(); }
+    { if (!active || Data == null || Data.taskBolt) return; Data.taskBolt = true; uiDirtySeq++; QueueReward("bolt", "FIRST PART BOLTED", "Every machine starts with one bolt.", "+10 SCRAP", "2 BEAMS", "2 ARMOR PLATES"); if (autosave) Save(); }
     public static void RookieTaskWeld()
-    { if (!active || Data == null || Data.taskWeld) return; Data.taskWeld = true; Txn(10, "rookie checklist - first seam welded"); AddItem("beamlong", "Aluminum", 1); AddItem("spindle", "Aluminum", 1); uiDirtySeq++; QueueReward("FIRST WELD", "Welded seams hold x4. Your spike will thank you.", "+10 SCRAP", "1 LONG BEAM", "1 SPINDLE (axle)"); if (autosave) Save(); }
+    { if (!active || Data == null || Data.taskWeld) return; Data.taskWeld = true; uiDirtySeq++; QueueReward("weld", "FIRST WELD", "Welded seams hold x4. Your spike will thank you.", "+10 SCRAP", "1 LONG BEAM", "1 SPINDLE (axle)"); if (autosave) Save(); }
 
     /// <summary>Make sure the inventory can BUILD `snapshot` - grant whatever is
     /// short. owen's phone, 2026-09-04: a career created before the compass,
@@ -772,10 +780,8 @@ public static class Career
         if (!Data.taskBuy)
         {
             Data.taskBuy = true;
-            Txn(10, "rookie checklist - first purchase");
             uiDirtySeq++;
-            AddItem("cube", "Aluminum", 1);
-            QueueReward("FIRST PURCHASE", "The shop pays you back for shopping. Once.", "+10 SCRAP", "1 CUBE");
+            QueueReward("buy", "FIRST PURCHASE", "The shop pays you back for shopping. Once.", "+10 SCRAP", "1 CUBE");
         }
         QueuePurchase("buy", partId, mat);
         uiDirtySeq++;   // regression pass: the league board showed stale scrap after purchases
@@ -899,6 +905,7 @@ public static class Career
         public string title;                       // "FIRST BOUT"
         public string caption;                     // one line under the title
         public List<string> lines = new List<string>();   // "+10 SCRAP", "2 gussets"
+        public string id;                          // pendingRewards key, or null for a pure ceremony (medal)
     }
     public static readonly List<RewardPop> rewardQueue = new List<RewardPop>();
     public static void QueueReward(string title, string caption, params string[] lines)
@@ -908,6 +915,42 @@ public static class Career
         r.lines.AddRange(lines);
         rewardQueue.Add(r);
 #endif
+    }
+    /// <summary>Queue a reward whose GRANT is deferred to the box opening.
+    /// `id` names the grant (see GrantReward). In the editor there is no box,
+    /// so the grant lands at once - the benches see exactly what they saw.</summary>
+    public static void QueueReward(string id, string title, string caption, params string[] lines)
+    {
+        if (Data != null && id != null && !Data.pendingRewards.Contains(id)) Data.pendingRewards.Add(id);
+#if !UNITY_EDITOR
+        var r = new RewardPop { title = title, caption = caption, id = id };
+        r.lines.AddRange(lines);
+        rewardQueue.Add(r);
+#else
+        GrantReward(id);
+#endif
+    }
+    /// <summary>Deliver a deferred reward exactly once. Idempotent: the id is
+    /// removed from pendingRewards first, so a box that opens AND is destroyed
+    /// grants once, and a re-fire finds nothing to do.</summary>
+    public static void GrantReward(string id)
+    {
+        if (Data == null || id == null || !Data.pendingRewards.Remove(id)) return;
+        switch (id)
+        {
+            case "bolt":   Txn(10, "rookie checklist - first part bolted"); AddItem("beam", "Aluminum", 2); AddItem("plate", "Aluminum", 2); break;
+            case "weld":   Txn(10, "rookie checklist - first seam welded"); AddItem("beamlong", "Aluminum", 1); AddItem("spindle", "Aluminum", 1); break;
+            case "buy":    Txn(10, "rookie checklist - first purchase"); AddItem("cube", "Aluminum", 1); break;
+            case "fight":  Txn(10, "rookie checklist - first bout fought"); AddItem("wedge", "Aluminum", 1); AddItem("gusset", "Steel", 1); break;
+            case "rescue": Txn(50, "rookie salvage - one-time"); AddItem("gusset", "Steel", 2); AddItem("plate", "Steel", 1); break;
+        }
+        uiDirtySeq++;
+        if (autosave) Save();
+    }
+    public static void GrantPendingRewards()
+    {
+        if (Data == null) return;
+        foreach (var id in Data.pendingRewards.ToArray()) GrantReward(id);
     }
     public static int lastPay;
     /// <summary>The medal SettleFight just minted, or null. Same one-shot
@@ -1096,6 +1139,10 @@ public static class Career
         // Ledger it the way the starter kit grant does: 0 scrap, but the audit
         // trail is where "when did this happen" is answered.
         Txn(0, "medal * " + lg.name + " champion \u00b7 " + m.robot);
+        // The sweep gets the same ceremony as the checklist (web QA 2026-09-04:
+        // the medal was granted, the trophy case updated, and nothing popped).
+        QueueReward("LEAGUE SWEPT", lg.name + " - every contest won. The next league is open.",
+                    "CHAMPION MEDAL", m.robot + " is champion");
         return m;
     }
 
@@ -1123,14 +1170,11 @@ public static class Career
         if (!Data.taskFight)
         {
             Data.taskFight = true;
-            Txn(10, "rookie checklist - first bout fought");
             uiDirtySeq++;
             // The wedge is what the win-path guide coaches next, and the gusset
             // makes the checklist's "weld a seam" reachable for a WINNER (the
             // crate only gives gussets on a loss; the shop wants 200).
-            AddItem("wedge", "Aluminum", 1);
-            AddItem("gusset", "Steel", 1);
-            QueueReward("FIRST BOUT", win ? "You fought. You won. Keep going." : "You fought. That is the part that counts.",
+            QueueReward("fight", "FIRST BOUT", win ? "You fought. You won. Keep going." : "You fought. That is the part that counts.",
                         "+10 SCRAP", "1 WEDGE", "1 GUSSET (weld kit)");
         }
         if (!win && !Data.rescueGranted)
@@ -1144,12 +1188,9 @@ public static class Career
             // the TxnSum == scrap audit stays true. NOT a faucet: this flag
             // never resets.
             Data.rescueGranted = true;
-            Txn(50, "rookie salvage - one-time");
-            AddItem("gusset", "Steel", 2);
-            AddItem("plate", "Steel", 1);
             lastRescue = true;
             uiDirtySeq++;
-            QueueReward("THE YARD LOOKS AFTER ROOKIES", "One-time salvage. Bolt the heavy plate LOW to stay off your back.",
+            QueueReward("rescue", "THE YARD LOOKS AFTER ROOKIES", "One-time salvage. Bolt the heavy plate LOW to stay off your back.",
                         "+50 SCRAP", "2 GUSSETS (weld kit)", "1 STEEL ARMOR PLATE");
             RBTelemetry.Once(RBTelemetry.RESCUE);
         }

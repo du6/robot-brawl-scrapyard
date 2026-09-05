@@ -326,7 +326,7 @@ public class MobileBuilderUI : MonoBehaviour
     {
         get
         {
-            string m = (msgBar != null && msgBar.activeSelf && msgText != null) ? msgText.text + "   \u00b7   " : "";
+            string m = (msgBar != null && msgBar.activeSelf && msgText != null && msgText.text.Length > 0) ? msgText.text + "   \u00b7   " : "";
             return m + (statsText != null ? statsText.text : "");
         }
     }
@@ -1829,12 +1829,12 @@ public class MobileBuilderUI : MonoBehaviour
         if (!ckAll)
         {
             var ckSb = new System.Text.StringBuilder("ROOKIE CHECKLIST - earn while you learn");
-            ckSb.Append(ckd.taskFight ? "\n + fight a bout" : "\n o fight a bout  (+10 scrap)");
-            ckSb.Append(ckd.taskBolt  ? "\n + bolt on a part" : "\n o bolt on a part  (+10 scrap)");
-            ckSb.Append(ckd.taskWeld  ? "\n + weld a seam with a gusset" : "\n o weld a seam with a gusset  (+10 scrap)");
-            ckSb.Append(ckd.taskBuy   ? "\n + buy a part in the SHOP" : "\n o buy a part in the SHOP  (+10 scrap)");
-            ckSb.Append(ckd.fightWins > 0 ? "\n + win a contest" : "\n o win a contest  (the purse)");
-            ckSb.Append(ckd.medals.Count > 0 ? "\n + sweep the league" : "\n o sweep the league  (champion medal)");
+            ckSb.Append(ckd.taskFight ? "\n \u2713 fight a bout" : "\n \u25cb fight a bout  (+10 scrap)");
+            ckSb.Append(ckd.taskBolt  ? "\n \u2713 bolt on a part" : "\n \u25cb bolt on a part  (+10 scrap)");
+            ckSb.Append(ckd.taskWeld  ? "\n \u2713 weld a seam with a gusset" : "\n \u25cb weld a seam with a gusset  (+10 scrap)");
+            ckSb.Append(ckd.taskBuy   ? "\n \u2713 buy a part in the SHOP" : "\n \u25cb buy a part in the SHOP  (+10 scrap)");
+            ckSb.Append(ckd.fightWins > 0 ? "\n \u2713 win a contest" : "\n \u25cb win a contest  (the purse)");
+            ckSb.Append(ckd.medals.Count > 0 ? "\n \u2713 sweep the league" : "\n \u25cb sweep the league  (champion medal)");
             var ck = MkText("rookiechecklist", careerBoardContent, ckSb.ToString(), 13, TextAnchor.UpperLeft);
             ck.color = new Color(1f, 0.84f, 0.40f);
             ck.gameObject.AddComponent<LayoutElement>().minHeight = 7 * 20f;
@@ -4493,7 +4493,7 @@ public class MobileBuilderUI : MonoBehaviour
         Stretch(txt.rectTransform);
         txt.rectTransform.offsetMin = new Vector2(8f, 2f); txt.rectTransform.offsetMax = new Vector2(-8f, -2f);
         txt.supportRichText = false;
-        var ph = MkText("ph", go.transform, "robot name...", 15, TextAnchor.MiddleLeft);
+        var ph = MkText("ph", go.transform, "type a name to enable NEW ROBOT / RENAME", 15, TextAnchor.MiddleLeft);
         Stretch(ph.rectTransform);
         ph.rectTransform.offsetMin = new Vector2(8f, 2f); ph.rectTransform.offsetMax = new Vector2(-8f, -2f);
         ph.color = new Color(1f, 1f, 1f, 0.35f);
@@ -5174,7 +5174,7 @@ public class MobileBuilderUI : MonoBehaviour
             PumpTip();          // R4 finding 4: onboarding is a THIRD channel
             {
             statsText.color = Color.white;
-            statsText.text = bm.HasSelection
+            statsText.text = bm.HasSelection && tab == 0   // a held part only means something on BUILD (web QA: "HOLDING Gusset" followed the player into SHOP and LEAGUE)
                 ? string.Format(bm.SelectedApplique
                       ? "HOLDING {0} - tap a surface to weld it; parts bolted there hold ×"
                         + BuilderManager.GUSSET_SEAM_MULT.ToString("0.#") + " (+10 kg)  ·  {1} kg · {2} part{3}"
@@ -5680,7 +5680,12 @@ public class MobileBuilderUI : MonoBehaviour
         if (!string.IsNullOrEmpty(msg) && msg != msgSeen) { msgSeen = msg; msgAt = Time.unscaledTime; }
         bool live = !string.IsNullOrEmpty(msgSeen) && Time.unscaledTime - msgAt < MSG_LIFE;
         if (live) { msgText.color = new Color(1f, 0.82f, 0.25f); msgText.text = msgSeen; }
-        if (msgBar.activeSelf != live) { msgBar.SetActive(live); ApplyDockH(); }
+        // The notice bar is RESERVED, not toggled (web QA 2026-09-04): when it
+        // appeared and vanished the whole dock hopped a row each way, and a
+        // tap aimed at a tab landed on the header a beat later. An empty bar
+        // keeps its one-line height; only a long notice still grows it.
+        if (!live) msgText.text = "";
+        if (!msgBar.activeSelf) { msgBar.SetActive(true); ApplyDockH(); }
         // The bar is sized to the NOTICE, so it has to be re-fitted whenever
         // the notice changes - not only when the layout changes. The longest
         // messages in this game are the refusals, which are exactly the ones

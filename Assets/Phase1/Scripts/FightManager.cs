@@ -911,7 +911,7 @@ public class FightManager : MonoBehaviour
         float pMob = 1f - Mathf.Clamp01(player.immobileTime / span);
         float eMob = 1f - Mathf.Clamp01(enemy.immobileTime / span);
         string cmp = string.Format(
-            "Judges' decision - damage {0:F0} vs {1:F0} ({2:F1}% margin {9}) · pieces {3}/{4} vs {5}/{6}"
+            "Judges' decision - damage {0:F0} vs {1:F0} ({2:F1}% margin {9}) · pieces incl. wheels {3}/{4} vs {5}/{6}"
             + " · aggression {10:F0}% vs {11:F0}% · on its back {7:F0}% vs {8:F0}%",
             player.dealt, enemy.dealt, pct,
             player.partsNow, player.startParts, enemy.partsNow, enemy.startParts,
@@ -1081,20 +1081,30 @@ public class FightManager : MonoBehaviour
         // R5 finding 2: the side lines are 18pt now, not 14. Measured against
         // the longest real string the HUD prints - "WIDOWMAKER · 8/8 parts ·
         // 4/4 wheels · HP 88%" - which clipped its own percentage at 900/425.
-        float w = 1010f;
+        // PHONE WIDTH (web QA 2026-09-04, 500 px viewport): a fixed 1010 box
+        // on a 500-wide screen hung 255 units off BOTH edges - QUIT was
+        // overprinted by the contest title, the player's name clipped off the
+        // left, the enemy's wheels off the right. The box now fits the screen
+        // and, when it has to shrink, the side lines drop to name + HP (the
+        // pip row still shows every part) and the banner narrows with it.
+        float screenW = Screen.width / UIS;
+        bool narrow = screenW < 1030f;
+        float w = narrow ? screenW - 20f : 1010f;
         lastHudW = w;
-        float x = (Screen.width / UIS - w) * 0.5f;
+        float x = (screenW - w) * 0.5f;
         // ...and the fight now says WHICH fight it is. Arriving at the World
         // Championship in The Crucible for a 3000 purse looked exactly like an
         // exhibition: no league, no arena, no purse anywhere on screen.
         string cid = ContestHudLine();
         float dy = cid == null ? 0f : 22f;
         GUI.Box(new Rect(x, 8, w, 130 + dy), "");
-        if (cid != null) GUI.Label(new Rect(x, 11, w, 26), cid, hudIdStyle);
+        float cidX = narrow && MobileBuilderUI.Active ? x + 92f : x;   // clear the QUIT button
+        if (cid != null) GUI.Label(new Rect(cidX, 11, w - (cidX - x), 26), cid, hudIdStyle);
         int t = Mathf.Max(0, Mathf.CeilToInt(timer));
         GUI.Label(new Rect(x, 12 + dy, w, 26), string.Format("{0}:{1:00}", t / 60, t % 60), hudStyle);
-        DrawBar(x + 16, 40 + dy, 482, player);
-        DrawBar(x + w - 498, 40 + dy, 482, enemy);
+        float barW = narrow ? (w - 48f) * 0.5f : 482f;
+        DrawBar(x + 16, 40 + dy, barW, player, narrow);
+        DrawBar(x + w - 16 - barW, 40 + dy, barW, enemy, narrow);
 
         // P3c: the armed banner (design §6) - a fight the autopilot drives
         // says so, loudly, for the WHOLE fight (persistent mode banner, the
@@ -1108,7 +1118,8 @@ public class FightManager : MonoBehaviour
             abst.fontSize = 15; abst.fontStyle = FontStyle.Bold;
             var apc = GUI.color;
             GUI.color = new Color(1f, 0.8f, 0.25f, 0.95f);
-            GUI.Box(new Rect(x + (w - 520f) * 0.5f, 142f + dy, 520f, 28f),
+            float bannerW = Mathf.Min(520f, w - 8f);
+            GUI.Box(new Rect(x + (w - bannerW) * 0.5f, 142f + dy, bannerW, 28f),
                     "PROGRAM ARMED — autopilot drives this fight", abst);
             GUI.color = apc;
         }
@@ -1162,10 +1173,12 @@ public class FightManager : MonoBehaviour
     /// things. The bar is DAMAGE to what is still bolted on; the pip row is
     /// STRUCTURE. Conflating them made both unreadable and hid the fact that
     /// shear, not damage, is what was actually taking robots apart.</summary>
-    void DrawBar(float x, float y, float w, Side s)
+    void DrawBar(float x, float y, float w, Side s, bool compact = false)
     {
         GUI.Label(new Rect(x, y, w, 23),
-            string.Format("{0} · {1}/{2} parts · {3}/{4} wheels · HP {5:F0}%",
+            compact
+              ? string.Format("{0} · HP {1:F0}%", s.label, s.hpFrac * 100f)
+              : string.Format("{0} · {1}/{2} parts · {3}/{4} wheels · HP {5:F0}%",
                           s.label, s.bodyNow, s.startBody, s.wheelsNow, s.startWheels, s.hpFrac * 100f),
             nameStyle);
         Color old = GUI.color;
@@ -1459,7 +1472,9 @@ public class FightManager : MonoBehaviour
         // input path. BACK is first and coloured: after a contest the play is
         // to go spend the purse or rebuild, never to rematch.
         bool touch = MobileBuilderUI.Active;
-        float bw = 264f, bh = 54f;
+        // Two buttons side by side need 548 units; a phone-width web viewport
+        // (500 px, scale 1) has fewer. Shrink rather than spill.
+        float bw = Mathf.Min(264f, (W - 30f) * 0.5f), bh = 54f;
         // The button follows the stats DOWN. It used to estimate where they
         // ended as `statsTop + H*0.18 + 46` — a restatement of the same fixed
         // fractions the rows themselves no longer use, so once the rows were
@@ -1469,9 +1484,20 @@ public class FightManager : MonoBehaviour
         // statsBottom is the real measured end of the block, so this cannot
         // drift again. Both paths take it, because a long wrapped row can push
         // past 0.705H on a short screen whether or not there is a purse.
-        float contentFloor = statsBottom + H * 0.03f;
+        // ...and the MONEY + MEDAL block, which the old floor ignored: on a
+        // narrow screen the wrapped stat rows push `my` down, the purse lines
+        // and the champion ribbon follow, and the floor - measured from the
+        // STATS alone - put the buttons straight over "NET +238 SCRAP" and the
+        // ribbon inside CLAIM & UPGRADE (web QA, 2026-09-04, 500 px).
+        float moneyBottom = cIsContest ? my + 63f : my + 44f;
+        if (cIsContest && Career.lastRescue) moneyBottom = my + 88f;
+        if (cMedal.Length > 0) moneyBottom = Mathf.Max(moneyBottom, my + 72f + 36f);
+        float contentFloor = Mathf.Max(statsBottom + H * 0.03f, moneyBottom + H * 0.02f);
         float by = arenaLive ? Mathf.Max(H * 0.705f, contentFloor)
                              : Mathf.Max(H * 0.705f + medalDrop, contentFloor);
+        // A short screen: keep the whole button stack on it, as low as it goes.
+        float stackH = (cIsContest && !arenaLive ? 2f * bh + 12f : bh) + 10f;
+        if (by + stackH > H) by = Mathf.Max(contentFloor - H * 0.02f, H - stackH);
         float cx = W * 0.5f;
         GUI.backgroundColor = new Color(0.30f, 0.62f, 0.88f);
         // A LIVE LADDER MATCH gets one centered button and no REMATCH — the

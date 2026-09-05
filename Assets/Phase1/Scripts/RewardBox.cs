@@ -154,7 +154,11 @@ namespace RobotBrawl.Phase0
             SfxSynth.Place();
         }
 
-        void OnDestroy() { if (active == this) active = null; }
+        void OnDestroy()
+        {
+            if (pop != null) Career.GrantReward(pop.id);   // auto-dismissed or skipped: still paid
+            if (active == this) active = null;
+        }
 
         void Update()
         {
@@ -232,6 +236,7 @@ namespace RobotBrawl.Phase0
         {
             if (phase != Phase.Closed) return;
             phase = Phase.Opening; t = 0f;
+            if (pop != null) Career.GrantReward(pop.id);   // the reveal IS the grant now
             RBTelemetry.Once("reward", "&o=1");
         }
 
