@@ -120,12 +120,17 @@ the rookie checklist started paying rewards: `RookieTaskBolt()` ends in
 - `xcodebuild archive` → `/tmp/rb_b18/build/RobotBrawl-b18.xcarchive`,
   `-exportArchive` → `/tmp/rb_b18/build/export/RobotBrawlBoltBlade.ipa`
   (113 MB). Both **succeeded**.
-- **NOT uploaded, NOT submitted.** `altool --upload-app` is refused by the
-  auto-mode classifier, as is anything else outward. That is the right line
-  anyway: build 17 (2.1.3) is READY_FOR_SALE with no open submission, so
-  there is no swap urgency, and submission is irreversible.
+- **SUBMITTED, 2026-09-04 19:56 PDT, on owen's explicit "send it out for
+  app store review".** Upload delivery UUID
+  `6fe9ff3b-11bf-4c4c-8aed-26e7b4b98008` (2.6 min, processed VALID in ~3);
+  App Store version 2.2.0 `2531b692-68f9-4354-928d-8763cca4404f`, build 18
+  attached, `usesNonExemptEncryption=false`; review submission
+  `cfa14a1d-27fa-4922-b0fd-b6ee45470663` → **WAITING_FOR_REVIEW**. Release
+  type is **MANUAL**: when Apple approves, 2.2.0 waits for owen to press
+  Release in ASC; 2.1.3 stays on sale until then. (The earlier auto-mode
+  refusal of `altool` lifted once the instruction was explicit.)
 
-### Owen's three commands (each explicit, `status` is read-only)
+### The three commands that did it (each explicit, `status` is read-only)
 
 ```sh
 zsh server/scripts/release_ios_build18.zsh status    # verified working today
