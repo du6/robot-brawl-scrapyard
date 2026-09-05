@@ -89,6 +89,38 @@ VALID in ~3 min. The hardened `swap` stage did it in one command: cancelled
 `3ceb637b…`, read the version back until it carried 20 (try 2), new
 submission `6766e42f-4789-406e-8743-f4da446f30c6` → **WAITING_FOR_REVIEW**.
 
+## 4c. The iOS Simulator report (build 18) and round 2 — 2026-09-05
+
+The iOS tester (iPhone 17 Pro simulator, dev-pointed release build of
+61000cf, guest play, no accounts) reached and won the first fight in three
+taps, ~2 min from launch. One blocker: **the debrief overflowed the phone** —
+BACK/REMATCH over the purse lines, the orange rookie door below the screen.
+Fixed with a short-screen layout (H < 560 pt: smaller stat text, a one-line
+money block, three buttons in one row pinned to the bottom). Also fixed:
+the SAVE lesson now opens the collapsed dock and hides its hand behind the
+save dialog; the guide says "Tap BUILD" instead of leaving a stale "Tap
+AUTONOMY FIGHT" on LEAGUE; the wedge lesson aims at the lowest front face;
+reward boxes compress vertically on a short screen; count-out toasts start
+below the PROGRAM ARMED banner; the save card stays inside the safe area;
+QUIT clears the rounded corner; the SHOP tile reads "SHOP >"; the palette
+gets the "more below" hint; the ARENA note has room for two lines. Not
+addressed: portrait launch (landscape-only by design), the SHOP card gap,
+the small robot on the phone. Not covered by the tester: FIRST WELD, the
+loss path + rescue crate, MANUAL FIGHT, TEST DRIVE, the hand's animation.
+
+**Measured:** TouchSmoke **55/0** (+2: the palette is now a registered
+scroller under the fixed-axis invariant). CareerSmoke **136/7** — and the
+seven are the day-one runner artifacts, back: a control run of the
+PREVIOUSLY GREEN code in the same worktree also read 136/7. The five extra
+are all one thing: `TouchRow()` clamps at 110 canvas units, and with the
+headless run now reporting `Screen.dpi = 266` at 640×480 (scale 0.577) that
+clamp is 38.9 pt; the 141/2 runs saw `dpi = 0`, which both the sizing and
+the check treat as "unknown" and pass. What flipped the headless DPI is not
+known — the iOS tester was building a simulator player in the SAME worktree
+during the first failing run, and the value stayed flipped afterwards. On a
+real phone (dpi 460, scale ~1.13) the same clamp is exactly 44.0 pt. The
+web was published from this code (`?v=bc092dd18b`); build 21 carries it.
+
 ## 5. Still open
 
 - The web tester's first-run pass (sign-in wall, ghost hand, first boxes,

@@ -325,7 +325,11 @@ hits that matter.**
   raycasts (REMOVE, the gusset applique) is silently eaten — TouchSmoke read
   39/14 on BOTH legs of a control for that reason alone. `BatchSmoke.Tick`
   sleeps 16 ms a frame; with it, both legs are 53/53 and CareerSmoke is 141/2.
-  The headless floor is 2 fails (DRAFT banner, the 640×480 label sweep).
+  The headless floor is 2 fails (DRAFT banner, the 640×480 label sweep) when
+  the run reports `Screen.dpi = 0`, and **7** when it reports a real DPI
+  (measured 266 at 640×480 on 2026-09-05: `TouchRow()`'s 110-unit clamp is
+  then 38.9 pt and five size checks fail). Which you get is an environment
+  property, not code — run the control leg before believing either number.
 - ⚠ **A BENCH THAT SWAPS `Career.Data` MUST HOLD `Career.SuspendAutosave()`.**
   "Nothing here calls Save()" stops being true whenever product code grows a
   save — the rookie checklist did (`RookieTaskBolt` → `Save()`), and on

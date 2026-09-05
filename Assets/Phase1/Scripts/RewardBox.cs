@@ -116,15 +116,20 @@ namespace RobotBrawl.Phase0
             lidRt.anchoredPosition = new Vector2(0f, bh);
 
             // Words: title above, caption below the title, hint under the box.
-            title = MkText("title", cgo.transform, "", Mathf.RoundToInt(30f * k), TextAnchor.MiddleCenter);
+            // A short screen (iPhone landscape) cannot hold the tall layout:
+            // the title sat on the status line and the reward lines on the
+            // tab strip (iOS QA 2026-09-05). Compress every vertical offset so
+            // the top of the title stays inside the screen.
+            float v = Mathf.Clamp((Screen.height * 0.5f - 24f * k) / (237f * k), 0.45f, 1f);
+            title = MkText("title", cgo.transform, "", Mathf.RoundToInt(30f * k * Mathf.Max(0.8f, v)), TextAnchor.MiddleCenter);
             title.fontStyle = FontStyle.Bold; title.color = new Color(1f, 0.84f, 0.40f);
-            Place(title.rectTransform, 0f, 215f * k, 900f * k, 44f * k);
+            Place(title.rectTransform, 0f, 215f * k * v, 900f * k, 44f * k);
             caption = MkText("caption", cgo.transform, "", Mathf.RoundToInt(15f * k), TextAnchor.MiddleCenter);
             caption.color = new Color(0.86f, 0.90f, 0.98f);
-            Place(caption.rectTransform, 0f, 182f * k, 900f * k, 26f * k);
+            Place(caption.rectTransform, 0f, 182f * k * v, 900f * k, 26f * k);
             tapHint = MkText("hint", cgo.transform, "TAP THE BOX TO OPEN", Mathf.RoundToInt(15f * k), TextAnchor.MiddleCenter);
             tapHint.color = new Color(1f, 1f, 1f, 0.85f);
-            Place(tapHint.rectTransform, 0f, -165f * k, 500f * k, 26f * k);
+            Place(tapHint.rectTransform, 0f, -165f * k * v, 500f * k, 26f * k);
 
             // Reward lines start INSIDE the box and rise out of it on open.
             for (int i = 0; i < pop.lines.Count; i++)
@@ -135,7 +140,7 @@ namespace RobotBrawl.Phase0
                 Place(l.rectTransform, 0f, 10f * k, 700f * k, 34f * k);
                 lines.Add(l);
                 // first (biggest) line highest; the rest stack downward toward the lid
-                lineHome.Add(new Vector2(0f, (140f - 30f * i) * k));
+                lineHome.Add(new Vector2(0f, (140f - 30f * i) * k * v));
             }
 
             // CLAIM - appears once revealed.

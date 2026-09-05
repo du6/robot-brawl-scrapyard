@@ -784,7 +784,19 @@ public class MobileBuilderUI : MonoBehaviour
     {
         if (saveDlgCard == null) return;
         float dh = dockRt != null ? dockRt.sizeDelta.y : 0f;
-        saveDlgCard.anchoredPosition = new Vector2(0f, dh * 0.5f);
+        // ...but never above the screen: on a landscape phone the dock is most
+        // of the height, so "half the dock up" pushed the card's title off the
+        // top edge (iOS QA 2026-09-05). Clamp to the safe area.
+        float up = dh * 0.5f;
+        var canvasRt = canvas != null ? canvas.GetComponent<RectTransform>() : null;
+        if (canvasRt != null)
+        {
+            float scale = canvasRt.localScale.y > 0f ? canvasRt.localScale.y : 1f;
+            float safeTop = (Screen.height - Screen.safeArea.yMax) / scale;
+            float maxUp = canvasRt.rect.height * 0.5f - saveDlgCard.sizeDelta.y * 0.5f - safeTop - 8f;
+            up = Mathf.Min(up, Mathf.Max(0f, maxUp));
+        }
+        saveDlgCard.anchoredPosition = new Vector2(0f, up);
     }
 
     bool SaveDlgNameEmpty()
@@ -829,11 +841,7 @@ public class MobileBuilderUI : MonoBehaviour
         // twice over: it leaves the buttons crowded against the tab row even
         // when it works, and the dock's height is per-tab, so the number to
         // beat changes underneath you.
-        if (saveDlgCard != null)
-        {
-            float dh = dockRt != null ? dockRt.sizeDelta.y : 0f;
-            saveDlgCard.anchoredPosition = new Vector2(0f, dh * 0.5f);
-        }
+        CentreSaveDlgCard();
         RefreshSaveDlgGate();
     }
     public void CloseSaveDialog() { if (saveDlg != null) saveDlg.SetActive(false); }
@@ -946,6 +954,10 @@ public class MobileBuilderUI : MonoBehaviour
         var content = MkPanel("content", viewport.transform, new Color(0f,0f,0f,0f));
         var crt = content.GetComponent<RectTransform>();
         crt.anchorMin = new Vector2(0f,1f); crt.anchorMax = new Vector2(0f,1f); crt.pivot = new Vector2(0f,1f); crt.anchoredPosition = Vector2.zero;
+        // The palette's vertical fallback (FitPaletteRows) gets the same
+        // "more below" fade the list tabs have; a half-clipped last tile with
+        // no hint reads as a cut-off, not a scroll (iOS QA 2026-09-05).
+        AddListOverflow(scrollGO, scroll, vp);
         // R1 fix 1 (CRITICAL). The palette was a SINGLE horizontal row: nine
         // of the 19 parts fitted, the row ended flush with the screen edge,
         // and there was no scrollbar, no fade and no half-tile to say
@@ -1097,7 +1109,7 @@ public class MobileBuilderUI : MonoBehaviour
         // is NOT in partButtons, so the refresh/highlight loops never touch it;
         // ArrangePalette parks it last and shows it only when the palette is
         // filtered (career, non-draft).
-        shopHintTile = MkButton("part_shophint", content.transform, "MORE\nIN SHOP >", 12, () => ShowTab(3));
+        shopHintTile = MkButton("part_shophint", content.transform, "SHOP >", 13, () => ShowTab(3));   // one line: "MORE\nIN SHOP" clipped to "MORE" in a 44 pt cell (iOS QA 2026-09-05)
         {
             var hi = shopHintTile.GetComponent<Image>(); if (hi != null) hi.color = new Color(0.30f, 0.24f, 0.10f, 0.96f);
             var ht = shopHintTile.GetComponentInChildren<Text>();
@@ -3264,7 +3276,7 @@ public class MobileBuilderUI : MonoBehaviour
                 "signing in is what lets you see the ladder, enlist a robot,\n"
                 + "challenge, and spend what you win.", 13, TextAnchor.UpperLeft);
             note.color = new Color(0.70f, 0.76f, 0.86f);
-            note.gameObject.AddComponent<LayoutElement>().minHeight = 38f;
+            note.gameObject.AddComponent<LayoutElement>().minHeight = 56f;   // two wrapped lines at phone width were cut by the scroll edge (iOS QA 2026-09-05)
             return;
         }
 

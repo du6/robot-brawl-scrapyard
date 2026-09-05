@@ -1063,10 +1063,12 @@ public class FightManager : MonoBehaviour
 
     void DrawHud()
     {
+        // The results screen shrinks these on a short screen; the HUD does not.
+        smallStyle.fontSize = 22; moneySmall.fontSize = 19; moneyStyle.fontSize = 28;
         // Critic round 1 (mobile): no touch way to leave a running fight
         // (B is a keyboard key). Small corner button, far from the pads.
         if (MobileBuilderUI.Active && bm != null)
-            if (GUI.Button(new Rect(10f, 8f, 88f, 36f), "QUIT"))
+            if (GUI.Button(new Rect(10f + Screen.safeArea.x / UIS, 8f, 88f, 36f), "QUIT"))   // clear the rounded corner / notch (iOS QA 2026-09-05)
             {
                 // A LIVE LADDER MATCH cannot be torn down under MatchRunner's
                 // feet — and quitting one is conceding it locally. The REAL
@@ -1132,7 +1134,10 @@ public class FightManager : MonoBehaviour
         if (bellFlash > 0f)
             BigLine("FIGHT!", new Color(0.35f, 1f, 0.45f), 0.30f);
 
-        float ty = 0.30f;
+        // Toasts start BELOW the armed banner (iOS QA 2026-09-05: on a 402 pt
+        // phone 0.30H is 120, and "SCOUT COUNT-OUT: 8.8" printed straight over
+        // "PROGRAM ARMED" at 142).
+        float ty = Mathf.Max(0.30f, programBannerNow ? (180f + dy) / (Screen.height / UIS) : 0f);
         // ROUND-1-IMPL FIX (critic CRITICAL 3, second half): the pack seam has
         // a voice now. The critic's point was that the ONE failure that ends a
         // match outright arrived with no signal whatsoever - the player watched
@@ -1239,6 +1244,16 @@ public class FightManager : MonoBehaviour
         programBannerNow = false;   // P3c: the fight is over; so is the banner
         Color old = GUI.color;
         float H = Screen.height / UIS, W = Screen.width / UIS;
+        // SHORT SCREEN (iOS QA 2026-09-05, iPhone landscape = ~402 pt): the
+        // stat stack alone filled the height, the money lines sat under the
+        // buttons and the orange rookie door was BELOW the screen - the
+        // warm-up's debrief branch was dead on a phone. Below 560 pt the text
+        // steps down, the money block is one line, and the buttons share a
+        // single row pinned to the bottom edge.
+        bool shortH = H < 560f;
+        smallStyle.fontSize = shortH ? 16 : 22;
+        moneySmall.fontSize = shortH ? 15 : 19;
+        moneyStyle.fontSize = shortH ? 20 : 28;
         Color accent = outcome == Outcome.PlayerWin  ? new Color(0.35f, 1f, 0.45f)
                      : outcome == Outcome.PlayerLoss ? new Color(1f, 0.32f, 0.26f)
                      :                                 new Color(1f, 0.85f, 0.30f);
@@ -1335,7 +1350,7 @@ public class FightManager : MonoBehaviour
             float provTop = causeTop + causeH + 8f;
             GUI.Label(new Rect(pad, provTop, causeW, 26),
                       "unofficial — the referee is confirming this in MY FIGHTS", prov);
-            statsTop = Mathf.Max(H * 0.375f, provTop + 34f);
+            statsTop = Mathf.Max(H * (shortH ? 0.31f : 0.375f), provTop + 34f);
         }
         else
         {
@@ -1345,7 +1360,7 @@ public class FightManager : MonoBehaviour
             // long, so it gets the same treatment.
             float causeTop = H * 0.28f;
             GUI.Label(new Rect(pad, causeTop, causeW, causeH), causeLine, medStyle);
-            statsTop = Mathf.Max(H * 0.375f, causeTop + causeH + 10f);
+            statsTop = Mathf.Max(H * (shortH ? 0.31f : 0.375f), causeTop + causeH + 10f);
         }
 
         int tsec = Mathf.RoundToInt(elapsed);
@@ -1405,6 +1420,16 @@ public class FightManager : MonoBehaviour
                 ? string.Format("PURSE {0}      BONUS {1}{2}",
                                 cPurse, cPay - cPurse < 0 ? "-" : "+", Mathf.Abs(cPay - cPurse))
                 : string.Format("PURSE {0} NOT WON — the league pays wins only", cPurse);
+            if (shortH)
+            {
+                moneySmall.normal.textColor = net >= 0 ? new Color(0.40f, 1f, 0.50f) : new Color(1f, 0.42f, 0.34f);
+                GUI.Label(new Rect(0, my, W, 24),
+                    line1 + string.Format("   \u00b7   NET {0}{1} SCRAP   \u00b7   BALANCE {2}",
+                                          net >= 0 ? "+" : "-", Mathf.Abs(net), Career.Data.scrap),
+                    moneySmall);
+            }
+            else
+            {
             moneySmall.normal.textColor = new Color(0.72f, 0.74f, 0.80f);
             GUI.Label(new Rect(0, my, W, 26), line1, moneySmall);
             moneyStyle.normal.textColor = net >= 0 ? new Color(0.40f, 1f, 0.50f)
@@ -1413,6 +1438,7 @@ public class FightManager : MonoBehaviour
                 string.Format("NET {0}{1} SCRAP          BALANCE {2}",
                               net >= 0 ? "+" : "-", Mathf.Abs(net), Career.Data.scrap),
                 moneyStyle);
+            }
             if (Career.lastRescue)
             {
                 // The rescue crate (design 2026-09-03 §4D): shown exactly on
@@ -1420,7 +1446,7 @@ public class FightManager : MonoBehaviour
                 // the NET row and the buttons at 0.705H without collision.
                 var salv = new GUIStyle(moneySmall);
                 salv.normal.textColor = new Color(1f, 0.84f, 0.40f);
-                GUI.Label(new Rect(0, my + 64f, W, 24),
+                GUI.Label(new Rect(0, my + (shortH ? 26f : 64f), W, 24),
                     "THE YARD LOOKS AFTER ROOKIES - salvage: +50 scrap · 2 gussets · 1 steel plate. Bolt the heavy plate LOW to stay off your back.",
                     salv);
             }
@@ -1452,10 +1478,10 @@ public class FightManager : MonoBehaviour
         // ended up 1px apart with the ribbon jammed under NET - photographed,
         // and it read as an overlap bug rather than an award. There is a large
         // dead band below the buttons; spend it.
-        float medalDrop = cMedal.Length > 0 ? 52f : 0f;
+        float medalDrop = cMedal.Length > 0 && !shortH ? 52f : 0f;
         if (cMedal.Length > 0)
         {
-            float ry = my + 72f;
+            float ry = my + (shortH ? (Career.lastRescue ? 52f : 28f) : 72f);
             GUI.color = new Color(1f, 0.72f, 0.18f, 0.26f);
             GUI.DrawTexture(new Rect(W * 0.5f - 330f, ry - 4f, 660f, 40f), Texture2D.whiteTexture);
             GUI.color = new Color(1f, 0.80f, 0.32f, 0.85f);
@@ -1474,7 +1500,9 @@ public class FightManager : MonoBehaviour
         bool touch = MobileBuilderUI.Active;
         // Two buttons side by side need 548 units; a phone-width web viewport
         // (500 px, scale 1) has fewer. Shrink rather than spill.
-        float bw = Mathf.Min(264f, (W - 30f) * 0.5f), bh = 54f;
+        float bw = Mathf.Min(264f, (W - 30f) * 0.5f), bh = shortH ? 46f : 54f;
+        bool oneRow = shortH && cIsContest && !arenaLive;          // three buttons across
+        if (oneRow) bw = Mathf.Min(bw, (W - 40f) / 3f);
         // The button follows the stats DOWN. It used to estimate where they
         // ended as `statsTop + H*0.18 + 46` — a restatement of the same fixed
         // fractions the rows themselves no longer use, so once the rows were
@@ -1489,14 +1517,14 @@ public class FightManager : MonoBehaviour
         // and the champion ribbon follow, and the floor - measured from the
         // STATS alone - put the buttons straight over "NET +238 SCRAP" and the
         // ribbon inside CLAIM & UPGRADE (web QA, 2026-09-04, 500 px).
-        float moneyBottom = cIsContest ? my + 63f : my + 44f;
-        if (cIsContest && Career.lastRescue) moneyBottom = my + 88f;
-        if (cMedal.Length > 0) moneyBottom = Mathf.Max(moneyBottom, my + 72f + 36f);
+        float moneyBottom = cIsContest ? my + (shortH ? 26f : 63f) : my + 44f;
+        if (cIsContest && Career.lastRescue) moneyBottom = my + (shortH ? 50f : 88f);
+        if (cMedal.Length > 0) moneyBottom = Mathf.Max(moneyBottom, my + (shortH ? (Career.lastRescue ? 52f : 28f) : 72f) + 36f);
         float contentFloor = Mathf.Max(statsBottom + H * 0.03f, moneyBottom + H * 0.02f);
         float by = arenaLive ? Mathf.Max(H * 0.705f, contentFloor)
                              : Mathf.Max(H * 0.705f + medalDrop, contentFloor);
         // A short screen: keep the whole button stack on it, as low as it goes.
-        float stackH = (cIsContest && !arenaLive ? 2f * bh + 12f : bh) + 10f;
+        float stackH = (cIsContest && !arenaLive && !oneRow ? 2f * bh + 12f : bh) + 10f;
         if (by + stackH > H) by = Mathf.Max(contentFloor - H * 0.02f, H - stackH);
         float cx = W * 0.5f;
         GUI.backgroundColor = new Color(0.30f, 0.62f, 0.88f);
@@ -1522,17 +1550,18 @@ public class FightManager : MonoBehaviour
             if (outcome == Outcome.PlayerWin) { dLabel = "CLAIM & UPGRADE >"; improveTab = "shop"; }
             else if (causeLine != null && causeLine.Contains("flipped")) { dLabel = "MAKE IT STABLER >"; improveTab = "stability"; }
             else { dLabel = "HIT HARDER >"; improveTab = "damage"; }
-            improve = GUI.Button(new Rect(cx - bw - 10f, by + bh + 12f, bw * 2f + 20f, bh), dLabel, btnStyle);   // BELOW back/rematch - above them it sat on the NET line (seen 2026-09-03)
+            improve = GUI.Button(oneRow ? new Rect(cx - bw * 0.5f, by, bw, bh)
+                                        : new Rect(cx - bw - 10f, by + bh + 12f, bw * 2f + 20f, bh), dLabel, btnStyle);   // BELOW back/rematch - above them it sat on the NET line (seen 2026-09-03)
             GUI.backgroundColor = new Color(0.30f, 0.62f, 0.88f);
         }
-        bool back = GUI.Button(new Rect(cx - bw - 10f, by, bw, bh),
+        bool back = GUI.Button(oneRow ? new Rect(cx - bw * 1.5f - 10f, by, bw, bh) : new Rect(cx - bw - 10f, by, bw, bh),
                                touch ? "BACK TO WORKSHOP" : "BACK TO WORKSHOP  (B)", btnStyle);
         GUI.backgroundColor = Color.white;
         // REMATCH re-runs the same builds as an EXHIBITION: ResetFight() goes
         // through StartFight(), not StartCareerFight(), and SettleFight() has
         // already cleared the contest - so it charges no entry fee, pays
         // sandbox scrap, and cannot re-win the purse. Label it as what it is.
-        bool again = GUI.Button(new Rect(cx + 10f, by, bw, bh),
+        bool again = GUI.Button(oneRow ? new Rect(cx + bw * 0.5f + 10f, by, bw, bh) : new Rect(cx + 10f, by, bw, bh),
                                 cIsContest ? (touch ? "REMATCH · EXHIBITION" : "REMATCH · EXHIBITION  (R)")
                                            : (touch ? "REMATCH" : "REMATCH  (R)"), btnStyle);
         if (improve && bm != null)

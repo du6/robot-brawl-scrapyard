@@ -168,20 +168,23 @@ namespace RobotBrawl.Phase0
             {
                 case 1:
                     if (bm.SelectedPart == targetTile) { step = 2; Say(); }
-                    if (bm.PlacedCount > startParts) { step = 4; Say(); }   // they raced ahead
+                    if (bm.PlacedCount > startParts) { step = 4; ui.SetDockOpen(true); Say(); }   // they raced ahead
                     break;
                 case 2:
                     if (bm.GhostLive) { step = 3; Say(); }
-                    if (bm.PlacedCount > startParts) { step = 4; Say(); }
+                    if (bm.PlacedCount > startParts) { step = 4; ui.SetDockOpen(true); Say(); }
                     if (bm.SelectedPart != targetTile && bm.SelectedPart >= 0) { }  // any part is fine — the gesture is the lesson
                     if (bm.SelectedPart < 0) { step = 1; Say(); }
                     break;
                 case 3:
-                    if (bm.PlacedCount > startParts) { step = 4; Say(); }
+                    // Placement collapses the dock; the SAVE this step points at
+                    // lives inside it (iOS QA 2026-09-05: "no hand, no SAVE").
+                    if (bm.PlacedCount > startParts) { step = 4; ui.SetDockOpen(true); Say(); }
                     if (bm.SelectedPart < 0 && !bm.GhostLive) { step = 1; Say(); }
                     break;
                 case 4:
                     if (!bm.ActiveEditDirty()) { step = 5; Say(); }
+                    if (ui.SaveDialogOpen) { Hide(); return; }   // the dialog has the floor; no hand pulsing behind it
                     break;
                 case 5:
                     if (Career.Data.fights >= 2 || FightManager.current != null)
@@ -237,7 +240,13 @@ namespace RobotBrawl.Phase0
             // Pre-fight lines (step < 1) speak on their own tabs; post-fight
             // steps 1-4 coach BUILD-tab controls, so they stay quiet elsewhere
             // (the win path lands on SHOP where the wedge does not exist).
-            if (step >= 1 && step < 5 && ui != null && ui.CurrentTab != 0) return;
+            if (step >= 1 && step < 5 && ui != null && ui.CurrentTab != 0)
+            {
+                // Say SOMETHING off-tab, or the previous line ("Tap AUTONOMY
+                // FIGHT") outlives the fight it was about (iOS QA 2026-09-05).
+                bm.Coach("Tap BUILD - let's improve your machine");
+                return;
+            }
             RBTelemetry.Once("guide", "&s=" + step);
             switch (step)
             {
@@ -297,7 +306,11 @@ namespace RobotBrawl.Phase0
             {
                 case STEP_LEAGUE: { var r = Find("tab1"); if (r == null) return false; from = to = r.position; return true; }
                 case STEP_AUTO:   { var b = FindByLabel("AUTONOMY FIGHT"); if (b == null) return false; from = to = b.position; return true; }
-                case 1: { var r = Find("part_" + targetTile); if (r == null) return false; from = to = r.position; return true; }
+                case 1:
+                {
+                    if (ui != null && ui.CurrentTab != 0) { var tb = Find("tab0"); if (tb == null) return false; from = to = tb.position; return true; }
+                    var r = Find("part_" + targetTile); if (r == null) return false; from = to = r.position; return true;
+                }
                 case 2: { var r = Find("part_" + targetTile); var w = RobotOnScreen();
                           from = r != null ? (Vector2)r.position : w; to = w; return true; }
                 case 3: { to = from = RobotOnScreen(); return true; }
@@ -321,8 +334,21 @@ namespace RobotBrawl.Phase0
         {
             var cam = Camera.main;
             if (cam == null) return new Vector2(Screen.width * 0.5f, Screen.height * 0.55f);
-            // the build robot lives around the origin; aim slightly high-front
-            return cam.WorldToScreenPoint(new Vector3(0f, 0.75f, 0.30f));
+            // "Low is strong" - so aim at the LOWEST, FRONT-most face of the
+            // chassis, not the top of the core (iOS QA 2026-09-05: the hand
+            // pointed at the roof and the wedge landed on top of the machine).
+            // The front is +Z, the drive direction; the frame parts sit at the
+            // core's height, so the target is the nose of the lowest frame part.
+            Vector3 best = new Vector3(0f, 0.75f, 0.30f); float bestScore = float.NegativeInfinity;
+            foreach (var pp in bm.placed)
+            {
+                if (pp == null || pp.go == null || pp.def == null) continue;
+                if (pp.def.id == "wheel") continue;
+                var pos = pp.go.transform.position;
+                float score = pos.z * 2f - pos.y;            // forward and low
+                if (score > bestScore) { bestScore = score; best = pos + new Vector3(0f, -0.05f, pp.def.size.z * 0.5f); }
+            }
+            return cam.WorldToScreenPoint(best);
         }
 
         RectTransform Find(string name)
