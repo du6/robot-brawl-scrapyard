@@ -98,6 +98,23 @@ public class CareerSmoke : MonoBehaviour
         return sp.z <= 0f ? Vector3.zero : sp;
     }
 
+    // A bench scratch-career is bare of the rookie WARM-UP: the checklist's
+    // +10 grants (fight/bolt/weld/buy) and the crate would shift every scrap
+    // total this bench hard-codes, and the pre-built starter would fill the
+    // stable it asserts is empty. This bench tests the CORE economy; the
+    // warm-up has its own coverage. Flagging the tasks done makes the scratch
+    // career behave like a veteran's - no grants fire (2026-09-04, iOS port).
+    static void CoreEconomyOnly()
+    {
+        var d = Career.Data;
+        d.taskFight = d.taskBolt = d.taskWeld = d.taskBuy = true;
+        d.rescueGranted = true; d.guideDone = true;
+    }
+    // Boot-onto-active-robot (2026-09-04) means the builder boots showing the
+    // OWNER's active robot, not a bare core; a scratch-career section must
+    // reset the build to a known bare core before it places its fixture.
+    const string BARE_CORE = BuilderManager.SNAP_STAMP + "\ncore|0,0.7,0|0|0,0,0";
+
     IEnumerator Start()
     {
         yield return null;
@@ -143,6 +160,9 @@ public class CareerSmoke : MonoBehaviour
         var autosaveHold = Career.SuspendAutosave();
         Career.Data = new CareerData();
         Career.active = true;
+        CoreEconomyOnly();
+        bm.LoadSnapshot(BARE_CORE);   // boot loaded the owner's active robot; this section builds from bare
+        yield return null;
         int exp = 0;
         Career.Txn(500, "test grant"); exp += 500;
         Career.AddItem("beam", "Aluminum", 1);
@@ -238,6 +258,9 @@ public class CareerSmoke : MonoBehaviour
 
         // ==== C3: leagues, contests, enrollment, settlement ====
         Career.Data = new CareerData();
+        CoreEconomyOnly();
+        bm.LoadSnapshot(BARE_CORE);   // c3 places its wheel+battery onto a bare core, deterministically
+        yield return null;
         Career.Txn(1000, "c3 grant");
         // own everything already bolted to the build (the C2 section left a
         // beam placed), or CareerShortfall fires before every C3 check
@@ -288,7 +311,11 @@ public class CareerSmoke : MonoBehaviour
             int be = -1;
             for (int i = 1; i < bm.PaletteCount; i++) if (bm.PartId(i) == "beam") { be = i; break; }
             int have = Career.CountOf("beam", bm.PartMatKey(be));
-            Career.AddItem("beam", bm.PartMatKey(be), 1);   // now exactly one spare to place
+            // exactly one spare to place. c3 now starts from a BARE core, so
+            // its "own the bolted beam" grant is a spare too; consume down to
+            // one rather than blindly adding a second (2026-09-04, iOS port).
+            if (have > 1) Career.TryConsume("beam", bm.PartMatKey(be), have - 1);
+            else if (have < 1) Career.AddItem("beam", bm.PartMatKey(be), 1 - have);
             bm.SelectPart(be); yield return null;
             Check(bm.HasSelection && bm.CareerRemaining(be) == 1,
                   "auto-done setup: one beam left, held");
@@ -454,6 +481,7 @@ public class CareerSmoke : MonoBehaviour
 
         // ==== C4: the workshop - hands-on run from a fresh kit ====
         Career.Data = new CareerData();
+        CoreEconomyOnly();
         Career.lastResultLine = "";
         foreach (var kk in CareerDB.StarterKit()) Career.AddItem(kk.partId, kk.mat, kk.count);
         Career.Txn(0, "kit granted (test)");
@@ -900,6 +928,8 @@ public class CareerSmoke : MonoBehaviour
         // tests depend on is its own kind of bug.
         var c10Saved = Career.Data;
         Career.Data = new CareerData();
+        CoreEconomyOnly();
+        bm.LoadSnapshot(BARE_CORE);
         yield return null;
         int stepBuilt = bm.CareerTipStep();
         Career.Data.tipsOff = true;
@@ -1411,6 +1441,9 @@ public class CareerSmoke : MonoBehaviour
             string gSaved = bm.SnapshotString();
             int gIdx = bm.PaletteIndexOf("gusset");
             Check(gIdx >= 0, "GUSSET: tile present in career mode");
+            // The build here is a BARE core since the C10 reset went
+            // deterministic (2026-09-04) - give the weld something to land on.
+            if (bm.placed.Count < 2) { bm.LoadSnapshot(SAWYER); yield return null; }
             var gTarget = bm.placed.Count > 1 ? bm.placed[1] : null;
             bm.selected = gIdx;
             bm.ApplyGusset(gTarget);
@@ -1418,9 +1451,13 @@ public class CareerSmoke : MonoBehaviour
                   && bm.LastMessage != null && bm.LastMessage.Contains("No Gusset"),
                   "GUSSET: with no stock the career refuses in words");
             Career.AddItem("gusset", "Steel", 1);
+            // A frame between welds: the product debounces same-frame doubles
+            // (a synthetic-input artifact), and this second weld is deliberate.
+            yield return new WaitForSecondsRealtime(0.1f);
             bm.ApplyGusset(gTarget);
             Check(gTarget != null && gTarget.reinforced, "GUSSET: one granted, one applied");
             Check(bm.CareerRemaining(gIdx) == 0, "GUSSET: …and the shelf reads zero");
+            yield return new WaitForSecondsRealtime(0.1f);
             bm.ApplyGusset(bm.placed.Count > 2 ? bm.placed[2] : gTarget);
             Check(bm.LastMessage != null
                   && (bm.LastMessage.Contains("No Gusset") || bm.LastMessage.Contains("already")),

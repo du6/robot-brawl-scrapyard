@@ -1569,7 +1569,7 @@ public class MobileBuilderUI : MonoBehaviour
             var bt = matBtn.GetComponentInChildren<Text>();
             if (bt != null)
                 bt.text = MatDB.Get(cur).name.ToUpper()
-                        + (MatSheetOpen ? "  v" : "  ^");
+                        + (MatSheetOpen ? "  \u25be" : "  \u25b4");
             // C19: the label just changed — keep its width honest, or a
             // long material name re-clips until the next scale re-apply.
             if (bt != null)
@@ -2641,7 +2641,7 @@ public class MobileBuilderUI : MonoBehaviour
             handleRt.anchoredPosition = new Vector2(0f, dh);
             var ht = dockHandle.GetComponentInChildren<UnityEngine.UI.Text>();
             if (ht != null)
-                ht.text = dockOpen ? "v  HIDE PANEL" : "^  SHOW PANEL";
+                ht.text = dockOpen ? "\u25bc  HIDE PANEL" : "\u25b2  SHOW PANEL";
         }
 
         PublishCover(dh + (handleRt != null ? HANDLE_H : 0f));
