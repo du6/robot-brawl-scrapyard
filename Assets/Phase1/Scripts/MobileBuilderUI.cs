@@ -142,7 +142,7 @@ public class MobileBuilderUI : MonoBehaviour
     bool cosmeticsBusy;
     // ---- C3: career league board ----
     GameObject careerBoard; Transform careerBoardContent;
-    Button ladderBtn, exhibBtn;
+    Button ladderBtn, exhibBtn, testDriveBtn;
     // ---- C4: workshop ----
     GameObject robotsPanel;
     Transform robotsContent;
@@ -1620,6 +1620,7 @@ public class MobileBuilderUI : MonoBehaviour
         // directly. Deterministic - and it is where the critic asked for it,
         // beside the CAREER header rather than above the league board.
         var tdb = MkButton("test", fightPanel.transform, "TEST DRIVE", 14, () => { if (bm != null) bm.StartTest(); });
+        testDriveBtn = tdb;
         var tdl = tdb.gameObject.AddComponent<LayoutElement>();
         tdl.ignoreLayout = true;
         // ⚠ LAST SIBLING, OR THE BOTTOM HALF OF THIS BUTTON IS DEAD — 2026-08-12.
@@ -1725,12 +1726,16 @@ public class MobileBuilderUI : MonoBehaviour
     }
 
     /// <summary>C3: sandbox shows LADDER/EXHIBITION; career shows the league
-    /// board. TEST DRIVE stays in both.</summary>
+    /// board. TEST DRIVE is SANDBOX-ONLY (owen, 2026-09-04): the career's
+    /// fights are the autonomy flow the guide walks a rookie through, and a
+    /// "drive" chip beside AUTONOMY FIGHT read as one more way to fight - on a
+    /// phone, one with no touch steering at all.</summary>
     void RefreshFightTab()
     {
         bool car = Career.active;
         if (ladderBtn != null) ladderBtn.gameObject.SetActive(!car);
         if (exhibBtn != null) exhibBtn.gameObject.SetActive(!car);
+        if (testDriveBtn != null) testDriveBtn.gameObject.SetActive(!car);
         if (careerBoard != null) careerBoard.SetActive(car);
         if (car) RefreshCareerBoard();
     }
