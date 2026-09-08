@@ -38,6 +38,7 @@ The records, most recent first:
 
 | doc | what |
 |---|---|
+| `docs/QA_Round1_Fixes_2026-09-05.md` | **two play-test agents (web + iOS simulator), three fix rounds, builds 19-22.** 2.2.0 (build 21) is ON SALE with a debrief that can strand a phone after a fight; **2.2.1 (build 22) in review is the fix.** The debrief's short-screen layout, deferred reward grants (`pendingRewards`), the fight autosaving the build, the runner's DPI artifact and its control leg |
 | `docs/Build18_iOS_Port_2026-09-04.md` | **build 18 / 2.2.0 — the web warm-up ported to iOS, sign-in wall kept.** Cut, archived, exported, NOT uploaded (owen's three commands are in `server/scripts/release_ios_build18.zsh`). Also: **headless TouchSmoke overwrote the career save** (rookie rewards call Save; TouchSmoke now holds autosave) — restore command in §3; and every headless raycast bench was racing physics at 3-4k fps until `BatchSmoke` capped the loop |
 | `docs/Gusset_x4_2026-08-18.md` | the gusset holds **×4**, measured with its control leg — and the finding that fell out of it: **`Main.unity` has no `BuilderManager`**, so every fight-running bench is unrunnable without a human clicking Start. Also: the ladder is at ×4 while build 9 in review is at ×1.5 |
 | `docs/HANDOVER_iOS_Launch_2026-08-16.md` | **THE LAUNCH OPERATING MANUAL** — 1.0 submitted (build 8 then, **build 10** now); production topology, the four alerts and the regex trap that silences them, the 5-min health check, symptom→subsystem playbook, the build-9 ritual, the in-review build-swap procedure, open items in bite order |

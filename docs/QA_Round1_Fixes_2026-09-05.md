@@ -172,6 +172,28 @@ by hash before and after boot).
 fail set (one bench line updated: the gusset probe re-selects the tool the
 product now puts down). Web published as `?v=0c5a4e815a`.
 
+## 4f. 2.2.0 approved and on sale; round 3 verified; 2.2.1 (build 22) submitted — 2026-09-07
+
+- The iOS tester's round-3 check on the simulator: **PASS** — the debrief fits a
+  402 pt phone with room to spare, all three buttons on screen and tappable,
+  CLAIM lands in SHOP, the FIRST BOUT box appears with its title clear of the
+  status line (`r3_10/11/12_*.png`). Residual: the box title overprints the
+  amber coach line while it is up, and an opened reward line crosses "HIDE
+  PANEL" - untidy, readable, not filed. The tester's note that the count-out
+  still overprints the banner was a misread: `r3_04` shows it clear below.
+- Meanwhile **2.2.0 (build 21) went READY_FOR_SALE** - Apple approved it and it
+  is live. The first build-22 upload was refused: "CFBundleShortVersionString
+  [2.2.0] must be higher than the previously approved version". So build 22
+  ships as **2.2.1**: bundleVersion 2.2.1 (`5604398`), delivery
+  `ff405f4c-849c-4993-95a8-f79a3329c299`, VALID in ~3 min, version 2.2.1
+  `22fab00f-4804-45ac-ad35-d2fdfc20c95a` created with its own What's New,
+  submission `3977c894-68d0-4429-91f0-5ee0e37a0c37` → **WAITING_FOR_REVIEW**.
+  ⚠ The live 2.2.0 carries the round-2 debrief, which the simulator showed
+  can leave a phone with NO buttons after a fight whose cause line wraps.
+  2.2.1 is the fix; until it is approved, that is the state of the store.
+- The iOS tester's session hit its usage limit after the report (resets
+  14:40 PT); the web tester finished and restored owen's browser career.
+
 ## 5. Still open
 
 - The web tester's first-run pass (sign-in wall, ghost hand, first boxes,
