@@ -97,6 +97,12 @@ public class FightManager : MonoBehaviour
 
     public static float INCAP_GRACE = 2f;   // s flipped/immobile before the count starts
     public static float COUNT_OUT = 10f;    // s of visible count-out
+    // QUICK FIGHT profile (plan step 1): a 30-s bout, a 5-s count, and the
+    // walls close in for the last 10 s so nothing ends on the judges.
+    public static bool quickBout;
+    public static float QUICK_MATCH_TIME = 30f, QUICK_COUNT_OUT = 5f, QUICK_CRUSH_AT = 10f;
+    bool crushStarted; float crushToast;
+    public bool CrushStarted { get { return crushStarted; } }
     public static float RECOVER_CANCEL = 0.6f;  // s of continuous recovery before a running count is cancelled
     public static float DEFAULT_MATCH_TIME = 90f;
 
@@ -224,7 +230,7 @@ public class FightManager : MonoBehaviour
         player.bot = pBot; player.drive = pDrive;
         enemy.label = string.IsNullOrEmpty(enemyName) ? "MAULER" : enemyName;
         enemy.bot = eBot; enemy.drive = eDrive; enemy.ai = eAi;
-        timer = DEFAULT_MATCH_TIME;
+        timer = quickBout ? QUICK_MATCH_TIME : DEFAULT_MATCH_TIME;
         // P1: the compass tracker's "match beacon" — each side's SensorBus
         // (if the build carries sensors) tracks the OTHER machine.
         if (pBot != null)
@@ -382,6 +388,13 @@ public class FightManager : MonoBehaviour
         if (bellFlash > 0f) bellFlash -= dt;
         elapsed += dt;
         timer -= dt;
+        if (quickBout && !crushStarted && timer <= QUICK_CRUSH_AT)
+        {
+            crushStarted = true; crushToast = 2.5f;
+            ArenaHazards.StartCrush(BuilderManager.ARENA_HALF, QUICK_CRUSH_AT);
+            SfxSynth.Deny();
+        }
+        if (crushToast > 0f) crushToast -= dt;
 
         Poll(player);
         Poll(enemy);
@@ -626,7 +639,7 @@ public class FightManager : MonoBehaviour
         if (s.incapTimer < INCAP_GRACE) return false;
         if (s.countOut < 0f)
         {
-            s.countOut = COUNT_OUT;
+            s.countOut = quickBout ? QUICK_COUNT_OUT : COUNT_OUT;
             // Round-3 fix 3: freeze the MEASURED reason at the instant the count
             // starts. The old screen printed one canned string ("add a self-right
             // mechanism or lower your center of mass") for every count-out; it
@@ -970,6 +983,8 @@ public class FightManager : MonoBehaviour
             : " — too close to call, scored a draw"));
     }
 
+    bool cIsQuick; string cQuickLine = "";
+    public bool IsQuick { get { return cIsQuick; } }
     public void End(Outcome o, string cause)
     {
         if (state == State.Ended) return;
@@ -1008,6 +1023,16 @@ public class FightManager : MonoBehaviour
         }
         Career.lastSettled = false;
         Career.lastMedal = null; cMedal = "";
+        cIsQuick = Career.quickFight; cQuickLine = "";
+        if (cIsQuick)
+        {
+            // Quick fights settle here, before OnMatchEnd's exhibition path can
+            // pay a second purse: OnMatchEnd is told it has been handled.
+            Career.SettleQuickFight(o == Outcome.PlayerWin, player.dealt);
+            cPay = Career.lastQuickPay; cQuickLine = Career.lastQuickLine;
+            Progression.rewarded = true;
+            Career.quickFight = false; quickBout = false;
+        }
         // Phase 4: settle scrap + ladder advancement, exactly once per fight.
         // Funnel: a fight actually FINISHED, and how it went. This is the
         // event that answers "has anyone completed a league fight" — which
@@ -1134,6 +1159,8 @@ public class FightManager : MonoBehaviour
         }
         if (bellFlash > 0f)
             BigLine("FIGHT!", new Color(0.35f, 1f, 0.45f), 0.30f);
+        if (crushToast > 0f)
+            BigLine("THE WALLS CLOSE IN", new Color(1f, 0.55f, 0.15f), 0.30f);
 
         // Toasts start BELOW the armed banner (iOS QA 2026-09-05: on a 402 pt
         // phone 0.30H is 120, and "SCOUT COUNT-OUT: 8.8" printed straight over
@@ -1465,6 +1492,11 @@ public class FightManager : MonoBehaviour
                     salv);
             }
         }
+        else if (cIsQuick)
+        {
+            moneySmall.normal.textColor = outcome == Outcome.PlayerWin ? new Color(0.40f, 1f, 0.50f) : new Color(0.80f, 0.84f, 0.92f);
+            GUI.Label(new Rect(0, my, W, 24), "+" + cPay + " SCRAP   \u00b7   " + cQuickLine, moneySmall);
+        }
         else if (Progression.lastRewardLine.Length > 0)
         {
             GUI.Label(new Rect(0, my + 14f, W, 30), Progression.lastRewardLine, smallStyle);
@@ -1531,7 +1563,7 @@ public class FightManager : MonoBehaviour
         // and the champion ribbon follow, and the floor - measured from the
         // STATS alone - put the buttons straight over "NET +238 SCRAP" and the
         // ribbon inside CLAIM & UPGRADE (web QA, 2026-09-04, 500 px).
-        float moneyBottom = cIsContest ? my + (shortH ? 26f : 63f) : my + 44f;
+        float moneyBottom = cIsContest ? my + (shortH ? 26f : 63f) : cIsQuick ? my + 26f : my + 44f;
         if (cIsContest && Career.lastRescue) moneyBottom = my + (shortH ? 50f : 88f);
         if (cMedal.Length > 0) moneyBottom = Mathf.Max(moneyBottom, my + (shortH ? (Career.lastRescue ? 52f : 28f) : 72f) + 36f);
         float contentFloor = Mathf.Max(statsBottom + H * 0.03f, moneyBottom + H * 0.02f);
@@ -1569,6 +1601,17 @@ public class FightManager : MonoBehaviour
             improve = GUI.Button(oneRow ? new Rect(cx - bw * 0.5f, by, bw, bh)
                                         : new Rect(cx - bw - 10f, by + bh + 12f, bw * 2f + 20f, bh), dLabel, btnStyle);   // BELOW back/rematch - above them it sat on the NET line (seen 2026-09-03)
             GUI.backgroundColor = new Color(0.30f, 0.62f, 0.88f);
+        }
+        if (cIsQuick)
+        {
+            // The quick loop's card: BACK, and NEXT FIGHT as the loud one.
+            bool qback = GUI.Button(new Rect(cx - bw - 10f, by, bw, bh), "BACK TO WORKSHOP", btnStyle);
+            GUI.backgroundColor = new Color(1f, 0.62f, 0.24f);
+            bool qnext = GUI.Button(new Rect(cx + 10f, by, bw, bh), "NEXT FIGHT >", btnStyle);
+            GUI.backgroundColor = Color.white;
+            if (qback && bm != null) { bm.BackToBuild(); return; }
+            if (qnext && bm != null) { bm.BackToBuild(); bm.StartQuickFight(-1); return; }
+            return;
         }
         bool back = GUI.Button(oneRow ? new Rect(cx - bw * 1.5f - 10f, by, bw, bh) : new Rect(cx - bw - 10f, by, bw, bh),
                                touch ? "BACK TO WORKSHOP" : "BACK TO WORKSHOP  (B)", btnStyle);

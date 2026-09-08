@@ -143,6 +143,7 @@ public class MobileBuilderUI : MonoBehaviour
     // ---- C3: career league board ----
     GameObject careerBoard; Transform careerBoardContent;
     Button ladderBtn, exhibBtn, testDriveBtn;
+    GameObject quickPanel; Text quickMeter; readonly Button[] quickBtns = new Button[3];
     // ---- C4: workshop ----
     GameObject robotsPanel;
     Transform robotsContent;
@@ -1685,6 +1686,26 @@ public class MobileBuilderUI : MonoBehaviour
         var tdt = tdb.GetComponentInChildren<Text>();
         if (tdt != null) tdt.color = new Color(0.68f, 0.72f, 0.79f, 1f);
         // C3: the career league board replaces LADDER/EXHIBITION in career mode
+        // QUICK FIGHT (docs/CATS_Gap_Analysis_Plan_2026-09-07.md, step 2): the
+        // loop's door sits ABOVE the league board - three opponents, one tap,
+        // a 30-second bout, and the meter that says what the next win earns.
+        quickPanel = MkPanel("quickpanel", fightPanel.transform, new Color(0.08f, 0.10f, 0.14f, 0.96f));
+        var qle = quickPanel.AddComponent<LayoutElement>(); qle.minHeight = TouchRow() + 48f; qle.preferredHeight = TouchRow() + 48f;
+        var qv = quickPanel.AddComponent<VerticalLayoutGroup>(); qv.spacing = 4f; qv.padding = new RectOffset(8, 8, 6, 6);
+        qv.childForceExpandWidth = true; qv.childForceExpandHeight = false;
+        quickMeter = MkText("quickmeter", quickPanel.transform, "QUICK FIGHT  \u00b7  30-second bouts  \u00b7  3 wins = a toolbox", 13, TextAnchor.MiddleLeft);
+        quickMeter.color = new Color(1f, 0.84f, 0.40f);
+        quickMeter.gameObject.AddComponent<LayoutElement>().minHeight = 36f;
+        var qrow = MkPanel("quickrow", quickPanel.transform, new Color(0f, 0f, 0f, 0f));
+        var qrl = qrow.AddComponent<LayoutElement>(); qrl.minHeight = TouchRow(); qrl.preferredHeight = TouchRow();
+        var qh = qrow.AddComponent<HorizontalLayoutGroup>(); qh.spacing = 6f; qh.childForceExpandWidth = true; qh.childForceExpandHeight = true;
+        for (int qi = 0; qi < 3; qi++)
+        {
+            int idx = qi;
+            var qb = MkButton("quick_" + qi, qrow.transform, "...", 14, () => { if (bm != null) bm.StartQuickFight(idx); });
+            qb.GetComponent<Image>().color = new Color(0.55f, 0.30f, 0.75f, 1f);
+            quickBtns[qi] = qb;
+        }
         careerBoard = MkPanel("careerboard", fightPanel.transform, new Color(0f,0f,0f,0f));
         var cbl = careerBoard.AddComponent<LayoutElement>(); cbl.flexibleHeight = 1f; cbl.minHeight = 90f;
         var cbs = careerBoard.AddComponent<ScrollRect>(); cbs.horizontal = false; cbs.vertical = true;
@@ -1748,6 +1769,8 @@ public class MobileBuilderUI : MonoBehaviour
         if (ladderBtn != null) ladderBtn.gameObject.SetActive(!car);
         if (exhibBtn != null) exhibBtn.gameObject.SetActive(!car);
         if (testDriveBtn != null) testDriveBtn.gameObject.SetActive(!car);
+        if (quickPanel != null) quickPanel.SetActive(car);
+        if (car) RefreshQuickPanel();
         if (careerBoard != null) careerBoard.SetActive(car);
         if (car) RefreshCareerBoard();
     }
@@ -1805,8 +1828,34 @@ public class MobileBuilderUI : MonoBehaviour
         return go;
     }
 
+    /// <summary>The three Quick Fight offers and the meter line.</summary>
+    public void RefreshQuickPanel()
+    {
+        if (quickPanel == null || Career.Data == null) return;
+        var pool = Career.QuickPool();
+        for (int i = 0; i < quickBtns.Length; i++)
+        {
+            var b = quickBtns[i]; if (b == null) continue;
+            bool have = i < pool.Count;
+            b.gameObject.SetActive(have);
+            if (!have) continue;
+            var t = b.GetComponentInChildren<Text>();
+            if (t != null) t.text = pool[i].label + "\n" + pool[i].tier.ToString().ToLower()
+                                  + (string.IsNullOrEmpty(pool[i].armourMat) ? "" : " \u00b7 " + pool[i].armourMat.ToLower());
+        }
+        var d = Career.Data;
+        int toBox = Career.QUICK_BOX_WINS - d.quickWinsToBox;
+        string cap = d.quickBoxesToday >= Career.QUICK_BOXES_PER_DAY && d.quickBoxDay == System.DateTime.UtcNow.ToString("yyyy-MM-dd")
+                   ? "  \u00b7  box cap reached - more tomorrow" : "";
+        quickMeter.text = "QUICK FIGHT  \u00b7  30-second bouts  \u00b7  "
+                        + (d.quickFights == 0 ? "3 wins = a toolbox"
+                           : "streak " + d.quickStreak + "  \u00b7  " + toBox + " win" + (toBox == 1 ? "" : "s") + " to a toolbox")
+                        + (d.crowns > 0 ? "  \u00b7  " + d.crowns + " crown" + (d.crowns == 1 ? "" : "s") + " banked" : "")
+                        + cap;
+    }
     void RefreshCareerBoard()
     {
+        RefreshQuickPanel();
         if (careerBoardContent == null || bm == null) return;
         fightGates.Clear();   // the rows below are about to be destroyed
         for (int i = careerBoardContent.childCount - 1; i >= 0; i--)

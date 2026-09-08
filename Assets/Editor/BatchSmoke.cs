@@ -12,6 +12,7 @@ namespace RobotBrawl.EditorTools
 {
     public static class BatchSmoke
     {
+        public static void Quick()  { Arm("quick"); }
         public static void Career() { Arm("career"); }
         public static void Touch()  { Arm("touch"); }
         static void Arm(string which)
@@ -37,6 +38,7 @@ namespace RobotBrawl.EditorTools
         static bool Finished()
         {
             return which == "career" ? RobotBrawl.Phase0.CareerSmoke.finished
+                                     : which == "quick" ? RobotBrawl.Phase0.QuickFightBench.finished
                                      : (touch != null && touch.finished);
         }
         static void Tick()
@@ -70,7 +72,11 @@ namespace RobotBrawl.EditorTools
                 // chooser forever. Take the exact path the touch button takes.
                 if (which == "career" && Object.FindFirstObjectByType<RobotBrawl.Phase0.BuilderManager>() == null)
                     RobotBrawl.Phase0.ModeSelect.StartCareer(true);
-                if (which == "career") RobotBrawl.Phase0.CareerSmoke.Run(); else touch = RobotBrawl.Phase0.TouchSmoke.Run();
+                if (which == "quick" && Object.FindFirstObjectByType<RobotBrawl.Phase0.BuilderManager>() == null)
+                    RobotBrawl.Phase0.ModeSelect.StartCareer(true);
+                if (which == "career") RobotBrawl.Phase0.CareerSmoke.Run();
+                else if (which == "quick") RobotBrawl.Phase0.QuickFightBench.Run();
+                else touch = RobotBrawl.Phase0.TouchSmoke.Run();
             }
             if (launched && Finished())
             {

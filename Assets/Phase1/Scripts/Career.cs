@@ -389,6 +389,11 @@ public static class CareerDB
     /// auto-dismissed or lost to a closed tab, any id still here at the next
     /// boot is granted on Load. Nothing is ever lost; only the reveal moves.</summary>
     public List<string> pendingRewards = new List<string>();
+    /// <summary>QUICK FIGHT (docs/CATS_Gap_Analysis_Plan_2026-09-07.md, steps 1-2):
+    /// 30-second bouts, 3 wins = a toolbox, 5 in a row = a crown, a DAILY CAP
+    /// on boxes instead of a wait timer. JsonUtility hands older saves zeros.</summary>
+    public int quickFights, quickWins, quickStreak, quickBestStreak, crowns, quickBoxesToday, quickWinsToBox;
+    public string quickBoxDay = "";
     public int fights; public int fightWins; public int sessions;   // telemetry
     public int tutorialStep;
     /// <summary>C4: index into stable of the robot being edited; -1 = none.</summary>
@@ -936,6 +941,20 @@ public static class Career
     public static void GrantReward(string id)
     {
         if (Data == null || id == null || !Data.pendingRewards.Remove(id)) return;
+        if (id.StartsWith("qbox:"))
+        {
+            // qbox:<scrap>:<partId>:<mat>:<count> - rolled at queue time, granted here
+            var f = id.Split(':');
+            int scrap, count;
+            if (f.Length == 5 && int.TryParse(f[1], out scrap) && int.TryParse(f[4], out count))
+            {
+                Txn(scrap, "toolbox");
+                AddItem(f[2], f[3], count);
+            }
+            uiDirtySeq++;
+            if (autosave) Save();
+            return;
+        }
         switch (id)
         {
             case "bolt":   Txn(10, "rookie checklist - first part bolted"); AddItem("beam", "Aluminum", 2); AddItem("plate", "Aluminum", 2); break;
@@ -951,6 +970,124 @@ public static class Career
     {
         if (Data == null) return;
         foreach (var id in Data.pendingRewards.ToArray()) GrantReward(id);
+    }
+    // ---- QUICK FIGHT ------------------------------------------------------
+    public const int QUICK_BOX_WINS = 3, QUICK_CROWN_STREAK = 5, QUICK_BOXES_PER_DAY = 6;
+    /// <summary>True while the fight on the floor is a Quick Fight (no contest,
+    /// 30-s clock, crusher walls). Set by BuilderManager.StartQuickFight.</summary>
+    public static bool quickFight;
+    public static int lastQuickPay;
+    public static string lastQuickLine = "";
+    public struct QuickOffer { public string oppId; public AiTier tier; public string armourMat; public string label; }
+    static string Today() { return System.DateTime.UtcNow.ToString("yyyy-MM-dd"); }
+    /// <summary>The furthest league the player has unlocked (0-based).</summary>
+    public static int FurthestLeague()
+    {
+        int f = 0;
+        for (int i = 0; i < CareerDB.Leagues.Length; i++) if (LeagueUnlocked(i)) f = i;
+        return f;
+    }
+    /// <summary>Three opponents to pick from, drawn from the roster around the
+    /// player's level and reseeded after every quick fight so the choice moves.</summary>
+    public static List<QuickOffer> QuickPool()
+    {
+        var pool = new List<QuickOffer>();
+        if (Data == null) return pool;
+        int lvl = FurthestLeague();
+        var rng = new System.Random(1000 + Data.quickFights * 7 + Data.quickWins * 3);
+        var ids = new List<string>();
+        foreach (var e in EnemyRoster.All) ids.Add(e.id);
+        string[] mats = { null, "Aluminum", "Steel", "Titanium", "Titanium" };
+        for (int k = 0; k < 3 && ids.Count > 0; k++)
+        {
+            int i = rng.Next(ids.Count);
+            string id = ids[i]; ids.RemoveAt(i);
+            // tier follows the league with a one-in-three chance of a step up
+            int t = Mathf.Clamp(lvl <= 0 ? 0 : lvl <= 2 ? 1 : 2, 0, 2);
+            if (rng.Next(3) == 0) t = Mathf.Min(2, t + 1);
+            var e = EnemyRoster.Find(id);
+            pool.Add(new QuickOffer { oppId = id, tier = (AiTier)t, armourMat = mats[Mathf.Clamp(lvl, 0, 4)],
+                                      label = e != null ? e.label : id.ToUpper() });
+        }
+        return pool;
+    }
+    /// <summary>Roll a toolbox: scrap by league, one part drop, +1 part per crown.
+    /// Encoded into the reward id so the grant is exact and self-describing:
+    /// qbox:&lt;scrap&gt;:&lt;partId&gt;:&lt;mat&gt;:&lt;count&gt;.</summary>
+    public static string QuickBoxRoll(int crownsUsed, out string[] lines)
+    {
+        int lvl = FurthestLeague();
+        var rng = new System.Random(unchecked(Data.quickFights * 31 + Data.quickWins * 17 + Data.crowns));
+        string[] parts = { "beam", "plate", "wedge", "gusset", "spike", "beamlong", "wheel", "battery", "cube" };
+        string[] mats  = { "Aluminum", "Aluminum", "Steel", "Steel", "Titanium" };
+        string part = parts[rng.Next(parts.Length)];
+        string mat = part == "wheel" ? "Rubber" : part == "gusset" ? "Steel" : mats[Mathf.Clamp(lvl, 0, 4)];
+        int count = 1 + crownsUsed;
+        int scrap = 40 + 30 * lvl + 20 * crownsUsed;
+        string id = "qbox:" + scrap + ":" + part + ":" + mat + ":" + count;
+        var lbl = P1PartDef.Palette();
+        string pname = part;
+        foreach (var d in lbl) if (d.id == part) { pname = d.label; break; }
+        lines = new[] { "+" + scrap + " SCRAP", count + " x " + pname.ToUpper() + " (" + mat + ")" };
+        return id;
+    }
+    /// <summary>Settle a Quick Fight: small purse, streak, box meter, crowns,
+    /// the rookie first-bout box - and the daily box cap, which is the whole
+    /// point: the RETURN comes from tomorrow's boxes, not from a timer.</summary>
+    public static void SettleQuickFight(bool win, float dealt)
+    {
+        if (Data == null) return;
+        int lvl = FurthestLeague();
+        int pay = win ? 20 + 10 * lvl + Mathf.RoundToInt(Mathf.Min(dealt, 300f) * 0.1f) : 5;
+        Txn(pay, (win ? "quick win" : "quick loss"));
+        lastQuickPay = pay;
+        Data.quickFights++;
+        Data.fights++;
+        if (Today() != Data.quickBoxDay) { Data.quickBoxDay = Today(); Data.quickBoxesToday = 0; }
+        string line;
+        if (win)
+        {
+            Data.quickWins++; Data.fightWins++;
+            Data.quickStreak++;
+            if (Data.quickStreak > Data.quickBestStreak) Data.quickBestStreak = Data.quickStreak;
+            Data.quickWinsToBox++;
+            bool crown = Data.quickStreak > 0 && Data.quickStreak % QUICK_CROWN_STREAK == 0;
+            if (crown) { Data.crowns++; RBTelemetry.Once(RBTelemetry.STREAK); }
+            if (Data.quickWinsToBox >= QUICK_BOX_WINS)
+            {
+                Data.quickWinsToBox = 0;
+                if (Data.quickBoxesToday < QUICK_BOXES_PER_DAY)
+                {
+                    Data.quickBoxesToday++;
+                    int use = Data.crowns; Data.crowns = 0;
+                    string[] lines;
+                    string id = QuickBoxRoll(use, out lines);
+                    QueueReward(id, use > 0 ? "CROWNED TOOLBOX" : "TOOLBOX",
+                                use > 0 ? "Five in a row. The crown made it heavier." : "Three wins. The Yard pays in parts.", lines);
+                    RBTelemetry.Once(RBTelemetry.BOX);
+                    line = "TOOLBOX EARNED  ·  " + Data.quickBoxesToday + "/" + QUICK_BOXES_PER_DAY + " today";
+                }
+                else line = "box cap reached - more toolboxes tomorrow  ·  streak " + Data.quickStreak;
+            }
+            else line = "streak " + Data.quickStreak + "  ·  " + (QUICK_BOX_WINS - Data.quickWinsToBox) + " more win" + (QUICK_BOX_WINS - Data.quickWinsToBox == 1 ? "" : "s") + " to a toolbox"
+                        + (crown ? "  ·  CROWN!" : "");
+        }
+        else
+        {
+            Data.quickStreak = 0;
+            line = "streak reset  ·  " + (QUICK_BOX_WINS - Data.quickWinsToBox) + " more win" + (QUICK_BOX_WINS - Data.quickWinsToBox == 1 ? "" : "s") + " to a toolbox";
+        }
+        lastQuickLine = line;
+        if (!Data.taskFight)
+        {
+            Data.taskFight = true;
+            QueueReward("fight", "FIRST BOUT", win ? "You fought. You won. Keep going." : "You fought. That is the part that counts.",
+                        "+10 SCRAP", "1 WEDGE", "1 GUSSET (weld kit)");
+        }
+        Data.scrapCurve.Add(Data.scrap);
+        if (Data.scrapCurve.Count > 200) Data.scrapCurve.RemoveAt(0);
+        uiDirtySeq++;
+        if (autosave) Save();
     }
     public static int lastPay;
     /// <summary>The medal SettleFight just minted, or null. Same one-shot

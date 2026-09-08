@@ -85,5 +85,8 @@ namespace RobotBrawl.Phase0
         public const string RETURN = "return";   // booted into an existing career
         public const string RESCUE = "rescue";   // first-defeat crate granted
         public const string FIGHT2 = "fight2";   // a SECOND fight started - retention in miniature
+        public const string QUICK  = "quick";    // first QUICK FIGHT started (the loop, 2026-09-07)
+        public const string BOX    = "box";      // first toolbox earned (3 quick wins)
+        public const string STREAK = "streak";   // first 5-win streak (a crown)
     }
 }

@@ -48,7 +48,9 @@ STEPS = [("open","opened the page"), ("ready","game became playable"),
          ("boot","scene first frame"),
          ("door","chose a door"), ("build","placed a part"),
          ("saved","founded a robot"), ("fight","started a fight"),
-         ("result","finished a fight"), ("return","came back later")]
+         ("result","finished a fight"),
+         ("quick","first QUICK FIGHT"), ("box","earned a toolbox"), ("streak","a 5-win streak"),
+         ("return","came back later")]
 total = len(ev)
 print(f"== Robot Brawl web funnel · last {os.environ['FRESH']} ==")
 if skipped: print(f"   ({skipped} hits from this machine excluded; pass --all to include)")
@@ -107,6 +109,13 @@ if notready:
     if errs:  print("     errored, kind:        " + ", ".join(f"{k} x{v}" for k,v in errs.most_common()))
     print(f"     silent (no leave, no error - the tab died?): {silent}")
 booted = sum(1 for s in ev.values() if "boot" in s)
+
+reloads = collections.Counter()
+for sid, s_ in ev.items():
+    if "reload" in s_: reloads[s_["reload"].get("at", "?")] += 1
+if reloads:
+    print("     same-tab reloads, by the phase the previous load reached:  " + ", ".join(f"{k} x{v}" for k, v in reloads.most_common()))
+    print("       (a reload at open/25/50/75/starting is a crash-or-abandon; at ready/boot it is a return)")
 readyn = sum(1 for s in ev.values() if "ready" in s)
 if readyn: print(f"   playable -> first scene frame: {booted}/{readyn}" + ("" if booted >= readyn else f"   ({readyn-booted} lost between the loader and the scene)"))
 

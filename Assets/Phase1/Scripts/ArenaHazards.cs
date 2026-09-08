@@ -531,7 +531,25 @@ public static class ArenaHazards
     {
         if (root != null) Object.Destroy(root);
         root = null;
+        crushing = false;
         HazardBase.ResetTally();
+    }
+    public static bool crushing;
+    /// <summary>Start the crusher walls (quick fights, last `seconds`). Safe
+    /// to call when no league hazards were built.</summary>
+    public static void StartCrush(float half, float seconds)
+    {
+        if (crushing) return;
+        crushing = true;
+        if (root == null) root = new GameObject("arena_hazards");
+        foreach (var sgn in new[] { 1f, -1f })
+        {
+            var go = new GameObject("crusher");
+            go.transform.SetParent(root.transform, false);
+            var c = go.AddComponent<CrusherHazard>();
+            c.half = half; c.seconds = seconds; c.sign = sgn;
+            c.Build();
+        }
     }
 
     static T Mk<T>(string name, Vector3 pos, float yaw, float scale, float phase) where T : HazardBase
@@ -636,6 +654,50 @@ public static class ArenaHazards
 }
 
 /// <summary>Static pillar: an obstacle, never a damager. Real collider.</summary>
+/// <summary>THE WALLS CLOSE IN (CATS's "walls of death", plan step 1): two
+/// kinematic slabs on the arena's X edges that drive inward over the last
+/// seconds of a QUICK FIGHT, so a 30-s bout never ends on the judges. They
+/// shove (kinematic body vs dynamic robots) and they hurt on contact.</summary>
+public class CrusherHazard : HazardBase
+{
+    public float half = 7f, seconds = 10f, sign = 1f;
+    float t;
+    Rigidbody rb;
+    public override bool Dangerous { get { return true; } }
+    public void Build()
+    {
+        var go = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        go.name = "crusher_slab";
+        go.transform.SetParent(transform, false);
+        go.transform.localScale = new Vector3(0.6f, 1.6f, half * 2f + 1f);
+        go.transform.localPosition = new Vector3(0f, 0.8f, 0f);
+        var r = go.GetComponent<Renderer>();
+        if (r != null) r.sharedMaterial = PartVisualFactory.HazardYellow;
+        rb = gameObject.AddComponent<Rigidbody>();
+        rb.isKinematic = true;
+        var relay = go.AddComponent<CrusherRelay>(); relay.owner = this;
+        transform.localPosition = new Vector3(sign * (half + 0.5f), 0f, 0f);
+        lastTelegraphAt = Time.time;   // the toast IS the telegraph
+    }
+    void FixedUpdate()
+    {
+        if (rb == null) return;
+        t += Time.fixedDeltaTime;
+        float k = Mathf.Clamp01(t / Mathf.Max(0.1f, seconds));
+        float x = Mathf.Lerp(half + 0.5f, 0.45f, k) * sign;
+        rb.MovePosition(new Vector3(x, 0f, 0f));
+    }
+    public void Contact(Collider other)
+    {
+        HitPart(other, 60f * Time.fixedDeltaTime * 8f, 1f);
+    }
+    class CrusherRelay : MonoBehaviour
+    {
+        public CrusherHazard owner;
+        void OnCollisionStay(Collision c) { if (owner != null) owner.Contact(c.collider); }
+    }
+}
+
 public class PillarHazard : HazardBase
 {
     public override bool Dangerous { get { return false; } }

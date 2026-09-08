@@ -4779,6 +4779,80 @@ public class BuilderManager : MonoBehaviour
     /// single authority), a ProgramRunner carrying the robot's SAVED program,
     /// the P3c ARMED banner, and the autonomy mark on a win. The opponent is
     /// untouched (roster AI). Same fee, purse, settlement, medals.</summary>
+    /// <summary>QUICK FIGHT (plan step 2): pick one of Career.QuickPool()'s three
+    /// offers (or -1 for the next random one), fight a 30-s bout with the
+    /// crusher walls, settle by streak and box meter. Autonomy when the active
+    /// robot carries a program, manual otherwise. No contest, no purse table.</summary>
+    bool quickNext;
+    string quickArmourMat;
+    public void StartQuickFight(int offer)
+    {
+        Career.fightAutonomous = false;
+        if (!Career.active || Career.Data == null) return;
+        EndScout();
+        string err = Validate();
+        if (err != null) { message = err; SfxSynth.Deny(); return; }
+        var lack = CareerShortfall();
+        if (lack.Count > 0) { message = "YOUR BUILD needs " + string.Join(", ", lack.ToArray()); SfxSynth.Deny(); return; }
+        {
+            int ar = Career.Data.activeRobot;
+            if (ar >= 0 && ar < Career.Data.stable.Count && !SaveWouldDraft)
+            {
+                string snapNow = SnapshotString();
+                if (Career.Data.stable[ar].snapshot != snapNow)
+                {
+                    Career.Data.stable[ar].snapshot = snapNow;
+                    if (Career.autosave) Career.Save();
+                }
+            }
+        }
+        var pool = Career.QuickPool();
+        if (pool.Count == 0) return;
+        if (offer < 0 || offer >= pool.Count) offer = new System.Random().Next(pool.Count);
+        var o = pool[offer];
+        RobotProgram autoProg = null;
+        bool autonomy = false;
+        if (Career.Data.activeRobot >= 0 && Career.Data.activeRobot < Career.Data.stable.Count)
+        {
+            string aTag; string aWhy = AutonomyBlocker(out aTag);
+            if (aWhy == null)
+            {
+                autoProg = RobotProgram.FromJson(Career.Data.stable[Career.Data.activeRobot].program);
+                autonomy = autoProg != null;
+            }
+        }
+        Career.fightBuildValue = BuildValueCareer();
+        var recipe = EnemyRoster.Recipe(o.oppId, palette, o.armourMat, false);
+        int ov = 0;
+        foreach (var p2 in recipe) ov += CareerDB.PartPrice(p2.def.id, p2.MatName());
+        Career.fightOppValue = ov;
+        Career.activeLeague = null; Career.activeContest = null;
+        Career.targetLeagueIdx = Career.FurthestLeague();
+        CrowdAudio.SetVenue(Career.targetLeagueIdx);
+        opponentId = o.oppId;
+        opponentTier = o.tier;
+        quickArmourMat = o.armourMat;
+        Progression.activeRungIndex = -1;
+        Progression.activeChallengeIdx = -1;
+        quickNext = true;
+        RobotBrawl.Phase0.RBTelemetry.Once(RobotBrawl.Phase0.RBTelemetry.QUICK);
+        StartFight();
+        quickNext = false;
+        if (mode != Mode.Fight) { Career.quickFight = false; FightManager.quickBout = false; return; }
+        if (autonomy && testRobot != null)
+        {
+            var afm = Object.FindFirstObjectByType<FightManager>();
+            if (afm != null)
+            {
+                afm.playerSource = ControlSource.Program;
+                var apr = testRobot.gameObject.AddComponent<ProgramRunner>();
+                apr.Init(testRobot, testDrive);
+                apr.program = autoProg;
+                Career.fightAutonomous = true;
+            }
+        }
+    }
+
     public void StartCareerFight(int li, int ci, bool autonomy)
     {
         Career.fightAutonomous = false;   // explicit every fight; set true only below
@@ -5376,6 +5450,11 @@ public class BuilderManager : MonoBehaviour
 
     public void StartFight()
     {
+        // A quick fight is a profile the FightManager reads at Setup; every
+        // other door through here (contest, ladder, exhibition) clears it.
+        // (First landed in EnterMatchArena by a matching anchor - the ladder's
+        // path, never this one - and the bench read a 90-s clock. 2026-09-07.)
+        Career.quickFight = quickNext; FightManager.quickBout = quickNext;
         // Funnel: reached the point of the game. Once per session, so a
         // player who fights ten times still counts as one who fought.
         RobotBrawl.Phase0.RBTelemetry.Once(RobotBrawl.Phase0.RBTelemetry.FIGHT);
@@ -5437,7 +5516,9 @@ public class BuilderManager : MonoBehaviour
         // player's build — its local drive dir is +Z, so LookRotation(-axis)
         // faces the player. Nothing about the opponent is privileged.
         var entry = EnemyRoster.Find(opponentId);
-        var recipe = EnemyRoster.Recipe(entry.id, palette);
+        var recipe = quickNext && !string.IsNullOrEmpty(quickArmourMat)
+                   ? EnemyRoster.Recipe(entry.id, palette, quickArmourMat, false)
+                   : EnemyRoster.Recipe(entry.id, palette);
         RaycastWheelDrive drv;
         aiRobot = SpawnBot(recipe, entry.label, axis * 4f,
                            Quaternion.LookRotation(-axis), Vector3.forward, out drv);
