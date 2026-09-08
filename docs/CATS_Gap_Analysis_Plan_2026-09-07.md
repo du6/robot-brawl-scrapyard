@@ -302,6 +302,26 @@ to control the rig itself" — a 4.8★ review).
 
 ---
 
+## Progress log
+
+**2026-09-07 — Steps 1, 2 and the Step 0 instrumentation, built and measured
+(`c95a1af`).** QUICK FIGHT is a door on the LEAGUE tab above the league
+board: three roster opponents around the player's league (reseeded after
+every fight), a 30-second bout with a 5-second count-out and the crusher
+walls closing over the last 10 s, a result card whose loud button is NEXT
+FIGHT, a purse of 20-60 scrap, 3 wins = a toolbox (one part drop + scrap,
+self-describing id, granted at the box's opening), 5 in a row = a crown
+that adds a part to the next box, and a cap of 6 boxes a day instead of a
+timer. Autonomy when the robot carries a program, manual otherwise.
+Measured: `QuickFightBench` 24/0 headless — the bout ended at 31.2 s with
+the walls in, meter/box/crown/cap/day-reset/ledger all hold; CareerSmoke at
+the control's floor; TouchSmoke 55/0; career save untouched. Funnel events
+`quick`, `box`, `streak` and a same-tab `reload` beacon (Safari crash vs
+return) with a `starting` milestone are in the script and the template.
+Not yet: Step 3 (real players' snapshots as opponents — the pool is the
+roster for now), the iOS build (2.2.1 is in review; Quick Fight goes into
+2.3.0 rather than another swap), and Poki/CrazyGames submissions (owen).
+
 ## Sources
 - Game Developer — "C.A.T.S. One Year Retrospective: turning fun concept into a hit" (ZeptoLab)
 - PocketGamer.biz — "Feline fighters: the making of ZeptoLab's C.A.T.S."
