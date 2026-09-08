@@ -1690,20 +1690,23 @@ public class MobileBuilderUI : MonoBehaviour
         // loop's door sits ABOVE the league board - three opponents, one tap,
         // a 30-second bout, and the meter that says what the next win earns.
         quickPanel = MkPanel("quickpanel", fightPanel.transform, new Color(0.08f, 0.10f, 0.14f, 0.96f));
-        var qle = quickPanel.AddComponent<LayoutElement>(); qle.minHeight = TouchRow() + 48f; qle.preferredHeight = TouchRow() + 48f;
+        var qle = quickPanel.AddComponent<LayoutElement>(); qle.minHeight = TouchRow() + 48f; qle.preferredHeight = TouchRow() + 48f; qle.flexibleHeight = 0f;
         var qv = quickPanel.AddComponent<VerticalLayoutGroup>(); qv.spacing = 4f; qv.padding = new RectOffset(8, 8, 6, 6);
         qv.childForceExpandWidth = true; qv.childForceExpandHeight = false;
         quickMeter = MkText("quickmeter", quickPanel.transform, "QUICK FIGHT  \u00b7  30-second bouts  \u00b7  3 wins = a toolbox", 13, TextAnchor.MiddleLeft);
         quickMeter.color = new Color(1f, 0.84f, 0.40f);
         quickMeter.gameObject.AddComponent<LayoutElement>().minHeight = 36f;
         var qrow = MkPanel("quickrow", quickPanel.transform, new Color(0f, 0f, 0f, 0f));
-        var qrl = qrow.AddComponent<LayoutElement>(); qrl.minHeight = TouchRow(); qrl.preferredHeight = TouchRow();
+        var qrl = qrow.AddComponent<LayoutElement>(); qrl.minHeight = TouchRow(); qrl.preferredHeight = TouchRow(); qrl.flexibleHeight = 0f;
         var qh = qrow.AddComponent<HorizontalLayoutGroup>(); qh.spacing = 6f; qh.childForceExpandWidth = true; qh.childForceExpandHeight = true;
         for (int qi = 0; qi < 3; qi++)
         {
             int idx = qi;
             var qb = MkButton("quick_" + qi, qrow.transform, "...", 14, () => { if (bm != null) bm.StartQuickFight(idx); });
             qb.GetComponent<Image>().color = new Color(0.55f, 0.30f, 0.75f, 1f);
+            // one touch row tall, no more: on the live site the three offers
+            // grew to ~4 rows and ate the league board (2026-09-07)
+            var qbl = qb.gameObject.AddComponent<LayoutElement>(); qbl.minHeight = TouchRow(); qbl.preferredHeight = TouchRow(); qbl.flexibleHeight = 0f; qbl.flexibleWidth = 1f;
             quickBtns[qi] = qb;
         }
         careerBoard = MkPanel("careerboard", fightPanel.transform, new Color(0f,0f,0f,0f));
