@@ -20,9 +20,13 @@ HERE="${0:A:h}"
 source "$HERE/asc_jwt_env.sh"
 IPA="${IPA:-/tmp/rb_b18/build/export/RobotBrawlBoltBlade.ipa}"
 API="https://api.appstoreconnect.apple.com/v1"
-VERSION="2.2.0"
+VERSION="${VERSION:-2.2.1}"   # 2.2.0 (build 21) went READY_FOR_SALE 2026-09-07; 2.2.1 = build 22
 BUILD_NO="${BUILD_NO:-19}"   # 18 shipped to review 2026-09-04; 19 swaps it in with the QA round-1 fixes
 read -r -d '' WHATS_NEW <<'EOF' || true
+Fixes from the first week of the Rookie Warm-Up: the fight results screen now fits every iPhone (the CLAIM & UPGRADE door was off the bottom edge), the guide opens the panel before it points at SAVE and tells you which save to pick, it never asks you to mount a part that is already on your robot, reward boxes wait for you and fit the screen, the count-out no longer resets when you ram a downed opponent, and no drive stick appears while your program is fighting.
+EOF
+# 2.2.0's notes, kept for the record:
+read -r -d '' WHATS_NEW_220 <<'EOF' || true
 The Rookie Warm-Up: a pre-built starter robot (SCRAPPER) that is ready to fight the moment you open the game, a step-by-step guide with a ghost hand that shows you where to tap, and reward boxes for your first bolt, first weld, first purchase and first fight. Lose your first fight and a rescue crate arrives with the parts to fix what went wrong. Plus: the build now loads your active robot at boot, and the workshop opens faster.
 EOF
 
