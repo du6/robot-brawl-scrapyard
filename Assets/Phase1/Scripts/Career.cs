@@ -1002,9 +1002,12 @@ public static class Career
         {
             int i = rng.Next(ids.Count);
             string id = ids[i]; ids.RemoveAt(i);
-            // tier follows the league with a one-in-three chance of a step up
+            // tier follows the league; ONE of the three may step up, and only
+            // from the Regional Circuit on (a Garage-League player was offered
+            // two Champions in three on the live site, 2026-09-07 - the loop
+            // wants winnable fights, the ladder is where the wall is)
             int t = Mathf.Clamp(lvl <= 0 ? 0 : lvl <= 2 ? 1 : 2, 0, 2);
-            if (rng.Next(3) == 0) t = Mathf.Min(2, t + 1);
+            if (k == 2 && lvl >= 2 && rng.Next(2) == 0) t = Mathf.Min(2, t + 1);
             var e = EnemyRoster.Find(id);
             pool.Add(new QuickOffer { oppId = id, tier = (AiTier)t, armourMat = mats[Mathf.Clamp(lvl, 0, 4)],
                                       label = e != null ? e.label : id.ToUpper() });
