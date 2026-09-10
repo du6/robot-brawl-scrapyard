@@ -118,7 +118,7 @@ public static class Progression
     static ProfileData data;
 
     static string FilePath()
-    { return Path.Combine(Application.persistentDataPath, "robotbrawl_profile.json"); }
+    { return Path.Combine(Application.persistentDataPath, "scrapyard_profile.json"); }
 
     public static ProfileData Data
     {

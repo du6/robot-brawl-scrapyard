@@ -479,7 +479,11 @@ public static class Career
         public static bool active;
     public static CareerData Data = new CareerData();
 
-    static string PathFile { get { return Application.persistentDataPath + "/robotbrawl_career.json"; } }
+    // SCRAPYARD (2026-09-09): its own file in its own folder. persistentDataPath
+    // already differs from Robot Brawl's (Unity derives it from company +
+    // product name, and the product is "Robot Brawl: Scrapyard"); the file
+    // name differs too so the two saves can never be confused for each other.
+    static string PathFile { get { return Application.persistentDataPath + "/scrapyard_save.json"; } }
 
     public static void Load()
     {

@@ -1,3 +1,53 @@
+# Robot Brawl: Scrapyard — working notes for Claude
+
+⚠ **THIS IS THE FORK, NOT ROBOT BRAWL.** `du6/robot-brawl-scrapyard`, forked
+from `du6/robot-brawl` at `1dc752e` (feature/scraplands, 2026-09-09) as a
+**separate game**: owen's "start with a rookie robot, drive a map, find
+crates, challenge parked robots, points on a board, log in only to
+challenge". The design — the whole game, the fork, what is deleted, what is
+shared, the milestones and the stop rule — is
+**`docs/Scrapyard_Design_2026-09-09.md`. READ IT FIRST.**
+
+What is different from the repo this was forked from, as of the fork:
+
+| | Robot Brawl: Bolt & Blade | **Scrapyard (this repo)** |
+|---|---|---|
+| local folder | `~/Setup Guide In-Editor Tutorial` | `~/robot-brawl-scrapyard` |
+| product / bundle | Robot Brawl: Bolt & Blade / `club.cyberduck.robotbrawl` | Robot Brawl: Scrapyard / `club.cyberduck.scrapyard`, version 0.1.0 build 1 |
+| save file | `…/owen/Robot Brawl_ Bolt & Blade/robotbrawl_career.json` | `…/owen/Robot Brawl_ Scrapyard/scrapyard_save.json` (+ `scrapyard_profile.json`) — a different folder AND a different name |
+| web | `cyberduck.club/play/rb/` | `cyberduck.club/play/scrapyard/`, beacon `/v1/beacon/scrapyard-play` (template still to be made — the WebGL template lives in `~/rb-webgl-spike`, not here) |
+| server | shared: one API, one DB, one worker | **the same server**, with `GET /v1/pool`, the `yard` ruleset and the `game` tag (deployed 2026-09-09). Server code lives in Robot Brawl's repo (`server/**`); this repo's copy is a snapshot and must not be deployed from |
+| git | side branches, never main | this repo's `main` IS the game; push by URL with the token in `.gh_token.local` (gitignored; never print it) |
+
+**The fight core is kept BYTE-IDENTICAL to Robot Brawl's** — `CompoundRobot`,
+`MatDB`, `RaycastWheelDrive`, `Actuator`, `DamageResolver`, `ProgramRunner`,
+`SensorBus`, `RobotProgram`, `RobotSnapshot`, `RobotCategory`, `MatchRunner`,
+`RobotWorker`, `FightWorkerLoop` — because the shared referee is built from
+Robot Brawl's repo and fights this game's robots. **Backport fixes, never
+features, in both directions, by commit reference.** A change to any file in
+that list is not done until it is in both repos with both suites green.
+
+**Owner state is sacred here too**, and it is a DIFFERENT file: Robot Brawl's
+career save must never be touched from this repo, and this game's save must
+survive every bench byte-identical. The rules below about `Career.Data`
+isolation and `Career.SuspendAutosave()` apply unchanged.
+
+**Day-one deletions** (design §2.2), one commit per system, benches green
+after each — status is tracked in the design doc's progress log: title
+screen / `ModeSelect` boot button · the five leagues, contests, medals ·
+`RookieGuide` and the ghost hand · the ARENA tab's sign-in wall · MANUAL
+FIGHT and TEST DRIVE as modes · the `RB_PORTAL` gate.
+
+---
+
+Everything below this line was inherited from Robot Brawl's `CLAUDE.md` at
+the fork and is still true of the shared code, the benches and the traps.
+Where it describes a system this game deletes, the deletion commit is the
+correction. Paths like `~/Setup Guide In-Editor Tutorial` refer to the
+OTHER repo.
+
+---
+
 # Robot Brawl: Bolt & Blade — working notes for Claude
 
 owen's physics robot construction/combat game. Unity 6.5 (6000.5.4f1),

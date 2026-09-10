@@ -78,7 +78,7 @@ namespace RobotBrawl.Editor
                 Debug.Log("[BuildAndroid] ⚠ DEBUG KEYSTORE — installable, benchable, NOT uploadable to Play.");
 
             Directory.CreateDirectory(outDir);
-            string artifact = Path.Combine(outDir, aab ? "robotbrawl.aab" : "robotbrawl.apk");
+            string artifact = Path.Combine(outDir, aab ? "scrapyard.aab" : "scrapyard.apk");
 
             var opts = new BuildPlayerOptions
             {

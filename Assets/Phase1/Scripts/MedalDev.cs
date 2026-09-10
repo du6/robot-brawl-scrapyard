@@ -39,8 +39,8 @@ public class MedalDev : MonoBehaviour
     readonly List<string> log = new List<string>();
     int shots;
 
-    static string CareerPath { get { return Path.Combine(Application.persistentDataPath, "robotbrawl_career.json"); } }
-    static string ProfilePath { get { return Path.Combine(Application.persistentDataPath, "robotbrawl_profile.json"); } }
+    static string CareerPath { get { return Path.Combine(Application.persistentDataPath, "scrapyard_save.json"); } }
+    static string ProfilePath { get { return Path.Combine(Application.persistentDataPath, "scrapyard_profile.json"); } }
 
     byte[] careerBak, profileBak;
     bool careerExisted, profileExisted, savedAutosave, savedFree;

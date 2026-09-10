@@ -544,6 +544,17 @@ Nothing in M0 is blocked.
 
 ## Progress log
 
+- **2026-09-09, late — M0 step 2 begun: THE FORK EXISTS.** `du6/robot-brawl-
+  scrapyard`, main = Robot Brawl's `1dc752e`, cloned to
+  `~/robot-brawl-scrapyard` with Robot Brawl removed as a remote. First
+  commit on the fork: identity — product "Robot Brawl: Scrapyard", bundle
+  `club.cyberduck.scrapyard`, 0.1.0 build 1, `scrapyard_save.json` and
+  `scrapyard_profile.json` (a different folder by construction: Unity
+  derives persistentDataPath from company + product), Android artifact
+  names, and a `CLAUDE.md` header that says what this repo is. Compiled
+  clean in batchmode (0 errors). Not yet: the day-one deletions (§2.2), the
+  web template (it lives in `~/rb-webgl-spike`, not in this repo), the
+  beacon path.
 - **2026-09-09, night — M0 step 1 DEPLOYED.** API image `20260909-203659`
   (migration 017 applied at boot, `/v1/pool` answering anonymously in
   production with real robots and no program key, the board badged by
