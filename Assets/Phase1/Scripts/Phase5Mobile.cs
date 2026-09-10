@@ -122,6 +122,15 @@ public class TouchControls : MonoBehaviour
     bool stickHeld, fireHeld;
     Vector2 anchor;        // floating stick anchor, input space (y up)
     Vector2 stickPos;
+    // THE ANCHOR IS WHERE THE PRESS BEGAN, NOT WHERE THE POINTER IS ON THE
+    // FIRST FRAME WE POLL IT (2026-09-10, measured with a pointer drive on the
+    // live page: a press-and-flick that moved before the first poll anchored
+    // at the END of the flick, so the throttle read zero and only the steer
+    // was left - the machine turned on the spot). A thumb does the same thing
+    // in miniature on a fast flick. For a mouse the pointer hovers before it
+    // presses, so the last unpressed position IS the press point; a touch
+    // cannot move before contact, so its first sample is right already.
+    Vector2 lastFree; bool lastFreeValid; bool mouseSample;
 
     // R4 finding 3: was a seventh copy of the dpi rule; now one rule, one place.
     static float S { get { return BuilderManager.GuiScale; } }
@@ -148,11 +157,19 @@ public class TouchControls : MonoBehaviour
                 if (c >= buf.Length) break;
                 if (t.press.isPressed) buf[c++] = t.position.ReadValue();
             }
-        if (c == 0 && (mouseTest || MouseAccepted) && Mouse.current != null && Mouse.current.leftButton.isPressed)
-            buf[c++] = Mouse.current.position.ReadValue();
+        mouseSample = false;
+        if (c == 0 && (mouseTest || MouseAccepted) && Mouse.current != null)
+        {
+            if (Mouse.current.leftButton.isPressed) { buf[c++] = Mouse.current.position.ReadValue(); mouseSample = true; }
+            else { lastFree = Mouse.current.position.ReadValue(); lastFreeValid = true; }
+        }
 #else
         for (int i = 0; i < Input.touchCount && c < buf.Length; i++) buf[c++] = Input.GetTouch(i).position;
-        if (c == 0 && (mouseTest || MouseAccepted) && Input.GetMouseButton(0)) buf[c++] = Input.mousePosition;
+        if (c == 0 && (mouseTest || MouseAccepted))
+        {
+            if (Input.GetMouseButton(0)) { buf[c++] = Input.mousePosition; mouseSample = true; }
+            else { lastFree = Input.mousePosition; lastFreeValid = true; }
+        }
 #endif
         return c;
     }
@@ -179,7 +196,14 @@ public class TouchControls : MonoBehaviour
             Vector2 p = pts[i];
             if (p.x < halfW && p.y < Screen.height * 0.7f)
             {
-                if (!stickHeld) anchor = p;   // floating stick: anchors where you touch
+                if (!stickHeld)
+                {
+                    // floating stick: anchors where the press BEGAN (see lastFree)
+                    anchor = p;
+                    if (mouseSample && lastFreeValid && (lastFree - p).magnitude < range * 1.5f
+                        && lastFree.x < halfW && lastFree.y < Screen.height * 0.7f)
+                        anchor = lastFree;
+                }
                 stickPos = p;
                 thr = Mathf.Clamp((p.y - anchor.y) / range, -1f, 1f);
                 str = Mathf.Clamp((p.x - anchor.x) / range, -1f, 1f);
