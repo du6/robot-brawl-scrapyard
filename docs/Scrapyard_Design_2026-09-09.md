@@ -544,6 +544,19 @@ Nothing in M0 is blocked.
 
 ## Progress log
 
+- **2026-09-10 — the league campaign is off the screen.** The LEAGUE tab's
+  board (trophy case, rookie checklist, five league headers, contest rows
+  with SCOUT / MANUAL FIGHT / AUTONOMY FIGHT) and the two sandbox buttons
+  (LADDER, EXHIBITION) are gone from the dock; the tab is Quick Fight
+  until the map replaces it. Deleted with them: MedalDev, R3Dev,
+  CareerShot, CareerBench, ChallengeBench. Kept as data: `Career.Leagues`,
+  `EnemyRoster`, medals and `doneContests` fields (saves still load;
+  `StartCareerFight` and the settle path are unreachable and go when the
+  map lands). Measured: compile 0 errors, TouchSmoke **55/0**,
+  QuickFightBench **24/0**. The day-one list (§2.2) is done as amended:
+  four deletions landed, TEST DRIVE deliberately kept (it is the map's
+  drive loop). Next: M0 step 3, the prototype yard grown out of
+  `StartTest()`.
 - **2026-09-10, small hours — day-one deletions, three of them.** On the
   fork: the `RB_PORTAL` gate (`e602c2c`), the Rookie Warm-Up guide
   (`db27aa0`), and the title screen + login gate + CareerSmoke (this

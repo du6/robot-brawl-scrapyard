@@ -141,8 +141,7 @@ public class MobileBuilderUI : MonoBehaviour
     string depositKey = System.Guid.NewGuid().ToString();
     bool cosmeticsBusy;
     // ---- C3: career league board ----
-    GameObject careerBoard; Transform careerBoardContent;
-    Button ladderBtn, exhibBtn, testDriveBtn;
+    Button testDriveBtn;
     GameObject quickPanel; Text quickMeter; readonly Button[] quickBtns = new Button[3];
     // ---- C4: workshop ----
     GameObject robotsPanel;
@@ -1613,12 +1612,6 @@ public class MobileBuilderUI : MonoBehaviour
         // R3 critic: TEST DRIVE's fixed height squeezed this two-line header
         // until it clipped - reserve its own two lines.
         var fil = fightInfo.gameObject.AddComponent<LayoutElement>(); fil.minHeight = 44f; fil.preferredHeight = 44f;
-        ladderBtn = MkButton("ladder", fightPanel.transform, "LADDER — next rung", 19, () => { if (bm != null) bm.StartLadderFight(); });
-        // with childForceExpandHeight off, a plain Button reports no preferred
-        // height at all and would collapse to nothing in the sandbox.
-        var lbl2 = ladderBtn.gameObject.AddComponent<LayoutElement>(); lbl2.minHeight = 40f; lbl2.preferredHeight = 40f;
-        exhibBtn = MkButton("exhib", fightPanel.transform, "EXHIBITION FIGHT", 19, () => { if (bm != null) { Progression.activeRungIndex = -1; Progression.activeChallengeIdx = -1; bm.StartFight(); } });
-        var ebl2 = exhibBtn.gameObject.AddComponent<LayoutElement>(); ebl2.minHeight = 40f; ebl2.preferredHeight = 40f;
         // R2 (critic finding 8): TEST DRIVE was a full-width bar and the single
         // brightest element on the campaign screen - a sandbox action outranking
         // the mode's core loop. It is now a small right-aligned secondary chip
@@ -1708,21 +1701,6 @@ public class MobileBuilderUI : MonoBehaviour
             var qbl = qb.gameObject.AddComponent<LayoutElement>(); qbl.minHeight = TouchRow(); qbl.preferredHeight = TouchRow(); qbl.flexibleHeight = 0f; qbl.flexibleWidth = 1f;
             quickBtns[qi] = qb;
         }
-        careerBoard = MkPanel("careerboard", fightPanel.transform, new Color(0f,0f,0f,0f));
-        var cbl = careerBoard.AddComponent<LayoutElement>(); cbl.flexibleHeight = 1f; cbl.minHeight = 90f;
-        var cbs = careerBoard.AddComponent<ScrollRect>(); cbs.horizontal = false; cbs.vertical = true;
-        var cbvp = MkPanel("cbviewport", careerBoard.transform, new Color(0f,0f,0f,0.15f));
-        var cbvprt = cbvp.GetComponent<RectTransform>(); Stretch(cbvprt);
-        cbvp.AddComponent<Mask>().showMaskGraphic = true;
-        var cbc = MkPanel("cbcontent", cbvp.transform, new Color(0f,0f,0f,0f));
-        var cbcrt = cbc.GetComponent<RectTransform>();
-        cbcrt.anchorMin = new Vector2(0f,1f); cbcrt.anchorMax = new Vector2(1f,1f); cbcrt.pivot = new Vector2(0.5f,1f); cbcrt.anchoredPosition = Vector2.zero;
-        cbcrt.sizeDelta = new Vector2(0f, 0f);   // R1 critic: rows clipped both screen edges
-        var cbclg = cbc.AddComponent<VerticalLayoutGroup>(); cbclg.spacing = 4f; cbclg.childForceExpandWidth = true; cbclg.childForceExpandHeight = false; cbclg.padding = new RectOffset(4,4,4,4);
-        var cbcsf = cbc.AddComponent<ContentSizeFitter>(); cbcsf.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
-        cbs.viewport = cbvprt; cbs.content = cbcrt;
-        AddListOverflow(careerBoard, cbs, cbvprt);   // R2 finding 8: LEAGUE
-        careerBoardContent = cbc.transform;
 
         // ⚠ LAST LINE OF THIS METHOD, AND IT MUST STAY LAST. See the TEST DRIVE
         // block above for why the button needs to be the final sibling: the
@@ -1768,12 +1746,9 @@ public class MobileBuilderUI : MonoBehaviour
     void RefreshFightTab()
     {
         bool car = Career.active;
-        if (ladderBtn != null) ladderBtn.gameObject.SetActive(!car);
-        if (exhibBtn != null) exhibBtn.gameObject.SetActive(!car);
         if (testDriveBtn != null) testDriveBtn.gameObject.SetActive(!car);
         if (quickPanel != null) quickPanel.SetActive(car);
         if (car) RefreshQuickPanel();
-        if (careerBoard != null) careerBoard.SetActive(car);
         if (car) RefreshCareerBoard();
     }
 
@@ -1855,125 +1830,15 @@ public class MobileBuilderUI : MonoBehaviour
                         + (d.crowns > 0 ? "  \u00b7  " + d.crowns + " crown" + (d.crowns == 1 ? "" : "s") + " banked" : "")
                         + cap;
     }
+    /// <summary>SCRAPYARD (2026-09-10): the league campaign board - trophy
+    /// case, rookie checklist, five league headers and their contest rows with
+    /// SCOUT / MANUAL FIGHT / AUTONOMY FIGHT - is GONE from this game. The
+    /// LEAGUE tab is Quick Fight until the map replaces the tab (design §3).
+    /// Career.Leagues and EnemyRoster stay as data: they are where the yard
+    /// bots are defined and QuickPool() draws from them.</summary>
     void RefreshCareerBoard()
     {
         RefreshQuickPanel();
-        if (careerBoardContent == null || bm == null) return;
-        fightGates.Clear();   // the rows below are about to be destroyed
-        for (int i = careerBoardContent.childCount - 1; i >= 0; i--)
-            Destroy(careerBoardContent.GetChild(i).gameObject);
-
-        // ---- THE TROPHY CASE LIVES HERE NOW (owen, 2026-08-10) -------------
-        // It had its own tab until ARENA took index 4. Moving it here rather
-        // than deleting it, because a medal is the LEAGUE's reward - "win
-        // every contest in a league and its champion medal lands here" - and
-        // a trophy case on its own tab is a room you visit to be told nothing
-        // has changed. On the board it is read on the way past, next to the
-        // contests that are still owed.
-        int medalsWon = Career.Data.medals.Count;
-        var tcase = MkText("trophycase", careerBoardContent,
-            medalsWon > 0
-                ? "* TROPHY CASE  \u00b7  " + medalsWon + " of " + CareerDB.Leagues.Length
-                  + " league campaigns won"
-                : "TROPHY CASE  \u00b7  no medals yet - sweep every contest in a league "
-                  + "to win its champion medal",
-            14, TextAnchor.MiddleLeft);
-        tcase.color = medalsWon > 0 ? new Color(1f, 0.87f, 0.46f) : new Color(0.72f, 0.78f, 0.88f);
-        tcase.gameObject.AddComponent<LayoutElement>().minHeight = 22f;
-
-        // ---- ROOKIE CHECKLIST (design 2026-09-03 §4E) ----------------------
-        // Six verbs, each once per career, four paying a fixed 10. It sits
-        // here until every line is done, then vanishes for good - its real
-        // job is not the scrap, it is that each line NAMES a verb the player
-        // has not tried yet. All state is CareerData flags; nothing repeats.
-        var ckd = Career.Data;
-        bool ckAll = ckd.taskFight && ckd.taskBolt && ckd.taskWeld && ckd.taskBuy
-                     && ckd.fightWins > 0 && ckd.medals.Count > 0;
-        if (!ckAll)
-        {
-            var ckSb = new System.Text.StringBuilder("ROOKIE CHECKLIST - earn while you learn");
-            ckSb.Append(ckd.taskFight ? "\n \u2713 fight a bout" : "\n \u25cb fight a bout  (+10 scrap)");
-            ckSb.Append(ckd.taskBolt  ? "\n \u2713 bolt on a part" : "\n \u25cb bolt on a part  (+10 scrap)");
-            ckSb.Append(ckd.taskWeld  ? "\n \u2713 weld a seam with a gusset" : "\n \u25cb weld a seam with a gusset  (+10 scrap)");
-            ckSb.Append(ckd.taskBuy   ? "\n \u2713 buy a part in the SHOP" : "\n \u25cb buy a part in the SHOP  (+10 scrap)");
-            ckSb.Append(ckd.fightWins > 0 ? "\n \u2713 win a contest" : "\n \u25cb win a contest  (the purse)");
-            ckSb.Append(ckd.medals.Count > 0 ? "\n \u2713 sweep the league" : "\n \u25cb sweep the league  (champion medal)");
-            var ck = MkText("rookiechecklist", careerBoardContent, ckSb.ToString(), 13, TextAnchor.UpperLeft);
-            ck.color = new Color(1f, 0.84f, 0.40f);
-            ck.gameObject.AddComponent<LayoutElement>().minHeight = 7 * 20f;
-        }
-
-        for (int li = 0; li < CareerDB.Leagues.Length; li++)
-        {
-            var lg = CareerDB.Leagues[li];
-            bool open = Career.LeagueUnlocked(li);
-            // The medal rides on its own league's header. Everything the old
-            // trophy row said that is not already on this line - who won it,
-            // their record, when - goes in the second line, and only when
-            // there is a medal to describe.
-            var medal = Career.MedalFor(li);
-            var hdr = MkText("lg_" + li, careerBoardContent,
-                string.Format("{0}{1}{2} \u00b7 {3} \u00b7 cap {4} kg \u00b7 {5}{6}",
-                    open ? "" : "[locked] ", medal != null ? "* " : "",
-                    lg.name, lg.arenaName, Mathf.RoundToInt(lg.weightCap),
-                    ArenaHazards.Summary(lg.arenaId),
-                    medal != null
-                        ? "\n    CHAMPION \u00b7 " + medal.robot + " " + medal.wins + "-" + medal.losses
-                          + " \u00b7 " + medal.contests + " contest" + (medal.contests == 1 ? "" : "s")
-                          + " swept \u00b7 " + medal.when
-                        : ""),
-                14, TextAnchor.MiddleLeft);
-            hdr.color = medal != null ? new Color(1f, 0.87f, 0.46f)
-                      : open         ? new Color(0.80f,0.88f,1f)
-                                     : new Color(0.55f,0.55f,0.60f);
-            hdr.gameObject.AddComponent<LayoutElement>().minHeight = medal != null ? 38f : 20f;
-            if (!open) continue;
-            for (int ci = 0; ci < lg.contests.Length; ci++)
-            {
-                int lidx = li, cidx = ci;
-                var c = lg.contests[ci];
-                bool done = Career.Data.doneContests.Contains(c.id);
-                // P4: * = ever won this contest AUTONOMOUSLY (owen's "shared
-                // contests, tracked separately" - the mark is the record).
-                bool autoDone = Career.Data.autoDoneContests.Contains(c.id);
-                var row = MkPanel("contest_" + c.id, careerBoardContent, new Color(0.10f,0.11f,0.14f,1f));
-                var rle = row.AddComponent<LayoutElement>(); rle.minHeight = TouchRow(); rle.preferredHeight = TouchRow();
-                var rh = row.AddComponent<HorizontalLayoutGroup>(); rh.spacing = 4f; rh.childForceExpandHeight = true; rh.childForceExpandWidth = false; rh.padding = new RectOffset(6,4,2,2);
-                if (autoDone) AutoMark(row.transform, c.id);
-                // First-win rule (owen, 2026-08-13): a beaten contest is a
-                // practice bout - the row says so instead of quoting a purse
-                // that will not be paid. Entry fees no longer exist anywhere
-                // (owen, same day), so no row mentions one.
-                var lbl = MkText("lbl", row.transform,
-                    done
-                        ? string.Format("+ {0} ({1}) \u00b7 practice - no purse",
-                            EnemyRoster.Find(c.oppId).label, c.tier)
-                        : string.Format("{0} ({1}) \u00b7 {2} scrap",
-                            EnemyRoster.Find(c.oppId).label, c.tier, c.purse),
-                    14, TextAnchor.MiddleLeft);
-                lbl.gameObject.AddComponent<LayoutElement>().flexibleWidth = 1f;
-                // R5 (critic finding 8): the header says "SCOUT shows the
-                // opponent", the status bar says "SCOUT first, then FIGHT", and
-                // the row used to lay the buttons out FIGHT | SCOUT in matching
-                // grey. Free and reversible reads first and primary; the one
-                // that spends an entry fee reads second and committed.
-                var scb = MkButton("cscout_" + c.id, row.transform, "SCOUT", 14, () => { if (bm != null) bm.StartScout(lidx, cidx); });
-                scb.gameObject.AddComponent<LayoutElement>().minWidth = 72f;
-                scb.GetComponent<Image>().color = new Color(0.20f,0.45f,0.65f,1f);
-                // P4 (owen 2026-08-06): FIGHT splits into MANUAL FIGHT and
-                // AUTONOMY FIGHT — same contest, same purse; autonomy hands
-                // the robot to its saved program and kills the keyboard.
-                var fb = MkButton("cfight_" + c.id, row.transform, "MANUAL FIGHT", 14, () => { if (bm != null) bm.StartCareerFight(lidx, cidx); });
-                fb.gameObject.AddComponent<LayoutElement>().minWidth = 118f;
-                fb.GetComponent<Image>().color = FIGHT_OK;
-                var ab = MkButton("cauto_" + c.id, row.transform, "AUTONOMY FIGHT", 14, () => { if (bm != null) bm.StartCareerFight(lidx, cidx, true); });
-                ab.gameObject.AddComponent<LayoutElement>().minWidth = 132f;
-                ab.GetComponent<Image>().color = AUTO_OK;
-                fightGates.Add(new FightGate { btn = fb, img = fb.GetComponent<Image>(),
-                                               abtn = ab, aimg = ab.GetComponent<Image>(),
-                                               lbl = lbl, baseLabel = lbl.text, li = lidx, ci = cidx });
-            }
-        }
     }
 
     void BuildGarageTab()
@@ -4913,7 +4778,7 @@ public class MobileBuilderUI : MonoBehaviour
     public int CurrentTab { get { return tab; } }
     void ConsumePendingTab()
     {
-        if (pendingTab < 0 || bm == null || careerBoardContent == null) return;
+        if (pendingTab < 0 || bm == null || quickPanel == null) return;   // the fight tab is built
         int t = pendingTab; pendingTab = -1;
         SetDockOpen(true);
         ShowTab(t);
