@@ -128,6 +128,17 @@ namespace RobotBrawl.Editor
             string resDir = Path.Combine(Application.dataPath, "Resources");
             string hidDir = Path.Combine(Application.dataPath, "Resources~");
             bool hid = false;
+            // A KILLED BUILD LEAVES THE FOLDER HIDDEN (2026-09-10: the system
+            // killed a batchmode build for memory and `finally` never ran, so
+            // Assets/Resources~ sat there and the next build would have shipped
+            // iOS without its music). Recover first, then hide again.
+            if (Directory.Exists(hidDir) && !Directory.Exists(resDir))
+            {
+                Directory.Move(hidDir, resDir);
+                if (File.Exists(hidDir + ".meta")) File.Move(hidDir + ".meta", resDir + ".meta");
+                Debug.LogWarning("[BuildWebGL] Assets/Resources~ was left behind by an interrupted build - restored");
+                AssetDatabase.Refresh();
+            }
             if (Directory.Exists(resDir) && !Directory.Exists(hidDir))
             {
                 Directory.Move(resDir, hidDir);
