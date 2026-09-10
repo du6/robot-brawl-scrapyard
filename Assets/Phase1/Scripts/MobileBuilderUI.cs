@@ -143,6 +143,18 @@ public class MobileBuilderUI : MonoBehaviour
     // ---- C3: career league board ----
     GameObject careerBoard; Transform careerBoardContent;
     Button ladderBtn, exhibBtn, testDriveBtn;
+    /// <summary>PORTAL BUILD (RB_PORTAL, 2026-09-08). CrazyGames' account rules
+    /// say plainly that an in-game email login is not allowed, and their Basic
+    /// Launch table repeats it as "no external login options". ARENA is our
+    /// ladder sign-in, so a portal build drops the tab whole - which also
+    /// removes every external ladder request from that build. Inert everywhere
+    /// else: the define is only set by BuildWebGL.BuildPortal.</summary>
+#if RB_PORTAL
+    public const bool ARENA_OFF = true;
+#else
+    public const bool ARENA_OFF = false;
+#endif
+    const int TAB_ARENA = 4;
     GameObject quickPanel; Text quickMeter; readonly Button[] quickBtns = new Button[3];
     // ---- C4: workshop ----
     GameObject robotsPanel;
@@ -2812,9 +2824,11 @@ public class MobileBuilderUI : MonoBehaviour
         // anyway. What it uniquely showed - which robot was holding what - it
         // stopped being able to say when designs stopped holding parts.
         int n = Career.active ? 6 : 3;   // P3a: +PROGRAM in career
+        int visN = ARENA_OFF && n > TAB_ARENA ? n - 1 : n;
+        int vi = 0;
         for (int i = 0; i < tabBtns.Count; i++)
         {
-            bool show = i < n;
+            bool show = i < n && !(ARENA_OFF && i == TAB_ARENA);
             tabBtns[i].gameObject.SetActive(show);
             if (!show) continue;
             var rt = tabBtns[i].GetComponent<RectTransform>();
@@ -2824,8 +2838,9 @@ public class MobileBuilderUI : MonoBehaviour
             // tabs — BUILD and whatever is last (TROPHIES then, ARENA now) — were
             // the two sitting underneath it.
             // Dividing 0..1 evenly is only correct on a rectangle.
-            rt.anchorMin = new Vector2(Mathf.Lerp(safeFracL, safeFracR, i / (float)n), 1f);
-            rt.anchorMax = new Vector2(Mathf.Lerp(safeFracL, safeFracR, (i + 1) / (float)n), 1f);
+            rt.anchorMin = new Vector2(Mathf.Lerp(safeFracL, safeFracR, vi / (float)visN), 1f);
+            rt.anchorMax = new Vector2(Mathf.Lerp(safeFracL, safeFracR, (vi + 1) / (float)visN), 1f);
+            vi++;
         }
         // C4: the workshop renames FIGHT/GARAGE in career mode
         var tl1 = tabBtns.Count > 1 ? tabBtns[1].GetComponentInChildren<Text>() : null;
@@ -4944,6 +4959,7 @@ public class MobileBuilderUI : MonoBehaviour
     public void ShowTab(int i)
     {
         if (i >= 3 && !Career.active) i = 0;   // SHOP/PARTS are career-only
+        if (ARENA_OFF && i == TAB_ARENA) i = 0;   // portal build: no ladder tab
         tab = i;
         armSell = -1;
         retireArmM = -1;
