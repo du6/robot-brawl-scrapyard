@@ -139,6 +139,16 @@ namespace RobotBrawl.Phase0
             int items1 = 0; foreach (var it in d.inventory) items1 += it.count;
             Check(d.scrap > scrap0 && items1 > items0, "...and it paid scrap and a part at once (+" + (d.scrap - scrap0) + " scrap, +" + (items1 - items0) + " part)");
             Check(RBTelemetry.Has(RBTelemetry.CRATE), "...and the funnel hears `crate`");
+            var burst = GameObject.Find("treasure_burst");
+            int coins = 0; if (burst != null) foreach (var tr in burst.GetComponentsInChildren<Transform>()) if (tr.name == "coin") coins++;
+            Check(burst != null && coins == 10, "...coins fly from the chest where it stood (" + coins + ")");
+            Check(burst != null && burst.GetComponentInChildren<BuilderManager.RiseAndTurn>() != null, "...and the part rises out of it");
+            var thumb = RewardThumb.Render("beam", "Aluminum", 64);
+            Check(thumb != null && thumb.width == 64 && thumb.height == 64, "a reward's picture renders to a 64 px texture (the part built by the game's own visual factory)");
+            var coinsTex = RewardThumb.Render("coins", null, 64);
+            Check(coinsTex != null && coinsTex.width == 64, "...and scrap's picture is a coin stack");
+            if (thumb != null) Object.Destroy(thumb); if (coinsTex != null) Object.Destroy(coinsTex);
+            Check(GameObject.Find("reward_studio") == null, "...and the studio is torn down after the photograph");
             Check(d.worldOpened.Count == 1 && d.worldOpened[0].Contains(":"), "...and the save remembers which crate, by chunk (" + d.worldOpened[0] + ")");
             bm.LeaveMap(); yield return null;
             bm.EnterMap(); yield return null; yield return null;

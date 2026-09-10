@@ -568,13 +568,16 @@ public partial class BuilderManager
         var g = c.crates[i];
         if (g == null) return;
         c.crates[i] = null;
+        Vector3 chestAt = g.transform.position;
         Object.Destroy(g);
         if (Career.Data != null && !Career.Data.worldOpened.Contains(c.crateKeys[i])) Career.Data.worldOpened.Add(c.crateKeys[i]);
         string[] lines;
         string id = Career.QuickBoxRoll(0, out lines);
-        Career.QueueReward(id, "CRATE", "found in the wastes", lines);   // editor: granted at once; device: the box opens here
+        var idf = id.Split(':');
+        SpawnTreasureBurst(chestAt, idf.Length == 5 ? idf[2] : null, idf.Length == 5 ? idf[3] : null);
+        Career.QueueReward(id, "TREASURE", "found in the wastes", lines);   // editor: granted at once; device: the box opens here
         if (Career.autosave) Career.Save();
-        yardToast = "CRATE  ·  " + string.Join("  ·  ", lines);
+        yardToast = "TREASURE  ·  " + string.Join("  ·  ", lines);
         yardToastT = 3.5f;
         SfxSynth.Place();
         RBTelemetry.Once(RBTelemetry.CRATE);
@@ -701,7 +704,7 @@ public partial class BuilderManager
             Vector3 nearestCrate = Vector3.zero; float best = float.MaxValue; bool any = false;
             foreach (var c in chunks.Values) foreach (var g in c.crates) if (g != null)
             { float d = (g.transform.position - me).sqrMagnitude; if (d < best) { best = d; nearestCrate = g.transform.position; any = true; } }
-            sb.Append(any ? Bearing("CRATE", nearestCrate - me, fwd) : "no crate in sight - drive on");
+            sb.Append(any ? Bearing("TREASURE", nearestCrate - me, fwd) : "no treasure in sight - drive on");
             var en = NearestEnemy(me);
             if (en != null) sb.Append("     ").Append(Bearing(en.name.ToUpper(), en.rb.position - me, fwd));
             sb.Append("     ").Append(Bearing("HOME", homePos - me, fwd));

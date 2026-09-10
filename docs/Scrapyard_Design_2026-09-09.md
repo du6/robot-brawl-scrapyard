@@ -552,6 +552,19 @@ Nothing in M0 is blocked.
 
 ## Progress log
 
+- **2026-09-10 — TREASURE (owen: "treasure box doesn't look like treasure
+  right now… when a part is acquired, we should display the image of the
+  part in addition to text. for scraps we should show something like
+  coins").** In the world the crate is now a **chest**: dark body, domed
+  lid, gold bands, a lit clasp, light in the seam, the beam. Driving into
+  it: **ten coins fly and the part itself rises out of the chest and
+  turns** (`SpawnTreasureBurst`). In the reward panel every line carries a
+  **picture**: the part, built by the game's own `PartVisualFactory` in a
+  studio 500 m under the world and photographed once into a texture
+  (`RewardThumb.Render`), or a **coin stack** for scrap. No image assets
+  anywhere. **Measured: MapBench 59/0** (coins fly, the part rises, a
+  64 px picture renders for a beam and for coins, the studio is torn down
+  the same frame).
 - **2026-09-10 — LEAGUE and ARENA tabs removed (owen).** The dock strip
   is BUILD · GARAGE · SHOP with **DRIVE OUT** at its right end, visible
   from every tab; indices 1 and 4 stay allocated and hidden (CLAUDE.md's

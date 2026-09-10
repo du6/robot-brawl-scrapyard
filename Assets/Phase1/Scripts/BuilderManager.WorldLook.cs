@@ -291,21 +291,76 @@ public partial class BuilderManager
         SpawnStructure(parent, 0, homePos.x + 7f, homePos.z + 4f, TerrainHeight(homePos.x + 7f, homePos.z + 4f), rng);
     }
 
-    /// <summary>A crate is a supply pod: a dark shell with an amber band and a
-    /// beam you can see from a way off.</summary>
+    /// <summary>A TREASURE CHEST (owen, 2026-09-10: "treasure box doesn't look
+    /// like treasure right now"): a dark chest with a domed lid, gold bands, a
+    /// lit clasp, a glowing seam, and the beam you can see from a way off.</summary>
+    Material matChest, matChestLid, matGold;
     GameObject MakePod(Transform parent, float x, float gy, float z, string key)
     {
-        var pod = GameObject.CreatePrimitive(PrimitiveType.Cube);
-        pod.name = "crate " + key;
-        pod.transform.SetParent(parent, false);
-        pod.transform.position = new Vector3(x, gy + 0.4f, z);
-        pod.transform.rotation = Quaternion.Euler(0f, 25f, 0f);
-        pod.transform.localScale = new Vector3(1.0f, 0.8f, 0.8f);
-        pod.GetComponent<Renderer>().sharedMaterial = matPod;
-        Object.Destroy(pod.GetComponent<Collider>());     // you drive INTO it
-        Prim(PrimitiveType.Cube, pod.transform, Vector3.zero, new Vector3(1.04f, 0.16f, 0.84f), Quaternion.identity, matAmber, false);
-        Prim(PrimitiveType.Cylinder, pod.transform, new Vector3(0f, 3.0f, 0f), new Vector3(0.10f, 2.4f, 0.12f), Quaternion.identity, matAmber, false);
-        return pod;
+        if (matChest == null)
+        {
+            matChest = PartVisualFactory.Mat(new Color(0.30f, 0.19f, 0.11f), 0.15f, 0.35f);
+            matChestLid = PartVisualFactory.Mat(new Color(0.40f, 0.26f, 0.14f), 0.15f, 0.40f);
+            matGold = PartVisualFactory.Emissive(new Color(0.95f, 0.72f, 0.20f), new Color(0.9f, 0.6f, 0.1f) * 0.5f, 0.9f, 0.7f);
+        }
+        var chest = new GameObject("crate " + key);
+        chest.transform.SetParent(parent, false);
+        chest.transform.position = new Vector3(x, gy, z);
+        chest.transform.rotation = Quaternion.Euler(0f, 25f, 0f);
+        var t = chest.transform;
+        Prim(PrimitiveType.Cube, t, new Vector3(0f, 0.32f, 0f), new Vector3(1.15f, 0.62f, 0.78f), Quaternion.identity, matChest, false);
+        Prim(PrimitiveType.Cylinder, t, new Vector3(0f, 0.63f, 0f), new Vector3(0.78f, 0.575f, 0.78f), Quaternion.Euler(0f, 0f, 90f), matChestLid, false);   // the domed lid, lying along x
+        Prim(PrimitiveType.Cube, t, new Vector3(-0.36f, 0.45f, 0f), new Vector3(0.10f, 0.95f, 0.82f), Quaternion.identity, matGold, false);
+        Prim(PrimitiveType.Cube, t, new Vector3(0.36f, 0.45f, 0f), new Vector3(0.10f, 0.95f, 0.82f), Quaternion.identity, matGold, false);
+        Prim(PrimitiveType.Cube, t, new Vector3(0f, 0.60f, 0.40f), new Vector3(0.18f, 0.20f, 0.08f), Quaternion.identity, matAmber, false);   // the clasp
+        Prim(PrimitiveType.Cube, t, new Vector3(0f, 0.625f, 0.395f), new Vector3(1.10f, 0.03f, 0.02f), Quaternion.identity, matAmber, false);  // light in the seam
+        Prim(PrimitiveType.Cylinder, t, new Vector3(0f, 3.2f, 0f), new Vector3(0.10f, 2.2f, 0.12f), Quaternion.identity, matAmber, false);  // the beam
+        return chest;
+    }
+
+    /// <summary>What you SEE when a chest opens where it stands: coins fly,
+    /// and the part itself rises out of it and turns for a moment.</summary>
+    void SpawnTreasureBurst(Vector3 at, string partId, string mat)
+    {
+        if (matGold == null) matGold = PartVisualFactory.Emissive(new Color(0.95f, 0.72f, 0.20f), new Color(0.9f, 0.6f, 0.1f) * 0.5f, 0.9f, 0.7f);
+        var root = new GameObject("treasure_burst");
+        if (worldRoot != null) root.transform.SetParent(worldRoot.transform, true);
+        root.transform.position = at;
+        var rng = new System.Random(unchecked((int)(at.x * 31f + at.z * 17f)));
+        for (int i = 0; i < 10; i++)
+        {
+            var coin = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+            coin.name = "coin";
+            coin.transform.SetParent(root.transform, false);
+            coin.transform.localPosition = new Vector3(0f, 0.7f, 0f);
+            coin.transform.localScale = new Vector3(0.22f, 0.02f, 0.22f);
+            coin.GetComponent<Renderer>().sharedMaterial = matGold;
+            var rb = coin.AddComponent<Rigidbody>();
+            rb.mass = 0.05f;
+            rb.linearVelocity = new Vector3((float)rng.NextDouble() * 4f - 2f, 4f + (float)rng.NextDouble() * 3f, (float)rng.NextDouble() * 4f - 2f);
+            rb.angularVelocity = new Vector3((float)rng.NextDouble() * 20f, (float)rng.NextDouble() * 20f, (float)rng.NextDouble() * 20f);
+        }
+        if (!string.IsNullOrEmpty(partId))
+        {
+            var model = RewardThumb.BuildModel(root.transform, partId, mat);
+            model.transform.localPosition = new Vector3(0f, 0.9f, 0f);
+            var rise = model.AddComponent<RiseAndTurn>();
+            rise.life = 2.4f;
+        }
+        Object.Destroy(root, 3.0f);
+    }
+
+    /// <summary>The part that rises out of an opened chest.</summary>
+    public class RiseAndTurn : MonoBehaviour
+    {
+        public float life = 2.4f; float t;
+        void Update()
+        {
+            t += Time.deltaTime;
+            transform.localPosition += Vector3.up * 0.9f * Time.deltaTime;
+            transform.Rotate(0f, 120f * Time.deltaTime, 0f, Space.World);
+            if (t > life) Destroy(gameObject);
+        }
     }
 }
 }

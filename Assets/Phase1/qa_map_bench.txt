@@ -29,6 +29,11 @@ PASS  leaving and re-entering gives the same world (the seed persists)
 PASS  driving into a crate opens it (20 of 21 left)
 PASS  ...and it paid scrap and a part at once (+40 scrap, +1 part)
 PASS  ...and the funnel hears `crate`
+PASS  ...coins fly from the chest where it stood (10)
+PASS  ...and the part rises out of it
+PASS  a reward's picture renders to a 64 px texture (the part built by the game's own visual factory)
+PASS  ...and scrap's picture is a coin stack
+PASS  ...and the studio is torn down after the photograph
 PASS  ...and the save remembers which crate, by chunk (0,0:0)
 PASS  an opened crate never respawns (20)
 PASS  400 m out, the world is still 25 chunks around you (25)
@@ -36,7 +41,7 @@ PASS  ...and you are on the ground there (y -0.8 vs ground -1.0)
 PASS  the card comes up within 4 m of the parked bot
 PASS  ...and the funnel hears `meet`
 PASS  drive away and the card folds - decline is free
-      trace: 4.7s yaw 0 steer 0.00 thr 0.00 v 0.2 | 5.1s yaw 0 steer -0.01 thr 1.00 v 2.5 | 5.5s yaw 0 steer 0.00 thr 1.00 v 5.1 | 5.9s yaw 0 steer 0.00 thr 1.00 v 6.4 | 6.3s yaw 0 steer 0.00 thr 1.00 v 6.3 | 
+      trace: 4.9s yaw 0 steer 0.00 thr 0.00 v 0.2 | 5.3s yaw 0 steer -0.01 thr 1.00 v 2.4 | 5.7s yaw 0 steer 0.00 thr 1.00 v 5.2 | 6.2s yaw 0 steer 0.00 thr 1.00 v 6.4 | 6.5s yaw 0 steer 0.00 thr 1.00 v 6.3 | 
 PASS  full throttle for 2 s moves the machine (9.5 m)
 PASS  ...and with the stick inside the dead zone it holds its heading (0.1 deg)
 PASS  ...the dead zone reads as zero stick; only the heading hold steers (0.00)

@@ -54,6 +54,10 @@ namespace RobotBrawl.Phase0
         Button claim;
         readonly List<Text> lines = new List<Text>();
         readonly List<Vector2> lineHome = new List<Vector2>();
+        // SCRAPYARD (owen, 2026-09-10): a PICTURE beside each line - the part
+        // itself, photographed by RewardThumb, or a coin stack for scrap.
+        readonly List<RawImage> lineImgs = new List<RawImage>();
+        readonly List<Texture2D> lineTex = new List<Texture2D>();
         Font font;
         static Sprite white;
 
@@ -143,7 +147,34 @@ namespace RobotBrawl.Phase0
                 Place(l.rectTransform, 0f, 10f * k, 700f * k, 34f * k);
                 lines.Add(l);
                 // first (biggest) line highest; the rest stack downward toward the lid
-                lineHome.Add(new Vector2(0f, (140f - 30f * i) * k * v));
+                lineHome.Add(new Vector2(0f, (140f - 38f * i) * k * v));
+                // which picture: "+N SCRAP" is coins; a part line is that part
+                string thumbId = null, thumbMat = null;
+                string ln = pop.lines[i];
+                if (ln.StartsWith("+") && ln.Contains("SCRAP")) thumbId = "coins";
+                else if (pop.id != null && pop.id.StartsWith("qbox:"))
+                {
+                    var f = pop.id.Split(':');
+                    if (f.Length == 5) { thumbId = f[2]; thumbMat = f[3]; }
+                }
+                RawImage img = null; Texture2D tex = null;
+                if (thumbId != null)
+                {
+                    tex = RewardThumb.Render(thumbId, thumbMat, Mathf.RoundToInt(96f * k));
+                    if (tex != null)
+                    {
+                        var igo = new GameObject("thumb" + i, typeof(RectTransform));
+                        igo.transform.SetParent(l.transform, false);
+                        img = igo.AddComponent<RawImage>();
+                        img.texture = tex; img.raycastTarget = false;
+                        img.color = new Color(1f, 1f, 1f, 0f);
+                        var irt = img.rectTransform;
+                        irt.anchorMin = irt.anchorMax = new Vector2(0.5f, 0.5f);
+                        irt.sizeDelta = new Vector2(44f * k, 44f * k);
+                        irt.anchoredPosition = Vector2.zero;   // set beside the text at reveal, once its width is known
+                    }
+                }
+                lineImgs.Add(img); lineTex.Add(tex);
             }
 
             // CLAIM - appears once revealed.
@@ -164,6 +195,7 @@ namespace RobotBrawl.Phase0
 
         void OnDestroy()
         {
+            foreach (var tx in lineTex) if (tx != null) Destroy(tx);
             if (pop != null) Career.GrantReward(pop.id);   // auto-dismissed or skipped: still paid
             if (active == this) active = null;
         }
@@ -220,6 +252,12 @@ namespace RobotBrawl.Phase0
                         rt.anchoredPosition = Vector2.Lerp(new Vector2(0f, 10f * k), lineHome[i], ei);
                         lines[i].color = new Color(1f, 0.92f, 0.55f, ei);
                         rt.localScale = Vector3.one * (0.6f + 0.4f * ei);
+                        var im = i < lineImgs.Count ? lineImgs[i] : null;
+                        if (im != null)
+                        {
+                            im.rectTransform.anchoredPosition = new Vector2(-(lines[i].preferredWidth * 0.5f + 32f * k), 0f);
+                            im.color = new Color(1f, 1f, 1f, ei);
+                        }
                     }
                     var ci = claim.GetComponent<Image>();
                     ci.color = new Color(0.30f, 0.62f, 0.88f, e);
