@@ -207,7 +207,8 @@ namespace RobotBrawl.Phase0
             Vector3 fwd2 = bm.testRobot.transform.TransformDirection(bm.TestDriveDir); fwd2.y = 0f;
             Check(Vector3.Angle(fwd1, fwd2) > 15f, "a held full stick still turns it (" + Vector3.Angle(fwd1, fwd2).ToString("0") + " deg in 1.5 s)");
             Check(bm.MapSteerNow > 0f && bm.MapSteerNow <= BuilderManager.STEER_GAIN + 0.001f, "...at no more than the map's gain (" + bm.MapSteerNow.ToString("0.00") + ")");
-            Check(TouchControls.RANGE >= 170f && TouchControls.RING >= 200f && TouchControls.MouseAccepted, "the stick is big (travel " + TouchControls.RANGE + ", ring " + TouchControls.RING + ") and takes a mouse on every platform");
+            Check(TouchControls.RANGE >= 130f && Mathf.Approximately(TouchControls.RING, 2f * TouchControls.RANGE) && Mathf.Approximately(TouchControls.KNOB_TRAVEL, TouchControls.RANGE) && TouchControls.MouseAccepted,
+                  "the stick is big and honest: the ring's edge is full lock (travel " + TouchControls.RANGE + ", ring " + TouchControls.RING + "), and it takes a mouse on every platform");
             Phase0Input.debugThrottle = 0f; Phase0Input.debugSteer = 0f;
             for (int i = 0; i < 30; i++) yield return null;
 

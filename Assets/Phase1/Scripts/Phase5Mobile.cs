@@ -99,11 +99,16 @@ public class TouchControls : MonoBehaviour
     // takes a MOUSE on every platform, not only under a bench flag: a
     // desktop web player had no stick at all (keys only), and a pointer drag
     // is how a person would try it.
-    public static float RANGE = 175f;        // units of GuiScale to full deflection
-    public static float RING = 220f;         // drawn ring, units
-    public static float KNOB = 70f;          // drawn knob, units
-    public static float KNOB_TRAVEL = 92f;   // how far the knob is drawn from the anchor
-    public static float REST = 170f;         // resting spot from the bottom-left corner
+    // MEASURED with a pointer drive on the live page (2026-09-10): a push to
+    // the ring's edge gave ~60% throttle and 16 m in ten seconds, because the
+    // ring's radius (110) was not the travel (175) - the old stick had the
+    // same 0.62 ratio. THE RING'S EDGE IS FULL LOCK NOW: travel = ring radius,
+    // and the knob is drawn out to it.
+    public static float RANGE = 140f;        // units of GuiScale to full deflection = the ring's radius
+    public static float RING = 280f;         // drawn ring, units (diameter)
+    public static float KNOB = 76f;          // drawn knob, units
+    public static float KNOB_TRAVEL = 140f;  // the knob reaches the ring's edge at full lock
+    public static float REST = 175f;         // resting spot from the bottom-left corner
     public static bool MouseAccepted = true;
     FightManager fm;   // results-card detection: pads hide while it is up
     static TouchControls inst;
