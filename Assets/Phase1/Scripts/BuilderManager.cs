@@ -18,9 +18,9 @@ namespace RobotBrawl.Phase0
 /// Build: click face place · R rotate · right-click removes a whole branch ·
 /// Z undo · Q/E orbit · scroll zoom · T test.  Test: WASD drive · R reset · B back to builder.
 /// </summary>
-public class BuilderManager : MonoBehaviour
+public partial class BuilderManager : MonoBehaviour
 {
-    public enum Mode { Build, Test, Fight }
+    public enum Mode { Build, Test, Fight, Map }   // Map: the yard (BuilderManager.Map.cs)
 
     public class PlacedPart
     {
@@ -1024,6 +1024,7 @@ public class BuilderManager : MonoBehaviour
         PumpUiFraming();
         if (mode == Mode.Build) UpdateBuild();
         else if (mode == Mode.Test) UpdateTest();
+        else if (mode == Mode.Map) UpdateMap();
         else UpdateFight();
     }
 
@@ -5464,6 +5465,7 @@ public class BuilderManager : MonoBehaviour
         // Phase 5 fix: a fight must never stack on top of a live test drive
         // (the touch dock used to stay tappable during TEST DRIVE).
         if (mode == Mode.Test) BackToBuild();
+        if (mode == Mode.Map) LeaveMap();
 
         // ---- Phase 4: fight context. A ladder fight (StartLadderFight) has
         // already set activeRungIndex; every other entry point is an
@@ -6003,6 +6005,7 @@ public class BuilderManager : MonoBehaviour
     public void EnterMatchArena(float arenaHalf)
     {
         if (mode == Mode.Test) BackToBuild();
+        if (mode == Mode.Map) LeaveMap();
         ARENA_HALF = arenaHalf;
         Progression.rewarded = false;
         Progression.lastRewardLine = "";
@@ -6557,6 +6560,7 @@ public class BuilderManager : MonoBehaviour
             // BACK on top of a working one.
             if (scoutRoot != null) { if (!MobileBuilderUI.ScoutCardLive) ScoutHud(); return; }
             if (mode == Mode.Test) MobileTestHud();
+            else if (mode == Mode.Map) MapHud();
             return;
         }
         // A BuilderManager that SURVIVES A DOMAIN RELOAD comes back with a null
@@ -6582,6 +6586,7 @@ public class BuilderManager : MonoBehaviour
         }
         if (scoutRoot != null) { ScoutHud(); return; }   // C3: scouting overlay
         if (mode == Mode.Fight) return;  // FightManager draws the fight HUD/results
+        if (mode == Mode.Map) { MapHud(); return; }
         if (mode == Mode.Test)
         {
             EnsureStyles();

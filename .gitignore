@@ -132,3 +132,6 @@ _relay/
 # Never in git: it is a build artefact and it is enormous.
 build/
 .house_account.local
+
+# the fork's player builds (BuildWebGL/BuildWorker output)
+build/

@@ -394,6 +394,10 @@ public static class CareerDB
     /// on boxes instead of a wait timer. JsonUtility hands older saves zeros.</summary>
     public int quickFights, quickWins, quickStreak, quickBestStreak, crowns, quickBoxesToday, quickWinsToBox;
     public string quickBoxDay = "";
+    /// <summary>SCRAPYARD: the yard re-rolls daily (the seed is the date); the
+    /// crates opened today, by index, so a re-entry does not re-spawn them.</summary>
+    public string yardDay = "";
+    public List<int> yardOpened = new List<int>();
     public int fights; public int fightWins; public int sessions;   // telemetry
     public int tutorialStep;
     /// <summary>C4: index into stable of the robot being edited; -1 = none.</summary>

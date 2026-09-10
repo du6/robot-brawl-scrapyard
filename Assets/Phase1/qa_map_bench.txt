@@ -1,0 +1,31 @@
+PASS  DRIVE OUT enters the yard
+PASS  ...and the funnel hears `map`
+PASS  the player's machine is on the map, combat off
+PASS  three crates stand in the yard (3)
+PASS  ...every crate is inside the fence
+PASS  the first crate is 8 m from the door, in view (8.0)
+PASS  a yard bot is parked inside the fence
+PASS  ...and it is SCOUT, not another rookie (SCOUT)
+PASS  ...far enough from the door to be a drive
+PASS  no card at the door
+PASS  GARAGE returns to the garage
+PASS  leaving and re-entering gives the same yard (the seed is the date)
+PASS  driving into a crate opens it (2 left)
+PASS  ...and it paid scrap and a part at once (+40 scrap, +1 part)
+PASS  ...and the funnel hears `crate`
+PASS  ...and the save remembers which crate, and the day
+PASS  an opened crate does not respawn the same day
+PASS  the card comes up within 4 m of the parked bot
+PASS  ...and the funnel hears `meet`
+PASS  drive away and the card folds - decline is free
+PASS  SCRAPPER (compass + wall sensor) gets Ram Hunter
+PASS  no sensors gets First Steps, and it validates (First Steps)
+PASS  CHALLENGE enters a fight
+PASS  ...a Quick bout, settled as a quick fight
+PASS  ...with the auto-brain driving, not the stick
+PASS  ...against the parked bot (scout)
+PASS  ...and the funnel hears `challenge`
+PASS  the bout ended on its own
+PASS  ...and settled once (quickFights=1)
+PASS  after the bell, the garage
+PASS  the ledger still audits

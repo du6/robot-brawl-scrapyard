@@ -544,6 +544,26 @@ Nothing in M0 is blocked.
 
 ## Progress log
 
+- **2026-09-10 — M0 step 3: THE YARD EXISTS (headless).** Grown out of
+  `StartTest()` as a partial of BuilderManager (`BuilderManager.Map.cs`,
+  ~470 lines): `Mode.Map`, an 80 × 80 m plane with a fence and a glowing
+  garage door, 28 seeded wrecks, **three crates** (the first 8 m from the
+  door), **one parked SCOUT** 38 m out, the touch stick + WASD, a
+  FollowCamera, a compass strip (bearings to crate / bot / garage), a
+  righting mercy, DRIVE OUT in the dock and GARAGE on the HUD. A crate is
+  a `qbox` opened where it stands (`QuickBoxRoll` + `QueueReward`); the
+  card shows within 4 m and folds when you leave; CHALLENGE is a Quick
+  bout against the parked bot under **BrainPick** (compass+wall →
+  RamHunter, compass → Brawler, wall → WallShy, none → FirstSteps, always
+  validated). Funnel events `map crate meet challenge`; save fields
+  `yardDay`/`yardOpened`. **Measured: MapBench 31/0** (fence, seed,
+  crate-once, no-respawn, card, brain, fight-to-the-bell, ledger), and no
+  regression: TouchSmoke 55/0, QuickFightBench 24/0, FightWorkerBench
+  28/0 + 29/0. The web template, beacon plugin (path
+  `/v1/beacon/scrapyard-play`) and `BuildWebGL` are carried in from the
+  spike; `web_funnel.zsh` takes `RB_BEACON=scrapyard-play`. M0 still owes:
+  the deployed web build at `/play/scrapyard/` and its size, then the
+  live-site exit numbers (median time on the map, crate rate).
 - **2026-09-10 — the league campaign is off the screen.** The LEAGUE tab's
   board (trophy case, rookie checklist, five league headers, contest rows
   with SCOUT / MANUAL FIGHT / AUTONOMY FIGHT) and the two sandbox buttons

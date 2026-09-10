@@ -88,5 +88,10 @@ namespace RobotBrawl.Phase0
         public const string QUICK  = "quick";    // first QUICK FIGHT started (the loop, 2026-09-07)
         public const string BOX    = "box";      // first toolbox earned (3 quick wins)
         public const string STREAK = "streak";   // first 5-win streak (a crown)
+        // SCRAPYARD (design §6): the yard's funnel
+        public const string MAP       = "map";        // drove out
+        public const string CRATE     = "crate";      // opened one
+        public const string MEET      = "meet";       // an encounter card shown
+        public const string CHALLENGE = "challenge";  // accepted one
     }
 }

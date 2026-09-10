@@ -16,6 +16,7 @@ namespace RobotBrawl.EditorTools
     {
         public static void Quick()  { Arm("quick"); }
         public static void FightWorker() { Arm("fightworker"); }
+        public static void Map() { Arm("map"); }
         public static void Touch()  { Arm("touch"); }
         static void Arm(string which)
         {
@@ -31,6 +32,7 @@ namespace RobotBrawl.EditorTools
         static bool launched; static double armedAt; static string which;
         static RobotBrawl.Phase0.TouchSmoke touch;
         static RobotBrawl.Phase0.FightWorkerBench fw;
+        static RobotBrawl.Phase0.MapBench mb;
         static BatchSmokeBoot()
         {
             which = SessionState.GetString("rb_smoke", "");
@@ -42,6 +44,7 @@ namespace RobotBrawl.EditorTools
         {
             return which == "quick" ? RobotBrawl.Phase0.QuickFightBench.finished
                                      : which == "fightworker" ? (fw != null && fw.finished)
+                                     : which == "map" ? RobotBrawl.Phase0.MapBench.finished
                                      : (touch != null && touch.finished);
         }
         static void Tick()
@@ -73,11 +76,12 @@ namespace RobotBrawl.EditorTools
                 // -batchmode -nographics has no Device Simulator, so the editor's
                 // DeviceWantsTouch() says no and ModeSelect draws the desktop
                 // chooser forever. Take the exact path the touch button takes.
-                if (which == "quick" && Object.FindFirstObjectByType<RobotBrawl.Phase0.BuilderManager>() == null)
+                if ((which == "quick" || which == "map") && Object.FindFirstObjectByType<RobotBrawl.Phase0.BuilderManager>() == null)
                     RobotBrawl.Phase0.ModeSelect.StartCareer(true);
                 if (which == "fightworker" && Object.FindFirstObjectByType<RobotBrawl.Phase0.BuilderManager>() == null)
                     new GameObject("BuilderManager").AddComponent<RobotBrawl.Phase0.BuilderManager>();
                 if (which == "quick") RobotBrawl.Phase0.QuickFightBench.Run();
+                else if (which == "map") mb = RobotBrawl.Phase0.MapBench.Run();
                 else if (which == "fightworker") { RobotBrawl.Phase0.FightWorkerBench.RunPure(); fw = RobotBrawl.Phase0.FightWorkerBench.Run(); }
                 else touch = RobotBrawl.Phase0.TouchSmoke.Run();
             }

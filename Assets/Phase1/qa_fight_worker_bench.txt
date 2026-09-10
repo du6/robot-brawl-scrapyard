@@ -16,21 +16,21 @@ PASS  an empty queue is not an error and posts nothing
 PASS  the loop completes a real match and posts exactly once
 PASS  …having uploaded the summary
 PASS  …and uploaded the actual .rbr.gz RECORDING, not just a scorecard
-PASS  …with real bytes in it (1337)
+PASS  …with real bytes in it (1330)
 PASS  …with a verdict the API's CHECK accepts (DRAW)
 PASS  …with the playable recording FIRST in replayUrls, ahead of the summary
 PASS  the replay doc is versioned
 PASS  …and carries the bouts
 == K. a yard job fights on the Quick clock (Scrapyard, 2026-09-09) ==
-      league: 30.3 s - Called early — no contact in 30 s · Judges' decision - damage 0 vs 0 (0.0% margin level) · pieces incl. wheels 10/10 vs 10/10 · aggression 99% vs 100% · on its back 0% vs 0% — too close to call, scored a draw
+      league: 30.4 s - Called early — no contact in 30 s · Judges' decision - damage 0 vs 0 (0.0% margin level) · pieces incl. wheels 10/10 vs 10/10 · aggression 100% vs 100% · on its back 0% vs 0% — too close to call, scored a draw
 PASS  control: the league job completes and posts once
 PASS  control: a league claim is fought on the 90-s clock (90)
 PASS  control: …and no crusher walls closed on it
-      yard: 30.1 s - Called early — no contact in 30 s · Judges' decision - damage 0 vs 0 (0.0% margin level) · pieces incl. wheels 10/10 vs 10/10 · aggression 79% vs 72% · on its back 0% vs 0% — too close to call, scored a draw
+      yard: 16.4 s - Counted out — flipped onto its back with nothing aboard to right it - heavy parts mounted LOW keep a machine on its wheels
 PASS  a yard job completes, posts once and uploads its recording
 PASS  …the same pair under a yard claim is fought on the 30-s clock (30)
-PASS  …and the bout ended inside that clock plus settle (30.1 s)
-PASS  …the crusher walls closed for the last 10 s
+PASS  …and the bout ended inside that clock plus settle (16.4 s)
+PASS  …it ended before the walls were due
 PASS  …and the Quick flag is restored afterwards (False)
 == J. owner state ==
 PASS  the career object was never swapped

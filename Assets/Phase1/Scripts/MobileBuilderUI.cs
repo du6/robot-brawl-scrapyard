@@ -1612,6 +1612,10 @@ public class MobileBuilderUI : MonoBehaviour
         // R3 critic: TEST DRIVE's fixed height squeezed this two-line header
         // until it clipped - reserve its own two lines.
         var fil = fightInfo.gameObject.AddComponent<LayoutElement>(); fil.minHeight = 44f; fil.preferredHeight = 44f;
+        // SCRAPYARD: the loud button. The map is the front door (design §3.1).
+        var driveOut = MkButton("driveout", fightPanel.transform, "DRIVE OUT", 20, () => { if (bm != null) bm.EnterMap(); });
+        var dol = driveOut.gameObject.AddComponent<LayoutElement>(); dol.minHeight = TouchRow() + 8f; dol.preferredHeight = TouchRow() + 8f;
+        driveOut.GetComponent<Image>().color = new Color(0.16f, 0.50f, 0.30f, 1f);
         // R2 (critic finding 8): TEST DRIVE was a full-width bar and the single
         // brightest element on the campaign screen - a sandbox action outranking
         // the mode's core loop. It is now a small right-aligned secondary chip
@@ -5039,6 +5043,7 @@ public class MobileBuilderUI : MonoBehaviour
         }
         bool fighting = FightManager.current != null
                      || bm.mode == BuilderManager.Mode.Test   // fix: dock stayed up over TEST DRIVE
+                     || bm.mode == BuilderManager.Mode.Map    // the yard owns the screen
                      || bm.Scouting;                          // C3: scouting overlay owns the screen
         // Scouting keeps the canvas UP now: the card lives on it, and turning
         // the canvas off is what forced the IMGUI version that cannot be
