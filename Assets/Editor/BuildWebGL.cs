@@ -135,14 +135,28 @@ namespace RobotBrawl.Editor
             // ...and Unity recreates an EMPTY Assets/Resources from the meta at
             // the next start (seen 2026-09-10, twice), which hid the leftover
             // from the check below. An empty folder in the way is removed first.
-            if (Directory.Exists(hidDir) && Directory.Exists(resDir)
-                && Directory.GetFileSystemEntries(resDir).Length == 0)
-                Directory.Delete(resDir);
-            if (Directory.Exists(hidDir) && !Directory.Exists(resDir))
+            // (And "empty" is not a safe test either - macOS drops a .DS_Store in
+            // it. Seen 2026-09-10, a third time.) So: MERGE. Whatever is in the
+            // leftover goes back into Assets/Resources, file by file, and the
+            // leftover is removed.
+            if (Directory.Exists(hidDir))
             {
-                Directory.Move(hidDir, resDir);
-                if (File.Exists(hidDir + ".meta")) File.Move(hidDir + ".meta", resDir + ".meta");
-                Debug.LogWarning("[BuildWebGL] Assets/Resources~ was left behind by an interrupted build - restored");
+                Directory.CreateDirectory(resDir);
+                foreach (var f in Directory.GetFiles(hidDir))
+                {
+                    string dst = Path.Combine(resDir, Path.GetFileName(f));
+                    if (File.Exists(dst)) File.Delete(dst);
+                    File.Move(f, dst);
+                }
+                foreach (var d in Directory.GetDirectories(hidDir))
+                {
+                    string dst = Path.Combine(resDir, Path.GetFileName(d));
+                    if (Directory.Exists(dst)) Directory.Delete(dst, true);
+                    Directory.Move(d, dst);
+                }
+                Directory.Delete(hidDir, true);
+                if (File.Exists(hidDir + ".meta")) File.Delete(hidDir + ".meta");
+                Debug.LogWarning("[BuildWebGL] Assets/Resources~ was left behind by an interrupted build - merged back");
                 AssetDatabase.Refresh();
             }
             if (Directory.Exists(resDir) && !Directory.Exists(hidDir))
