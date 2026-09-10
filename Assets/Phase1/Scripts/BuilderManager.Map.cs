@@ -744,7 +744,9 @@ public partial class BuilderManager
         to.y = 0f;
         float dist = to.magnitude;
         float ang = Vector3.SignedAngle(fwd, to, Vector3.up);
-        string arrow = Mathf.Abs(ang) < 25f ? "↑" : ang > 0f ? (ang > 135f ? "↓" : "→") : (ang < -135f ? "↓" : "←");
+        // ASCII on purpose: the arrow glyphs (U+2191 etc.) are not in the IMGUI
+        // font and drew as nothing - seen live 2026-09-10, "TREASURE   17 m".
+        string arrow = Mathf.Abs(ang) < 25f ? "^" : ang > 0f ? (ang > 135f ? "v" : ">") : (ang < -135f ? "v" : "<");
         return what + " " + arrow + " " + Mathf.RoundToInt(dist) + " m";
     }
 }
