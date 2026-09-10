@@ -4,20 +4,26 @@ PASS  GARAGE is the door back to the workshop
 PASS  DRIVE OUT enters the yard
 PASS  ...and the funnel hears `map`
 PASS  the player's machine is on the map, combat off
-PASS  three crates stand in the yard (3)
-PASS  ...every crate is inside the fence
-PASS  the first crate is 8 m from the door, in view (8.0)
-PASS  a yard bot is parked inside the fence
-PASS  ...and it is SCOUT, not another rookie (SCOUT)
-PASS  ...far enough from the door to be a drive
-PASS  no card at the door
+PASS  the world around home is loaded: 25 chunks of 25
+PASS  the world's seed was rolled and saved (799557550)
+PASS  crates stand in the loaded world (30)
+PASS  ...every crate sits on the terrain
+PASS  the first crate is 8 m from home, in view (8.0)
+PASS  an enemy is parked on the terrain
+PASS  ...the nearest is SCOUT, not another rookie (SCOUT)
+PASS  ...far enough from home to be a drive
+PASS  no card at home
+PASS  home is flat
+PASS  ...and the world is not (-2.0 m, -1.0 m)
 PASS  GARAGE returns to the garage
-PASS  leaving and re-entering gives the same yard (the seed is the date)
-PASS  driving into a crate opens it (2 left)
+PASS  leaving and re-entering gives the same world (the seed persists)
+PASS  driving into a crate opens it (29 of 30 left)
 PASS  ...and it paid scrap and a part at once (+40 scrap, +1 part)
 PASS  ...and the funnel hears `crate`
-PASS  ...and the save remembers which crate, and the day
-PASS  an opened crate does not respawn the same day
+PASS  ...and the save remembers which crate, by chunk (0,0:0)
+PASS  an opened crate never respawns (29)
+PASS  400 m out, the world is still 25 chunks around you (25)
+PASS  ...and you are on the ground there (y 0.2 vs ground 0.1)
 PASS  the card comes up within 4 m of the parked bot
 PASS  ...and the funnel hears `meet`
 PASS  drive away and the card folds - decline is free

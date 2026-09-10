@@ -1,20 +1,26 @@
 // ===========================================================================
-// BuilderManager.Map.cs — THE YARD (Robot Brawl: Scrapyard, M0 prototype,
-// docs/Scrapyard_Design_2026-09-09.md §3 and §8).
+// BuilderManager.Map.cs — THE WORLD (Robot Brawl: Scrapyard,
+// docs/Scrapyard_Design_2026-09-09.md §3).
 //
-// Grown out of StartTest(), not built beside it: the test drive already
-// spawned the player's robot under the touch stick with a FollowCamera and
-// a target, which is the map's whole drive loop. This file is a partial of
-// BuilderManager because everything it needs — `placed`, `driveDir`, `cam`,
-// SpawnBot, FloorNet, BackToBuild's sweep — is private state of the one
-// object that owns the build, and the point of a fork is not to widen that.
+// owen, 2026-09-10: "The map is not an arena. It should be a global map like
+// real world. There is no leagues/program. It is a brand new experience like
+// minecraft, where users explore the world and collect parts and fight
+// enemies."
 //
-// M0 scope, deliberately: an 80 x 80 m plane with a fence, seeded wrecks,
-// THREE crates, ONE parked yard bot (SCOUT), DRIVE OUT / GARAGE doors, and
-// the `map` / `crate` / `meet` / `challenge` events. Crates are qboxes
-// opened where they stand; a challenge is a Quick bout under the
-// auto-brain. Zones, the daily cap, real robots from the pool and the
-// return-to-map after a fight are M1/M2.
+// So: an OPEN WORLD, generated as you drive. Terrain is chunked and made from
+// layered noise on a per-player seed (code, not data — the web budget), with
+// biomes by region, wrecks and ruins scattered from each chunk's own seed,
+// crates to drive into and enemy robots parked by their wrecks. Chunks load
+// on approach and unload behind you. There is no fence; there is no end.
+//
+// Grown out of StartTest(): the player's robot under the touch stick with a
+// FollowCamera is the drive loop, and this is a partial of BuilderManager
+// because `placed`, `driveDir`, `cam`, SpawnBot and BackToBuild's sweep are
+// its private state. The GARAGE button opens the workshop wherever you are.
+//
+// Still owed after this pass (said plainly): a challenge cuts to the
+// standard ring for the bout; fighting IN PLACE, where you met the enemy,
+// with no walls, is the next pass. Enemies idle; roaming is after that.
 // ===========================================================================
 using System.Collections.Generic;
 using UnityEngine;
@@ -23,53 +29,279 @@ namespace RobotBrawl.Phase0
 {
 public partial class BuilderManager
 {
-    public const float YARD_HALF = 40f;      // 80 x 80 m; the arena is 14 x 14
-    public const int   YARD_CRATES = 3;      // M0; the design's 8 is M1
+    // ------------------------------------------------------------ tunables
+    public const float CHUNK = 48f;          // metres per chunk side
+    public const int   CHUNK_RES = 24;       // quads per side (2 m) -> 625 verts, 1152 tris
+    public const int   VIEW_CHUNKS = 2;      // load radius: (2*2+1)^2 = 25 chunks around you
     public const float CRATE_REACH = 1.6f;   // drive into it
     public const float CARD_REACH = 4f;      // the encounter card slides up
-    public const string YARD_BOT = "scout";  // never the rookie's own build (mirror lock)
+    public const string YARD_BOT = "scout";  // the spawn chunk's guaranteed first enemy
+    public const float SPAWN_FLAT = 22f;     // the world is flat this far from home
 
-    /// <summary>THE MAP IS THE FRONT DOOR (owen, 2026-09-10: "it should start
-    /// with a rookie robot ready for exploring a map"). A fresh BuilderManager
-    /// drives out on its first frames instead of showing the workshop; GARAGE
-    /// is the door back. Benches set this false before creating one, because
-    /// they assert against the workshop; MapBench sets it true to prove it.</summary>
+    /// <summary>THE MAP IS THE FRONT DOOR. A fresh BuilderManager drives out on
+    /// its first frames; GARAGE is the door back. Benches set this false
+    /// before creating one; MapBench sets it true to prove it.</summary>
     public static bool bootToYard = true;
     bool bootedToYard;
 
-    readonly List<GameObject> crates = new List<GameObject>();
-    readonly List<int> crateIds = new List<int>();
-    CompoundRobot parkedBot;
-    Vector3 garageDoor;                      // where you spawn and where GARAGE is
-    Vector3 parkedPos;
-    bool yardCard;                           // the card is up
+    // ------------------------------------------------------------ state
+    class Chunk
+    {
+        public int cx, cz;
+        public GameObject root;
+        public readonly List<GameObject> crates = new List<GameObject>();
+        public readonly List<string> crateKeys = new List<string>();
+        public CompoundRobot enemy; public string enemyId = "";
+    }
+    readonly Dictionary<long, Chunk> chunks = new Dictionary<long, Chunk>();
+    GameObject worldRoot;
+    int worldSeed;
+    float noiseOx, noiseOz;                  // seed-derived offsets into the noise field
+    Vector3 homePos = Vector3.zero;          // where you spawn; the compass calls it HOME
+    CompoundRobot cardBot; string cardBotId = "";
+    bool yardCard;
     string yardToast = ""; float yardToastT;
     float flippedFor;
+    Material matRust, matSteppe, matAsh, matWreck, matPillar;
 
-    /// <summary>The seam a bench reads: is the encounter card up?</summary>
+    static long Key(int cx, int cz) { return ((long)cx << 32) ^ (uint)cz; }
+    static int ChunkOf(float v) { return Mathf.FloorToInt(v / CHUNK); }
+    static string CrateKey(int cx, int cz, int i) { return cx + "," + cz + ":" + i; }
+
+    // ------------------------------------------------------------ seams (benches)
     public bool YardCardShown { get { return mode == Mode.Map && yardCard; } }
-    public int  YardCratesLeft { get { int n = 0; foreach (var c in crates) if (c != null) n++; return n; } }
-    public CompoundRobot YardParked { get { return parkedBot; } }
-    public Vector3 YardGarageDoor { get { return garageDoor; } }
-    /// <summary>Crate positions still standing (a bench reads these to check
-    /// the seed and the fence). Opened crates are skipped.</summary>
+    public int  YardCratesLeft { get { int n = 0; foreach (var c in chunks.Values) foreach (var g in c.crates) if (g != null) n++; return n; } }
+    public CompoundRobot YardParked { get { return cardBot != null ? cardBot : NearestEnemy(testRobot != null ? testRobot.rb.position : homePos); } }
+    public Vector3 YardGarageDoor { get { return homePos; } }
+    public int WorldChunksLoaded { get { return chunks.Count; } }
+    public int WorldSeedNow { get { return worldSeed; } }
     public List<Vector3> YardCratePositions()
     {
         var l = new List<Vector3>();
-        foreach (var c in crates) if (c != null) l.Add(c.transform.position);
+        foreach (var c in chunks.Values) foreach (var g in c.crates) if (g != null) l.Add(g.transform.position);
+        l.Sort((a, b) => (a - homePos).sqrMagnitude.CompareTo((b - homePos).sqrMagnitude));
         return l;
     }
 
-    /// <summary>The yard re-rolls at local midnight: the seed is the date.</summary>
-    public static int YardSeed()
+    // ------------------------------------------------------------ the terrain
+    /// <summary>Ground height at a world position: three octaves of noise on
+    /// the player's seed, flattened around home so the first minute is a
+    /// drive and not a climb. Deterministic: the same seed is the same world.</summary>
+    public float TerrainHeight(float x, float z)
     {
-        var d = System.DateTime.Now;
-        return d.Year * 10000 + d.Month * 100 + d.Day;
+        float nx = x + noiseOx, nz = z + noiseOz;
+        float h = 6.0f * Mathf.PerlinNoise(nx / 220f, nz / 220f)
+                + 2.5f * Mathf.PerlinNoise(nx / 60f + 3.7f, nz / 60f + 1.3f)
+                + 0.8f * Mathf.PerlinNoise(nx / 17f + 9.1f, nz / 17f + 4.2f);
+        h -= 4.6f;   // roughly zero-mean
+        float dHome = Vector2.Distance(new Vector2(x, z), new Vector2(homePos.x, homePos.z));
+        float flat = Mathf.Clamp01((dHome - SPAWN_FLAT) / 30f);
+        return h * flat;
     }
-    static string YardToday() { return System.DateTime.Now.ToString("yyyy-MM-dd"); }
+    /// <summary>0..1: rust flats, scrap steppe, ash fields.</summary>
+    float Biome(float x, float z) { return Mathf.PerlinNoise((x + noiseOx) / 300f + 11f, (z + noiseOz) / 300f + 5f); }
+    Material BiomeMat(float b) { return b < 0.42f ? matRust : b < 0.66f ? matSteppe : matAsh; }
+
+    void EnsureWorldMats()
+    {
+        if (matRust != null) return;
+        matRust   = PartVisualFactory.Mat(new Color(0.44f, 0.30f, 0.20f), 0.05f, 0.20f);
+        matSteppe = PartVisualFactory.Mat(new Color(0.33f, 0.36f, 0.28f), 0.05f, 0.22f);
+        matAsh    = PartVisualFactory.Mat(new Color(0.24f, 0.24f, 0.26f), 0.05f, 0.25f);
+        matWreck  = PartVisualFactory.Mat(new Color(0.36f, 0.30f, 0.24f), 0.6f, 0.3f);
+        matPillar = PartVisualFactory.Mat(new Color(0.45f, 0.42f, 0.38f), 0.6f, 0.3f);
+    }
+
+    Chunk BuildChunk(int cx, int cz)
+    {
+        var ch = new Chunk { cx = cx, cz = cz };
+        ch.root = new GameObject("chunk_" + cx + "_" + cz);
+        ch.root.transform.SetParent(worldRoot.transform, false);
+        float x0 = cx * CHUNK, z0 = cz * CHUNK;
+
+        // the ground: a mesh with a collider, coloured by the biome at its centre
+        int n = CHUNK_RES + 1;
+        var verts = new Vector3[n * n]; var uvs = new Vector2[n * n];
+        for (int j = 0; j < n; j++)
+            for (int i = 0; i < n; i++)
+            {
+                float x = x0 + i * (CHUNK / CHUNK_RES), z = z0 + j * (CHUNK / CHUNK_RES);
+                verts[j * n + i] = new Vector3(x, TerrainHeight(x, z), z);
+                uvs[j * n + i] = new Vector2(i / (float)CHUNK_RES, j / (float)CHUNK_RES);
+            }
+        var tris = new int[CHUNK_RES * CHUNK_RES * 6]; int t = 0;
+        for (int j = 0; j < CHUNK_RES; j++)
+            for (int i = 0; i < CHUNK_RES; i++)
+            {
+                int a = j * n + i, b = a + 1, c = a + n, d = c + 1;
+                tris[t++] = a; tris[t++] = c; tris[t++] = b;
+                tris[t++] = b; tris[t++] = c; tris[t++] = d;
+            }
+        var mesh = new Mesh { name = "ground_" + cx + "_" + cz };
+        mesh.vertices = verts; mesh.uv = uvs; mesh.triangles = tris;
+        mesh.RecalculateNormals(); mesh.RecalculateBounds();
+        var ground = new GameObject("ground");
+        ground.transform.SetParent(ch.root.transform, false);
+        ground.AddComponent<MeshFilter>().sharedMesh = mesh;
+        ground.AddComponent<MeshRenderer>().sharedMaterial = BiomeMat(Biome(x0 + CHUNK * 0.5f, z0 + CHUNK * 0.5f));
+        ground.AddComponent<MeshCollider>().sharedMesh = mesh;
+
+        // this chunk's own seed: the world's, mixed with where it is
+        var rng = new System.Random(unchecked(worldSeed * 73856093 ^ cx * 19349663 ^ cz * 83492791));
+        bool spawnChunk = cx == ChunkOf(homePos.x) && cz == ChunkOf(homePos.z);
+        float dHome = Vector2.Distance(new Vector2(x0 + CHUNK * 0.5f, z0 + CHUNK * 0.5f), new Vector2(homePos.x, homePos.z));
+
+        // wrecks and ruins
+        int wrecks = 4 + rng.Next(6);
+        for (int w = 0; w < wrecks; w++)
+        {
+            float x = x0 + (float)rng.NextDouble() * CHUNK, z = z0 + (float)rng.NextDouble() * CHUNK;
+            if (Vector2.Distance(new Vector2(x, z), new Vector2(homePos.x, homePos.z)) < 12f) continue;   // home stays clear
+            bool pillar = rng.Next(3) == 0;
+            var g = GameObject.CreatePrimitive(pillar ? PrimitiveType.Cylinder : PrimitiveType.Cube);
+            g.name = pillar ? "ruin" : "wreck";
+            g.transform.SetParent(ch.root.transform, false);
+            float h = pillar ? 1.2f + (float)rng.NextDouble() * 2.5f : 0.4f + (float)rng.NextDouble() * 0.8f;
+            Vector3 sc = pillar ? new Vector3(0.6f + (float)rng.NextDouble() * 0.6f, h, 0.6f + (float)rng.NextDouble() * 0.6f)
+                                : new Vector3(1.5f + (float)rng.NextDouble() * 3.5f, h, 1f + (float)rng.NextDouble() * 2.5f);
+            float gy = TerrainHeight(x, z);
+            g.transform.position = new Vector3(x, gy + sc.y * (pillar ? 1f : 0.45f), z);
+            g.transform.localScale = sc;
+            g.transform.rotation = Quaternion.Euler(pillar ? 0f : (float)rng.NextDouble() * 8f - 4f, (float)rng.NextDouble() * 360f, 0f);
+            g.GetComponent<Renderer>().sharedMaterial = pillar ? matPillar : matWreck;
+        }
+
+        // crates: the spawn chunk's first is 8 m from home, in view; others by chance
+        int crates = spawnChunk ? 2 : rng.Next(3);
+        for (int i = 0; i < crates; i++)
+        {
+            float x, z;
+            if (spawnChunk && i == 0) { x = homePos.x; z = homePos.z + 8f; }
+            else { x = x0 + 3f + (float)rng.NextDouble() * (CHUNK - 6f); z = z0 + 3f + (float)rng.NextDouble() * (CHUNK - 6f); }
+            string key = CrateKey(cx, cz, i);
+            ch.crateKeys.Add(key);
+            if (Career.Data != null && Career.Data.worldOpened.Contains(key)) { ch.crates.Add(null); continue; }
+            ch.crates.Add(MakeCrate(ch.root.transform, x, TerrainHeight(x, z), z, key));
+        }
+
+        // an enemy: the spawn chunk always parks SCOUT 30 m out; elsewhere by
+        // chance, tougher the further from home
+        bool wantEnemy = spawnChunk || rng.Next(100) < 55;
+        if (wantEnemy)
+        {
+            string id;
+            float ex, ez;
+            if (spawnChunk) { id = YARD_BOT; ex = homePos.x + 6f; ez = homePos.z + 30f; }
+            else
+            {
+                string[] rookies = { "scout", "tipper" }, veterans = { "mauler", "ripper", "millstone" }, champs = { "bulwark", "widowmaker", "bastion" };
+                var pool = dHome < 120f ? rookies : dHome < 300f ? veterans : champs;
+                id = pool[rng.Next(pool.Length)];
+                ex = x0 + 6f + (float)rng.NextDouble() * (CHUNK - 12f); ez = z0 + 6f + (float)rng.NextDouble() * (CHUNK - 12f);
+            }
+            var entry = EnemyRoster.Find(id);
+            if (entry != null)
+            {
+                RaycastWheelDrive edrv;
+                var bot = SpawnBot(EnemyRoster.Recipe(entry.id, palette), entry.label, new Vector3(ex, 0f, ez),
+                                   Quaternion.Euler(0f, (float)rng.NextDouble() * 360f, 0f), Vector3.forward, out edrv);
+                if (bot != null)
+                {
+                    bot.combatEnabled = false;
+                    bot.controlSource = ControlSource.AI;      // no controller: it idles by its wreck
+                    LiftToGround(bot, TerrainHeight(ex, ez) + 0.6f);
+                    ch.enemy = bot; ch.enemyId = entry.id;
+                }
+            }
+        }
+        return ch;
+    }
+
+    GameObject MakeCrate(Transform parent, float x, float gy, float z, string key)
+    {
+        var crate = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        crate.name = "crate " + key;
+        crate.transform.SetParent(parent, false);
+        crate.transform.position = new Vector3(x, gy + 0.35f, z);
+        crate.transform.localScale = new Vector3(0.7f, 0.7f, 0.7f);
+        crate.transform.rotation = Quaternion.Euler(0f, 30f, 0f);
+        crate.GetComponent<Renderer>().sharedMaterial = PartVisualFactory.HazardYellow;
+        Object.Destroy(crate.GetComponent<Collider>());     // you drive INTO it
+        var glow = PartVisualFactory.Deco(PrimitiveType.Cylinder, crate.transform, new Vector3(0f, 2.2f, 0f),
+            new Vector3(0.12f, 1.8f, 0.12f), Vector3.zero, PartVisualFactory.CyanGlow, "beacon");
+        var gc = glow.GetComponent<Collider>(); if (gc != null) Object.Destroy(gc);
+        return crate;
+    }
+
+    /// <summary>Move the player's whole machine (every part's rigidbody, not
+    /// just the core) and drop it on the ground there. A bench's teleport
+    /// through rb.position alone tore the robot in half.</summary>
+    public void TeleportPlayer(Vector3 xz)
+    {
+        if (mode != Mode.Map || testRobot == null) return;
+        var t = testRobot.transform;
+        Vector3 to = new Vector3(xz.x, TerrainHeight(xz.x, xz.z) + 0.6f, xz.z);
+        Vector3 d = to - testRobot.rb.position;
+        t.position += d;
+        foreach (var rb in testRobot.GetComponentsInChildren<Rigidbody>())
+        { rb.position += Vector3.zero; rb.linearVelocity = Vector3.zero; rb.angularVelocity = Vector3.zero; }
+        Physics.SyncTransforms();
+        LoadAround(to);
+    }
+
+    static void LiftToGround(CompoundRobot bot, float y)
+    {
+        var t = bot.transform;
+        Vector3 d = new Vector3(0f, y - t.position.y, 0f);
+        t.position += d;
+        foreach (var rb in bot.GetComponentsInChildren<Rigidbody>())
+        { rb.linearVelocity = Vector3.zero; rb.angularVelocity = Vector3.zero; }
+    }
+
+    /// <summary>Load what is near, drop what is far. One new chunk per call,
+    /// nearest first, so a fast drive never hitches for 25 meshes at once.</summary>
+    void PumpChunks(Vector3 at)
+    {
+        int pcx = ChunkOf(at.x), pcz = ChunkOf(at.z);
+        int bestCx = 0, bestCz = 0, bestD = int.MaxValue; bool want = false;
+        for (int dz = -VIEW_CHUNKS; dz <= VIEW_CHUNKS; dz++)
+            for (int dx = -VIEW_CHUNKS; dx <= VIEW_CHUNKS; dx++)
+            {
+                if (chunks.ContainsKey(Key(pcx + dx, pcz + dz))) continue;
+                int dd = dx * dx + dz * dz;
+                if (dd < bestD) { bestD = dd; bestCx = pcx + dx; bestCz = pcz + dz; want = true; }
+            }
+        if (want) chunks[Key(bestCx, bestCz)] = BuildChunk(bestCx, bestCz);
+        // unload beyond the view + 1 ring
+        List<long> drop = null;
+        foreach (var kv in chunks)
+        {
+            var c = kv.Value;
+            if (Mathf.Abs(c.cx - pcx) <= VIEW_CHUNKS + 1 && Mathf.Abs(c.cz - pcz) <= VIEW_CHUNKS + 1) continue;
+            if (c.enemy != null && c.enemy == cardBot) continue;     // never under a live card
+            if (drop == null) drop = new List<long>();
+            drop.Add(kv.Key);
+        }
+        if (drop != null) foreach (var k in drop) UnloadChunk(k);
+    }
+
+    void UnloadChunk(long k)
+    {
+        Chunk c;
+        if (!chunks.TryGetValue(k, out c)) return;
+        chunks.Remove(k);
+        if (c.enemy != null && c.enemy.gameObject != null) { c.enemy.gameObject.SetActive(false); Destroy(c.enemy.gameObject); }
+        if (c.root != null) Destroy(c.root);
+    }
+
+    /// <summary>All chunks around a point, synchronously (the boot, and a bench).</summary>
+    void LoadAround(Vector3 at)
+    {
+        for (int i = 0; i < (2 * VIEW_CHUNKS + 1) * (2 * VIEW_CHUNKS + 1); i++) PumpChunks(at);
+    }
 
     // ------------------------------------------------------------ the doors
-    /// <summary>DRIVE OUT. Legal build required, like every fight.</summary>
+    /// <summary>DRIVE OUT / the boot. Legal build required, like every fight.</summary>
     public void EnterMap()
     {
         if (mode == Mode.Fight) return;
@@ -78,7 +310,25 @@ public partial class BuilderManager
         string err = Validate();
         if (err != null) { message = err; SfxSynth.Deny(); return; }
 
-        ARENA_HALF = YARD_HALF;
+        // the world's seed lives in the save: your world is yours, and it persists
+        if (Career.Data != null)
+        {
+            if (Career.Data.worldSeed == 0)
+            {
+                Career.Data.worldSeed = new System.Random().Next(1, int.MaxValue);
+                if (Career.autosave) Career.Save();
+            }
+            worldSeed = Career.Data.worldSeed;
+        }
+        else worldSeed = 12345;
+        var srng = new System.Random(worldSeed);
+        noiseOx = (float)srng.NextDouble() * 4000f; noiseOz = (float)srng.NextDouble() * 4000f;
+        // HOME IS A CHUNK CENTRE, NOT A CORNER. At (0,0) a hair of drift put
+        // the player in chunk -1 and the load window loaded two extra chunks
+        // before the far ones dropped (MapBench: "27 chunks of 25").
+        homePos = new Vector3(CHUNK * 0.5f, 0f, CHUNK * 0.5f);
+
+        ARENA_HALF = 100000f;                // no fence: FloorNet is a fall net only
         ArenaHazards.Clear();
         TouchControls.Ensure();
         TouchControls.fightActive = true;    // the stick is up; no FIRE on the map
@@ -90,13 +340,20 @@ public partial class BuilderManager
         buildRoot.SetActive(false);
         mode = Mode.Map;
         message = "";
-        yardCard = false; yardToast = ""; yardToastT = 0f; flippedFor = 0f;
+        yardCard = false; cardBot = null; cardBotId = ""; yardToast = ""; yardToastT = 0f; flippedFor = 0f;
 
-        BuildYard();
+        EnsureWorldMats();
+        worldRoot = new GameObject("world");
+        sandboxRoot = worldRoot;             // BackToBuild's sweep destroys it
+        // home: a glowing pad you can find again
+        var pad = PartVisualFactory.Deco(PrimitiveType.Cylinder, worldRoot.transform, homePos + new Vector3(0f, 0.02f, 0f),
+            new Vector3(3.5f, 0.02f, 3.5f), Vector3.zero, PartVisualFactory.CyanGlow, "home_pad");
+        var pc = pad.GetComponent<Collider>(); if (pc != null) Object.Destroy(pc);
+        LoadAround(homePos);
 
-        testRobot = SpawnBot(placed, "PlayerBuild", garageDoor, Quaternion.identity, driveDir, out testDrive);
+        testRobot = SpawnBot(placed, "PlayerBuild", homePos, Quaternion.identity, driveDir, out testDrive);
         if (testRobot == null) { BackToBuild(); message = "the build would not spawn"; return; }
-        testRobot.combatEnabled = false;     // nothing on the map fights
+        testRobot.combatEnabled = false;     // nothing on the map fights until you challenge
         testRobot.controlSource = ControlSource.Keyboard;
         foreach (var act in testRobot.GetComponentsInChildren<Actuator>(true)) act.playerControlled = false;
         combatArmAt = -1f;
@@ -105,148 +362,25 @@ public partial class BuilderManager
         followCam.target = testRobot.transform;
         followCam.forwardHint = driveDir;
         followCam.distance = 9f; followCam.height = 4.5f;
-        followCam.clampHalf = YARD_HALF - 0.8f;
+        followCam.clampHalf = 0f;            // no clamp: the world has no edge
         followCam.SnapNow();
         AddHeadlight(testRobot, driveDir);
 
         RBTelemetry.Once(RBTelemetry.MAP);
     }
 
-    /// <summary>GARAGE. BackToBuild's sweep already tears down every
-    /// CompoundRobot and the sandbox root the yard hangs from.</summary>
+    /// <summary>GARAGE. BackToBuild's sweep tears down every CompoundRobot and
+    /// the world root.</summary>
     public void LeaveMap()
     {
         if (mode != Mode.Map) return;
-        crates.Clear(); crateIds.Clear();
-        parkedBot = null; yardCard = false;
+        chunks.Clear();
+        cardBot = null; cardBotId = ""; yardCard = false;
         BackToBuild();
+        worldRoot = null;
         ARENA_HALF = 7f;
     }
 
-    // ------------------------------------------------------------ the yard
-    void BuildYard()
-    {
-        float HALF = YARD_HALF;
-        sandboxRoot = new GameObject("yard");
-        var floor = GameObject.CreatePrimitive(PrimitiveType.Plane);
-        floor.name = "yard_floor";
-        FloorBoxCollider(floor);
-        floor.transform.SetParent(sandboxRoot.transform, false);
-        floor.transform.localScale = new Vector3(HALF / 5f, 1f, HALF / 5f);
-        floor.GetComponent<Renderer>().sharedMaterial = PartVisualFactory.Mat(new Color(0.30f, 0.29f, 0.27f), 0.1f, 0.25f);
-
-        // the fence: the arena's walls, longer
-        for (int i = 0; i < 4; i++)
-        {
-            bool alongX = i < 2; float sign = (i % 2 == 0) ? 1f : -1f;
-            var wall = GameObject.CreatePrimitive(PrimitiveType.Cube);
-            wall.name = "fence_" + i;
-            wall.transform.SetParent(sandboxRoot.transform, false);
-            wall.transform.position = alongX ? new Vector3(0f, 1.0f, sign * HALF) : new Vector3(sign * HALF, 1.0f, 0f);
-            wall.transform.localScale = alongX ? new Vector3(2f * HALF + 0.5f, 2f, 0.5f) : new Vector3(0.5f, 2f, 2f * HALF + 0.5f);
-            wall.GetComponent<Renderer>().sharedMaterial = PartVisualFactory.Mat(new Color(0.22f, 0.22f, 0.25f), 0.5f, 0.4f);
-            for (int k = 0; k < 2 * (int)HALF / 4; k++)
-            {
-                float off = -HALF + 2f + k * 4f;
-                PartVisualFactory.Deco(PrimitiveType.Cube, sandboxRoot.transform,
-                    alongX ? new Vector3(off, 2.1f, sign * HALF) : new Vector3(sign * HALF, 2.1f, off),
-                    alongX ? new Vector3(2f, 0.22f, 0.7f) : new Vector3(0.7f, 0.22f, 2f),
-                    Vector3.zero, k % 2 == 0 ? PartVisualFactory.HazardYellow : PartVisualFactory.HazardBlack,
-                    "fence_hazard_" + i + "_" + k);
-            }
-        }
-
-        // the garage door: south fence, middle. You spawn just inside it.
-        garageDoor = new Vector3(0f, 0f, -HALF + 6f);
-        var door = GameObject.CreatePrimitive(PrimitiveType.Cube);
-        door.name = "garage_door";
-        door.transform.SetParent(sandboxRoot.transform, false);
-        door.transform.position = new Vector3(0f, 1.5f, -HALF + 0.3f);
-        door.transform.localScale = new Vector3(6f, 3f, 0.8f);
-        door.GetComponent<Renderer>().sharedMaterial = PartVisualFactory.CyanGlow;
-
-        // wrecks from the seed: slabs and pillars in the arena's materials,
-        // with colliders, kept off the door lane and off every crate.
-        var rng = new System.Random(YardSeed());
-        var taken = new List<Vector3>();
-        taken.Add(garageDoor);
-        for (int w = 0; w < 28; w++)
-        {
-            Vector3 p = new Vector3((float)(rng.NextDouble() * 2 - 1) * (HALF - 4f), 0f,
-                                    (float)(rng.NextDouble() * 2 - 1) * (HALF - 4f));
-            if (Mathf.Abs(p.x) < 4f && p.z < -HALF + 16f) continue;     // the door lane
-            bool pillar = rng.Next(3) == 0;
-            var wreck = GameObject.CreatePrimitive(pillar ? PrimitiveType.Cylinder : PrimitiveType.Cube);
-            wreck.name = "wreck_" + w;
-            wreck.transform.SetParent(sandboxRoot.transform, false);
-            float h = pillar ? 1.2f + (float)rng.NextDouble() * 1.5f : 0.4f + (float)rng.NextDouble() * 0.6f;
-            Vector3 sc = pillar ? new Vector3(0.6f, h, 0.6f)
-                                : new Vector3(1.5f + (float)rng.NextDouble() * 3f, h, 1f + (float)rng.NextDouble() * 2f);
-            wreck.transform.position = new Vector3(p.x, sc.y * (pillar ? 1f : 0.5f), p.z);
-            wreck.transform.localScale = sc;
-            wreck.transform.rotation = Quaternion.Euler(0f, (float)rng.NextDouble() * 360f, 0f);
-            wreck.GetComponent<Renderer>().sharedMaterial =
-                PartVisualFactory.Mat(pillar ? new Color(0.45f, 0.42f, 0.38f) : new Color(0.36f, 0.30f, 0.24f), 0.6f, 0.3f);
-            taken.Add(p);
-        }
-
-        // crates: the first is EIGHT METRES ahead of the door, in view; the
-        // rest are seeded, apart from each other and from every wreck.
-        crates.Clear(); crateIds.Clear();
-        bool today = Career.Data != null && Career.Data.yardDay == YardToday();
-        for (int c = 0; c < YARD_CRATES; c++)
-        {
-            Vector3 p;
-            if (c == 0) p = garageDoor + Vector3.forward * 8f;
-            else
-            {
-                int tries = 0;
-                do
-                {
-                    p = new Vector3((float)(rng.NextDouble() * 2 - 1) * (HALF - 6f), 0f,
-                                    (float)(rng.NextDouble() * 2 - 1) * (HALF - 6f));
-                    tries++;
-                } while (tries < 50 && TooClose(p, taken, 4f));
-            }
-            taken.Add(p);
-            crateIds.Add(c);
-            if (today && Career.Data.yardOpened.Contains(c)) { crates.Add(null); continue; }
-            var crate = GameObject.CreatePrimitive(PrimitiveType.Cube);
-            crate.name = "crate_" + c;
-            crate.transform.SetParent(sandboxRoot.transform, false);
-            crate.transform.position = new Vector3(p.x, 0.35f, p.z);
-            crate.transform.localScale = new Vector3(0.7f, 0.7f, 0.7f);
-            crate.transform.rotation = Quaternion.Euler(0f, 30f, 0f);
-            crate.GetComponent<Renderer>().sharedMaterial = PartVisualFactory.HazardYellow;
-            Object.Destroy(crate.GetComponent<Collider>());     // you drive INTO it, not against it
-            var glow = PartVisualFactory.Deco(PrimitiveType.Cylinder, crate.transform, new Vector3(0f, 1.6f, 0f),
-                new Vector3(0.12f, 1.2f, 0.12f), Vector3.zero, PartVisualFactory.CyanGlow, "crate_beacon_" + c);
-            var gc = glow.GetComponent<Collider>(); if (gc != null) Object.Destroy(gc);
-            crates.Add(crate);
-        }
-
-        // the one parked yard bot: 30 m past the first crate, facing away,
-        // and it is SCOUT, not another rookie.
-        parkedPos = garageDoor + Vector3.forward * 38f + Vector3.right * 6f;
-        parkedPos.z = Mathf.Min(parkedPos.z, HALF - 6f);
-        var entry = EnemyRoster.Find(YARD_BOT);
-        RaycastWheelDrive pdrv;
-        parkedBot = SpawnBot(EnemyRoster.Recipe(entry.id, palette), entry.label, parkedPos,
-                             Quaternion.LookRotation(Vector3.forward), Vector3.forward, out pdrv);
-        if (parkedBot != null)
-        {
-            parkedBot.combatEnabled = false;
-            parkedBot.controlSource = ControlSource.AI;   // no controller: it idles
-        }
-    }
-
-    static bool TooClose(Vector3 p, List<Vector3> taken, float d)
-    {
-        foreach (var t in taken) if ((t - p).sqrMagnitude < d * d) return true;
-        return false;
-    }
-
-    // ------------------------------------------------------------ per frame
     /// <summary>Called from Update while in Build mode: the one-shot boot.</summary>
     void PumpBootToYard()
     {
@@ -256,32 +390,65 @@ public partial class BuilderManager
         EnterMap();
     }
 
+    // ------------------------------------------------------------ per frame
+    CompoundRobot NearestEnemy(Vector3 me)
+    {
+        CompoundRobot best = null; float bd = float.MaxValue;
+        foreach (var c in chunks.Values)
+        {
+            if (c.enemy == null) continue;
+            float d = (c.enemy.rb.position - me).sqrMagnitude;
+            if (d < bd) { bd = d; best = c.enemy; }
+        }
+        return best;
+    }
+    string EnemyIdOf(CompoundRobot bot)
+    {
+        foreach (var c in chunks.Values) if (c.enemy == bot) return c.enemyId;
+        return YARD_BOT;
+    }
+
     void UpdateMap()
     {
-        FloorNet(testRobot);
-        FloorNet(parkedBot);
         if (Phase0Input.BackDown()) { LeaveMap(); return; }
         if (testRobot == null) { LeaveMap(); return; }
         if (yardToastT > 0f) yardToastT -= Time.deltaTime;
 
         Vector3 me = testRobot.rb.position;
+        PumpChunks(me);
+
+        // the fall net: under the ground (a seam between chunks, a bad landing)
+        // puts you back on it
+        float gy = TerrainHeight(me.x, me.z);
+        if (me.y < gy - 3f) { LiftToGround(testRobot, gy + 1.0f); me = testRobot.rb.position; }
+        foreach (var c in chunks.Values)
+            if (c.enemy != null && c.enemy.rb.position.y < TerrainHeight(c.enemy.rb.position.x, c.enemy.rb.position.z) - 3f)
+                LiftToGround(c.enemy, TerrainHeight(c.enemy.rb.position.x, c.enemy.rb.position.z) + 1.0f);
 
         // crates: drive into one and it opens where it stands
-        for (int i = 0; i < crates.Count; i++)
+        bool opened = false;
+        foreach (var c in chunks.Values)
         {
-            var c = crates[i];
-            if (c == null) continue;
-            Vector3 cp = c.transform.position; cp.y = me.y;
-            if ((cp - me).sqrMagnitude < CRATE_REACH * CRATE_REACH) { OpenCrate(i); break; }
+            if (opened) break;
+            for (int i = 0; i < c.crates.Count; i++)
+            {
+                var g = c.crates[i];
+                if (g == null) continue;
+                Vector3 cp = g.transform.position; cp.y = me.y;
+                if ((cp - me).sqrMagnitude < CRATE_REACH * CRATE_REACH) { OpenCrate(c, i); opened = true; break; }
+            }
         }
 
-        // the encounter card
-        bool near = parkedBot != null && (parkedBot.rb.position - me).sqrMagnitude < CARD_REACH * CARD_REACH;
-        if (near && !yardCard) RBTelemetry.Once(RBTelemetry.MEET);
-        yardCard = near;
+        // the encounter card: the nearest enemy within reach
+        var near = NearestEnemy(me);
+        bool show = near != null && (near.rb.position - me).sqrMagnitude < CARD_REACH * CARD_REACH;
+        if (show && !yardCard) RBTelemetry.Once(RBTelemetry.MEET);
+        yardCard = show;
+        cardBot = show ? near : null;
+        cardBotId = show ? EnemyIdOf(near) : "";
 
-        // righting: a machine on its back with the stick held for a second
-        // flips back onto its wheels - a visible mercy the fight does not offer
+        // righting: on your back with the stick held for a second flips you
+        // back onto your wheels - a visible mercy the fight does not offer
         bool flipped = Vector3.Dot(testRobot.transform.up, Vector3.up) < 0.2f;
         if (flipped && Mathf.Abs(Phase0Input.Throttle()) > 0.3f) flippedFor += Time.deltaTime; else flippedFor = 0f;
         if (flippedFor > 1f)
@@ -289,27 +456,23 @@ public partial class BuilderManager
             flippedFor = 0f;
             Vector3 fwd = testRobot.transform.forward; fwd.y = 0f;
             if (fwd.sqrMagnitude < 0.01f) fwd = Vector3.forward;
-            testRobot.rb.position = me + Vector3.up * 0.6f;
+            testRobot.rb.position = new Vector3(me.x, TerrainHeight(me.x, me.z) + 0.8f, me.z);
             testRobot.rb.rotation = Quaternion.LookRotation(fwd.normalized, Vector3.up);
             VelUtil.SetLinearVelocity(testRobot.rb, Vector3.zero);
             testRobot.rb.angularVelocity = Vector3.zero;
         }
     }
 
-    void OpenCrate(int i)
+    void OpenCrate(Chunk c, int i)
     {
-        var c = crates[i];
-        if (c == null) return;
-        crates[i] = null;
-        Object.Destroy(c);
-        if (Career.Data != null)
-        {
-            if (Career.Data.yardDay != YardToday()) { Career.Data.yardDay = YardToday(); Career.Data.yardOpened.Clear(); }
-            if (!Career.Data.yardOpened.Contains(crateIds[i])) Career.Data.yardOpened.Add(crateIds[i]);
-        }
+        var g = c.crates[i];
+        if (g == null) return;
+        c.crates[i] = null;
+        Object.Destroy(g);
+        if (Career.Data != null && !Career.Data.worldOpened.Contains(c.crateKeys[i])) Career.Data.worldOpened.Add(c.crateKeys[i]);
         string[] lines;
         string id = Career.QuickBoxRoll(0, out lines);
-        Career.QueueReward(id, "CRATE", "found in the yard", lines);   // editor: granted at once; device: the box opens here
+        Career.QueueReward(id, "CRATE", "found in the wastes", lines);   // editor: granted at once; device: the box opens here
         if (Career.autosave) Career.Save();
         yardToast = "CRATE  ·  " + string.Join("  ·  ", lines);
         yardToastT = 3.5f;
@@ -318,13 +481,13 @@ public partial class BuilderManager
     }
 
     // ------------------------------------------------------------ the challenge
-    /// <summary>CHALLENGE, from the card. Leaves the yard and starts a Quick
-    /// bout against the parked bot under the auto-brain. M0 returns to the
-    /// garage after the bell; back-to-the-map is M1.</summary>
+    /// <summary>CHALLENGE, from the card. Leaves the world and starts a Quick
+    /// bout against that enemy under the auto-brain. Fighting in place is the
+    /// next pass; for now the bout is in the standard ring.</summary>
     public void ChallengeParked()
     {
-        if (mode != Mode.Map || parkedBot == null) return;
-        string opp = YARD_BOT;
+        if (mode != Mode.Map || cardBot == null) return;
+        string opp = string.IsNullOrEmpty(cardBotId) ? YARD_BOT : cardBotId;
         LeaveMap();
         StartYardFight(opp);
     }
@@ -354,13 +517,7 @@ public partial class BuilderManager
         }
         var entry = EnemyRoster.Find(oppId);
         if (entry == null) return;
-        RobotProgram autoProg = null;
-        if (Career.Data.activeRobot >= 0 && Career.Data.activeRobot < Career.Data.stable.Count)
-        {
-            string aTag; string aWhy = AutonomyBlocker(out aTag);
-            if (aWhy == null) autoProg = RobotProgram.FromJson(Career.Data.stable[Career.Data.activeRobot].program);
-        }
-        if (autoProg == null || autoProg.hats.Count == 0) autoProg = BrainPick(placed);
+        RobotProgram autoProg = BrainPick(placed);
 
         Career.fightBuildValue = BuildValueCareer();
         var recipe = EnemyRoster.Recipe(entry.id, palette);
@@ -397,7 +554,7 @@ public partial class BuilderManager
 
     /// <summary>THE AUTO-BRAIN (design §3.6): chosen by what the build carries,
     /// and validated against it, so "needs a Wall sensor" never fires here.
-    /// A saved program overrides it - that is the garage upgrade.</summary>
+    /// There is no program in this game; this is the only driver.</summary>
     public static RobotProgram BrainPick(List<PlacedPart> build)
     {
         var ids = new List<string>();
@@ -431,40 +588,42 @@ public partial class BuilderManager
         bool garage = GUI.Button(new Rect(w - 106f, top, 96f, 40f), "GARAGE");
         GUI.skin.button.fontSize = fs;
 
-        // the compass strip: bearings to the nearest crate and the parked bot
+        // the compass strip: bearings to the nearest crate, the nearest enemy, home
         var st = new GUIStyle(GUI.skin.label); st.fontSize = 20; st.fontStyle = FontStyle.Bold;
         st.normal.textColor = new Color(0.95f, 0.97f, 1f);
-        GUI.Box(new Rect(8f, top, w - 124f, 40f), "");   // the dark backing the text reads against
+        GUI.Box(new Rect(8f, top, w - 124f, 40f), "");
         if (testRobot != null)
         {
             Vector3 me = testRobot.rb.position;
             Vector3 fwd = testRobot.transform.TransformDirection(driveDir); fwd.y = 0f;
             if (fwd.sqrMagnitude < 0.01f) fwd = Vector3.forward;
             var sb = new System.Text.StringBuilder();
-            GameObject nearest = null; float best = float.MaxValue;
-            foreach (var c in crates) if (c != null) { float d = (c.transform.position - me).sqrMagnitude; if (d < best) { best = d; nearest = c; } }
-            if (nearest != null) sb.Append(Bearing("CRATE", nearest.transform.position - me, fwd));
-            else sb.Append("no crates left today");
-            if (parkedBot != null) sb.Append("     ").Append(Bearing(EnemyRoster.Find(YARD_BOT).label, parkedBot.rb.position - me, fwd));
-            sb.Append("     ").Append(Bearing("GARAGE", garageDoor - me, fwd));
+            Vector3 nearestCrate = Vector3.zero; float best = float.MaxValue; bool any = false;
+            foreach (var c in chunks.Values) foreach (var g in c.crates) if (g != null)
+            { float d = (g.transform.position - me).sqrMagnitude; if (d < best) { best = d; nearestCrate = g.transform.position; any = true; } }
+            sb.Append(any ? Bearing("CRATE", nearestCrate - me, fwd) : "no crate in sight - drive on");
+            var en = NearestEnemy(me);
+            if (en != null) sb.Append("     ").Append(Bearing(en.name.ToUpper(), en.rb.position - me, fwd));
+            sb.Append("     ").Append(Bearing("HOME", homePos - me, fwd));
             GUI.Label(new Rect(20f, top + 6f, w - 140f, 28f), sb.ToString(), st);
         }
         if (yardToastT > 0f && yardToast.Length > 0)
         {
             var ts = new GUIStyle(GUI.skin.label); ts.fontSize = 20; ts.fontStyle = FontStyle.Bold; ts.alignment = TextAnchor.MiddleCenter;
             ts.normal.textColor = new Color(1f, 0.87f, 0.46f);
-            GUI.Label(new Rect(0f, top + 44f, w, 30f), yardToast, ts);
+            GUI.Label(new Rect(0f, top + 48f, w, 30f), yardToast, ts);
         }
         bool challenge = false;
-        if (yardCard)
+        if (yardCard && cardBot != null)
         {
-            var entry = EnemyRoster.Find(YARD_BOT);
-            float cw = Mathf.Min(360f, w - 24f), ch = 112f;
+            var entry = EnemyRoster.Find(string.IsNullOrEmpty(cardBotId) ? YARD_BOT : cardBotId);
+            float cw = Mathf.Min(380f, w - 24f), ch = 112f;
             var box = new Rect((w - cw) * 0.5f, h - ch - 16f - Screen.safeArea.y / s, cw, ch);
             GUI.Box(box, "");
             var hs = new GUIStyle(GUI.skin.label); hs.fontSize = 18; hs.fontStyle = FontStyle.Bold; hs.alignment = TextAnchor.MiddleCenter;
             hs.normal.textColor = Color.white;
-            GUI.Label(new Rect(box.x, box.y + 6f, box.width, 26f), entry.label + "   ·   " + entry.tier.ToString().ToUpper() + "   ·   yard bot", hs);
+            GUI.Label(new Rect(box.x, box.y + 6f, box.width, 26f),
+                      (entry != null ? entry.label + "   ·   " + entry.tier.ToString().ToUpper() : cardBot.name), hs);
             var cs = new GUIStyle(GUI.skin.label); cs.fontSize = 13; cs.alignment = TextAnchor.MiddleCenter;
             cs.normal.textColor = new Color(0.75f, 0.80f, 0.88f);
             GUI.Label(new Rect(box.x, box.y + 32f, box.width, 20f), "30-second bout  ·  your machine drives itself (" + BrainPickTitle + ")  ·  drive away to decline", cs);

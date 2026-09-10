@@ -2679,7 +2679,7 @@ public class MobileBuilderUI : MonoBehaviour
         // row ("own N"), so the tab restated two numbers the player had
         // anyway. What it uniquely showed - which robot was holding what - it
         // stopped being able to say when designs stopped holding parts.
-        int n = Career.active ? 6 : 3;   // P3a: +PROGRAM in career
+        int n = Career.active ? 5 : 3;   // SCRAPYARD: no PROGRAM tab - every robot drives itself (design §3.6)
         int visN = n;
         int vi = 0;
         for (int i = 0; i < tabBtns.Count; i++)
@@ -4815,6 +4815,7 @@ public class MobileBuilderUI : MonoBehaviour
     public void ShowTab(int i)
     {
         if (i >= 3 && !Career.active) i = 0;   // SHOP/PARTS are career-only
+        if (i >= 5) i = 0;                     // SCRAPYARD: there is no PROGRAM tab
         tab = i;
         armSell = -1;
         retireArmM = -1;

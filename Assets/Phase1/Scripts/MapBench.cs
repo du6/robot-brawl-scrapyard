@@ -39,7 +39,7 @@ namespace RobotBrawl.Phase0
             if (ok) passed++; else failed++;
             log.Add((ok ? "PASS  " : "FAIL  ") + what);
         }
-        static bool Inside(Vector3 p) { return Mathf.Abs(p.x) < BuilderManager.YARD_HALF && Mathf.Abs(p.z) < BuilderManager.YARD_HALF; }
+        static bool OnGround(BuilderManager bm, Vector3 p) { return Mathf.Abs(p.y - bm.TerrainHeight(p.x, p.z)) < 2.5f; }
 
         IEnumerator Start()
         {
@@ -80,17 +80,25 @@ namespace RobotBrawl.Phase0
             Check(bm.mode == BuilderManager.Mode.Map, "DRIVE OUT enters the yard");
             Check(RBTelemetry.Has(RBTelemetry.MAP), "...and the funnel hears `map`");
             Check(bm.testRobot != null && !bm.testRobot.combatEnabled, "the player's machine is on the map, combat off");
+            int loaded = bm.WorldChunksLoaded, want = (2 * BuilderManager.VIEW_CHUNKS + 1) * (2 * BuilderManager.VIEW_CHUNKS + 1);
+            Check(loaded == want, "the world around home is loaded: " + loaded + " chunks of " + want);
+            Check(bm.WorldSeedNow != 0 && d.worldSeed == bm.WorldSeedNow, "the world's seed was rolled and saved (" + d.worldSeed + ")");
             var crates = bm.YardCratePositions();
-            Check(crates.Count == BuilderManager.YARD_CRATES, "three crates stand in the yard (" + crates.Count + ")");
-            bool allIn = true; foreach (var c in crates) if (!Inside(c)) allIn = false;
-            Check(allIn, "...every crate is inside the fence");
+            int cratesAtBoot = crates.Count;
+            Check(crates.Count >= 2, "crates stand in the loaded world (" + crates.Count + ")");
+            bool allOn = true; foreach (var c in crates) if (!OnGround(bm, c)) allOn = false;
+            Check(allOn, "...every crate sits on the terrain");
             float d0 = crates.Count > 0 ? Vector3.Distance(new Vector3(crates[0].x, 0f, crates[0].z), bm.YardGarageDoor) : -1f;
-            Check(d0 > 7f && d0 < 9f, "the first crate is 8 m from the door, in view (" + d0.ToString("0.0") + ")");
+            Check(d0 > 7f && d0 < 9f, "the first crate is 8 m from home, in view (" + d0.ToString("0.0") + ")");
             var parked = bm.YardParked;
-            Check(parked != null && Inside(parked.rb.position), "a yard bot is parked inside the fence");
-            Check(parked != null && parked.name.ToUpper().Contains("SCOUT"), "...and it is SCOUT, not another rookie (" + (parked != null ? parked.name : "-") + ")");
-            Check(parked != null && Vector3.Distance(parked.rb.position, bm.YardGarageDoor) > 20f, "...far enough from the door to be a drive");
-            Check(!bm.YardCardShown, "no card at the door");
+            Check(parked != null && OnGround(bm, parked.rb.position), "an enemy is parked on the terrain");
+            Check(parked != null && parked.name.ToUpper().Contains("SCOUT"), "...the nearest is SCOUT, not another rookie (" + (parked != null ? parked.name : "-") + ")");
+            Check(parked != null && Vector3.Distance(parked.rb.position, bm.YardGarageDoor) > 20f, "...far enough from home to be a drive");
+            Check(!bm.YardCardShown, "no card at home");
+            var hp = bm.YardGarageDoor;
+            Check(Mathf.Abs(bm.TerrainHeight(hp.x, hp.z)) < 0.01f && Mathf.Abs(bm.TerrainHeight(hp.x + 10f, hp.z + 10f)) < 0.01f, "home is flat");
+            float hA = bm.TerrainHeight(300f, 300f), hB = bm.TerrainHeight(-260f, 410f);
+            Check(Mathf.Abs(hA - hB) > 0.05f || Mathf.Abs(hA) > 0.05f, "...and the world is not (" + hA.ToString("0.0") + " m, " + hB.ToString("0.0") + " m)");
 
             // ---- 2. the seed is the date --------------------------------------
             bm.LeaveMap(); yield return null;
@@ -99,28 +107,37 @@ namespace RobotBrawl.Phase0
             var crates2 = bm.YardCratePositions();
             bool same = crates2.Count == crates.Count;
             for (int i = 0; same && i < crates.Count; i++) if ((crates[i] - crates2[i]).sqrMagnitude > 0.01f) same = false;
-            Check(same, "leaving and re-entering gives the same yard (the seed is the date)");
+            Check(same && crates2.Count == cratesAtBoot, "leaving and re-entering gives the same world (the seed persists)");
 
             // ---- 3. a crate opens where it stands ------------------------------
             int scrap0 = d.scrap; int items0 = 0; foreach (var it in d.inventory) items0 += it.count;
-            bm.testRobot.rb.position = new Vector3(crates2[0].x, 0.5f, crates2[0].z);
+            int before = bm.YardCratesLeft;
+            bm.TeleportPlayer(new Vector3(crates2[0].x, 0f, crates2[0].z));
             yield return null; yield return null; yield return null;
-            Check(bm.YardCratesLeft == BuilderManager.YARD_CRATES - 1, "driving into a crate opens it (" + bm.YardCratesLeft + " left)");
+            Check(bm.YardCratesLeft == before - 1, "driving into a crate opens it (" + bm.YardCratesLeft + " of " + before + " left)");
             int items1 = 0; foreach (var it in d.inventory) items1 += it.count;
             Check(d.scrap > scrap0 && items1 > items0, "...and it paid scrap and a part at once (+" + (d.scrap - scrap0) + " scrap, +" + (items1 - items0) + " part)");
             Check(RBTelemetry.Has(RBTelemetry.CRATE), "...and the funnel hears `crate`");
-            Check(d.yardOpened.Contains(0) && d.yardDay.Length > 0, "...and the save remembers which crate, and the day");
+            Check(d.worldOpened.Count == 1 && d.worldOpened[0].Contains(":"), "...and the save remembers which crate, by chunk (" + d.worldOpened[0] + ")");
             bm.LeaveMap(); yield return null;
             bm.EnterMap(); yield return null; yield return null;
-            Check(bm.YardCratesLeft == BuilderManager.YARD_CRATES - 1, "an opened crate does not respawn the same day");
+            Check(bm.YardCratesLeft == before - 1, "an opened crate never respawns (" + bm.YardCratesLeft + ")");
+            // drive far: chunks stream in ahead and drop behind
+            bm.TeleportPlayer(new Vector3(hp.x, 0f, hp.z + 400f));
+            for (int i = 0; i < 40; i++) yield return null;
+            Check(bm.WorldChunksLoaded == want, "400 m out, the world is still " + want + " chunks around you (" + bm.WorldChunksLoaded + ")");
+            Vector3 far = bm.testRobot.rb.position;
+            Check(OnGround(bm, far), "...and you are on the ground there (y " + far.y.ToString("0.0") + " vs ground " + bm.TerrainHeight(far.x, far.z).ToString("0.0") + ")");
+            bm.TeleportPlayer(new Vector3(hp.x, 0f, hp.z));
+            for (int i = 0; i < 40; i++) yield return null;
 
             // ---- 4. the encounter card ------------------------------------------
             parked = bm.YardParked;
-            bm.testRobot.rb.position = parked.rb.position + new Vector3(2.5f, 0.5f, 0f);
+            bm.TeleportPlayer(parked.rb.position + new Vector3(2.5f, 0f, 0f));
             yield return null; yield return null;
             Check(bm.YardCardShown, "the card comes up within " + BuilderManager.CARD_REACH + " m of the parked bot");
             Check(RBTelemetry.Has(RBTelemetry.MEET), "...and the funnel hears `meet`");
-            bm.testRobot.rb.position = bm.YardGarageDoor + new Vector3(0f, 0.5f, 2f);
+            bm.TeleportPlayer(bm.YardGarageDoor + new Vector3(0f, 0f, -6f));
             yield return null; yield return null;
             Check(!bm.YardCardShown, "drive away and the card folds - decline is free");
 
@@ -133,7 +150,7 @@ namespace RobotBrawl.Phase0
             Check(bp.title == "First Steps" && bp.Validate(bareIds) == null, "no sensors gets First Steps, and it validates (" + bp.title + ")");
 
             // ---- 5. CHALLENGE ------------------------------------------------------
-            bm.testRobot.rb.position = parked.rb.position + new Vector3(2.5f, 0.5f, 0f);
+            bm.TeleportPlayer(parked.rb.position + new Vector3(2.5f, 0f, 0f));
             yield return null; yield return null;
             bm.ChallengeParked();
             yield return null; yield return null;

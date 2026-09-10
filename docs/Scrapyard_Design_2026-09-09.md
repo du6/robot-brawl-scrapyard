@@ -29,20 +29,26 @@ need.
 
 ## 0. The pitch
 
-You start in a garage with a rookie machine, already built. The door opens
-onto a scrapyard the size of ten arenas. You drive. Crates glint between
-the wrecks; drive into one and it opens on the spot: scrap, a part,
-sometimes both. Other machines are out there too, idling by their own
-wrecks — some are the game's, some belong to real people. Drive up to one
-and a card appears: name, weight class, record, CHALLENGE. Say yes and the
-walls of a pocket arena rise around you both; thirty seconds later one of
-you is on its back. Nobody programs anything — every machine drives itself
-in a fight, yours included. Win and the crate you were fighting over is
-yours. Beat a real person's machine and your name climbs a board they can
-see. The board is the only reason to sign in.
+owen, 2026-09-10, after seeing the first prototype: "The map is not an
+arena. It should be a global map like real world. There is no
+leagues/program. It is a brand new experience like minecraft, where users
+explore the world and collect parts and fight enemies."
 
-There is no title screen, no league table, no tutorial, no program
-canvas on the way in. The map is the tutorial.
+You start on a glowing pad in the wastes with a rookie machine, already
+built. The world goes on in every direction: rust flats, scrap steppe, ash
+fields, wrecks and ruins, made as you drive from a seed that is yours.
+Crates glint between the wrecks; drive into one and it opens on the spot:
+scrap, a part, sometimes both. Other machines are out there too, idling by
+their own wrecks, tougher the further you range. Drive up to one and a card
+appears: name, class, CHALLENGE. Say yes and thirty seconds later one of you
+is on its back. Nobody programs anything — every machine drives itself in a
+fight, yours included. Win and the crate you were fighting over is yours.
+Beat a real person's machine and your name climbs a board they can see. The
+board is the only reason to sign in.
+
+There is no title screen, no league table, no tutorial, no program canvas
+anywhere. The world is the tutorial; the GARAGE button opens the workshop
+wherever you are, like an inventory.
 
 ---
 
@@ -114,8 +120,9 @@ The point of the fork. Each is a hard delete, not a flag:
   checklist (the map replaces it; a smaller checklist returns in §3.9);
 - the **ARENA tab** and `ArenaScreen`'s sign-in wall (the board and the
   one-moment login of §3.8 replace it);
-- **MANUAL FIGHT** and **TEST DRIVE** as modes (the map *is* the drive;
-  the fight is always autonomous);
+- **MANUAL FIGHT** as a mode (the fight is always autonomous) and the
+  **PROGRAM tab** (there is no program); TEST DRIVE's start routine became
+  the world's drive loop rather than being deleted;
 - the **web sign-in gate**, the `RB_PORTAL` define (nothing to gate);
 - every bench that drives a deleted screen (§6).
 
@@ -156,24 +163,26 @@ make the auto-brain good; a new game does not need a new rookie.
 Target, from the funnel: a new player opens a crate within 30 s of `map`
 and finishes a fight within 3 minutes.
 
-### 3.2 The map
+### 3.2 The world
 
-- **A flat yard, not terrain.** One `Plane` at **80 × 80 m** for the
-  prototype (the arena is 14 × 14), ringed by the arena's perimeter walls.
-  Terrain is a data cost the web cannot afford (§5) and a drive-tuning cost
-  week one cannot.
-- **Wrecks from primitives**, placed from a seed: slabs, pillars, broken
-  beams in the arena's materials. Cover and landmarks; code, not assets.
-- **Zones by weight class**, outward from the garage: FEATHER wrecks by
-  the door, then LIGHT, MIDDLE, HEAVY, SUPER at the far fence. Encounters
-  are drawn from the zone's class, so the rookie meets rookies and can
-  *see* the heavies it is not ready for. The class caps are the game's
-  "power capacity"; no new constraint.
-- **The seed is the date.** Crates and parked robots re-roll at local
-  midnight — the daily return without a timer on anything ("the yard has
-  new crates tomorrow"; `quickBoxDay` already does the day arithmetic).
-- **A compass strip** across the top: garage, nearest crate, nearest
-  encounter, as icons on a bearing line. No minimap in v1.
+- **Generated, not drawn.** Terrain is chunked (48 m squares, 25 loaded
+  around you, one built per frame as you approach, dropped behind you) and
+  made from three octaves of noise on a **per-player seed** saved in the
+  career, so your world is yours and persists. Code, not data: the web
+  budget (§5) is untouched by the size of the world, which has no edge.
+- **Home is flat** for the first 20 m, so the first minute is a drive and
+  not a climb; beyond it the ground rolls at driveable slopes.
+- **Biomes by region**: rust flats, scrap steppe, ash fields — the ground's
+  colour changes as you range, and later its parts and enemies do too.
+- **Wrecks and ruins** from each chunk's own seed (the world's seed mixed
+  with the chunk's coordinates), so a place looks the same every time you
+  come back.
+- **Danger grows with distance.** Within ~120 m of home the enemies are
+  rookies (SCOUT, TIPPER); to ~300 m veterans (MAULER, RIPPER, MILLSTONE);
+  beyond, champions (BULWARK, WIDOWMAKER, BASTION). The world is its own
+  weight class.
+- **A compass strip** across the top: bearings to the nearest crate, the
+  nearest enemy, and HOME. No minimap in v1.
 
 ### 3.3 Driving
 
@@ -240,11 +249,10 @@ what the build carries:
 | compass only | `Brawler` | needs a Compass tracker |
 | wall sensor only | `WallShy` | |
 | no sensors | `FirstSteps` | the sensor-free preset |
-| a saved program on the robot | the player's program | the garage upgrade; opt-in |
 
-A saved program overrides the auto-brain: that is where autonomy
-programming lives in this game — an upgrade found in the garage, never a
-prerequisite. The PROGRAM tab stays in the garage.
+**There is no program in this game** (owen, 2026-09-10). The PROGRAM tab is
+deleted; the auto-brain is the only driver, always. Robot Brawl keeps
+autonomy programming; Scrapyard's depth is the build and the world.
 
 **The player never drives in a fight.** One control scheme per screen: you
 drive on the map, the brain drives in the ring.
@@ -289,7 +297,7 @@ the same name and the same robots.
 
 ### 3.9 The garage
 
-BUILD / ROBOTS / SHOP / PROGRAM, the dock, unchanged from Robot Brawl. New:
+BUILD / ROBOTS / SHOP, the dock, unchanged from Robot Brawl (no PROGRAM). New:
 DRIVE OUT, a BOARD door, and a four-line checklist that pays once — first
 crate, first challenge, first win, first upgrade — reusing the reward
 plumbing the old checklist used.
@@ -544,6 +552,24 @@ Nothing in M0 is blocked.
 
 ## Progress log
 
+- **2026-09-10 — THE WORLD replaces the yard (owen: "not an arena… like
+  minecraft").** `BuilderManager.Map.cs` rewritten: chunked terrain from
+  three octaves of noise on a per-player seed (`CareerData.worldSeed`,
+  rolled on the first drive and saved), 48 m chunks, 25 loaded around the
+  player, one built per frame, dropped behind; biomes by region; wrecks
+  and ruins, crates (keyed per chunk in `worldOpened`, never respawn) and
+  enemies per chunk, tougher with distance from home; no fence, no edge;
+  a fall net; HOME on the compass. The PROGRAM tab is gone. Fights still
+  cut to the standard ring — **fighting in place is the next pass**, and
+  so is roaming. **Measured: MapBench 40/0** (25 chunks around home, the
+  seed rolled and saved, crates on the terrain, the first 8 m from home,
+  SCOUT nearest, home flat and the world not, the same world on re-entry,
+  crate-once with a per-chunk key, 400 m out still 25 chunks and on the
+  ground, the card, the brain, a fight to the bell, the ledger);
+  TouchSmoke 55/0, QuickFightBench 24/0. Two real bugs the bench caught
+  first: home sat on a chunk CORNER (a hair of drift loaded two extra
+  chunks) — now a chunk centre; and a teleport through `rb.position`
+  alone tore the machine in half — `TeleportPlayer` moves every part.
 - **2026-09-10 — M0 step 3 DEPLOYED: `https://cyberduck.club/play/scrapyard/`.**
   First web build of the fork was **26 MB of data**: the six music themes
   sit in `Assets/Resources` for iOS (21 MB) and `com.unity.ai.inference`
