@@ -552,6 +552,21 @@ Nothing in M0 is blocked.
 
 ## Progress log
 
+- **2026-09-10 — steering (owen: "turning is too sensitive, making it hard
+  to drive straight").** The fight's drive took the stick raw, and a
+  skid-steer build (SCRAPPER: four fixed wheels) turns by braking one side
+  at full stick whatever the speed — the drive's speed scaling only touches
+  steerable wheels. On the map the player's inputs now go through the
+  drive's AI channel, which the map file owns (the shared wheel model is
+  untouched): a dead zone (0.18), a gain (0.60, 0.45 at speed), a rate, a
+  **speed cap of 6 m/s**, and a **heading hold** — the heading is
+  remembered when the stick centres and steered back to (error + rate).
+  MapBench's trace found what a player felt: **the rookie veers by itself,
+  1° at 2 m/s and 12° at 10 m/s over two seconds** (the build is not
+  symmetrical; a 14 m ring never shows it). The hold's sign was measured
+  wrong once from a near-stationary pivot and fixed from the moving case.
+  **Measured: MapBench 45/0** — full throttle, stick centred, two seconds:
+  9.5 m and **0.0° of drift**; a held stick still turns 19° in 1.5 s.
 - **2026-09-10 — THE WORLD replaces the yard (owen: "not an arena… like
   minecraft").** `BuilderManager.Map.cs` rewritten: chunked terrain from
   three octaves of noise on a per-player seed (`CareerData.worldSeed`,

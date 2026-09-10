@@ -5,28 +5,34 @@ PASS  DRIVE OUT enters the yard
 PASS  ...and the funnel hears `map`
 PASS  the player's machine is on the map, combat off
 PASS  the world around home is loaded: 25 chunks of 25
-PASS  the world's seed was rolled and saved (799557550)
-PASS  crates stand in the loaded world (30)
+PASS  the world's seed was rolled and saved (4242)
+PASS  crates stand in the loaded world (16)
 PASS  ...every crate sits on the terrain
-PASS  the first crate is 8 m from home, in view (8.0)
+PASS  a crate stands 8 m from home, in view (8.0)
 PASS  an enemy is parked on the terrain
 PASS  ...the nearest is SCOUT, not another rookie (SCOUT)
 PASS  ...far enough from home to be a drive
 PASS  no card at home
 PASS  home is flat
-PASS  ...and the world is not (-2.0 m, -1.0 m)
+PASS  ...and the world is not (0.8 m, -1.5 m)
 PASS  GARAGE returns to the garage
 PASS  leaving and re-entering gives the same world (the seed persists)
-PASS  driving into a crate opens it (29 of 30 left)
+PASS  driving into a crate opens it (15 of 16 left)
 PASS  ...and it paid scrap and a part at once (+40 scrap, +1 part)
 PASS  ...and the funnel hears `crate`
 PASS  ...and the save remembers which crate, by chunk (0,0:0)
-PASS  an opened crate never respawns (29)
+PASS  an opened crate never respawns (15)
 PASS  400 m out, the world is still 25 chunks around you (25)
-PASS  ...and you are on the ground there (y 0.2 vs ground 0.1)
+PASS  ...and you are on the ground there (y -0.8 vs ground -1.0)
 PASS  the card comes up within 4 m of the parked bot
 PASS  ...and the funnel hears `meet`
 PASS  drive away and the card folds - decline is free
+      trace: 4.5s yaw 0 steer 0.00 thr 0.00 v 0.2 | 4.9s yaw 0 steer -0.01 thr 1.00 v 2.4 | 5.3s yaw 0 steer 0.00 thr 1.00 v 5.2 | 5.7s yaw 0 steer 0.00 thr 1.00 v 6.4 | 6.1s yaw 0 steer 0.00 thr 1.00 v 6.3 | 
+PASS  full throttle for 2 s moves the machine (9.5 m)
+PASS  ...and with the stick inside the dead zone it holds its heading (0.0 deg)
+PASS  ...the dead zone reads as zero stick; only the heading hold steers (0.00)
+PASS  a held full stick still turns it (19 deg in 1.5 s)
+PASS  ...at no more than the map's gain (0.45)
 PASS  SCRAPPER (compass + wall sensor) gets Ram Hunter
 PASS  no sensors gets First Steps, and it validates (First Steps)
 PASS  CHALLENGE enters a fight

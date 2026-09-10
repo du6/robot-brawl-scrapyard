@@ -58,6 +58,7 @@ namespace RobotBrawl.Phase0
             d.stable.Add(new CareerRobot { name = "SCRAPPER", snapshot = BuilderManager.STARTER_SNAPSHOT,
                                            program = "" });   // NO saved program: the auto-brain must drive
             d.activeRobot = 0;
+            d.worldSeed = 4242;   // one world, every run - a rolled seed made the crate layout a coin flip
             Career.TopUpForSnapshot(BuilderManager.STARTER_SNAPSHOT);
             bm.LoadSnapshot(BuilderManager.STARTER_SNAPSHOT);
             RBTelemetry.TestReset();
@@ -88,8 +89,9 @@ namespace RobotBrawl.Phase0
             Check(crates.Count >= 2, "crates stand in the loaded world (" + crates.Count + ")");
             bool allOn = true; foreach (var c in crates) if (!OnGround(bm, c)) allOn = false;
             Check(allOn, "...every crate sits on the terrain");
-            float d0 = crates.Count > 0 ? Vector3.Distance(new Vector3(crates[0].x, 0f, crates[0].z), bm.YardGarageDoor) : -1f;
-            Check(d0 > 7f && d0 < 9f, "the first crate is 8 m from home, in view (" + d0.ToString("0.0") + ")");
+            float d0 = -1f;
+            foreach (var c in crates) { float dd = Vector3.Distance(new Vector3(c.x, 0f, c.z), bm.YardGarageDoor); if (dd > 7f && dd < 9f) d0 = dd; }
+            Check(d0 > 0f, "a crate stands 8 m from home, in view (" + d0.ToString("0.0") + ")");
             var parked = bm.YardParked;
             Check(parked != null && OnGround(bm, parked.rb.position), "an enemy is parked on the terrain");
             Check(parked != null && parked.name.ToUpper().Contains("SCOUT"), "...the nearest is SCOUT, not another rookie (" + (parked != null ? parked.name : "-") + ")");
@@ -140,6 +142,44 @@ namespace RobotBrawl.Phase0
             bm.TeleportPlayer(bm.YardGarageDoor + new Vector3(0f, 0f, -6f));
             yield return null; yield return null;
             Check(!bm.YardCardShown, "drive away and the card folds - decline is free");
+
+            // ---- 5b. the drive: straight when you mean straight, and it still turns ---
+            // owen, 2026-09-10: "turning is too sensitive, making it hard to
+            // drive straight". Full throttle, no steer, for two seconds must hold
+            // a heading; a small stick wobble inside the dead zone must not
+            // steer; a held full stick must still turn.
+            bm.TeleportPlayer(new Vector3(hp.x - 9f, 0f, hp.z - 8f));   // FLAT and WRECK-FREE (inside 12 m of home), off the crate lane
+            for (int i = 0; i < 30; i++) yield return null;                 // settle after the drop
+            Vector3 fwd0 = bm.testRobot.transform.TransformDirection(bm.TestDriveDir); fwd0.y = 0f;
+            Vector3 pos0 = bm.testRobot.rb.position;
+            Phase0Input.debugThrottle = 1f; Phase0Input.debugSteer = 0.12f;   // a wobble inside the dead zone
+            float tEnd = Time.time + 2.0f; float tNext = Time.time;
+            var trace = new System.Text.StringBuilder();
+            while (Time.time < tEnd)
+            {
+                if (Time.time >= tNext)
+                {
+                    Vector3 f = bm.testRobot.transform.TransformDirection(bm.TestDriveDir); f.y = 0f;
+                    trace.Append(Time.time.ToString("0.0")).Append("s yaw ").Append(Vector3.SignedAngle(fwd0, f, Vector3.up).ToString("0")).Append(" steer ").Append(bm.MapSteerNow.ToString("0.00")).Append(" thr ").Append(bm.testDrive.CurrentThrottle().ToString("0.00")).Append(" v ").Append(VelUtil.GetLinearVelocity(bm.testRobot.rb).magnitude.ToString("0.0")).Append(" | ");
+                    tNext += 0.4f;
+                }
+                yield return null;
+            }
+            log.Add("      trace: " + trace);
+            Vector3 fwd1 = bm.testRobot.transform.TransformDirection(bm.TestDriveDir); fwd1.y = 0f;
+            float turned = Vector3.Angle(fwd0, fwd1);
+            float went = Vector3.Distance(pos0, bm.testRobot.rb.position);
+            Check(went > 3f, "full throttle for 2 s moves the machine (" + went.ToString("0.0") + " m)");
+            Check(turned < 8f, "...and with the stick inside the dead zone it holds its heading (" + turned.ToString("0.0") + " deg)");
+            Check(Mathf.Abs(bm.MapSteerNow) <= BuilderManager.HOLD_MAX + 0.001f, "...the dead zone reads as zero stick; only the heading hold steers (" + bm.MapSteerNow.ToString("0.00") + ")");
+            Phase0Input.debugSteer = 1f;
+            tEnd = Time.time + 1.5f;
+            while (Time.time < tEnd) yield return null;
+            Vector3 fwd2 = bm.testRobot.transform.TransformDirection(bm.TestDriveDir); fwd2.y = 0f;
+            Check(Vector3.Angle(fwd1, fwd2) > 15f, "a held full stick still turns it (" + Vector3.Angle(fwd1, fwd2).ToString("0") + " deg in 1.5 s)");
+            Check(bm.MapSteerNow > 0f && bm.MapSteerNow <= BuilderManager.STEER_GAIN + 0.001f, "...at no more than the map's gain (" + bm.MapSteerNow.ToString("0.00") + ")");
+            Phase0Input.debugThrottle = 0f; Phase0Input.debugSteer = 0f;
+            for (int i = 0; i < 30; i++) yield return null;
 
             // ---- 6. the auto-brain, before the fight uses it ----------------------
             Check(BuilderManager.BrainPick(bm.placed).title == "Ram Hunter", "SCRAPPER (compass + wall sensor) gets Ram Hunter");

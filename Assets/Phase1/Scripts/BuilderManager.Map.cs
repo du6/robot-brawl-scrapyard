@@ -37,6 +37,30 @@ public partial class BuilderManager
     public const float CARD_REACH = 4f;      // the encounter card slides up
     public const string YARD_BOT = "scout";  // the spawn chunk's guaranteed first enemy
     public const float SPAWN_FLAT = 22f;     // the world is flat this far from home
+    // THE MAP'S STEERING (owen, 2026-09-10: "turning is too sensitive, making
+    // it hard to drive straight"). The fight's drive takes the stick raw, and a
+    // skid-steer build (SCRAPPER: four fixed wheels, no steering geometry)
+    // turns by braking one side at full stick whatever the speed - the
+    // drive's speed scaling only touches STEERABLE wheels. So on the map the
+    // player's inputs go through the drive's AI channel, which this file
+    // owns: a dead zone the stick's jitter cannot cross, a gain, less of it
+    // at speed, and a rate so a tap is a nudge and a hold is a turn. The
+    // shared wheel model is untouched (fights are byte-identical).
+    public const float STEER_DEAD = 0.18f;
+    public const float STEER_GAIN = 0.60f;
+    public const float STEER_GAIN_FAST = 0.45f;   // at max speed (0.30 turned only 10 deg/s at 6 m/s - sluggish, measured)
+    public const float STEER_RATE = 3.0f;         // full deflection in ~0.33 s
+    // MEASURED (MapBench trace, flat ground, zero steer): the rookie veers by
+    // itself, and the veer grows with speed - 1 deg at 2 m/s, 12 deg at
+    // 10 m/s over two seconds. The build is not symmetrical, and a 14 m ring
+    // never lets it reach the speed where that shows. So the map caps speed
+    // (the design's "try 6") and holds heading: with the stick centred, a
+    // little counter-steer against the machine's own yaw rate.
+    public const float MAP_MAX_SPEED = 6f;
+    public const float HOLD_K = 0.15f;       // per rad/s of yaw rate (damping)
+    public const float HOLD_ERR = 0.020f;    // per degree off the held heading (return)
+    public const float HOLD_MAX = 0.30f;
+    float holdHeading; bool holding;
 
     /// <summary>THE MAP IS THE FRONT DOOR. A fresh BuilderManager drives out on
     /// its first frames; GARAGE is the door back. Benches set this false
@@ -75,6 +99,7 @@ public partial class BuilderManager
     public Vector3 YardGarageDoor { get { return homePos; } }
     public int WorldChunksLoaded { get { return chunks.Count; } }
     public int WorldSeedNow { get { return worldSeed; } }
+    public Vector3 TestDriveDir { get { return driveDir; } }   // the build's drive axis, for a bench's heading check
     public List<Vector3> YardCratePositions()
     {
         var l = new List<Vector3>();
@@ -354,7 +379,8 @@ public partial class BuilderManager
         testRobot = SpawnBot(placed, "PlayerBuild", homePos, Quaternion.identity, driveDir, out testDrive);
         if (testRobot == null) { BackToBuild(); message = "the build would not spawn"; return; }
         testRobot.combatEnabled = false;     // nothing on the map fights until you challenge
-        testRobot.controlSource = ControlSource.Keyboard;
+        testRobot.controlSource = ControlSource.AI;   // the map feeds aiThrottle/aiSteer itself (see STEER_*)
+        if (testDrive != null) { testDrive.aiThrottle = 0f; testDrive.aiSteer = 0f; testDrive.maxSpeed = MAP_MAX_SPEED; }
         foreach (var act in testRobot.GetComponentsInChildren<Actuator>(true)) act.playerControlled = false;
         combatArmAt = -1f;
 
@@ -416,6 +442,7 @@ public partial class BuilderManager
 
         Vector3 me = testRobot.rb.position;
         PumpChunks(me);
+        MapSteer();
 
         // the fall net: under the ground (a seam between chunks, a bad landing)
         // puts you back on it
@@ -461,6 +488,52 @@ public partial class BuilderManager
             VelUtil.SetLinearVelocity(testRobot.rb, Vector3.zero);
             testRobot.rb.angularVelocity = Vector3.zero;
         }
+    }
+
+    /// <summary>Stick and keys -> the drive's AI inputs, shaped for a world
+    /// rather than a ring. Public seam so a bench can read the result.</summary>
+    public float MapSteerNow { get { return testDrive != null ? testDrive.aiSteer : 0f; } }
+    void MapSteer()
+    {
+        if (testDrive == null) return;
+        float thr = Phase0Input.Throttle();
+        float raw = Phase0Input.Steer();
+        float mag = Mathf.Abs(raw);
+        float shaped = mag < STEER_DEAD ? 0f : Mathf.Sign(raw) * (mag - STEER_DEAD) / (1f - STEER_DEAD);
+        float v = VelUtil.GetLinearVelocity(testRobot.rb).magnitude;
+        float gain = Mathf.Lerp(STEER_GAIN, STEER_GAIN_FAST, Mathf.Clamp01(v / Mathf.Max(0.1f, testDrive.maxSpeed)));
+        float target = shaped * gain;
+        float rate = target == 0f ? STEER_RATE * 2f : STEER_RATE;   // let go and it straightens fast
+        if (target == 0f && Mathf.Abs(thr) > 0.05f)
+        {
+            // heading hold: counter the machine's own yaw when you mean straight
+            // MEASURED the wrong way first (MapBench trace: yaw -51 deg with the
+            // hold pushing +0.10 - a runaway spin at throttle). In this drive
+            // POSITIVE steer turns LEFT, i.e. NEGATIVE angular y, so the
+            // counter-steer has the same sign as the yaw rate.
+            // THE HEADING HOLD. Measured three ways before it was right: the
+            // sign first (yaw -51 with the hold pushing +0.10 - a runaway spin;
+            // in this drive POSITIVE steer turns LEFT, i.e. NEGATIVE angular
+            // y), then the strength (rate damping alone let the machine's own
+            // pull during acceleration walk the heading 23 deg and only then
+            // stop it). So: remember the heading the moment the stick centres,
+            // and steer back toward it - error and rate, both with the sign of
+            // the yaw. A moved stick releases the hold.
+            float yaw = testRobot.transform.eulerAngles.y;
+            if (!holding) { holdHeading = yaw; holding = true; }
+            float err = Mathf.DeltaAngle(holdHeading, yaw);     // +: turned right of the held heading
+            float yawRate = testRobot.rb.angularVelocity.y;
+            // Sign, MEASURED on the moving machine (trace: err +24 with the hold
+            // at +0.35 ran away to a spin): positive steer turns RIGHT, positive
+            // angular y is RIGHT, positive err is RIGHT - so the hold is the
+            // negative of both. (The near-stationary pivot in an earlier trace
+            // read the other way and was the wrong case to trust.)
+            target = -Mathf.Clamp(err * HOLD_ERR + yawRate * HOLD_K, -HOLD_MAX, HOLD_MAX);
+            rate = STEER_RATE * 2f;
+        }
+        else holding = false;
+        testDrive.aiSteer = Mathf.MoveTowards(testDrive.aiSteer, target, rate * Time.deltaTime);
+        testDrive.aiThrottle = Mathf.Abs(thr) < 0.05f ? 0f : thr;
     }
 
     void OpenCrate(Chunk c, int i)
