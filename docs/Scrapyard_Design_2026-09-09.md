@@ -544,6 +544,21 @@ Nothing in M0 is blocked.
 
 ## Progress log
 
+- **2026-09-10 — M0 step 3 DEPLOYED: `https://cyberduck.club/play/scrapyard/`.**
+  First web build of the fork was **26 MB of data**: the six music themes
+  sit in `Assets/Resources` for iOS (21 MB) and `com.unity.ai.inference`
+  shipped 6.5 MB of compute shaders. Fixed: the two AI packages are out of
+  the manifest; `BuildWebGL` hides `Assets/Resources` behind a `~` for the
+  web build (restored in `finally`) and ships the spike's re-encoded
+  tracks from `music_web/` beside the page, which `MusicLoader` streams
+  after boot. **Second build: data 3.5 MB, wasm 6.6 MB, initial 10.3 MB —
+  a MISS on the §5 budget of 9 MB by ~1.3 MB.** Named, not waved through:
+  ~1.6 MB is URP film-grain/SMAA textures the game never draws and ~1.3 MB
+  is the TextMesh Pro font; both are a settings pass, not code. Robot
+  Brawl's page is 7.8 MB for comparison. Beacon path `scrapyard-play`;
+  read the funnel with `RB_BEACON=scrapyard-play zsh
+  server/scripts/web_funnel.zsh` in the Robot Brawl repo. M0's exit (median
+  time on the map > 60 s, ≥ 50 % open a crate) now waits on players.
 - **2026-09-10 — M0 step 3: THE YARD EXISTS (headless).** Grown out of
   `StartTest()` as a partial of BuilderManager (`BuilderManager.Map.cs`,
   ~470 lines): `Mode.Map`, an 80 × 80 m plane with a fence and a glowing

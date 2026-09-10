@@ -116,7 +116,46 @@ namespace RobotBrawl.Editor
             };
 
             Debug.Log("[BuildWebGL] building " + outDir + " from " + scenes.Count + " scene(s)");
-            BuildReport report = BuildPipeline.BuildPlayer(opts);
+            // SCRAPYARD (2026-09-10): THE MUSIC IS NOT IN THE DATA FILE. This repo
+            // serves iOS too, so the six themes live in Assets/Resources for
+            // Resources.Load - and the first web build of the fork carried all
+            // 21 MB of them into webgl.data (26 MB against a 9 MB budget; the
+            // spike simply had no Resources folder). On the web MusicLoader
+            // streams music/<name>.mp3 from beside the page AFTER boot, so for
+            // this build the folder is hidden behind a `~` (Unity ignores it),
+            // restored in `finally`, and the small re-encoded tracks are copied
+            // next to index.html.
+            string resDir = Path.Combine(Application.dataPath, "Resources");
+            string hidDir = Path.Combine(Application.dataPath, "Resources~");
+            bool hid = false;
+            if (Directory.Exists(resDir) && !Directory.Exists(hidDir))
+            {
+                Directory.Move(resDir, hidDir);
+                if (File.Exists(resDir + ".meta")) File.Move(resDir + ".meta", hidDir + ".meta");
+                hid = true;
+                AssetDatabase.Refresh();
+            }
+            BuildReport report;
+            try { report = BuildPipeline.BuildPlayer(opts); }
+            finally
+            {
+                if (hid)
+                {
+                    Directory.Move(hidDir, resDir);
+                    if (File.Exists(hidDir + ".meta")) File.Move(hidDir + ".meta", resDir + ".meta");
+                    AssetDatabase.Refresh();
+                }
+            }
+            string musicSrc = Arg("-rbMusicDir") ?? Path.Combine(Path.GetDirectoryName(Application.dataPath), "music_web");
+            if (Directory.Exists(musicSrc))
+            {
+                string musicDst = Path.Combine(outDir, "music");
+                Directory.CreateDirectory(musicDst);
+                int nm = 0;
+                foreach (var f in Directory.GetFiles(musicSrc, "*.mp3")) { File.Copy(f, Path.Combine(musicDst, Path.GetFileName(f)), true); nm++; }
+                Debug.Log("[BuildWebGL] music/ beside the page: " + nm + " track(s) from " + musicSrc);
+            }
+            else Debug.LogWarning("[BuildWebGL] no music_web/ (or -rbMusicDir) - the page will have no music");
             var sum = report.summary;
             Debug.Log(string.Format(
                 "[BuildWebGL] result={0} size={1} errors={2} warnings={3} time={4}",
