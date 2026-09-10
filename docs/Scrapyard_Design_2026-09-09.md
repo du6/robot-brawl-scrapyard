@@ -1,4 +1,4 @@
-# Scraplands — a new game from the same base (design, 2026-09-09)
+# Robot Brawl: Scrapyard — a new game from the same base (design, 2026-09-09)
 
 owen: "I'm thinking about developing another version of the game (a
 completely new game), where user starts with a rookie robot. User can drive
@@ -17,7 +17,7 @@ prefer to build a brand new game so that the current game is not impacted.
 It feels very different even though a lot of things can be shared. We can
 create a new game but branched from the same base."
 
-So: **Scraplands** (working name) is a **new game in a new repository,
+So: **Robot Brawl: Scrapyard** is a **new game in a new repository,
 forked from Robot Brawl at `release/ios-build18` = `9d41135`**, with its own
 bundle id, store record, web path and portal listing, sharing the ladder
 server with Robot Brawl. Robot Brawl is not touched by anything in this
@@ -93,7 +93,7 @@ fix to the shared fight core lands twice from now on.
 | piece | files | note |
 |---|---|---|
 | the physics robot | `CompoundRobot`, `MatDB`, `RaycastWheelDrive`, `Actuator`, `PartVisualFactory`, `P1PartDef` | the fight core; changes here land in both games |
-| the fight | `FightManager` (Quick profile: 30 s, 5-s count-out, crusher walls at −10 s), `DamageResolver`, `ArenaHazards`, `FightCamera` | Scraplands uses **only** the Quick profile |
+| the fight | `FightManager` (Quick profile: 30 s, 5-s count-out, crusher walls at −10 s), `DamageResolver`, `ArenaHazards`, `FightCamera` | Scrapyard uses **only** the Quick profile |
 | the brain | `ProgramRunner`, `SensorBus`, `RobotProgram` presets, `AIController` | the auto-brain table, §3.6 |
 | the drive input | `TouchControls` (`Phase5Mobile.cs`), WASD | retuned for minutes of driving |
 | the garage | BUILD / ROBOTS / SHOP / PROGRAM panels of `MobileBuilderUI`, `BuilderManager`'s build half | the map's GARAGE door |
@@ -283,7 +283,7 @@ has). The wall copy is the reason, not a demand:
 
 Robot Brawl's web wall bounced 95 % when it stood at the door. Here it
 stands at the moment the player wants the thing it gives. Accounts are the
-shared ladder's accounts: a Robot Brawl player signs in to Scraplands with
+shared ladder's accounts: a Robot Brawl player signs in to Scrapyard with
 the same name and the same robots.
 
 ### 3.9 The garage
@@ -337,8 +337,8 @@ that way:
 **Funnel events** (the beacon in the web template + `web_funnel.zsh`, which
 the fork copies and trims): `open ready boot map crate meet challenge rank
 box streak return`. The step to move first is `map → crate` within 30 s;
-the one to move most is `boot → challenge`. Scraplands' beacon path is its
-own (`/v1/beacon/yard-play`), so the two games' funnels never mix.
+the one to move most is `boot → challenge`. Scrapyard's beacon path is its
+own (`/v1/beacon/scrapyard-play`), so the two games' funnels never mix.
 
 **Benches.** All under `#if UNITY_EDITOR || DEVELOPMENT_BUILD`, all holding
 `Career.SuspendAutosave()` and swapping `Career.Data` — owner state is
@@ -380,18 +380,18 @@ Deleted with their screens: `CareerSmoke` (leagues, guide, checklist),
 
 ### 7.1 Repository and identity
 
-| | Robot Brawl | Scraplands |
+| | Robot Brawl | Scrapyard |
 |---|---|---|
-| repo | `du6/robot-brawl` | **`du6/scraplands`** (new; first commit = the fork point `9d41135`, second = the doc, then one delete per system) |
-| local | `~/Setup Guide In-Editor Tutorial` | `~/scraplands` — a clone, **not** a worktree (building switches the active target; this project's is iOS) |
+| repo | `du6/robot-brawl` | **`du6/robot-brawl-scrapyard`** (new; first commit = the fork point `9d41135`, second = the doc, then one delete per system) |
+| local | `~/Setup Guide In-Editor Tutorial` | `~/robot-brawl-scrapyard` — a clone, **not** a worktree (building switches the active target; this project's is iOS) |
 | Unity | 6000.5.4f1 | same |
-| productName | Robot Brawl: Bolt & Blade | Scraplands (placeholder) |
-| bundle id | `club.cyberduck.robotbrawl` | `club.cyberduck.scraplands` |
+| productName | Robot Brawl: Bolt & Blade | Robot Brawl: Scrapyard |
+| bundle id | `club.cyberduck.robotbrawl` | `club.cyberduck.scrapyard` |
 | App Store | id6801680303 | a new app record; new screenshots, new review |
-| web | `cyberduck.club/play/rb/` | `cyberduck.club/play/yard/`; own `index.html` template, own beacon path |
+| web | `cyberduck.club/play/rb/` | `cyberduck.club/play/scrapyard/`; own `index.html` template, own beacon path |
 | CrazyGames | listing b91c802d… (awaiting review) | a second submission when M2's exit is met; Basic Launch, Brotli-only, no login on the way in — nothing to gate |
-| the site | `/robot-brawl/` page | its own page; the homepage lists two games |
-| save file | `robotbrawl_career.json` | `scraplands_save.json` — a new save, no migration; `CareerData` is copied and trimmed |
+| the site | `/robot-brawl/` page | `/scrapyard/`; the homepage lists two games |
+| save file | `robotbrawl_career.json` | `scrapyard_save.json` — a new save, no migration; `CareerData` is copied and trimmed |
 
 Owen's Robot Brawl career save is untouched by construction: the new game
 reads and writes a different path.
@@ -417,7 +417,7 @@ behaviour stays identical across games and the referee's bouts stay fair.
 ### 7.3 The shared server
 
 One API, one database, one worker, one set of accounts, ratings and
-seasons. Robot Brawl and Scraplands robots are in one pool and can be
+seasons. Robot Brawl and Scrapyard robots are in one pool and can be
 matched against each other; the class caps make that fair, and the more
 robots the pool holds the better both games are. Three server changes, all
 in `du6/robot-brawl` (the CLI owns `server/**`), deployed once:
@@ -429,7 +429,7 @@ in `du6/robot-brawl` (the CLI owns `server/**`), deployed once:
    and fights a `yard` match on the Quick profile (30 s, 5-s count-out,
    walls at −10 s, one bout) instead of best-of-3 at 90 s. Rating settles
    the same way. Add a CHECK for the two values.
-3. **A `game` tag on snapshots** (`'rb' | 'yard'`, default `'rb'`) so the
+3. **A `game` tag on snapshots** (`'rb' | 'scrapyard'`, default `'rb'`) so the
    pool and the board can filter or badge by origin. Not a ruleset; a
    label.
 
@@ -460,12 +460,12 @@ Each has an exit that can fail. Predict before measuring, in the doc.
 1. Server first: `GET /v1/pool` + the `yard` ruleset + the `game` tag,
    `api_smoke` green, deployed. Robot Brawl is unaffected (its challenges
    default to `league`).
-2. `du6/scraplands` from `9d41135`; one delete commit per system in §2.2
+2. `du6/robot-brawl-scrapyard` from `9d41135`; one delete commit per system in §2.2
    with the surviving suite green after each; new identity, save path,
    beacon path, web path.
 3. The prototype: 80 × 80 yard, 3 crates, 1 yard-bot encounter (SCOUT),
    stick + WASD, follow camera, DRIVE OUT / GARAGE doors, `map` and
-   `crate` events, deployed to `/play/yard/`.
+   `crate` events, deployed to `/play/scrapyard/`.
 *Exit:* initial ≤ 9 MB; DriveBench green; on the live path, of sessions
 that reach `map`, **median time on the map > 60 s** and **≥ 50 % open a
 crate**.
@@ -487,7 +487,7 @@ verdicts with WATCH, the BOARD screen.
 accounts per week > 0** (it has been 0 for 3 weeks); ≥ 1 refereed
 challenge a day from a non-bench account.
 
-**M3 — ship (week 7).** iOS 1.0 of Scraplands (new record, new review),
+**M3 — ship (week 7).** iOS 1.0 of Scrapyard (new record, new review),
 the CrazyGames submission, the site's second game page and the homepage
 listing two games. Robot Brawl's own 2.3.0 (Quick Fight) ships on its own
 schedule from its own repo.
@@ -497,19 +497,17 @@ now.
 
 ---
 
-## 9. Owen's calls, in the order they block work
+## 9. Owen's calls — all five made, 2026-09-09
 
-1. **The name** — it is the repo, the bundle id, the store record and the
-   web path, so it is first. Scraplands is a placeholder.
-2. **Points on the referee's verdict, with a wait** (recommended), or on
-   the local bout, instantly and cheatably. The 5-minute cadence is a
-   scheduler line and ~$35/mo if it must be instant.
-3. **One pool or two.** Robot Brawl robots parked in Scraplands yards and
-   vice versa (recommended: one pool, badged by `game`), or each game
-   fights only its own.
-4. **Battery on the map:** no drain (recommended for v1) or drain as pacing.
-5. **The numbers:** 8 crates/day, cap 6 shared, yard 80 m, first crate at
-   8 m. All tunable from `crate`/`meet`/`challenge` per session.
+| call | decision | what it fixes in this doc |
+|---|---|---|
+| the name | **Robot Brawl: Scrapyard** | repo `du6/robot-brawl-scrapyard`, bundle `club.cyberduck.scrapyard`, web `/play/scrapyard/`, save `scrapyard_save.json`, beacon `/v1/beacon/scrapyard-play`, referee ruleset `yard`, snapshot `game` tag `scrapyard` |
+| points | **the referee's verdict**, on the 5-minute scheduler | §3.7 as written; the local bout is UNOFFICIAL; no always-on worker |
+| the pool | **one pool across both games, badged by `game`** | §3.5, §7.3 as written; the card shows origin |
+| battery | **no drain on the map** | §3.3 as written |
+| the numbers | **8 crates/day, cap 6 shared, 80 m yard, first crate at 8 m** | §3.2, §3.4; tune from `crate`/`meet`/`challenge` after M0 |
+
+Nothing in M0 is blocked.
 
 ---
 
@@ -543,4 +541,6 @@ now.
 
 - **2026-09-09** — first draft put this on a branch of Robot Brawl
   (`feature/scraplands`); owen chose a new game. Rewritten for the fork.
-  Nothing built. Next: M0 step 1, the server changes, in this repo.
+  Then owen made all five calls (§9): the game is **Robot Brawl:
+  Scrapyard**. Nothing built. Next: M0 step 1, the server changes, in
+  this repo.
