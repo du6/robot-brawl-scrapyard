@@ -559,6 +559,14 @@ Nothing in M0 is blocked.
   read the funnel with `RB_BEACON=scrapyard-play zsh
   server/scripts/web_funnel.zsh` in the Robot Brawl repo. M0's exit (median
   time on the map > 60 s, ≥ 50 % open a crate) now waits on players.
+  **Seen live in Chrome (2026-09-10):** boot lands in the garage with
+  SCRAPPER, no title screen, no gate; LEAGUE tab → DRIVE OUT → the yard
+  renders: the machine at the door, the first crate 8 m ahead under its
+  cyan beacon, wrecks, the fence, the stick, GARAGE. Two things to fix
+  first thing: the compass strip is too faint to read on a desktop, and
+  the tip strip still carries Robot Brawl's league tips ("open the LEAGUE
+  tab to enter your first contest"). The ARENA tab is still there, as
+  planned until the board screen replaces it.
 - **2026-09-10 — M0 step 3: THE YARD EXISTS (headless).** Grown out of
   `StartTest()` as a partial of BuilderManager (`BuilderManager.Map.cs`,
   ~470 lines): `Mode.Map`, an 80 × 80 m plane with a fence and a glowing
