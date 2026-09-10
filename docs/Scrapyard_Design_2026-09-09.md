@@ -264,9 +264,10 @@ Two currencies of outcome, deliberately separated (§4):
   screen off the garage.
 - **A signed-in challenge to an enlisted robot does two things:** plays the
   local bout at once (something to watch, a reward to claim) and
-  `POST /v1/challenges` with the `yard` ruleset. The referee fights it
-  within the worker's cadence (Cloud Scheduler, 5 min — the $/latency dial)
-  and the verdict lands in `GET /v1/inbox` with a replay. The card says
+  `POST /v1/challenges` with the `yard` ruleset. The referee is an
+  ALWAYS-ON Cloud Run worker pool (`deploy_worker_live.zsh`, since
+  2026-08-14; the 5-minute scheduler job is the paused fallback), so the
+  verdict lands in `GET /v1/inbox` with a replay in seconds, not minutes. The card says
   *"sent to the referee — points on their verdict"*; the local result card
   is labelled UNOFFICIAL; the inbox badge lights when the verdict is back.
 
@@ -505,7 +506,7 @@ now.
 | call | decision | what it fixes in this doc |
 |---|---|---|
 | the name | **Robot Brawl: Scrapyard** | repo `du6/robot-brawl-scrapyard`, bundle `club.cyberduck.scrapyard`, web `/play/scrapyard/`, save `scrapyard_save.json`, beacon `/v1/beacon/scrapyard-play`, referee ruleset `yard`, snapshot `game` tag `scrapyard` |
-| points | **the referee's verdict**, on the 5-minute scheduler | §3.7 as written; the local bout is UNOFFICIAL; no always-on worker |
+| points | **the referee's verdict** | §3.7 as written; the local bout is UNOFFICIAL. Correction: the worker is already always-on (2026-08-14), so the wait is seconds |
 | the pool | **one pool across both games, badged by `game`** | §3.5, §7.3 as written; the card shows origin |
 | battery | **no drain on the map** | §3.3 as written |
 | the numbers | **8 crates/day, cap 6 shared, 80 m yard, first crate at 8 m** | §3.2, §3.4; tune from `crate`/`meet`/`challenge` after M0 |
@@ -534,14 +535,24 @@ Nothing in M0 is blocked.
   and the content is the robots; if M1's `return` does not move, the
   answer is more *robots* (the pool), not more *map*.
 - **Load size.** The §5 rule is a gate on every build, not a hope.
-- **The referee wait** may read as broken. The local UNOFFICIAL bout is
-  the mitigation; the inbox badge is the return hook.
+- **The referee wait** is seconds on the always-on pool, minutes only if
+  the pool is ever scaled back to the scheduler fallback. The local
+  UNOFFICIAL bout covers either; the inbox badge is the return hook.
 - **Auto-brain fairness.** An enlisted robot built for its owner's program
   fights under the auto-brain in a guest's yard and may look worse than it
   is. It is a *local* bout and pays no points; say so on the card.
 
 ## Progress log
 
+- **2026-09-09, night — M0 step 1 DEPLOYED.** API image `20260909-203659`
+  (migration 017 applied at boot, `/v1/pool` answering anonymously in
+  production with real robots and no program key, the board badged by
+  game); worker image `20260909-204656` on the always-on pool `rb-worker-
+  live`, Ready, host up and polling. Bolt & Blade's client is unchanged and
+  every old route behaves as before. The career save was restored the same
+  night (a plain `cp` went through; the 09-04 refusal was the classifier
+  being inconsistent). Next: M0 step 2, the fork — owen creates
+  `du6/robot-brawl-scrapyard`.
 - **2026-09-09, later** — M0 step 1 built in this repo (`4eb0cbf`):
   migration 017 (`snapshots.game`, the pool index), `GET /v1/pool`, the
   `yard` ruleset on `POST /v1/challenges`, `game` on the board,
