@@ -544,6 +544,22 @@ Nothing in M0 is blocked.
 
 ## Progress log
 
+- **2026-09-10, small hours — day-one deletions, three of them.** On the
+  fork: the `RB_PORTAL` gate (`e602c2c`), the Rookie Warm-Up guide
+  (`db27aa0`), and the title screen + login gate + CareerSmoke (this
+  commit) — `ModeSelect` is now a straight boot into the garage on every
+  platform, the editor included. Measured after each: compile 0 errors;
+  TouchSmoke **55/0** and QuickFightBench **24/0** in the fork, the same
+  numbers as Robot Brawl. **Two changes to §2.2, found by reading the
+  code:** (1) **TEST DRIVE stays** — `StartTest()` is the map's drive loop
+  already (spawn the player's robot, touch stick, `FollowCamera`, a
+  target), so M0 step 3 grows the map out of it instead of deleting it and
+  rebuilding the same thing; (2) **the leagues are a TRIM, not a delete** —
+  `Career.Leagues` is where the roster's contest opponents (SCOUT, TIPPER,
+  BULWARK…) are defined and `QuickPool()` draws from it, so the campaign
+  UI, `StartCareerFight`, medals and the trophy case go and the contest
+  table stays as the roster (renamed in M1). MANUAL FIGHT lives in the
+  contest rows and goes with them.
 - **2026-09-09, late — M0 step 2 begun: THE FORK EXISTS.** `du6/robot-brawl-
   scrapyard`, main = Robot Brawl's `1dc752e`, cloned to
   `~/robot-brawl-scrapyard` with Robot Brawl removed as a remote. First

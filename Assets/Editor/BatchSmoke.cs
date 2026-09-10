@@ -1,8 +1,10 @@
-// Batch-mode driver for the two UI smokes, one per invocation (they clobber
-// each other when run together - CLAUDE.md, Bench notes):
+// Batch-mode driver for the headless benches, one per invocation (they
+// clobber each other when run together - CLAUDE.md, Bench notes):
 //   Unity -batchmode -nographics -projectPath . \
-//         -executeMethod RobotBrawl.EditorTools.BatchSmoke.Career -logFile -
-//   Unity ... -executeMethod RobotBrawl.EditorTools.BatchSmoke.Touch -logFile -
+//         -executeMethod RobotBrawl.EditorTools.BatchSmoke.Touch -logFile -
+//   Unity ... -executeMethod RobotBrawl.EditorTools.BatchSmoke.Quick / .FightWorker
+// (Scrapyard: CareerSmoke and its .Career entry were deleted with the
+// leagues' boot rules, 2026-09-09.)
 // Same shape as BatchStarterBench: EnterPlaymode, re-armed across the domain
 // reload by a SessionState flag, exit 0 when the bench reports finished.
 using UnityEditor;
@@ -14,7 +16,6 @@ namespace RobotBrawl.EditorTools
     {
         public static void Quick()  { Arm("quick"); }
         public static void FightWorker() { Arm("fightworker"); }
-        public static void Career() { Arm("career"); }
         public static void Touch()  { Arm("touch"); }
         static void Arm(string which)
         {
@@ -39,8 +40,7 @@ namespace RobotBrawl.EditorTools
         }
         static bool Finished()
         {
-            return which == "career" ? RobotBrawl.Phase0.CareerSmoke.finished
-                                     : which == "quick" ? RobotBrawl.Phase0.QuickFightBench.finished
+            return which == "quick" ? RobotBrawl.Phase0.QuickFightBench.finished
                                      : which == "fightworker" ? (fw != null && fw.finished)
                                      : (touch != null && touch.finished);
         }
@@ -73,14 +73,11 @@ namespace RobotBrawl.EditorTools
                 // -batchmode -nographics has no Device Simulator, so the editor's
                 // DeviceWantsTouch() says no and ModeSelect draws the desktop
                 // chooser forever. Take the exact path the touch button takes.
-                if (which == "career" && Object.FindFirstObjectByType<RobotBrawl.Phase0.BuilderManager>() == null)
-                    RobotBrawl.Phase0.ModeSelect.StartCareer(true);
                 if (which == "quick" && Object.FindFirstObjectByType<RobotBrawl.Phase0.BuilderManager>() == null)
                     RobotBrawl.Phase0.ModeSelect.StartCareer(true);
                 if (which == "fightworker" && Object.FindFirstObjectByType<RobotBrawl.Phase0.BuilderManager>() == null)
                     new GameObject("BuilderManager").AddComponent<RobotBrawl.Phase0.BuilderManager>();
-                if (which == "career") RobotBrawl.Phase0.CareerSmoke.Run();
-                else if (which == "quick") RobotBrawl.Phase0.QuickFightBench.Run();
+                if (which == "quick") RobotBrawl.Phase0.QuickFightBench.Run();
                 else if (which == "fightworker") { RobotBrawl.Phase0.FightWorkerBench.RunPure(); fw = RobotBrawl.Phase0.FightWorkerBench.Run(); }
                 else touch = RobotBrawl.Phase0.TouchSmoke.Run();
             }

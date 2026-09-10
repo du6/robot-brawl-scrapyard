@@ -7716,122 +7716,26 @@ public class BuilderManager : MonoBehaviour
     }
 }
 
-/// <summary>Tiny startup menu: choose the Phase 0 sandbox or the Phase 1 builder.</summary>
+/// <summary>THE BOOT (Robot Brawl: Scrapyard, 2026-09-09). No title screen, no
+/// chooser, no login gate: every platform, the editor included, boots
+/// straight into the garage as a guest. Robot Brawl kept a desktop chooser
+/// with a hidden DEV SANDBOX door and, on iOS, a sign-in wall
+/// (LoginGate); this game's only sign-in is the moment a player sends a
+/// challenge to a real robot (design §3.8). The class keeps its name so
+/// Phase0Bootstrap, the benches and BatchSmoke need no change; StartCareer
+/// is the one path in, exactly as before.</summary>
 public class ModeSelect : MonoBehaviour
 {
-    /// <summary>OWEN 2026-08-03: "for a mobile user, it doesn't make sense to
-    /// see the desktop option, and vice versa. can we detect the device type
-    /// and skip the first screen?"
-    ///
-    /// Yes - and the screen was worse than redundant. MobileBuilderUI already
-    /// auto-detected, so on an iPad "START CAREER - Desktop" handed you the
-    /// touch UI regardless. The chooser asked a question the game then
-    /// overruled; both buttons landed in the same place.
-    ///
-    /// A build now boots straight into career in the detected mode. The EDITOR
-    /// keeps the chooser, so testing touch-on-desktop and the dev sandbox
-    /// stays one click away - the dev sandbox was always a dev door anyway,
-    /// and this is the honest place for it.</summary>
-    /// <summary>Should we skip the chooser and boot straight in?
-    ///
-    /// OWEN 2026-08-04: "I'm using the device simulator in unity to test
-    /// running on iphone. But when i click the 'start career' button there is
-    /// no response."
-    ///
-    /// Nothing was wrong with the button. Unity's Device Simulator DISABLES the
-    /// mouse and substitutes a simulated touchscreen - measured, with this
-    /// project's Input System-only handling:
-    ///
-    ///     devices: Keyboard[on] Mouse[off] Pen[off] Touchscreen[on]
-    ///
-    /// IMGUI wants mouse events, so with no mouse device every OnGUI screen in
-    /// the game RENDERS in the simulator and none of them can be clicked. That
-    /// includes this chooser, which is why it was a dead end rather than a
-    /// cosmetic annoyance.
-    ///
-    /// "Application.isEditor" was the wrong question all along. The real one is
-    /// "is a human going to drive the DESKTOP builder here", and under a
-    /// simulated phone the answer is no - the same as in a build, which is
-    /// exactly the thing the simulator exists to imitate. So the simulator now
-    /// boots like a build: past this screen, into the touch UI, which is uGUI
-    /// and does receive the simulated touches.
-    ///
-    /// A real editor on a real desktop still gets the chooser, so the dev
-    /// sandbox door stays one click away.</summary>
-    public static bool ShouldAutoBoot()
-    {
-        if (!Application.isEditor) return true;
-        return MobileBuilderUI.DeviceWantsTouch();
-    }
-
-    // The login gate holds boot while it is on screen (client B, owen:
-    // "make the user login/signup page the gate of the game"). It lives on
-    // THIS GameObject so every bench's ModeSelect destroy bypasses it.
-    bool gateActive;
-
     void Start()
     {
-        // FIRST SCENE FRAME. The loader's `ready` fires before the engine has
-        // drawn anything; this fires once the scene is actually running. The
-        // gap between them is where a phone's memory ceiling kills the tab
-        // (2026-09-04: 15 ready, 9 gate, and no way to say why).
+        // FIRST SCENE FRAME - the loader's `ready` fires before the engine
+        // has drawn anything; this fires once the scene is actually running.
         RobotBrawl.Phase0.RBTelemetry.Once("boot");
         string savedName;
-        // A returning GUEST is as entitled to skip this as a returning player
-        // with a session: they already answered the question once. Without
-        // this they meet the wall on every visit and it looks like their
-        // career is gone (it is not - career is local).
-        if (!RobotBrawl.Phase0.LadderClient.RestoreSession(out savedName)
-            && !RobotBrawl.Phase0.LadderClient.GuestChosen)
-        {
-#if UNITY_WEBGL && !UNITY_EDITOR
-            // NO WALL ON THE WEB — measured, not guessed. The funnel's first
-            // real week (2026-09-02, 87 sessions): 24 people were shown this
-            // screen and 23 walked away without pressing anything, INCLUDING
-            // the PLAY AS GUEST button, which owen verified works on a real
-            // iPhone. A 96% bounce is not a labelling problem. So a stranger
-            // boots straight into the workshop as a guest, and sign-in lives
-            // where the server is genuinely needed - the ARENA tab, which
-            // draws its own panel. The web's whole premise is zero friction;
-            // this is the last of it. iOS keeps the gate: its economy gate
-            // ordering (sign-in before a career exists) is load-bearing there
-            // and its own funnel has not voted yet.
-            //
-            // Deliberately NOT setting GuestChosen: nothing was chosen. The
-            // pref stays a record of an actual answer, and sign-out keeps
-            // meaning "ask me again" on every platform that still asks.
-            RobotBrawl.Phase0.RBTelemetry.Once(RobotBrawl.Phase0.RBTelemetry.GATE, "&d=auto");
-#else
-            gateActive = true;
-            gameObject.AddComponent<RobotBrawl.Phase0.LoginGate>();
-            return;   // GateDone() resumes the boot below
-#endif
-        }
-        else
-        {
-            // Boot went STRAIGHT past the wall — a stored session, or a guest
-            // who already answered once. Distinct from d=auto above: skip is
-            // "answered before", auto is "never asked".
-            RobotBrawl.Phase0.RBTelemetry.Once(RobotBrawl.Phase0.RBTelemetry.GATE, "&d=skip");
-        }
-        BootPastGate();
-    }
-
-    /// <summary>Called by LoginGate after a successful sign-in (or the
-    /// editor-only dev skip). Resumes exactly the boot the gate held.</summary>
-    public void GateDone()
-    {
-        gateActive = false;
-        BootPastGate();
-    }
-
-    void BootPastGate()
-    {
-        if (!ShouldAutoBoot()) return;   // editor desktop: the chooser draws
+        RobotBrawl.Phase0.LadderClient.RestoreSession(out savedName);   // a stored session is kept; nothing is asked
         StartCareer(MobileBuilderUI.DeviceWantsTouch());
         Destroy(gameObject);
     }
-
     /// <summary>One path in, so the two buttons and the auto-boot cannot drift.
     /// forceMobileUI is set EXPLICITLY either way rather than only on the touch
     /// branch - it is a static that survives a play-mode restart in the editor,
@@ -7901,47 +7805,6 @@ public class ModeSelect : MonoBehaviour
         RobotBrawl.Phase0.EconomySync.Kick();
     }
 
-    void OnGUI()
-    {
-        // Builds never draw this, and neither does a simulated device - Start()
-        // has already booted past it. Destroy is deferred to the end of the
-        // frame and OnGUI runs before that, so without this guard the chooser
-        // would flash over the game for one frame on the way through.
-        // The login gate holds the chooser too: IMGUI under a uGUI gate would
-        // both draw through it and (on desktop) steal its clicks.
-        if (gateActive || ShouldAutoBoot()) return;
-        // Critic round 1 (mobile): raw pixels made these buttons thumbnail
-        // sized on a 264-dpi iPad. Same DPI scale as the rest of the HUD.
-        float s = BuilderManager.GuiScale;   // R4 finding 3: one rule, one place
-        GUI.matrix = Matrix4x4.Scale(new Vector3(s, s, 1f));
-        // R2 critic: the first screen a player sees was a thumbnail-sized
-        // default-skin box floating in a void. Bigger, bolder, same skin.
-        float w = 440f, h = 200f;
-        float x = (Screen.width / s - w) * 0.5f, y = (Screen.height / s - h) * 0.5f;
-        var tst = new GUIStyle(GUI.skin.box);
-        tst.fontSize = 26; tst.fontStyle = FontStyle.Bold; tst.alignment = TextAnchor.UpperCenter; tst.padding.top = 16;
-        GUI.Box(new Rect(x, y, w, h), "ROBOT BRAWL", tst);
-        var mbst = new GUIStyle(GUI.skin.button); mbst.fontSize = 17;
-        // C6.5: five taps on the title reveal the dev sandbox entry - players
-        // never see a mode choice; the career IS the game (design doc v1.4).
-        if (GUI.Button(new Rect(x, y, w, 30), "", GUIStyle.none)) devTaps++;
-        // The detected default is marked, so the editor chooser doubles as a
-        // readout of what a real build would have done on this machine.
-        bool wantsTouch = MobileBuilderUI.DeviceWantsTouch();
-        if (GUI.Button(new Rect(x + 24, y + 64, w - 48, 44),
-                       "START CAREER - Desktop" + (wantsTouch ? "" : "   (detected)"), mbst))
-        { StartCareer(false); Destroy(gameObject); }
-        if (GUI.Button(new Rect(x + 24, y + 118, w - 48, 44),
-                       "START CAREER - Touch" + (wantsTouch ? "   (detected)" : ""), mbst))
-        { StartCareer(true); Destroy(gameObject); }
-        if (devTaps >= 5 && GUI.Button(new Rect(x + 24, y + h + 8, w - 48, 32), "DEV SANDBOX"))
-        {
-            Career.active = false;   // free-build test mode: loud banner, no career file
-            new GameObject("BuilderManager").AddComponent<BuilderManager>();
-            Destroy(gameObject);
-        }
-    }
-    int devTaps;
 }
 
 }
