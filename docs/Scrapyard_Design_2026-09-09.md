@@ -552,6 +552,25 @@ Nothing in M0 is blocked.
 
 ## Progress log
 
+- **2026-09-10 — THE PLANET (owen: "The map looks ugly. It should look
+  like some planets where robots live with modern designs. Driving the
+  robot around and exploring the planet itself should be an enjoyable
+  experience.")** All code, no assets: two URP shaders always included
+  (`Scrapyard/PlanetGround` — vertex colour, light, fog and a faint
+  6 m / 24 m grid etched into the flats; `Scrapyard/SkyBody` — banded,
+  limb-shaded, no fog); `BuilderManager.WorldLook.cs` — a tinted copy of
+  the scene's procedural skybox, linear fog to the edge of the loaded
+  world, trilight ambient, the sun low and warm, a 300 m sister planet and
+  a 70 m moon 800–900 m out following the camera at a fixed bearing;
+  ground colour per vertex (biome, height band, slope, the home plaza);
+  six structures in one language — monolith, antenna mast, crystal
+  cluster, solar array, ring beacon, relay hub — in graphite with cyan,
+  amber and violet light; crates as supply pods; a home plaza; terrain
+  with mesas and craters. Restored at GARAGE. **MapBench 54/0**; web
+  10.4 MB. Seen live: it reads as a planet — then two tunes from the
+  screenshot: the sister planet was dark and half out of frame (now ahead,
+  lit from behind the camera, brighter), and the sky's yellow band too
+  strong (thinner atmosphere, cooler tint).
 - **2026-09-10 — steering (owen: "turning is too sensitive, making it hard
   to drive straight").** The fight's drive took the stick raw, and a
   skid-steer build (SCRAPPER: four fixed wheels) turns by braking one side

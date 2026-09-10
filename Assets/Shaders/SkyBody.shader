@@ -53,7 +53,7 @@ Shader "Scrapyard/SkyBody"
                 float3 col = lerp(_ColorA.rgb, _ColorB.rgb, band);
                 float day = saturate(dot(n, normalize(_SunDir.xyz)));
                 float limb = pow(saturate(dot(n, normalize(i.viewWS))), 0.45);
-                float3 c = col * (0.18 + 0.82 * day) * (0.35 + 0.65 * limb);
+                float3 c = col * (0.45 + 0.55 * day) * (0.55 + 0.45 * limb);   // seen live: darker read as a blot on the sky
                 return half4(c, 1);
             }
             ENDHLSL

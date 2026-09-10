@@ -39,7 +39,10 @@ public partial class BuilderManager
     Light sun; Quaternion savedSunRot; Color savedSunColor; float savedSunIntensity; bool sunTouched;
     float savedFarClip; bool farClipTouched;
     GameObject sisterPlanet, moon;
-    Vector3 planetDir = new Vector3(0.55f, 0.28f, 0.79f).normalized, moonDir = new Vector3(-0.72f, 0.42f, 0.55f).normalized;
+    // Seen live 2026-09-10: the planet sat at the top-right edge, half out
+    // of frame and dark. Now ahead (+z, the way you drive out), 13 deg up,
+    // and lit by a sun that sits behind the camera.
+    Vector3 planetDir = new Vector3(0.30f, 0.22f, 0.93f).normalized, moonDir = new Vector3(-0.62f, 0.36f, 0.70f).normalized;
 
     /// <summary>The ground shader, or null in a build that lost it (then the
     /// flat biome materials draw instead - uglier, never broken).</summary>
@@ -74,10 +77,12 @@ public partial class BuilderManager
         if (savedSkybox != null && planetSky == null)
         {
             planetSky = new Material(savedSkybox);
-            if (planetSky.HasProperty("_SkyTint")) planetSky.SetColor("_SkyTint", new Color(0.30f, 0.52f, 0.78f));
-            if (planetSky.HasProperty("_GroundColor")) planetSky.SetColor("_GroundColor", new Color(0.36f, 0.26f, 0.30f));
-            if (planetSky.HasProperty("_AtmosphereThickness")) planetSky.SetFloat("_AtmosphereThickness", 1.35f);
-            if (planetSky.HasProperty("_Exposure")) planetSky.SetFloat("_Exposure", 1.25f);
+            // seen live: 1.35 atmosphere + 1.25 exposure made a yellow-green
+            // band the whole sky long; thinner and cooler reads as dusk
+            if (planetSky.HasProperty("_SkyTint")) planetSky.SetColor("_SkyTint", new Color(0.42f, 0.50f, 0.86f));
+            if (planetSky.HasProperty("_GroundColor")) planetSky.SetColor("_GroundColor", new Color(0.40f, 0.30f, 0.36f));
+            if (planetSky.HasProperty("_AtmosphereThickness")) planetSky.SetFloat("_AtmosphereThickness", 0.95f);
+            if (planetSky.HasProperty("_Exposure")) planetSky.SetFloat("_Exposure", 1.05f);
             if (planetSky.HasProperty("_SunSize")) planetSky.SetFloat("_SunSize", 0.05f);
         }
         if (planetSky != null) RenderSettings.skybox = planetSky;
@@ -119,8 +124,8 @@ public partial class BuilderManager
         var sbShader = Shader.Find("Scrapyard/SkyBody");
         if (sbShader != null)
         {
-            sisterPlanet = SkyBody("sister_planet", sbShader, 300f, new Color(0.88f, 0.58f, 0.40f), new Color(0.52f, 0.30f, 0.46f), 7f);
-            moon = SkyBody("moon", sbShader, 70f, new Color(0.80f, 0.82f, 0.88f), new Color(0.55f, 0.56f, 0.62f), 3f);
+            sisterPlanet = SkyBody("sister_planet", sbShader, 300f, new Color(0.98f, 0.74f, 0.58f), new Color(0.72f, 0.48f, 0.66f), 7f);
+            moon = SkyBody("moon", sbShader, 70f, new Color(0.92f, 0.93f, 0.97f), new Color(0.66f, 0.68f, 0.76f), 3f);
             PlaceSkyBodies();
         }
     }
