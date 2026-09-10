@@ -126,6 +126,12 @@ builder.Services.AddRateLimiter(o =>
     o.AddPolicy("auth", ctx => RateLimitPartition.GetFixedWindowLimiter(
         ctx.Connection.RemoteIpAddress?.ToString() ?? "anon",
         _ => new FixedWindowRateLimiterOptions { PermitLimit = 10, Window = TimeSpan.FromMinutes(1) }));
+    // The pool is anonymous and reads blobs, so it gets its own bucket, per
+    // IP: a Scrapyard client fetches it once a day (the yard is seeded by the
+    // date) and a scraper gets 30 a minute and no more.
+    o.AddPolicy("pool", ctx => RateLimitPartition.GetFixedWindowLimiter(
+        ctx.Connection.RemoteIpAddress?.ToString() ?? "anon",
+        _ => new FixedWindowRateLimiterOptions { PermitLimit = 30, Window = TimeSpan.FromMinutes(1) }));
     // The wallet gets its own bucket rather than sharing "upload". They are
     // different actions with different abuse profiles, and sharing one bucket
     // means a player who has been challenging hard is throttled out of
@@ -605,6 +611,11 @@ app.MapPost("/v1/snapshots", async (SnapshotReq req, ClaimsPrincipal user, IBlob
 {
     if (req.RobotId == Guid.Empty) return Bad("robotId is required");
     if (string.IsNullOrEmpty(req.Envelope)) return Bad("envelope is required");
+    // Which GAME uploaded this (Scrapyard, 2026-09-09). A label for the pool
+    // and the board, never a ruleset. Omitted means Robot Brawl: Bolt &
+    // Blade's client predates the field and must keep working unchanged.
+    var game = string.IsNullOrWhiteSpace(req.Game) ? "rb" : req.Game!.Trim().ToLowerInvariant();
+    if (game != "rb" && game != "scrapyard") return Bad("game must be rb, scrapyard, or omitted");
     var bytes = System.Text.Encoding.UTF8.GetBytes(req.Envelope);
     if (bytes.Length > MaxSnapshotBytes)
         return Bad($"snapshot is {bytes.Length} bytes; the limit is {MaxSnapshotBytes}");
@@ -641,12 +652,13 @@ app.MapPost("/v1/snapshots", async (SnapshotReq req, ClaimsPrincipal user, IBlob
     await using var tx = await c.BeginTransactionAsync();
     Guid snapId;
     await using (var ins = new NpgsqlCommand(
-        "INSERT INTO snapshots (robot_id, storage_url, sha256, client_version) VALUES ($1,$2,$3,$4) RETURNING id;", c, tx))
+        "INSERT INTO snapshots (robot_id, storage_url, sha256, client_version, game) VALUES ($1,$2,$3,$4,$5) RETURNING id;", c, tx))
     {
         ins.Parameters.AddWithValue(req.RobotId);
         ins.Parameters.AddWithValue(url);
         ins.Parameters.AddWithValue(sha);
         ins.Parameters.AddWithValue(clientVersion);
+        ins.Parameters.AddWithValue(game);
         snapId = (Guid)(await ins.ExecuteScalarAsync())!;
     }
     // The validate job and the row it describes commit together: a snapshot
@@ -664,7 +676,7 @@ app.MapPost("/v1/snapshots", async (SnapshotReq req, ClaimsPrincipal user, IBlob
     // had already started a worker is a boot bought for work that never
     // existed.
     await nudge.NudgeAsync(app.Logger);
-    return Results.Ok(new { id = snapId, status = "PENDING" });
+    return Results.Ok(new { id = snapId, status = "PENDING", game });
 }).RequireAuthorization().RequireRateLimiting("upload");
 
 app.MapGet("/v1/snapshots/{id:guid}", async (Guid id, ClaimsPrincipal user) =>
@@ -946,6 +958,14 @@ app.MapPost("/v1/challenges", async (ChallengeReq req, ClaimsPrincipal user, Wor
     var me = UserId(user);
     if (req.ChallengerSnapshotId == req.DefenderSnapshotId)
         return Bad("a robot cannot challenge itself");
+    // THE RULESET (Scrapyard, 2026-09-09). 'league' is Bolt & Blade's match
+    // as it has always been; 'yard' is Scrapyard's Quick bout — 30 s, 5-s
+    // count-out, crusher walls over the last 10 s — which the worker applies
+    // when its claim says so (MatchRunner.quick). Same seed, same referee,
+    // same rating settlement; only the clock differs. Omitted means league,
+    // so a client that predates the field is unchanged.
+    var arena = string.IsNullOrWhiteSpace(req.Arena) ? "league" : req.Arena!.Trim().ToLowerInvariant();
+    if (arena != "league" && arena != "yard") return Bad("arena must be league, yard, or omitted");
 
     await using var c = await db.OpenAsync();
 
@@ -1043,7 +1063,7 @@ app.MapPost("/v1/challenges", async (ChallengeReq req, ClaimsPrincipal user, Wor
     Guid matchId;
     await using (var ins = new NpgsqlCommand(@"
         INSERT INTO matches (challenger_snapshot_id, defender_snapshot_id, category, gap, arena, seeds, status, stake)
-        VALUES ($1,$2,$3,$4,'league',$5,'QUEUED',$6) RETURNING id;", c, tx))
+        VALUES ($1,$2,$3,$4,$7,$5,'QUEUED',$6) RETURNING id;", c, tx))
     {
         ins.Parameters.AddWithValue(req.ChallengerSnapshotId);
         ins.Parameters.AddWithValue(req.DefenderSnapshotId);
@@ -1052,6 +1072,7 @@ app.MapPost("/v1/challenges", async (ChallengeReq req, ClaimsPrincipal user, Wor
         ins.Parameters.AddWithValue(seeds);
         // What is CHARGED is what gets refunded. See migration 006.
         ins.Parameters.AddWithValue(stake);
+        ins.Parameters.AddWithValue(arena);
         matchId = (Guid)(await ins.ExecuteScalarAsync())!;
     }
     // stake_base is 0 since 2026-08-19 (migration 016), so this is normally
@@ -1077,7 +1098,7 @@ app.MapPost("/v1/challenges", async (ChallengeReq req, ClaimsPrincipal user, Wor
     await tx.CommitAsync();
     await nudge.NudgeAsync(app.Logger);
 
-    return Results.Ok(new { matchId, status = "QUEUED", stake, gap, category = df.Category, seeds });
+    return Results.Ok(new { matchId, status = "QUEUED", stake, gap, category = df.Category, seeds, arena });
 }).RequireAuthorization().RequireRateLimiting("upload");
 
 // The LIVE-FIGHT feed (owen, 2026-08-14): a challenge plays out ON the
@@ -1512,7 +1533,9 @@ app.MapGet("/v1/leaderboard/{category?}", async (string? category, int? limit) =
                r.id, r.name, u.display_name,
                (SELECT s.id FROM snapshots s
                  WHERE s.robot_id = r.id AND s.status = 'ACTIVE' LIMIT 1),
-               ct.name, cp.name
+               ct.name, cp.name,
+               (SELECT s.game FROM snapshots s
+                 WHERE s.robot_id = r.id AND s.status = 'ACTIVE' LIMIT 1)
           FROM ratings ra
           JOIN robots r ON r.id = ra.robot_id
           JOIN users  u ON u.id = r.user_id
@@ -1547,6 +1570,10 @@ app.MapGet("/v1/leaderboard/{category?}", async (string? category, int? limit) =
             // makes the scrap sink worth spending into.
             title = r.IsDBNull(9) ? null : r.GetString(9),
             plate = r.IsDBNull(10) ? null : r.GetString(10),
+            // Which game the robot was built in (Scrapyard, 2026-09-09) — a
+            // badge on a shared board, so a Scrapyard player can see who they
+            // are up against and vice versa.
+            game = r.IsDBNull(11) ? "rb" : r.GetString(11),
             updatedAt = r.GetDateTime(4),
         });
     // The season identity travels WITH the board: a board that says "Season 2
@@ -1556,6 +1583,118 @@ app.MapGet("/v1/leaderboard/{category?}", async (string? category, int? limit) =
     return Results.Ok(new { category = category ?? "ALL", count = rows.Count,
                             season = curSeason, seasonEndsAt, entries = rows });
 }).AllowAnonymous();
+
+// ---- THE POOL (Robot Brawl: Scrapyard, 2026-09-09) ----------------------
+// Scrapyard parks real players' robots in a yard for a GUEST to drive up to
+// and challenge; the fight is played locally under the game's auto-brain.
+// That needs, for a weight class, a handful of ACTIVE robots with their
+// BUILD — and never their program, which the privacy policy keeps private
+// and which the local bout does not need. This is the anonymous read that
+// serves it. GET /v1/robots and GET /v1/snapshots/{id} both require a
+// login and neither hands out a build; the envelopes endpoint hands out an
+// opponent's build but only to a participant in a match. So: a new route,
+// which reads exactly the two payload fields the envelopes endpoint reads
+// (robotName, build), and no more.
+//
+// Sampled, not ranked: ORDER BY random() over the class, so two players'
+// yards differ and one strong robot does not sit in everyone's. n is capped
+// at 12 because each entry is a blob read. Rate-limited per IP ("pool").
+// Robots from BOTH games are in it, badged by `game` (owen: one pool).
+app.MapGet("/v1/pool", async (string? category, int? n, IBlobStore blobs) =>
+{
+    if (category != null && Array.IndexOf(Categories, category) < 0)
+        return Bad($"'{category}' is not one of {string.Join(", ", Categories)}");
+    int take = Math.Clamp(n ?? 6, 1, 12);
+
+    await using var c = await db.OpenAsync();
+    var cfg = await LadderConfig(c);
+    int curSeason = cfg.TryGetValue("current_season", out var cs) ? (int)cs : 1;
+
+    var picked = new List<(Guid SnapId, Guid RobotId, string Owner, string Category, int? Mass,
+                           string Game, double? Rating, double? Dev, long Wins, long Losses, string Uri)>();
+    await using (var cmd = new NpgsqlCommand(@"
+        SELECT s.id, r.id, u.display_name, s.category, s.mass_kg, s.game, ra.rating, ra.deviation,
+               (SELECT count(*) FROM matches m
+                 WHERE m.status = 'COMPLETE'
+                   AND ((m.verdict = 'CHALLENGER' AND m.challenger_snapshot_id IN (SELECT id FROM snapshots WHERE robot_id = r.id))
+                     OR (m.verdict = 'DEFENDER'   AND m.defender_snapshot_id   IN (SELECT id FROM snapshots WHERE robot_id = r.id)))),
+               (SELECT count(*) FROM matches m
+                 WHERE m.status = 'COMPLETE'
+                   AND ((m.verdict = 'DEFENDER'   AND m.challenger_snapshot_id IN (SELECT id FROM snapshots WHERE robot_id = r.id))
+                     OR (m.verdict = 'CHALLENGER' AND m.defender_snapshot_id   IN (SELECT id FROM snapshots WHERE robot_id = r.id)))),
+               s.storage_url
+          FROM snapshots s
+          JOIN robots r ON r.id = s.robot_id AND NOT r.retired
+          JOIN users  u ON u.id = r.user_id
+          LEFT JOIN ratings ra ON ra.robot_id = r.id AND ra.category = s.category AND ra.season_id = $3
+         WHERE s.status = 'ACTIVE' AND s.category IS NOT NULL
+           AND ($1::text IS NULL OR s.category = $1)
+         ORDER BY random()
+         LIMIT $2;", c))
+    {
+        cmd.Parameters.AddWithValue((object?)category ?? DBNull.Value);
+        cmd.Parameters.AddWithValue(take);
+        cmd.Parameters.AddWithValue(curSeason);
+        await using var r = await cmd.ExecuteReaderAsync();
+        while (await r.ReadAsync())
+            picked.Add((r.GetGuid(0), r.GetGuid(1), r.GetString(2), r.GetString(3),
+                        r.IsDBNull(4) ? (int?)null : r.GetInt32(4), r.GetString(5),
+                        r.IsDBNull(6) ? (double?)null : r.GetDouble(6),
+                        r.IsDBNull(7) ? (double?)null : r.GetDouble(7),
+                        r.GetInt64(8), r.GetInt64(9), r.GetString(10)));
+    }
+
+    // Same resolution the envelopes endpoint uses: s3:// keys, file:// dev
+    // blobs, anything else straight to the store.
+    async Task<byte[]?> ReadPayload(string? uri)
+    {
+        if (BlobUri.IsObjectStore(uri)) return await blobs.GetAsync(BlobUri.KeyOf(uri)!);
+        if (uri != null && uri.StartsWith("file://", StringComparison.Ordinal))
+        {
+            var path = new Uri(uri).LocalPath;
+            return File.Exists(path) ? await File.ReadAllBytesAsync(path) : null;
+        }
+        return uri == null ? null : await blobs.GetAsync(uri);
+    }
+
+    var entries = new List<object>();
+    foreach (var p in picked)
+    {
+        var bytes = await ReadPayload(p.Uri);
+        if (bytes is null) continue;   // a missing blob is a robot the yard simply does not show
+        string name = "", build = "";
+        try
+        {
+            using var envDoc = JsonDocument.Parse(System.Text.Encoding.UTF8.GetString(bytes));
+            var payloadStr = envDoc.RootElement.GetProperty("payload").GetString() ?? "";
+            using var payDoc = JsonDocument.Parse(payloadStr);
+            if (payDoc.RootElement.TryGetProperty("robotName", out var nm)) name = nm.GetString() ?? "";
+            if (payDoc.RootElement.TryGetProperty("build", out var b)) build = b.GetString() ?? "";
+        }
+        catch { continue; }
+        if (build.Length == 0) continue;
+        entries.Add(new
+        {
+            snapshotId = p.SnapId,
+            robotId = p.RobotId,
+            robotName = name,
+            owner = p.Owner,
+            category = p.Category,
+            massKg = p.Mass,
+            game = p.Game,
+            rating = p.Rating is double rt ? Math.Round(rt, 1) : (double?)null,
+            provisional = p.Dev is not double dv || dv > 200,
+            wins = p.Wins,
+            losses = p.Losses,
+            // The build, in the game's own snapshot text. The client wraps it
+            // program-less (RobotSnapshot.ExportRaw(name, build, "")) exactly
+            // as ArenaScreen does for a live-fight opponent. There is no
+            // `program` key in this response and there must never be one.
+            build,
+        });
+    }
+    return Results.Ok(new { category = category ?? "ALL", season = curSeason, count = entries.Count, entries });
+}).AllowAnonymous().RequireRateLimiting("pool");
 
 // ---- WHO IS ACTUALLY WINNING THE SEASON ---------------------------------
 // New 2026-08-19, with the move to season-only rewards. A prize nobody can
@@ -2977,9 +3116,9 @@ public record SubscribeReq(string? Email, bool? Updates, bool? Seasons, string? 
 public record RegisterReq(string? Email, string? Password, string? DisplayName);
 public record LoginReq(string? Email, string? Password);
 public record RobotReq(string? Name);
-public record SnapshotReq(Guid RobotId, string? Envelope);
+public record SnapshotReq(Guid RobotId, string? Envelope, string? Game);
 public record ClaimReq(string? WorkerId, string? Kind);
-public record ChallengeReq(Guid ChallengerSnapshotId, Guid DefenderSnapshotId);
+public record ChallengeReq(Guid ChallengerSnapshotId, Guid DefenderSnapshotId, string? Arena);
 public record ReplayReq(string? Replay);
 public record DepositReq(int Amount, string? IdemKey);
 public record EconClaimReq(string? Kind, string? ContestId, double Dealt, double Mult, string? AttemptId);

@@ -15,7 +15,7 @@ PASS  a wrong password and an unknown account are indistinguishable (both 401)
 
 == D. robots ==
 PASS  a robot is created
-      robot 6b990613-bd61-4ee6-b68b-baacbea734f1
+      robot 25487153-bc9f-491f-9b6e-057fb6865d1e
 PASS  …but not without a token
 
 == E. snapshot upload stays opaque (§5.2) ==
@@ -30,7 +30,7 @@ PASS  …and a wrong key is refused too
 PASS  a keyed worker claims a job
 PASS  …and the job is the VALIDATE the upload enqueued
 PASS  …pointing at the snapshot just uploaded
-PASS  …and carries a payload location the worker can resolve (file:///tmp/rb-blobs/snapshots/6b990613-bd61-4ee6-b68b-baacbea734f1/7183132ad12143d28fef0216b532589c.json)
+PASS  …and carries a payload location the worker can resolve (file:///tmp/rb-blobs/snapshots/25487153-bc9f-491f-9b6e-057fb6865d1e/f6e7cf4fb8604e528474cc1426d80e56.json)
 PASS  …and the payload sha256 rides along, so the worker can verify storage
 PASS  another worker cannot heartbeat a job it does not hold
 PASS  …the holder can
@@ -194,7 +194,7 @@ PASS  …scoped to the season about to close
 PASS  …and capped at the payout places
 PASS  …listing each player at most once
 PASS  …with first place paying the full payout base
-      standings preview: 2 player(s), leader d22a2a15-e85c-411a-8ed0-cfaad2d7d8f1
+      standings preview: 2 player(s), leader 693917b6-4739-4481-b0f6-491b3ac08b8f
       season 1: 2 player(s) earned a rating, 1 enlisted without fighting and are therefore unpaid
 PASS  …and excluding players who enlisted but never fought
 PASS  a FORCED season rolls over
@@ -267,7 +267,7 @@ PASS  no wallet is overdrawn
 --- E. the career economy ---
 PASS  an economy account registers
 PASS  a NON-participant asking for match envelopes is told nothing
-PASS  …and the account id came back (86b0aeff-9afc-4ff7-830f-6001a0c3a41b)
+PASS  …and the account id came back (842bac4a-fd28-43cb-b610-f5745a540589)
 PASS  the wallet answers
 PASS  a fresh wallet holds exactly the signing bonus
 PASS  …and owns nothing
@@ -328,7 +328,7 @@ PASS  metrics carry pendingSnapshots
 PASS  pendingSnapshots agrees with the database
 PASS  failed agrees with the database
 PASS  the rbmetrics log line keeps its shape
-      rbmetrics ready=1 claimed=0 failed=4 done=16 oldest_ready_s=5 oldest_heartbeat_s=0 pending_snapshots=3 oldest_pending_s=13
+      rbmetrics ready=1 claimed=0 failed=4 done=16 oldest_ready_s=2 oldest_heartbeat_s=0 pending_snapshots=5 oldest_pending_s=9
 PASS  …and reports real counts, not a row of zeros
 
 --- B. season badges ---
@@ -419,8 +419,39 @@ PASS  ...and it says so rather than pretending it did the work again
 PASS  re-enlisting clears the retired flag
 PASS  ...and it is back on the board
 
+--- Y. the second game: the game tag, the yard ruleset, the pool ---
+      challenger: section F's robot 25487153-bc9f-491f-9b6e-057fb6865d1e, ACTIVE snapshot 420d3259-63df-4b50-9ceb-92d6fe8d2d56 (FEATHER)
+PASS  an upload may say which game built it
+PASS  …the response echoes the tag
+PASS  …and the row carries it
+PASS  an unknown game is refused
+PASS  a Bolt & Blade upload, which sends no game field, is 'rb' — every existing row is
+PASS  the Yardling is ACTIVE in the challenger's class
+PASS  a challenge may name the yard ruleset
+PASS  …and the response says so
+PASS  …one server-chosen seed, like every live fight
+PASS  …and the match row carries arena=yard for the worker
+PASS  an unknown ruleset is refused, not stored
+PASS  the worker's claim names the ruleset it must fight under
+PASS  a yard verdict settles like any other
+PASS  …the match is COMPLETE
+PASS  …still filed under the yard ruleset
+PASS  a challenge that names no ruleset is a league match, exactly as before
+PASS  the pool answers an ANONYMOUS caller (no token was sent)
+PASS  …for the class asked
+PASS  …with min(class, 12) entries — the class holds 3
+PASS  …and no program text leaves the server
+PASS  …there is not even a program key to be empty
+PASS  …every entry carries robotName, owner, build, class and game
+PASS  …and the freshly enlisted Yardling turns up in the sample
+PASS  …badged as a Scrapyard robot in one shared pool
+PASS  …with its record from the yard fight it just lost-or-won
+PASS  an unknown class is a 400, not an empty yard
+PASS  n is honoured (n=1)
+PASS  n is capped at 12 (asked 999, got 3)
+
 ----- NOT COVERED BY THIS RUN (1) -----
   blob URLs are built with the forwarded scheme -- no object store configured (BLOB_S3_BUCKET unset); file:// rows are passed through verbatim
 ----- a skip is not a pass; each line above is cover this run did not provide -----
 
-===== passed 356  failed 0  skipped 1 =====
+===== passed 384  failed 0  skipped 1 =====

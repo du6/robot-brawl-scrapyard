@@ -149,6 +149,9 @@ namespace RobotBrawl.Phase0
             Check(job != null && job.challengerUrl == "file:///c.json" && job.defenderUrl == "file:///d.json",
                   "BOTH payload locations survive the parse");
             Check(job != null && job.seeds.Length == 3, "and the seeds come with it");
+            Check(job != null && job.arena == "league", "and the arena (league) survives the parse");
+            var yjob = RobotWorker.ParseClaim(claim.Replace("\"arena\":\"league\"", "\"arena\":\"yard\""));
+            Check(yjob != null && yjob.arena == "yard", "a yard claim keeps its ruleset for the runner");
             // A VALIDATE claim must not acquire fight fields by accident.
             var vjob = RobotWorker.ParseClaim("{\"id\":1,\"kind\":\"VALIDATE\",\"snapshotId\":\"s\",\"payloadUrl\":\"file:///p\",\"payloadSha256\":\"cc\"}");
             Check(vjob != null && vjob.IsValidate && !vjob.IsFight, "a VALIDATE claim is still a VALIDATE");
@@ -283,6 +286,30 @@ namespace RobotBrawl.Phase0
                   "…with the playable recording FIRST in replayUrls, ahead of the summary");
             Check(net.lastReplayDoc.Contains("\"replayVersion\":1"), "the replay doc is versioned");
             Check(net.lastReplayDoc.Contains("\"bouts\":["), "…and carries the bouts");
+            var leagueRes = FightWorkerLoop.LastResult;
+
+            log.Add("== K. a yard job fights on the Quick clock (Scrapyard, 2026-09-09) ==");
+            // Two bare cores with no weapons never finish each other, so the
+            // clock decides: the league bout above is the CONTROL LEG and must
+            // have run long; the same pair under arena "yard" must end inside
+            // 30 s + settle, the crusher walls having closed. Same code path
+            // as the cloud referee: RunOnce, a claim with arena = yard.
+            float leagueS = leagueRes != null && leagueRes.bouts.Count > 0 ? leagueRes.bouts[0].simSeconds : -1f;
+            Check(leagueS > FightManager.QUICK_MATCH_TIME + 8f,
+                  "control: the league bout ran on the long clock (" + leagueS.ToString("0.0") + " s)");
+            net = new StubFightTransport();
+            net.blobs["file:///a"] = aJson; net.blobs["file:///b"] = bJson;
+            var yardJob = FightJob(5, "file:///a", envA.sha256, "file:///b", envB.sha256, new[] { 7 });
+            yardJob.arena = "yard";
+            net.jobs.Enqueue(yardJob);
+            bool quickBefore = FightManager.quickBout;
+            yield return FightWorkerLoop.RunOnce(net, bm, null);
+            var yardRes = FightWorkerLoop.LastResult;
+            float yardS = yardRes != null && yardRes.bouts.Count > 0 ? yardRes.bouts[0].simSeconds : -1f;
+            Check(net.posts == 1 && net.fileUploads >= 1, "a yard job completes, posts once and uploads its recording");
+            Check(yardS > 0f && yardS <= FightManager.QUICK_MATCH_TIME + 8f,
+                  "…and the bout ended inside the 30-s Quick clock plus settle (" + yardS.ToString("0.0") + " s)");
+            Check(FightManager.quickBout == quickBefore, "…and the Quick flag is restored afterwards (" + quickBefore + ")");
 
             log.Add("== J. owner state ==");
             Check(Career.Data == savedData, "the career object was never swapped");

@@ -380,6 +380,19 @@ done
 check_err "a config key cannot be duplicated" \
   "INSERT INTO ladder_config (key,value,note) VALUES ('stake_base',1,'dupe');"
 
+
+echo
+echo "== K. the second game (Scrapyard, migration 017) =="
+V=$(q "INSERT INTO snapshots (robot_id,storage_url,sha256,client_version) VALUES ('$R1','gs://x/k1','$H','t') RETURNING game;")
+[ "$V" = "rb" ] && ok "a snapshot with no game named is Robot Brawl's ('rb')" || no "default game should be 'rb', read '$V'"
+check_ok  "…and one may be tagged scrapyard" \
+  "INSERT INTO snapshots (robot_id,storage_url,sha256,client_version,game) VALUES ('$R1','gs://x/k2','$H','t','scrapyard');"
+check_err "an unknown game is refused" \
+  "INSERT INTO snapshots (robot_id,storage_url,sha256,client_version,game) VALUES ('$R1','gs://x/k3','$H','t','nope');"
+check_ok  "a yard match is a legal row — the ruleset rides on arena, which has no CHECK (league_night and synthetic live there too)" \
+  "INSERT INTO matches (challenger_snapshot_id,defender_snapshot_id,category,seeds,arena) VALUES ('$S1','$S2','LIGHT','{1}','yard');"
+V=$(q "SELECT count(*) FROM pg_indexes WHERE indexname='snapshots_pool_idx';")
+[ "$V" = "1" ] && ok "the pool's partial index exists" || no "snapshots_pool_idx is missing (read '$V')"
 echo
 echo "===== passed $pass  failed $fail ====="
 [ "$fail" -eq 0 ] || exit 1

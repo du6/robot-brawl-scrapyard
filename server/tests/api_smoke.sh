@@ -2315,6 +2315,145 @@ else
   fi
 fi
 
+# --------------------------------------------------------------- section Y
+# ROBOT BRAWL: SCRAPYARD SHARES THIS SERVER (owen, 2026-09-09 —
+# docs/Scrapyard_Design_2026-09-09.md §7.3). Three things the second game
+# needs, checked against Bolt & Blade's OWN accounts from section F so the
+# same checks prove the old callers are unchanged: a `game` tag on
+# snapshots, a 'yard' ruleset on challenges (carried on matches.arena, which
+# the worker always received and never read for rules), and the anonymous,
+# build-only pool.
+#
+# Self-sufficient on purpose. The first cut reused section F's snapshot ids
+# and was refused "your snapshot is SUPERSEDED": later sections re-upload
+# for both fixture robots and the defender ends the run with NO active
+# snapshot. So this section enlists its own defender (the Yardling, under the
+# second account) and challenges it from the first account's live snapshot.
+# Runs last: it leaves foreign jobs CLAIMED while draining the queue to reach
+# its own, the way FightWorkerLoop does.
+echo
+echo "--- Y. the second game: the game tag, the yard ruleset, the pool ---"
+YCSNAP=""; [ -n "${ROBOT:-}" ] && YCSNAP=$(dbq "SELECT id FROM snapshots WHERE robot_id='$ROBOT' AND status='ACTIVE';")
+YCCAT=""; [ -n "$YCSNAP" ] && YCCAT=$(dbq "SELECT category FROM snapshots WHERE id='$YCSNAP';")
+if [ -z "$YCSNAP" ] || [ -z "$YCCAT" ] || [ -z "${DAUTH:-}" ] || [ -z "${AUTH:-}" ]; then
+  skip "section Y (game tag + yard ruleset + pool, ~29 checks)" "section F's challenger has no ACTIVE snapshot, or an account token is missing"
+else
+  note "challenger: section F's robot $ROBOT, ACTIVE snapshot $YCSNAP ($YCCAT)"
+
+  # --- the game tag, on the defender we enlist for the second account -----
+  yenv() { "$PY" - "$1" <<'PYEOF'
+import json,hashlib,sys
+payload=json.dumps({"payloadVersion":1,"robotName":sys.argv[1],
+                    "build":"core|0,0,0|0|0,0,0|Aluminum",
+                    "program":"{\"title\":\"SECRET-HUNT-PROGRAM\"}"},separators=(',',':'))
+print(json.dumps({"payload":payload,"clientVersion":"0.9+smoke+yard","sha256":hashlib.sha256(payload.encode('utf-8')).hexdigest()}))
+PYEOF
+  }
+  ybody() { "$PY" -c "import json,sys;print(json.dumps({'robotId':sys.argv[1],'envelope':sys.argv[2],'game':sys.argv[3]}))" "$1" "$2" "$3"; }
+  S=$(req POST /v1/robots "{\"name\":\"Yardling$STAMP\"}" "$DAUTH"); YROBOT=$(jget id)
+  if [ -z "$YROBOT" ]; then
+    skip "section Y (game tag + yard ruleset + pool, ~29 checks)" "could not create the Yardling robot (HTTP $S)"
+  else
+    S=$(req POST /v1/snapshots "$(ybody "$YROBOT" "$(yenv "Yardling$STAMP")" scrapyard)" "$DAUTH")
+    expect "an upload may say which game built it" "$S" 200
+    YSNAP=$(jget id)
+    is "…the response echoes the tag" "$(jget game)" scrapyard
+    is "…and the row carries it" "$(dbq "SELECT game FROM snapshots WHERE id='$YSNAP';")" scrapyard
+    S=$(req POST /v1/snapshots "$(ybody "$YROBOT" "$(yenv "Nope$STAMP")" nope)" "$DAUTH")
+    expect "an unknown game is refused" "$S" 400
+    is "a Bolt & Blade upload, which sends no game field, is 'rb' — every existing row is" \
+       "$(dbq "SELECT game FROM snapshots WHERE id='$YCSNAP';")" rb
+
+    # validate the Yardling into the challenger's class
+    YVJOB=""
+    for i in 1 2 3 4 5 6 7 8; do
+      S=$(req POST /v1/worker/jobs/claim '{"workerId":"smoke-yard","kind":"VALIDATE"}' "X-Worker-Key: $WKEY")
+      [ "$S" = "204" ] && break
+      if [ "$(jget snapshotId)" = "$YSNAP" ]; then YVJOB=$(jget id); break; fi
+    done
+    if [ -z "$YVJOB" ]; then
+      skip "the yard ruleset and the pool (~22 checks)" "the Yardling's validate job was never claimed"
+    else
+      req POST "/v1/worker/jobs/$YVJOB/validate-result" \
+        "{\"snapshotId\":\"$YSNAP\",\"workerId\":\"smoke-yard\",\"legal\":true,\"massKg\":9,\"aabbX\":0.4,\"aabbY\":0.3,\"aabbZ\":0.5,\"category\":\"$YCCAT\",\"partsManifest\":[\"chassis_a\"],\"programHash\":\"$(printf '%064d' 7)\",\"failReasons\":[]}" \
+        "X-Worker-Key: $WKEY" >/dev/null
+      is "the Yardling is ACTIVE in the challenger's class" "$(dbq "SELECT status||'/'||category FROM snapshots WHERE id='$YSNAP';")" "ACTIVE/$YCCAT"
+
+      # --- the yard ruleset -------------------------------------------------
+      S=$(req POST /v1/challenges "{\"challengerSnapshotId\":\"$YCSNAP\",\"defenderSnapshotId\":\"$YSNAP\",\"arena\":\"yard\"}" "$AUTH")
+      expect "a challenge may name the yard ruleset" "$S" 200
+      YMATCH=$(jget matchId)
+      is "…and the response says so" "$(jget arena)" yard
+      is "…one server-chosen seed, like every live fight" \
+         "$("$PY" -c "import json;print(len(json.load(open('$BODY'))['seeds']))")" 1
+      is "…and the match row carries arena=yard for the worker" "$(dbq "SELECT arena FROM matches WHERE id='$YMATCH';")" yard
+      S=$(req POST /v1/challenges "{\"challengerSnapshotId\":\"$YCSNAP\",\"defenderSnapshotId\":\"$YSNAP\",\"arena\":\"cage\"}" "$AUTH")
+      expect "an unknown ruleset is refused, not stored" "$S" 400
+      YJOB=""; YARENA=""
+      for i in 1 2 3 4 5 6 7 8; do
+        S=$(req POST /v1/worker/jobs/claim '{"workerId":"smoke-yard","kind":"FIGHT"}' "X-Worker-Key: $WKEY")
+        [ "$S" = "204" ] && break
+        if [ "$(jget matchId)" = "$YMATCH" ]; then YJOB=$(jget id); YARENA=$(jget arena); break; fi
+      done
+      if [ -z "$YJOB" ]; then
+        skip "the worker is told the ruleset and settles it (4 checks)" "the yard FIGHT job was never claimed"
+      else
+        is "the worker's claim names the ruleset it must fight under" "$YARENA" yard
+        req POST "/v1/worker/matches/$YMATCH/replay" '{"replay":"{\"bouts\":1,\"recording\":\"opaque\"}"}' "X-Worker-Key: $WKEY" >/dev/null
+        YURL=$(jget url)
+        S=$(req POST "/v1/worker/jobs/$YJOB/fight-result" \
+            "{\"matchId\":\"$YMATCH\",\"workerId\":\"smoke-yard\",\"verdict\":\"DEFENDER\",\"replayUrls\":[\"$YURL\"],\"bouts\":[\"D:KO\"]}" \
+            "X-Worker-Key: $WKEY")
+        expect "a yard verdict settles like any other" "$S" 200
+        is "…the match is COMPLETE" "$(dbq "SELECT status FROM matches WHERE id='$YMATCH';")" COMPLETE
+        is "…still filed under the yard ruleset" "$(dbq "SELECT arena FROM matches WHERE id='$YMATCH';")" yard
+      fi
+      S=$(req POST /v1/challenges "{\"challengerSnapshotId\":\"$YCSNAP\",\"defenderSnapshotId\":\"$YSNAP\"}" "$AUTH")
+      if [ "$S" = "200" ]; then
+        is "a challenge that names no ruleset is a league match, exactly as before" \
+           "$(dbq "SELECT arena FROM matches WHERE id='$(jget matchId)';")" league
+      else
+        skip "the league default (1 check)" "the plain challenge returned HTTP $S: $(head -c 100 "$BODY")"
+      fi
+
+      # --- the pool: anonymous, class-filtered, build-only ------------------
+      S=$(req GET "/v1/pool?category=$YCCAT&n=12")
+      expect "the pool answers an ANONYMOUS caller (no token was sent)" "$S" 200
+      is "…for the class asked" "$(jget category)" "$YCCAT"
+      INCLASS=$(dbq "SELECT count(*) FROM snapshots s JOIN robots r ON r.id=s.robot_id WHERE s.status='ACTIVE' AND s.category='$YCCAT' AND NOT r.retired;")
+      WANT=$(( INCLASS < 12 ? INCLASS : 12 ))
+      is "…with min(class, 12) entries — the class holds $INCLASS" "$(jget count)" "$WANT"
+      if grep -q "SECRET-HUNT-PROGRAM" "$BODY"; then no "THE POOL LEAKED A PROGRAM — the payload's program text is in the response"
+      else ok "…and no program text leaves the server"; fi
+      if grep -q '"program"' "$BODY"; then no "the pool response carries a 'program' key — it must never have one"
+      else ok "…there is not even a program key to be empty"; fi
+      SHAPE=$("$PY" -c "
+import json;d=json.load(open('$BODY'));e=d['entries']
+print('ok' if e and all(x['build'] and x['owner'] and x['robotName'] and x['game'] in ('rb','scrapyard') and x['category']=='$YCCAT' for x in e) else 'bad')")
+      is "…every entry carries robotName, owner, build, class and game" "$SHAPE" ok
+      # The sample is random; look a few times for the Yardling before
+      # deciding. 30/min per IP is the pool's budget; this spends at most 6.
+      SEEN=""
+      for i in 1 2 3 4 5 6; do
+        if grep -q "$YSNAP" "$BODY"; then SEEN=1; break; fi
+        req GET "/v1/pool?category=$YCCAT&n=12" >/dev/null
+      done
+      if [ -n "$SEEN" ]; then
+        ok "…and the freshly enlisted Yardling turns up in the sample"
+        is "…badged as a Scrapyard robot in one shared pool" \
+           "$("$PY" -c "import json;print([x['game'] for x in json.load(open('$BODY'))['entries'] if x['snapshotId']=='$YSNAP'][0])")" scrapyard
+        is "…with its record from the yard fight it just lost-or-won" \
+           "$("$PY" -c "import json;e=[x for x in json.load(open('$BODY'))['entries'] if x['snapshotId']=='$YSNAP'][0];print(e['wins']+e['losses'])")" 1
+      else
+        skip "the Yardling in the sample (3 checks)" "not drawn in 6 random samples of $WANT from $INCLASS"
+      fi
+      S=$(req GET "/v1/pool?category=CRUISERWEIGHT"); expect "an unknown class is a 400, not an empty yard" "$S" 400
+      S=$(req GET "/v1/pool?n=1"); is "n is honoured (n=1)" "$(jget count)" 1
+      S=$(req GET "/v1/pool?n=999"); [ "$(jget count)" -le 12 ] && ok "n is capped at 12 (asked 999, got $(jget count))" || no "n=999 returned $(jget count) entries; the cap is 12"
+    fi
+  fi
+fi
+
 rm -f "$BODY" "$VRC_SNAP_FILE" "$VRC_JOB_FILE"
 echo
 if [ "$skipped" -gt 0 ]; then

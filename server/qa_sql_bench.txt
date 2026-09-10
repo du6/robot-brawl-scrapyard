@@ -1,5 +1,5 @@
 == resetting fixtures ==
-      users 7bb9b084-b053-44f1-92a9-5d614694864e / a9ffaef8-f78a-4f0d-8d3f-d29824364e6f ; robots 35db06f4-c93e-4279-8ece-d523e299f0c5 / 9a955491-0966-4859-8567-33b8b7d5fb1f
+      users aca1e984-c832-4420-bc04-97e92de2748f / 664e872d-6983-433f-ad15-1761e1e690fe ; robots 380c5bcd-4da3-429a-a336-7b69bce6b5d9 / b48e0651-ab68-40a3-aacb-03d789c3aa0e
 
 == A. identity and snapshots ==
 PASS  case-insensitive email is unique (OWEN@example.com is Owen) (ERROR:  duplicate key value violates unique constraint "users_email_lowe)
@@ -80,4 +80,11 @@ PASS  ladder_config no longer carries win_purse_base (per-match arena rewards ar
 PASS  ladder_config no longer carries defense_purse (per-match arena rewards are abolished)
 PASS  a config key cannot be duplicated (ERROR:  duplicate key value violates unique constraint "ladder_config_pk)
 
-===== passed 56  failed 0 =====
+== K. the second game (Scrapyard, migration 017) ==
+PASS  a snapshot with no game named is Robot Brawl's ('rb')
+PASS  …and one may be tagged scrapyard
+PASS  an unknown game is refused (ERROR:  new row for relation "snapshots" violates check constraint "snap)
+PASS  a yard match is a legal row — the ruleset rides on arena, which has no CHECK (league_night and synthetic live there too)
+PASS  the pool's partial index exists
+
+===== passed 61  failed 0 =====

@@ -39,6 +39,9 @@ namespace RobotBrawl.Phase0
     {
         public static string WorkerId = "editor-fight-1";
         public static float SpeedMultiplier = 10f;
+        /// <summary>The last completed match, for benches that want to look at
+        /// the bouts (clock, cause) rather than only at what was posted.</summary>
+        public static MatchRunner.MatchResult LastResult;
 
         // Pollable from outside — the domain reload makes holding a reference
         // across bridge calls impossible, so the bench and a driving session
@@ -92,8 +95,13 @@ namespace RobotBrawl.Phase0
             MatchRunner.MatchResult result = null;
             var runner = MatchRunner.Run(envA, envB, seeds, job.matchId, SpeedMultiplier, true,
                                          r => { result = r; });
+            // The claim always carried `arena`; until 2026-09-09 nothing read
+            // it. "yard" is Robot Brawl: Scrapyard's ruleset - the Quick clock.
+            // Anything else (league, league_night) is the fight as it was.
+            runner.quick = job.arena == "yard";
             while (!runner.finished) yield return null;
             result = runner.result;
+            LastResult = result;
             if (runner != null && runner.gameObject != null) UnityEngine.Object.Destroy(runner.gameObject);
 
             if (result == null || !result.Ok)

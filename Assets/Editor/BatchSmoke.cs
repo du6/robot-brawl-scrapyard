@@ -13,6 +13,7 @@ namespace RobotBrawl.EditorTools
     public static class BatchSmoke
     {
         public static void Quick()  { Arm("quick"); }
+        public static void FightWorker() { Arm("fightworker"); }
         public static void Career() { Arm("career"); }
         public static void Touch()  { Arm("touch"); }
         static void Arm(string which)
@@ -28,6 +29,7 @@ namespace RobotBrawl.EditorTools
     {
         static bool launched; static double armedAt; static string which;
         static RobotBrawl.Phase0.TouchSmoke touch;
+        static RobotBrawl.Phase0.FightWorkerBench fw;
         static BatchSmokeBoot()
         {
             which = SessionState.GetString("rb_smoke", "");
@@ -39,6 +41,7 @@ namespace RobotBrawl.EditorTools
         {
             return which == "career" ? RobotBrawl.Phase0.CareerSmoke.finished
                                      : which == "quick" ? RobotBrawl.Phase0.QuickFightBench.finished
+                                     : which == "fightworker" ? (fw != null && fw.finished)
                                      : (touch != null && touch.finished);
         }
         static void Tick()
@@ -74,8 +77,11 @@ namespace RobotBrawl.EditorTools
                     RobotBrawl.Phase0.ModeSelect.StartCareer(true);
                 if (which == "quick" && Object.FindFirstObjectByType<RobotBrawl.Phase0.BuilderManager>() == null)
                     RobotBrawl.Phase0.ModeSelect.StartCareer(true);
+                if (which == "fightworker" && Object.FindFirstObjectByType<RobotBrawl.Phase0.BuilderManager>() == null)
+                    new GameObject("BuilderManager").AddComponent<RobotBrawl.Phase0.BuilderManager>();
                 if (which == "career") RobotBrawl.Phase0.CareerSmoke.Run();
                 else if (which == "quick") RobotBrawl.Phase0.QuickFightBench.Run();
+                else if (which == "fightworker") { RobotBrawl.Phase0.FightWorkerBench.RunPure(); fw = RobotBrawl.Phase0.FightWorkerBench.Run(); }
                 else touch = RobotBrawl.Phase0.TouchSmoke.Run();
             }
             if (launched && Finished())

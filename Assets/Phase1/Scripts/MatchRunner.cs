@@ -94,6 +94,14 @@ namespace RobotBrawl.Phase0
         public bool stopWhenDecided = true;
         public float arenaHalf = 7f;
         public float wallClockCapPerBout = 90f;
+        /// <summary>THE YARD RULESET (Robot Brawl: Scrapyard, 2026-09-09).
+        /// A match whose claim says arena == "yard" is fought on the Quick
+        /// profile - FightManager.QUICK_MATCH_TIME (30 s), the 5-s count-out,
+        /// crusher walls over the last 10 s - instead of the 90-s league
+        /// clock. Same seed, same referee, same settlement; only the clock
+        /// differs, so a Bolt & Blade match (arena "league") is untouched.
+        /// Set by the caller after Run(), like liveHold.</summary>
+        public bool quick;
         public string matchId = "m0";
         public MatchResult result;
         public bool finished;
@@ -226,6 +234,7 @@ namespace RobotBrawl.Phase0
             int savedChallengeIdx = Progression.activeChallengeIdx;
             bool savedSuppress = Progression.suppressSettle;
             float savedScale = Time.timeScale;
+            bool savedQuick = FightManager.quickBout;
 
             Career.Data = new CareerData();
             Career.active = false;
@@ -243,6 +252,7 @@ namespace RobotBrawl.Phase0
             // the challenge index is cleared so nothing rides on a stale one.
             Progression.activeChallengeIdx = -1;
             Progression.suppressSettle = true;
+            FightManager.quickBout = quick;
 
             try
             {
@@ -263,6 +273,7 @@ namespace RobotBrawl.Phase0
             finally
             {
                 Time.timeScale = savedScale;
+                FightManager.quickBout = savedQuick;
                 Career.Data = savedData;
                 Career.active = savedActive;
                 Career.autosave = savedAuto;
@@ -391,6 +402,10 @@ namespace RobotBrawl.Phase0
                 fm.playerSource = ControlSource.AI;
             }
 
+            // Per bout, not just per match: FightManager.End() clears the
+            // static on the career's quick path, and Setup() is where the
+            // clock is read from it.
+            FightManager.quickBout = quick;
             fm.Setup(bm, botA, dA, botB, dB, aiB);
             if (aiB != null) aiB.fm = fm;
 
@@ -411,7 +426,8 @@ namespace RobotBrawl.Phase0
             // determinism disagreement the probe caught (local DRAW vs referee
             // WON). The cap now scales with speed and never truncates the fight.
             float wallCap = Mathf.Max(wallClockCapPerBout,
-                                      (FightManager.DEFAULT_MATCH_TIME + 5f) / Mathf.Max(0.01f, speed) + 5f);
+                                      ((quick ? FightManager.QUICK_MATCH_TIME : FightManager.DEFAULT_MATCH_TIME) + 5f)
+                                          / Mathf.Max(0.01f, speed) + 5f);
             while (fm.state == FightManager.State.Settling &&
                    Time.realtimeSinceStartup - t0 < wallCap)
                 yield return null;
