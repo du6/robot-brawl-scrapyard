@@ -97,6 +97,24 @@ namespace RobotBrawl.Phase0
             Check(parked != null && parked.name.ToUpper().Contains("SCOUT"), "...the nearest is SCOUT, not another rookie (" + (parked != null ? parked.name : "-") + ")");
             Check(parked != null && Vector3.Distance(parked.rb.position, bm.YardGarageDoor) > 20f, "...far enough from home to be a drive");
             Check(!bm.YardCardShown, "no card at home");
+            // ---- the look (WorldLook): a planet, not a plane ----------------------
+            Check(Shader.Find("Scrapyard/PlanetGround") != null && Shader.Find("Scrapyard/SkyBody") != null, "both planet shaders exist");
+            Check(bm.GroundMaterial != null && bm.GroundMaterial.shader.name == "Scrapyard/PlanetGround", "the ground draws with the planet shader");
+            var hpl = bm.YardGarageDoor;
+            var groundGo = GameObject.Find("chunk_" + Mathf.FloorToInt(hpl.x / BuilderManager.CHUNK) + "_" + Mathf.FloorToInt(hpl.z / BuilderManager.CHUNK) + "/ground");
+            var gmesh = groundGo != null ? groundGo.GetComponent<MeshFilter>().sharedMesh : null;
+            Check(gmesh != null && gmesh.colors.Length == gmesh.vertexCount, "...with a colour on every vertex");
+            Check(groundGo != null && groundGo.GetComponent<MeshCollider>() != null, "...and a collider to drive on");
+            Check(bm.PlanetLookOn && RenderSettings.fog && RenderSettings.fogMode == FogMode.Linear, "the sky is the planet's, with fog to the edge of the loaded world");
+            Check(GameObject.Find("sister_planet") != null && GameObject.Find("moon") != null, "a sister planet and a moon hang on the horizon");
+            int structures = 0;
+            if (groundGo != null) foreach (var tr in groundGo.transform.parent.GetComponentsInChildren<Transform>()) if (tr.name.StartsWith("structure_")) structures++;
+            Check(structures >= 3, "the home chunk has its plaza and structures (" + structures + ")");
+            float mesaH = -1f, craterH = 1f;
+            for (int sx = -600; sx <= 600 && (mesaH < 3.5f || craterH > -2f); sx += 40)
+                for (int sz = -600; sz <= 600; sz += 40)
+                { float hh = bm.TerrainHeight(sx, sz); if (hh > mesaH) mesaH = hh; if (hh < craterH) craterH = hh; }
+            Check(mesaH > 3.5f && craterH < -2f, "the land has mesas and craters (high " + mesaH.ToString("0.0") + " m, low " + craterH.ToString("0.0") + " m)");
             var hp = bm.YardGarageDoor;
             Check(Mathf.Abs(bm.TerrainHeight(hp.x, hp.z)) < 0.01f && Mathf.Abs(bm.TerrainHeight(hp.x + 10f, hp.z + 10f)) < 0.01f, "home is flat");
             float hA = bm.TerrainHeight(300f, 300f), hB = bm.TerrainHeight(-260f, 410f);
@@ -105,6 +123,7 @@ namespace RobotBrawl.Phase0
             // ---- 2. the seed is the date --------------------------------------
             bm.LeaveMap(); yield return null;
             Check(bm.mode == BuilderManager.Mode.Build, "GARAGE returns to the garage");
+            Check(!bm.PlanetLookOn && !RenderSettings.fog, "...and the garage gets its own sky and no fog back");
             bm.EnterMap(); yield return null; yield return null;
             var crates2 = bm.YardCratePositions();
             bool same = crates2.Count == crates.Count;

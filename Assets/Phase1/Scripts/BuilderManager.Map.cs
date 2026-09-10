@@ -119,6 +119,31 @@ public partial class BuilderManager
                 + 2.5f * Mathf.PerlinNoise(nx / 60f + 3.7f, nz / 60f + 1.3f)
                 + 0.8f * Mathf.PerlinNoise(nx / 17f + 9.1f, nz / 17f + 4.2f);
         h -= 4.6f;   // roughly zero-mean
+        // MESAS: where a slow noise runs high the ground steps up onto a
+        // plateau, with an edge you can drive (4 m over ~14 m).
+        float mesa = Mathf.PerlinNoise(nx / 150f + 31f, nz / 150f + 17f);
+        h += Mathf.SmoothStep(0f, 1f, (mesa - 0.62f) / 0.10f) * 4.2f;
+        // CRATERS: one per 160 m cell, half the time, a bowl with a rim.
+        float cell = 160f;
+        int cx = Mathf.FloorToInt(nx / cell), cz = Mathf.FloorToInt(nz / cell);
+        for (int dz = -1; dz <= 1; dz++)
+            for (int dx = -1; dx <= 1; dx++)
+            {
+                int gx = cx + dx, gz = cz + dz;
+                float hsh = Mathf.Abs(Mathf.Sin(gx * 127.1f + gz * 311.7f) * 43758.5453f);
+                float f = hsh - Mathf.Floor(hsh);
+                if (f > 0.5f) continue;
+                float rad = 12f + f * 34f;
+                float ox = (gx + 0.2f + f * 0.6f) * cell, oz = (gz + 0.25f + (f * 7.3f - Mathf.Floor(f * 7.3f)) * 0.5f) * cell;
+                float d = Vector2.Distance(new Vector2(nx, nz), new Vector2(ox, oz)) / rad;
+                if (d < 1.15f)
+                {
+                    float depth = rad * 0.16f;
+                    if (d < 1f) h -= depth * (1f - d * d);
+                    float rim = (d - 0.98f) / 0.10f;
+                    h += depth * 0.35f * Mathf.Exp(-rim * rim);
+                }
+            }
         float dHome = Vector2.Distance(new Vector2(x, z), new Vector2(homePos.x, homePos.z));
         float flat = Mathf.Clamp01((dHome - SPAWN_FLAT) / 30f);
         return h * flat;
@@ -165,10 +190,15 @@ public partial class BuilderManager
         var mesh = new Mesh { name = "ground_" + cx + "_" + cz };
         mesh.vertices = verts; mesh.uv = uvs; mesh.triangles = tris;
         mesh.RecalculateNormals(); mesh.RecalculateBounds();
+        // colour per vertex: biome, height band, slope, the home plaza
+        var norms = mesh.normals;
+        var cols = new Color[verts.Length];
+        for (int k = 0; k < verts.Length; k++) cols[k] = GroundColor(verts[k].x, verts[k].z, verts[k].y, norms[k]);
+        mesh.colors = cols;
         var ground = new GameObject("ground");
         ground.transform.SetParent(ch.root.transform, false);
         ground.AddComponent<MeshFilter>().sharedMesh = mesh;
-        ground.AddComponent<MeshRenderer>().sharedMaterial = BiomeMat(Biome(x0 + CHUNK * 0.5f, z0 + CHUNK * 0.5f));
+        ground.AddComponent<MeshRenderer>().sharedMaterial = matGround != null ? matGround : BiomeMat(Biome(x0 + CHUNK * 0.5f, z0 + CHUNK * 0.5f));
         ground.AddComponent<MeshCollider>().sharedMesh = mesh;
 
         // this chunk's own seed: the world's, mixed with where it is
@@ -176,24 +206,17 @@ public partial class BuilderManager
         bool spawnChunk = cx == ChunkOf(homePos.x) && cz == ChunkOf(homePos.z);
         float dHome = Vector2.Distance(new Vector2(x0 + CHUNK * 0.5f, z0 + CHUNK * 0.5f), new Vector2(homePos.x, homePos.z));
 
-        // wrecks and ruins
-        int wrecks = 4 + rng.Next(6);
-        for (int w = 0; w < wrecks; w++)
+        // structures: the planet's own architecture (WorldLook), fewer and
+        // larger than the old wrecks, never within 12 m of home
+        EnsureLookMats();
+        if (spawnChunk) SpawnHomePlaza(ch.root.transform, rng);
+        int structures = 3 + rng.Next(4);
+        for (int w = 0; w < structures; w++)
         {
-            float x = x0 + (float)rng.NextDouble() * CHUNK, z = z0 + (float)rng.NextDouble() * CHUNK;
-            if (Vector2.Distance(new Vector2(x, z), new Vector2(homePos.x, homePos.z)) < 12f) continue;   // home stays clear
-            bool pillar = rng.Next(3) == 0;
-            var g = GameObject.CreatePrimitive(pillar ? PrimitiveType.Cylinder : PrimitiveType.Cube);
-            g.name = pillar ? "ruin" : "wreck";
-            g.transform.SetParent(ch.root.transform, false);
-            float h = pillar ? 1.2f + (float)rng.NextDouble() * 2.5f : 0.4f + (float)rng.NextDouble() * 0.8f;
-            Vector3 sc = pillar ? new Vector3(0.6f + (float)rng.NextDouble() * 0.6f, h, 0.6f + (float)rng.NextDouble() * 0.6f)
-                                : new Vector3(1.5f + (float)rng.NextDouble() * 3.5f, h, 1f + (float)rng.NextDouble() * 2.5f);
-            float gy = TerrainHeight(x, z);
-            g.transform.position = new Vector3(x, gy + sc.y * (pillar ? 1f : 0.45f), z);
-            g.transform.localScale = sc;
-            g.transform.rotation = Quaternion.Euler(pillar ? 0f : (float)rng.NextDouble() * 8f - 4f, (float)rng.NextDouble() * 360f, 0f);
-            g.GetComponent<Renderer>().sharedMaterial = pillar ? matPillar : matWreck;
+            float x = x0 + 4f + (float)rng.NextDouble() * (CHUNK - 8f), z = z0 + 4f + (float)rng.NextDouble() * (CHUNK - 8f);
+            if (Vector2.Distance(new Vector2(x, z), new Vector2(homePos.x, homePos.z)) < 13f) continue;
+            int kind = rng.Next(6);
+            SpawnStructure(ch.root.transform, kind, x, z, TerrainHeight(x, z), rng);
         }
 
         // crates: the spawn chunk's first is 8 m from home, in view; others by chance
@@ -206,7 +229,7 @@ public partial class BuilderManager
             string key = CrateKey(cx, cz, i);
             ch.crateKeys.Add(key);
             if (Career.Data != null && Career.Data.worldOpened.Contains(key)) { ch.crates.Add(null); continue; }
-            ch.crates.Add(MakeCrate(ch.root.transform, x, TerrainHeight(x, z), z, key));
+            ch.crates.Add(MakePod(ch.root.transform, x, TerrainHeight(x, z), z, key));
         }
 
         // an enemy: the spawn chunk always parks SCOUT 30 m out; elsewhere by
@@ -368,8 +391,10 @@ public partial class BuilderManager
         yardCard = false; cardBot = null; cardBotId = ""; yardToast = ""; yardToastT = 0f; flippedFor = 0f;
 
         EnsureWorldMats();
+        EnsureLookMats();
         worldRoot = new GameObject("world");
         sandboxRoot = worldRoot;             // BackToBuild's sweep destroys it
+        SetupPlanetLook();
         // home: a glowing pad you can find again
         var pad = PartVisualFactory.Deco(PrimitiveType.Cylinder, worldRoot.transform, homePos + new Vector3(0f, 0.02f, 0f),
             new Vector3(3.5f, 0.02f, 3.5f), Vector3.zero, PartVisualFactory.CyanGlow, "home_pad");
@@ -387,7 +412,7 @@ public partial class BuilderManager
         followCam = cam.gameObject.AddComponent<FollowCamera>();
         followCam.target = testRobot.transform;
         followCam.forwardHint = driveDir;
-        followCam.distance = 9f; followCam.height = 4.5f;
+        followCam.distance = 8.5f; followCam.height = 3.4f;   // lower: the horizon in the frame
         followCam.clampHalf = 0f;            // no clamp: the world has no edge
         followCam.SnapNow();
         AddHeadlight(testRobot, driveDir);
@@ -402,6 +427,7 @@ public partial class BuilderManager
         if (mode != Mode.Map) return;
         chunks.Clear();
         cardBot = null; cardBotId = ""; yardCard = false;
+        RestoreLook();
         BackToBuild();
         worldRoot = null;
         ARENA_HALF = 7f;
@@ -443,6 +469,7 @@ public partial class BuilderManager
         Vector3 me = testRobot.rb.position;
         PumpChunks(me);
         MapSteer();
+        PlaceSkyBodies();
 
         // the fall net: under the ground (a seam between chunks, a bad landing)
         // puts you back on it
