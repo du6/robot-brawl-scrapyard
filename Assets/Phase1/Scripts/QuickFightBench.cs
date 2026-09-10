@@ -42,6 +42,7 @@ namespace RobotBrawl.Phase0
         IEnumerator Start()
         {
             var bm = Object.FindFirstObjectByType<BuilderManager>();
+            BuilderManager.bootToYard = false;   // this bench asserts against the workshop
             if (bm == null) bm = new GameObject("BuilderManager").AddComponent<BuilderManager>();
             yield return null; yield return null;
 

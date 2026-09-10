@@ -5441,7 +5441,10 @@ public class MobileBuilderUI : MonoBehaviour
         if (ts != tipStepSeen) { tipStepSeen = ts; tipView = -1; }
         // CareerTipStep returns TIP_COUNT for "nothing left to say", which
         // covers career-off, skipped, and finished in one test.
-        bool show = ts < BuilderManager.TIP_COUNT;
+        // SCRAPYARD (2026-09-10): Robot Brawl's seven league tips ("open the
+        // LEAGUE tab to enter your first contest") are not this game's
+        // onboarding - the yard is. The bar never shows.
+        bool show = false && ts < BuilderManager.TIP_COUNT;
         int view = tipView < 0 ? ts : Mathf.Clamp(tipView, 0, BuilderManager.TIP_COUNT - 1);
         if (show)
         {

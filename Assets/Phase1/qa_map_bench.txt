@@ -1,3 +1,6 @@
+PASS  a fresh boot lands IN THE YARD, not the workshop (Map)
+PASS  ...with the rookie under the stick
+PASS  GARAGE is the door back to the workshop
 PASS  DRIVE OUT enters the yard
 PASS  ...and the funnel hears `map`
 PASS  the player's machine is on the map, combat off

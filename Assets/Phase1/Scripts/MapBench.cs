@@ -63,6 +63,18 @@ namespace RobotBrawl.Phase0
             RBTelemetry.TestReset();
             yield return null;
 
+            // ---- 0. THE MAP IS THE FRONT DOOR ----------------------------------
+            // A fresh BuilderManager with bootToYard drives out by itself.
+            BuilderManager.bootToYard = true;
+            Object.Destroy(bm.gameObject); yield return null;
+            bm = new GameObject("BuilderManager").AddComponent<BuilderManager>();
+            for (int i = 0; i < 6 && bm.mode != BuilderManager.Mode.Map; i++) yield return null;
+            Check(bm.mode == BuilderManager.Mode.Map, "a fresh boot lands IN THE YARD, not the workshop (" + bm.mode + ")");
+            Check(bm.testRobot != null, "...with the rookie under the stick");
+            bm.LeaveMap(); yield return null;
+            BuilderManager.bootToYard = false;
+            Check(bm.mode == BuilderManager.Mode.Build, "GARAGE is the door back to the workshop");
+
             // ---- 1. DRIVE OUT ---------------------------------------------------
             bm.EnterMap(); yield return null; yield return null;
             Check(bm.mode == BuilderManager.Mode.Map, "DRIVE OUT enters the yard");

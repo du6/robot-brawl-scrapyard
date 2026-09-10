@@ -1022,7 +1022,7 @@ public partial class BuilderManager : MonoBehaviour
         }
         PumpBuildMusic();
         PumpUiFraming();
-        if (mode == Mode.Build) UpdateBuild();
+        if (mode == Mode.Build) { PumpBootToYard(); if (mode == Mode.Build) UpdateBuild(); }
         else if (mode == Mode.Test) UpdateTest();
         else if (mode == Mode.Map) UpdateMap();
         else UpdateFight();

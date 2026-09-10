@@ -29,6 +29,14 @@ public partial class BuilderManager
     public const float CARD_REACH = 4f;      // the encounter card slides up
     public const string YARD_BOT = "scout";  // never the rookie's own build (mirror lock)
 
+    /// <summary>THE MAP IS THE FRONT DOOR (owen, 2026-09-10: "it should start
+    /// with a rookie robot ready for exploring a map"). A fresh BuilderManager
+    /// drives out on its first frames instead of showing the workshop; GARAGE
+    /// is the door back. Benches set this false before creating one, because
+    /// they assert against the workshop; MapBench sets it true to prove it.</summary>
+    public static bool bootToYard = true;
+    bool bootedToYard;
+
     readonly List<GameObject> crates = new List<GameObject>();
     readonly List<int> crateIds = new List<int>();
     CompoundRobot parkedBot;
@@ -239,6 +247,15 @@ public partial class BuilderManager
     }
 
     // ------------------------------------------------------------ per frame
+    /// <summary>Called from Update while in Build mode: the one-shot boot.</summary>
+    void PumpBootToYard()
+    {
+        if (bootedToYard || !bootToYard) return;
+        if (!Career.active || placed.Count == 0) return;
+        bootedToYard = true;
+        EnterMap();
+    }
+
     void UpdateMap()
     {
         FloorNet(testRobot);
@@ -415,8 +432,9 @@ public partial class BuilderManager
         GUI.skin.button.fontSize = fs;
 
         // the compass strip: bearings to the nearest crate and the parked bot
-        var st = new GUIStyle(GUI.skin.label); st.fontSize = 15; st.fontStyle = FontStyle.Bold;
-        st.normal.textColor = new Color(0.85f, 0.92f, 1f);
+        var st = new GUIStyle(GUI.skin.label); st.fontSize = 20; st.fontStyle = FontStyle.Bold;
+        st.normal.textColor = new Color(0.95f, 0.97f, 1f);
+        GUI.Box(new Rect(8f, top, w - 124f, 40f), "");   // the dark backing the text reads against
         if (testRobot != null)
         {
             Vector3 me = testRobot.rb.position;
@@ -429,7 +447,7 @@ public partial class BuilderManager
             else sb.Append("no crates left today");
             if (parkedBot != null) sb.Append("     ").Append(Bearing(EnemyRoster.Find(YARD_BOT).label, parkedBot.rb.position - me, fwd));
             sb.Append("     ").Append(Bearing("GARAGE", garageDoor - me, fwd));
-            GUI.Label(new Rect(12f, top + 4f, w - 130f, 24f), sb.ToString(), st);
+            GUI.Label(new Rect(20f, top + 6f, w - 140f, 28f), sb.ToString(), st);
         }
         if (yardToastT > 0f && yardToast.Length > 0)
         {

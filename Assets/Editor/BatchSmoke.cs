@@ -78,6 +78,8 @@ namespace RobotBrawl.EditorTools
                 // chooser forever. Take the exact path the touch button takes.
                 if ((which == "quick" || which == "map") && Object.FindFirstObjectByType<RobotBrawl.Phase0.BuilderManager>() == null)
                     RobotBrawl.Phase0.ModeSelect.StartCareer(true);
+                // Every headless bench asserts against the workshop; MapBench flips this back to prove the boot.
+                RobotBrawl.Phase0.BuilderManager.bootToYard = false;
                 if (which == "fightworker" && Object.FindFirstObjectByType<RobotBrawl.Phase0.BuilderManager>() == null)
                     new GameObject("BuilderManager").AddComponent<RobotBrawl.Phase0.BuilderManager>();
                 if (which == "quick") RobotBrawl.Phase0.QuickFightBench.Run();

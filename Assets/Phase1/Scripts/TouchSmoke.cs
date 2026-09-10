@@ -75,6 +75,7 @@ public class TouchSmoke : MonoBehaviour
         if (ms != null) Destroy(ms);
         MobileBuilderUI.forceMobileUI = true;
         var bm = Object.FindFirstObjectByType<BuilderManager>();
+        BuilderManager.bootToYard = false;   // this bench asserts against the workshop
         if (bm == null) bm = new GameObject("BuilderManager").AddComponent<BuilderManager>();
         // BENCH REPAIR 2026-08-05: the device auto-boot builds the touch UI
         // under the OWNER'S career, and C6.5 then (correctly) never builds the
