@@ -22,6 +22,8 @@ PASS  the job id parses
 PASS  it is a FIGHT, not a VALIDATE
 PASS  BOTH payload locations survive the parse
 PASS  and the seeds come with it
+PASS  and the arena (league) survives the parse
+PASS  a yard claim keeps its ruleset for the runner
 PASS  a VALIDATE claim is still a VALIDATE
 PASS  …and carries no fight fields
 == E. both sides are verified BEFORE a fight is spent ==
@@ -30,4 +32,4 @@ PASS  an envelope whose sha does NOT match the claim is refused
 PASS  …and says storage was altered
 PASS  an unreadable payload is refused
 PASS  an empty payload is refused
- RESULT: 26 pass, 0 fail - ALL GREEN
+ RESULT: 28 pass, 0 fail - ALL GREEN

@@ -56,6 +56,12 @@ namespace RobotBrawl.Phase0
             public string cause = "";
             public float aDealt, bDealt;
             public float simSeconds;
+            /// <summary>The clock this bout was given at Setup (90 league, 30
+            /// yard) and whether the crusher walls closed - the ruleset the
+            /// referee actually applied, recorded so a bench can read it
+            /// instead of inferring it from how long the bout ran.</summary>
+            public float clock;
+            public bool crushed;
             /// <summary>Damage exchanges, and the sim time of the last one.
             /// deadAir = simSeconds - lastHitT is how long the bout ran after
             /// the fighting stopped.</summary>
@@ -407,6 +413,7 @@ namespace RobotBrawl.Phase0
             // clock is read from it.
             FightManager.quickBout = quick;
             fm.Setup(bm, botA, dA, botB, dB, aiB);
+            bout.clock = fm.timer;
             if (aiB != null) aiB.fm = fm;
 
             ReplayRecorder rec = null;
@@ -458,6 +465,7 @@ namespace RobotBrawl.Phase0
             bout.bWeaponsAlive = WeaponsAlive(botB);
             bout.outcome = fm.outcome.ToString();
             bout.cause = fm.causeLine ?? "";
+            bout.crushed = fm.CrushStarted;
             bout.aDealt = fm.player.dealt;
             bout.bDealt = fm.enemy.dealt;
             bout.simSeconds = Time.time - simStart;

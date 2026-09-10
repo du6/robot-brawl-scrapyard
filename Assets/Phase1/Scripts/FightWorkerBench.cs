@@ -286,29 +286,59 @@ namespace RobotBrawl.Phase0
                   "…with the playable recording FIRST in replayUrls, ahead of the summary");
             Check(net.lastReplayDoc.Contains("\"replayVersion\":1"), "the replay doc is versioned");
             Check(net.lastReplayDoc.Contains("\"bouts\":["), "…and carries the bouts");
-            var leagueRes = FightWorkerLoop.LastResult;
-
             log.Add("== K. a yard job fights on the Quick clock (Scrapyard, 2026-09-09) ==");
-            // Two bare cores with no weapons never finish each other, so the
-            // clock decides: the league bout above is the CONTROL LEG and must
-            // have run long; the same pair under arena "yard" must end inside
-            // 30 s + settle, the crusher walls having closed. Same code path
-            // as the cloud referee: RunOnce, a claim with arena = yard.
-            float leagueS = leagueRes != null && leagueRes.bouts.Count > 0 ? leagueRes.bouts[0].simSeconds : -1f;
-            Check(leagueS > FightManager.QUICK_MATCH_TIME + 8f,
-                  "control: the league bout ran on the long clock (" + leagueS.ToString("0.0") + " s)");
+            // WHAT IS MEASURED IS THE RULESET APPLIED, not how long the bout
+            // ran. Two attempts at a duration-based control leg failed for
+            // reasons that were the FIGHT's rules, not the referee's: bare
+            // cores are counted out (league 10.3 s / yard 7.3 s - the 10-s and
+            // 5-s count-outs), and spike-less shovers were "called early - no
+            // contact in 30 s" under league. So each bout now records the
+            // clock it was GIVEN at Setup and whether the crusher walls closed,
+            // and that is what is asserted. CONTROL LEG first: the same pair
+            // under "league" gets the 90-s clock and no walls.
+            var lines = new List<string>();
+            foreach (var ln in BuilderManager.STARTER_SNAPSHOT.Split('\n'))
+                if (!ln.StartsWith("spike|")) lines.Add(ln);
+            string shover = string.Join("\n", lines.ToArray());
+            string ram = RobotProgram.RamHunter().ToJson();
+            var envC = RobotSnapshot.ExportRaw("Shover-A", shover, ram);
+            var envD = RobotSnapshot.ExportRaw("Shover-B", shover, ram);
+            string cJson = JsonUtility.ToJson(envC), dJson = JsonUtility.ToJson(envD);
+
             net = new StubFightTransport();
-            net.blobs["file:///a"] = aJson; net.blobs["file:///b"] = bJson;
-            var yardJob = FightJob(5, "file:///a", envA.sha256, "file:///b", envB.sha256, new[] { 7 });
+            net.blobs["file:///c"] = cJson; net.blobs["file:///d"] = dJson;
+            net.jobs.Enqueue(FightJob(5, "file:///c", envC.sha256, "file:///d", envD.sha256, new[] { 7 }));
+            yield return FightWorkerLoop.RunOnce(net, bm, null);
+            var leagueRes = FightWorkerLoop.LastResult;
+            float leagueS = leagueRes != null && leagueRes.bouts.Count > 0 ? leagueRes.bouts[0].simSeconds : -1f;
+            string leagueWhy = leagueRes != null && leagueRes.bouts.Count > 0 ? leagueRes.bouts[0].cause : "(no bout)";
+            Note("league: " + leagueS.ToString("0.0") + " s - " + leagueWhy);
+            Check(net.posts == 1, "control: the league job completes and posts once");
+            float leagueClock = leagueRes != null && leagueRes.bouts.Count > 0 ? leagueRes.bouts[0].clock : -1f;
+            Check(Mathf.Approximately(leagueClock, FightManager.DEFAULT_MATCH_TIME),
+                  "control: a league claim is fought on the 90-s clock (" + leagueClock.ToString("0") + ")");
+            Check(leagueRes != null && leagueRes.bouts.Count > 0 && !leagueRes.bouts[0].crushed,
+                  "control: …and no crusher walls closed on it");
+
+            net = new StubFightTransport();
+            net.blobs["file:///c"] = cJson; net.blobs["file:///d"] = dJson;
+            var yardJob = FightJob(6, "file:///c", envC.sha256, "file:///d", envD.sha256, new[] { 7 });
             yardJob.arena = "yard";
             net.jobs.Enqueue(yardJob);
             bool quickBefore = FightManager.quickBout;
             yield return FightWorkerLoop.RunOnce(net, bm, null);
             var yardRes = FightWorkerLoop.LastResult;
             float yardS = yardRes != null && yardRes.bouts.Count > 0 ? yardRes.bouts[0].simSeconds : -1f;
+            string yardWhy = yardRes != null && yardRes.bouts.Count > 0 ? yardRes.bouts[0].cause : "(no bout)";
+            Note("yard: " + yardS.ToString("0.0") + " s - " + yardWhy);
             Check(net.posts == 1 && net.fileUploads >= 1, "a yard job completes, posts once and uploads its recording");
+            float yardClock = yardRes != null && yardRes.bouts.Count > 0 ? yardRes.bouts[0].clock : -1f;
+            Check(Mathf.Approximately(yardClock, FightManager.QUICK_MATCH_TIME),
+                  "…the same pair under a yard claim is fought on the 30-s clock (" + yardClock.ToString("0") + ")");
             Check(yardS > 0f && yardS <= FightManager.QUICK_MATCH_TIME + 8f,
-                  "…and the bout ended inside the 30-s Quick clock plus settle (" + yardS.ToString("0.0") + " s)");
+                  "…and the bout ended inside that clock plus settle (" + yardS.ToString("0.0") + " s)");
+            Check(yardRes != null && yardRes.bouts.Count > 0 && (yardRes.bouts[0].crushed || yardS < FightManager.QUICK_MATCH_TIME - FightManager.QUICK_CRUSH_AT),
+                  yardRes != null && yardRes.bouts.Count > 0 && yardRes.bouts[0].crushed ? "…the crusher walls closed for the last 10 s" : "…it ended before the walls were due");
             Check(FightManager.quickBout == quickBefore, "…and the Quick flag is restored afterwards (" + quickBefore + ")");
 
             log.Add("== J. owner state ==");

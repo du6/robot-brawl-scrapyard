@@ -427,8 +427,11 @@ in `du6/robot-brawl` (the CLI owns `server/**`), deployed once:
    DEFAULT 'league'`) and the worker never reads it for rules.
    `POST /v1/challenges` accepts `arena: "yard"`; `MatchRunner` reads it
    and fights a `yard` match on the Quick profile (30 s, 5-s count-out,
-   walls at −10 s, one bout) instead of best-of-3 at 90 s. Rating settles
-   the same way. Add a CHECK for the two values.
+   walls at −10 s, one bout) instead of one bout at 90 s. Rating settles
+   the same way. **No CHECK on the column:** it already carries
+   `league_night` (the admin endpoint) and `synthetic` (api_smoke writes it
+   directly), so the API validates the request field instead
+   (league | yard | omitted). Found while building it, 2026-09-09.
 3. **A `game` tag on snapshots** (`'rb' | 'scrapyard'`, default `'rb'`) so the
    pool and the board can filter or badge by origin. Not a ruleset; a
    label.
@@ -539,6 +542,22 @@ Nothing in M0 is blocked.
 
 ## Progress log
 
+- **2026-09-09, later** — M0 step 1 built in this repo (`4eb0cbf`):
+  migration 017 (`snapshots.game`, the pool index), `GET /v1/pool`, the
+  `yard` ruleset on `POST /v1/challenges`, `game` on the board,
+  `MatchRunner.quick` set from the worker's claim. Server measured:
+  sql_bench 56 → 61/0, api_smoke 356 → 384/0 (same one pre-existing skip).
+  Section Y is self-sufficient (see its header for why). Worker half
+  measured headlessly from a worktree (`BatchSmoke.FightWorker`):
+  FightWorkerBench pure 26 → **28/0**, play 21 → **29/0** — a league claim
+  is fought on the 90-s clock with no walls, the same pair under a yard
+  claim on the 30-s clock with the walls closed; the career save's mtime
+  unchanged. Two duration-based control legs failed first and were the
+  CHECK, not the product: bare cores are counted out (10 s / 5 s), and
+  spike-less shovers hit the league's own **"called early — no contact in
+  30 s"** rule — a rule the yard inherits, worth knowing for §3.6. The
+  bout now records the clock it was given and whether the walls closed,
+  and that is what is asserted.
 - **2026-09-09** — first draft put this on a branch of Robot Brawl
   (`feature/scraplands`); owen chose a new game. Rewritten for the fork.
   Then owen made all five calls (§9): the game is **Robot Brawl:
