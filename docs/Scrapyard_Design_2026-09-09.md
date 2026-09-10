@@ -552,6 +552,15 @@ Nothing in M0 is blocked.
 
 ## Progress log
 
+- **2026-09-10 — the stick (owen: "it still feels a bit hard to drive. can
+  you try to increase the size of the joystick and then simulate driving
+  the robot with joystick as a human?").** The stick's travel to full
+  deflection was 120 units, so a 40-unit thumb move was already a third of
+  lock; it is **175** now, and the ring (148 → 220), knob (54 → 70), knob
+  travel and resting spot grew with it. The stick also **takes a mouse on
+  every platform** (it took one only under a bench flag, so a desktop web
+  player had no stick at all). MapBench 60/0, TouchSmoke 57/0. The human
+  drive is the next log line.
 - **2026-09-10 — TREASURE (owen: "treasure box doesn't look like treasure
   right now… when a part is acquired, we should display the image of the
   part in addition to text. for scraps we should show something like

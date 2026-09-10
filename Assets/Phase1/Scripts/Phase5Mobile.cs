@@ -91,6 +91,20 @@ public class TouchControls : MonoBehaviour
     /// <summary>False when the player's machine has no actuated weapon - the
     /// FIRE pad would be a dead button (critic round 1, mobile).</summary>
     public static bool hasFire = true;
+    // SCRAPYARD (owen, 2026-09-10: "it still feels a bit hard to drive. can you
+    // try to increase the size of the joystick"). The stick's TRAVEL is what
+    // sets its sensitivity: full deflection used to be 120 units, so a thumb
+    // that moved 40 units was already at a third of lock. Travel is now 175
+    // and the drawn ring, knob and resting spot grow with it. And the stick
+    // takes a MOUSE on every platform, not only under a bench flag: a
+    // desktop web player had no stick at all (keys only), and a pointer drag
+    // is how a person would try it.
+    public static float RANGE = 175f;        // units of GuiScale to full deflection
+    public static float RING = 220f;         // drawn ring, units
+    public static float KNOB = 70f;          // drawn knob, units
+    public static float KNOB_TRAVEL = 92f;   // how far the knob is drawn from the anchor
+    public static float REST = 170f;         // resting spot from the bottom-left corner
+    public static bool MouseAccepted = true;
     FightManager fm;   // results-card detection: pads hide while it is up
     static TouchControls inst;
 
@@ -129,11 +143,11 @@ public class TouchControls : MonoBehaviour
                 if (c >= buf.Length) break;
                 if (t.press.isPressed) buf[c++] = t.position.ReadValue();
             }
-        if (c == 0 && mouseTest && Mouse.current != null && Mouse.current.leftButton.isPressed)
+        if (c == 0 && (mouseTest || MouseAccepted) && Mouse.current != null && Mouse.current.leftButton.isPressed)
             buf[c++] = Mouse.current.position.ReadValue();
 #else
         for (int i = 0; i < Input.touchCount && c < buf.Length; i++) buf[c++] = Input.GetTouch(i).position;
-        if (c == 0 && mouseTest && Input.GetMouseButton(0)) buf[c++] = Input.mousePosition;
+        if (c == 0 && (mouseTest || MouseAccepted) && Input.GetMouseButton(0)) buf[c++] = Input.mousePosition;
 #endif
         return c;
     }
@@ -142,7 +156,7 @@ public class TouchControls : MonoBehaviour
 
     void Update()
     {
-        if (!fightActive || (!HasTouch && !mouseTest)) { Release(); return; }
+        if (!fightActive || (!HasTouch && !mouseTest && !MouseAccepted)) { Release(); return; }
         if (fm == null) fm = Object.FindFirstObjectByType<FightManager>();
         if (fm != null && fm.state == FightManager.State.Ended) { Release(); return; }
         // AUTONOMY FIGHT (owen, 2026-09-05): the program drives, so the pads
@@ -154,7 +168,7 @@ public class TouchControls : MonoBehaviour
         bool sHeld = false, fHeld = false;
         float thr = 0f, str = 0f;
         float halfW = Screen.width * 0.5f;
-        float range = 120f * S;
+        float range = RANGE * S;
         for (int i = 0; i < c; i++)
         {
             Vector2 p = pts[i];
@@ -216,7 +230,7 @@ public class TouchControls : MonoBehaviour
 
     void OnGUI()
     {
-        if (!fightActive || (!HasTouch && !mouseTest)) return;
+        if (!fightActive || (!HasTouch && !mouseTest && !MouseAccepted)) return;
         if (fm != null && fm.state == FightManager.State.Ended) return;   // results card owns the screen
         if (fm != null && fm.playerSource == ControlSource.Program) return; // autonomy: no pads (see Update)
         if (ringTex == null) ringTex = MakeCircle(128, 0.86f);
@@ -226,7 +240,7 @@ public class TouchControls : MonoBehaviour
             padLbl = new GUIStyle(GUI.skin.label);
             padLbl.alignment = TextAnchor.MiddleCenter;
             padLbl.fontStyle = FontStyle.Bold;
-            padLbl.fontSize = 17;
+            padLbl.fontSize = 20;
             padLbl.normal.textColor = new Color(1f, 1f, 1f, 0.9f);
         }
         float s = S;
@@ -236,8 +250,8 @@ public class TouchControls : MonoBehaviour
 
         // Drive stick: ring base + faint fill, knob follows the finger.
         Vector2 a = stickHeld ? new Vector2(anchor.x / s, vh - anchor.y / s)
-                              : new Vector2(140f, vh - 140f);
-        Rect baseR = new Rect(a.x - 74f, a.y - 74f, 148f, 148f);
+                              : new Vector2(REST, vh - REST);
+        Rect baseR = new Rect(a.x - RING * 0.5f, a.y - RING * 0.5f, RING, RING);
         GUI.color = new Color(1f, 1f, 1f, stickHeld ? 0.10f : 0.06f);
         GUI.DrawTexture(baseR, discTex);
         GUI.color = new Color(1f, 1f, 1f, stickHeld ? 0.75f : 0.40f);
@@ -246,10 +260,10 @@ public class TouchControls : MonoBehaviour
         if (stickHeld)
         {
             k = new Vector2(stickPos.x / s, vh - stickPos.y / s);
-            k = a + Vector2.ClampMagnitude(k - a, 60f);
+            k = a + Vector2.ClampMagnitude(k - a, KNOB_TRAVEL);
         }
         GUI.color = stickHeld ? new Color(0.55f, 0.75f, 1f, 0.90f) : new Color(1f, 1f, 1f, 0.30f);
-        GUI.DrawTexture(new Rect(k.x - 27f, k.y - 27f, 54f, 54f), discTex);
+        GUI.DrawTexture(new Rect(k.x - KNOB * 0.5f, k.y - KNOB * 0.5f, KNOB, KNOB), discTex);
         GUI.color = saved;
         if (!stickHeld) GUI.Label(baseR, "DRIVE", padLbl);
 
