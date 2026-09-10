@@ -508,7 +508,6 @@ public class MobileBuilderUI : MonoBehaviour
         tipText.verticalOverflow = VerticalWrapMode.Truncate;
         var tskip = MkButton("tipskip", tipBar.transform, "SKIP TIPS", 14, () =>
         {
-            RookieGuide.Cancel();   // one skip gesture ends everything scripted
             // Was tutorialStep = 3, which silenced the row by CLAIMING you had
             // finished onboarding - and now that the tips run past step 3 it
             // would not even have silenced it. A skip should turn tips off,
@@ -5092,7 +5091,6 @@ public class MobileBuilderUI : MonoBehaviour
         if (bm == null) { bm = Object.FindFirstObjectByType<BuilderManager>(); if (bm == null) return; }
         ConsumePendingTab();
         RewardBox.Tick();            // hand over anything earned, one box at a time
-        RookieGuide.Tick(this, bm);
         if (shopRefreshQueued && !PointerHeld())
         {
             // Regression pass 2026-09-03: next-FRAME was not enough - a press
