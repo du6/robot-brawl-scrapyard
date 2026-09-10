@@ -559,8 +559,19 @@ Nothing in M0 is blocked.
   lock; it is **175** now, and the ring (148 → 220), knob (54 → 70), knob
   travel and resting spot grew with it. The stick also **takes a mouse on
   every platform** (it took one only under a bench flag, so a desktop web
-  player had no stick at all). MapBench 60/0, TouchSmoke 57/0. The human
-  drive is the next log line.
+  player had no stick at all). MapBench 60/0, TouchSmoke 57/0.
+  **Then, from three pointer drives on the live page:** (1) the ring's edge
+  was not full lock (radius 110 vs travel 175, the old stick's 0.62 ratio
+  too) — now travel 140 = ring radius 140, the knob drawn out to the edge;
+  (2) the stick anchored where the pointer was on the first POLLED frame,
+  not where the press began — a fast flick anchored at its end and the
+  throttle read zero; the anchor is now the last unpressed position for a
+  mouse. **The rig's limit, stated plainly:** the extension's tab is
+  HIDDEN (`document.visibilityState`, rAF 0/s, measured), so the game
+  advances only when a screenshot forces a paint and every timed drive
+  from that tab lands inside one game frame. The two fixes are measured
+  by MapBench where they can be (travel = ring, mouse accepted) and the
+  anchor by reasoning; **a real drive needs a visible tab or a thumb.**
 - **2026-09-10 — TREASURE (owen: "treasure box doesn't look like treasure
   right now… when a part is acquired, we should display the image of the
   part in addition to text. for scraps we should show something like
