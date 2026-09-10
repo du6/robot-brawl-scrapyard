@@ -132,6 +132,12 @@ namespace RobotBrawl.Editor
             // killed a batchmode build for memory and `finally` never ran, so
             // Assets/Resources~ sat there and the next build would have shipped
             // iOS without its music). Recover first, then hide again.
+            // ...and Unity recreates an EMPTY Assets/Resources from the meta at
+            // the next start (seen 2026-09-10, twice), which hid the leftover
+            // from the check below. An empty folder in the way is removed first.
+            if (Directory.Exists(hidDir) && Directory.Exists(resDir)
+                && Directory.GetFileSystemEntries(resDir).Length == 0)
+                Directory.Delete(resDir);
             if (Directory.Exists(hidDir) && !Directory.Exists(resDir))
             {
                 Directory.Move(hidDir, resDir);
