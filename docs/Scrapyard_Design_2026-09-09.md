@@ -570,6 +570,14 @@ Nothing in M0 is blocked.
   first: home sat on a chunk CORNER (a hair of drift loaded two extra
   chunks) — now a chunk centre; and a teleport through `rb.position`
   alone tore the machine in half — `TeleportPlayer` moves every part.
+  **DEPLOYED and seen live** (`/play/scrapyard/`, stamp `056a1a4977`,
+  initial 10.3 MB — the §5 miss stands): a fresh load boots INTO THE
+  WORLD on the home pad, the first crate 8 m ahead, crates and wrecks to
+  the horizon, a biome edge in view, the compass readable (CRATE 8 m ·
+  SCOUT 34 m · HOME 0 m), the stick and GARAGE. Driven by a held key: the
+  crate opened where it stood and the reward box popped in the world.
+  Next pass: fighting in place (no cut to the ring), enemies that roam,
+  the ARENA tab replaced by the board.
 - **2026-09-10 — M0 step 3 DEPLOYED: `https://cyberduck.club/play/scrapyard/`.**
   First web build of the fork was **26 MB of data**: the six music themes
   sit in `Assets/Resources` for iOS (21 MB) and `com.unity.ai.inference`
