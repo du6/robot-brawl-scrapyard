@@ -552,6 +552,16 @@ Nothing in M0 is blocked.
 
 ## Progress log
 
+- **2026-09-10 — LEAGUE and ARENA tabs removed (owen).** The dock strip
+  is BUILD · GARAGE · SHOP with **DRIVE OUT** at its right end, visible
+  from every tab; indices 1 and 4 stay allocated and hidden (CLAUDE.md's
+  renumbering trap), `ShowTab(1|4)` lands on BUILD. Deleted with the ARENA
+  tab: `EnlistUiBench`, `ReturningPlayerBench`, `ArenaShots` (all comment
+  references). TouchSmoke's two strip checks were the CHECK: they encoded
+  the FIGHT tab and its TEST DRIVE chip; they now assert the new strip and
+  that DRIVE OUT blocks an illegal build with a visible message.
+  **Measured: TouchSmoke 57/0, MapBench 54/0, QuickFightBench 24/0**; web
+  10.4 MB; live.
 - **2026-09-10 — THE PLANET (owen: "The map looks ugly. It should look
   like some planets where robots live with modern designs. Driving the
   robot around and exploring the planet itself should be an enjoyable

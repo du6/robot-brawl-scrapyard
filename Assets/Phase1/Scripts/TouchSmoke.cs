@@ -111,7 +111,11 @@ public class TouchSmoke : MonoBehaviour
             yield return null;
         }
 
-        Check(Btn("BUILD") != null && Btn("FIGHT") != null && Btn("GARAGE") != null, "three tab buttons present");
+        // SCRAPYARD (owen, 2026-09-10: "lets remove league and arena tabs"):
+        // the strip is BUILD and GARAGE with DRIVE OUT at its right end; the
+        // FIGHT/LEAGUE and ARENA tabs are hidden (their indices stay).
+        Check(Btn("BUILD") != null && Btn("GARAGE") != null && Btn("DRIVE OUT") != null, "the strip is BUILD, GARAGE and DRIVE OUT");
+        Check(Btn("FIGHT") == null && Btn("LEAGUE") == null && Btn("ARENA") == null, "...and no FIGHT, LEAGUE or ARENA tab");
 
         // BENCH REPAIR 2026-08-05: the chips moved into a SHEET over the
         // palette (2026-08-04), opened by the material button — current
@@ -366,10 +370,12 @@ public class TouchSmoke : MonoBehaviour
         Tap("GARAGE"); yield return null;
         Check(Btn("SAVE") != null && Btn("LOAD") != null, "garage SAVE/LOAD buttons present (not tapped: would overwrite owner slots)");
 
-        Tap("FIGHT"); yield return null;
-        bool tapped = Tap("TEST");
+        // SCRAPYARD: the gate on an illegal build is DRIVE OUT (EnterMap
+        // validates like every fight did), not the old TEST DRIVE chip.
+        bool tapped = Tap("DRIVE OUT");
         yield return null; yield return null;
         Check(tapped && bm.LastMessage != null && bm.LastMessage.Contains("wheel"), "invalid build blocked with a visible message");
+        Check(bm.mode == BuilderManager.Mode.Build, "...and the door stays shut (still in the workshop)");
         Tap("BUILD"); yield return null;
 
         // ---- C1: career inventory asserts. IN-MEMORY ONLY - Career.Save() is

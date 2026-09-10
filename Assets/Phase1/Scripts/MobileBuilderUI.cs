@@ -142,6 +142,8 @@ public class MobileBuilderUI : MonoBehaviour
     bool cosmeticsBusy;
     // ---- C3: career league board ----
     Button testDriveBtn;
+    Button driveOutBtn;          // SCRAPYARD: the strip's right end
+    public const float TAB_STRIP_FRAC = 0.74f;   // the tabs take this much of the safe width; DRIVE OUT the rest
     GameObject quickPanel; Text quickMeter; readonly Button[] quickBtns = new Button[3];
     // ---- C4: workshop ----
     GameObject robotsPanel;
@@ -588,6 +590,17 @@ public class MobileBuilderUI : MonoBehaviour
             var rt = tb.GetComponent<RectTransform>();
             rt.pivot = new Vector2(0.5f, 1f); rt.sizeDelta = new Vector2(-4f, 44f); rt.anchoredPosition = new Vector2(0f, 0f);
             tabBtns.Add(tb);
+        }
+        // SCRAPYARD (owen, 2026-09-10: "lets remove league and arena tabs"):
+        // the LEAGUE and ARENA tabs are hidden (indices 1 and 4 stay, so no
+        // index-keyed site moves - CLAUDE.md's renumbering trap), and the
+        // right end of the strip is DRIVE OUT, the door back to the world,
+        // visible from every tab.
+        driveOutBtn = MkButton("driveout", dock.transform, "DRIVE OUT", 20, () => { if (bm != null) bm.EnterMap(); });
+        {
+            var dort = driveOutBtn.GetComponent<RectTransform>();
+            dort.pivot = new Vector2(0.5f, 1f); dort.sizeDelta = new Vector2(-4f, 44f); dort.anchoredPosition = new Vector2(0f, 0f);
+            driveOutBtn.GetComponent<Image>().color = new Color(0.16f, 0.50f, 0.30f, 1f);
         }
         LayoutTabs();
 
@@ -1612,10 +1625,6 @@ public class MobileBuilderUI : MonoBehaviour
         // R3 critic: TEST DRIVE's fixed height squeezed this two-line header
         // until it clipped - reserve its own two lines.
         var fil = fightInfo.gameObject.AddComponent<LayoutElement>(); fil.minHeight = 44f; fil.preferredHeight = 44f;
-        // SCRAPYARD: the loud button. The map is the front door (design §3.1).
-        var driveOut = MkButton("driveout", fightPanel.transform, "DRIVE OUT", 20, () => { if (bm != null) bm.EnterMap(); });
-        var dol = driveOut.gameObject.AddComponent<LayoutElement>(); dol.minHeight = TouchRow() + 8f; dol.preferredHeight = TouchRow() + 8f;
-        driveOut.GetComponent<Image>().color = new Color(0.16f, 0.50f, 0.30f, 1f);
         // R2 (critic finding 8): TEST DRIVE was a full-width bar and the single
         // brightest element on the campaign screen - a sandbox action outranking
         // the mode's core loop. It is now a small right-aligned secondary chip
@@ -2680,11 +2689,20 @@ public class MobileBuilderUI : MonoBehaviour
         // anyway. What it uniquely showed - which robot was holding what - it
         // stopped being able to say when designs stopped holding parts.
         int n = Career.active ? 5 : 3;   // SCRAPYARD: no PROGRAM tab - every robot drives itself (design §3.6)
-        int visN = n;
+        // SCRAPYARD: LEAGUE (1) and ARENA (4) are hidden; the world is where you
+        // fight, and the board replaces the ladder tab later.
+        int visN = 0;
+        for (int i = 0; i < n; i++) if (i != 1 && i != 4) visN++;
         int vi = 0;
+        float stripR = Mathf.Lerp(safeFracL, safeFracR, TAB_STRIP_FRAC);
+        if (driveOutBtn != null)
+        {
+            var drt = driveOutBtn.GetComponent<RectTransform>();
+            drt.anchorMin = new Vector2(stripR, 1f); drt.anchorMax = new Vector2(safeFracR, 1f);
+        }
         for (int i = 0; i < tabBtns.Count; i++)
         {
-            bool show = i < n;
+            bool show = i < n && i != 1 && i != 4;
             tabBtns[i].gameObject.SetActive(show);
             if (!show) continue;
             var rt = tabBtns[i].GetComponent<RectTransform>();
@@ -2694,8 +2712,8 @@ public class MobileBuilderUI : MonoBehaviour
             // tabs — BUILD and whatever is last (TROPHIES then, ARENA now) — were
             // the two sitting underneath it.
             // Dividing 0..1 evenly is only correct on a rectangle.
-            rt.anchorMin = new Vector2(Mathf.Lerp(safeFracL, safeFracR, vi / (float)visN), 1f);
-            rt.anchorMax = new Vector2(Mathf.Lerp(safeFracL, safeFracR, (vi + 1) / (float)visN), 1f);
+            rt.anchorMin = new Vector2(Mathf.Lerp(safeFracL, stripR, vi / (float)visN), 1f);
+            rt.anchorMax = new Vector2(Mathf.Lerp(safeFracL, stripR, (vi + 1) / (float)visN), 1f);
             vi++;
         }
         // C4: the workshop renames FIGHT/GARAGE in career mode
@@ -4816,6 +4834,7 @@ public class MobileBuilderUI : MonoBehaviour
     {
         if (i >= 3 && !Career.active) i = 0;   // SHOP/PARTS are career-only
         if (i >= 5) i = 0;                     // SCRAPYARD: there is no PROGRAM tab
+        if (i == 1 || i == 4) i = 0;           // SCRAPYARD: no LEAGUE tab, no ARENA tab
         tab = i;
         armSell = -1;
         retireArmM = -1;

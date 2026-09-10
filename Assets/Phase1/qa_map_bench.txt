@@ -36,9 +36,9 @@ PASS  ...and you are on the ground there (y -0.8 vs ground -1.0)
 PASS  the card comes up within 4 m of the parked bot
 PASS  ...and the funnel hears `meet`
 PASS  drive away and the card folds - decline is free
-      trace: 4.5s yaw 0 steer 0.00 thr 0.00 v 0.2 | 4.9s yaw 0 steer -0.01 thr 1.00 v 2.4 | 5.3s yaw 0 steer 0.00 thr 1.00 v 5.1 | 5.7s yaw 0 steer 0.00 thr 1.00 v 6.4 | 6.1s yaw 0 steer 0.00 thr 1.00 v 6.3 | 
+      trace: 4.7s yaw 0 steer 0.00 thr 0.00 v 0.2 | 5.1s yaw 0 steer -0.01 thr 1.00 v 2.5 | 5.5s yaw 0 steer 0.00 thr 1.00 v 5.1 | 5.9s yaw 0 steer 0.00 thr 1.00 v 6.4 | 6.3s yaw 0 steer 0.00 thr 1.00 v 6.3 | 
 PASS  full throttle for 2 s moves the machine (9.5 m)
-PASS  ...and with the stick inside the dead zone it holds its heading (0.0 deg)
+PASS  ...and with the stick inside the dead zone it holds its heading (0.1 deg)
 PASS  ...the dead zone reads as zero stick; only the heading hold steers (0.00)
 PASS  a held full stick still turns it (18 deg in 1.5 s)
 PASS  ...at no more than the map's gain (0.45)
