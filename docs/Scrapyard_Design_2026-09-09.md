@@ -334,10 +334,20 @@ robot, `yard bot` for ours), CHALLENGE.
 
 **Decline is free.** Drive away and the card folds. Nothing attacks you.
 
-### 3.6 The challenge — you drive
+### 3.6 The challenge — you drive, where you stand
 
 Accept and it is a **Quick bout**: 30 s, 5-s count-out, walls at −10 s,
-`SettleQuickFight()` at the bell.
+`SettleQuickFight()` at the bell — **fought where you stand** (2026-09-10,
+the CrazyGames plan step 4). The ring's code assumes the origin (the
+floor net, the crush walls, the camera clamp, `BuildArena`), so rather
+than moving the ring into the world, **the world moves to the ring**: at
+CHALLENGE the world root shifts so the encounter is at (0,0,0) with the
+highest ground inside the ring at y=0, the planet stays as the backdrop
+(sky, fog, horizon, landmarks), the map's machines go, and the ring rises
+as a pad with a skirt on the terrain. After the bell the world comes down
+with the ring and CONTINUE EXPLORING rebuilds it where you stood. (The
+scatter props are mesh-combined per chunk rather than static-batched for
+exactly this reason: a static batch does not follow its parent.)
 
 **You drive the fight** (owen, 2026-09-10: "replace auto fight with manual
 fight"). The same stick that brought you to the encounter drives the bout,
@@ -352,12 +362,12 @@ Brawler / WallShy / FirstSteps by the build's sensors) is deleted with it.
 Robot Brawl keeps autonomy programming; Scrapyard's depth is the build,
 the world, and your driving.
 
-*Open, from this call:* a challenge against a **pool** robot (another
+*Resolved 2026-09-10:* a challenge against a **pool** robot (another
 player's snapshot, §3.5) is fought here, by you, against the snapshot's
-build under the AI — so POINTS for it come from the referee of a fight the
-player drove, and the server-fought `yard` job (§7.3) becomes the path for
-challenges the player is not present for, if any. Decide when the pool
-challenge is built.
+build under a Veteran AI; the verdict goes to `POST /v1/yard/bouts` and
+scores YARD POINTS under server caps (win 10, loss 2, ≤20 scored a day, ≤3
+per defender a day). The worker-fought `yard` job stays available but
+nothing in the client sends one.
 
 ### 3.7 Rewards, points, the board
 
@@ -941,3 +951,32 @@ Nothing in M0 is blocked.
   onClicks). (1) the guided first minute — `yardStep`, the objective line,
   the highlighted chip, the ring-and-beam marker (§3.1). **Measured:
   MapBench 127/0, TouchSmoke 61/0.**
+- **2026-09-10 — THE CRAZYGAMES PLAN, steps 5 and 3.** (5) **Web build
+  10.4 → 7.1 MB**: IL2CPP OptimizeSize + linker DiskSizeLTO (wasm 6.6 →
+  5.4), TextMesh Pro deleted (unused, 1.35 MB of font), the URP
+  PostProcessData unreferenced from both renderers (no camera renders
+  post-processing; 2.8 MB of film-grain/SMAA noise); `-rbClean` builds
+  carry the asset report. (3) **Other players**: the server gains
+  `POST /v1/yard/bouts` (the verdict of a bout the player drove against a
+  pool machine — win 10, loss 2, ≤20 scored/day, ≤3 scored per defender
+  per day, past a cap recorded at 0) and `GET /v1/yard/board` (accounts
+  by points, `me` when signed in), migration 018 (`yard_bouts`,
+  `yard_points`); api_smoke section Z. The client fetches the anonymous
+  pool once per session and parks strangers' machines in ~45% of chunks
+  beyond 60 m (`BuilderManager.Pool.cs`, `SnapshotParts` parses a build
+  without touching the builder); the card names the owner; CHALLENGE is
+  the game's one sign-in gate (a UGUI panel on the HUD: sign in / create
+  account / not now), then the bout runs against THEIR build under a
+  Veteran AI, and the verdict is reported at the bell with the points
+  toasted on the next drive out; BOARD on the HUD opens the yard board.
+  **Measured: MapBench 141/0, TouchSmoke 61/0, QuickFightBench 24/0;
+  sql_bench 61/0, api_smoke 403/0 (1 pre-existing skip).** The API is
+  NOT yet deployed — owen's go (§7.3).
+- **2026-09-10 — THE CRAZYGAMES PLAN, step 4: the ring rises where you
+  stand.** `LeaveMapForFight` shifts the world root to put the encounter
+  at the origin (the ring code's assumption), keeps the planet look, drops
+  the map's machines; `BuildArena` adds a skirt under the pad;
+  `BackToBuild` → `TeardownWorld`; CONTINUE EXPLORING rebuilds at the
+  spot. Scatter combined per chunk (`CombineScatter`). MapBench: the world
+  standing around the ring, shifted to the origin, the pad at the highest
+  ground, the planet's sky, the horizon, the rebuild after.

@@ -408,6 +408,54 @@ namespace RobotBrawl.Phase0
             // check is that THESE two are gone, not that none are loaded)
             bool gone = true; foreach (var f in f2) if (f != null) gone = false;
             Check(gone, "drive home and the arena's machines unload with their chunk");
+            // ---- 7. OTHER PLAYERS (CrazyGames plan, step 3) --------------------------
+            // A stranger's machine from the pool parks in the world, the card
+            // names the owner, CHALLENGE is the game's one sign-in gate, the
+            // bout is fought against THEIR build and the verdict is reported.
+            // Headless: the pool is injected (no server), the token is faked,
+            // and the report's intent is what is measured.
+            var visitor = new LadderClient.PoolEntry { snapshotId = "11111111-1111-1111-1111-111111111111", robotName = "VISITOR", owner = "someone",
+                                                       build = BuilderManager.STARTER_SNAPSHOT, category = "LIGHT", game = "scrapyard" };
+            bm.TestInjectPool(new List<LadderClient.PoolEntry> { visitor });
+            var vparts = bm.SnapshotParts(visitor.build);
+            Check(bm.PoolCount == 1 && vparts != null && vparts.Count >= 5 && vparts[0].def.id == "core", "a stranger's build parses into parts, core first (" + (vparts != null ? vparts.Count : 0) + ")");
+            Check(bm.SnapshotParts("core|0,0.7,0|0|0,0,0|Aluminum") == null && bm.SnapshotParts("") == null, "...a build with no wheel, or nothing, is refused");
+            var pv = bm.TestParkPool(visitor, new Vector3(hp.x - 12f, 0f, hp.z + 12f));
+            Check(pv != null && pv.name == "VISITOR", "...and it parks in the world under its name");
+            bm.TeleportPlayer(pv.rb.position + new Vector3(2.5f, 0f, 0f));
+            yield return null; yield return null; yield return null;
+            Check(bm.YardCardShown && bm.CardPoolEntry == visitor, "the card comes up for the stranger's machine");
+            Check(MapHudUI.inst.CardTitle.Contains("VISITOR") && MapHudUI.inst.CardTitle.Contains("by someone"), "...naming the machine and its owner (" + MapHudUI.inst.CardTitle + ")");
+            string tokenSave = LadderClient.Token; LadderClient.Token = "";
+            MapHudUI.inst.ChallengeButton.onClick.Invoke(); yield return null; yield return null;
+            Check(bm.mode == BuilderManager.Mode.Map && MapHudUI.inst.SignInShown, "CHALLENGE without an account asks you to sign in - the game's one gate");
+            Check(Object.FindFirstObjectByType<FightManager>() == null, "...and no fight starts");
+            MapHudUI.inst.HideSignIn();
+            LadderClient.Token = "bench-token";
+            MapHudUI.inst.ChallengeButton.onClick.Invoke(); yield return null; yield return null;
+            var fmp = Object.FindFirstObjectByType<FightManager>();
+            Check(bm.mode == BuilderManager.Mode.Fight && fmp != null && bm.aiRobot != null && bm.aiRobot.name == "VISITOR", "signed in, CHALLENGE fights the stranger's own build (" + (bm.aiRobot != null ? bm.aiRobot.name : "-") + ")");
+            Check(fmp != null && fmp.enemyName == "VISITOR" && fmp.playerSource == ControlSource.AI && bm.YardStickFight, "...named on the fight, driven from the stick");
+            Time.timeScale = 4f;
+            float pdeadline = Time.realtimeSinceStartup + 40f;
+            while (fmp != null && fmp.state != FightManager.State.Ended && Time.realtimeSinceStartup < pdeadline) yield return null;
+            yield return null; yield return null;
+            Time.timeScale = savedScale;
+            Check(fmp != null && fmp.state == FightManager.State.Ended, "the bout ends");
+            Check(bm.LastBoutPosted == visitor.snapshotId, "...and the verdict is reported for the stranger's snapshot (" + bm.LastBoutPosted + ")");
+            Check(fmp != null && bm.LastBoutWon == (fmp.outcome == FightManager.Outcome.PlayerWin), "...as the referee called it (" + (fmp != null ? fmp.outcome.ToString() : "-") + ")");
+            bm.BackToBuild(); yield return null;
+            LadderClient.Token = tokenSave;
+            bm.EnterMap(); yield return null; yield return null;
+            MapHudUI.inst.BoardButton.onClick.Invoke(); yield return null;
+            Check(MapHudUI.inst.BoardShown, "BOARD opens the yard board");
+            float bdead = Time.realtimeSinceStartup + 6f;
+            while (Time.realtimeSinceStartup < bdead && MapHudUI.inst.BoardText == "reading the board...") yield return null;
+            Check(MapHudUI.inst.BoardText.Length > 0 && MapHudUI.inst.BoardText != "reading the board...", "...and says what it can (offline here: " + MapHudUI.inst.BoardText.Split('\n')[0] + ")");
+            MapHudUI.inst.HideBoard();
+            bm.TestUnparkPool();
+            bm.TeleportPlayer(new Vector3(hp.x, 0f, hp.z)); for (int i = 0; i < 10; i++) yield return null;
+            int qf0 = d.quickFights;
             parked = bm.YardParked;
 
             // ---- 5. CHALLENGE ------------------------------------------------------
@@ -454,7 +502,7 @@ namespace RobotBrawl.Phase0
             while (fm != null && fm.state != FightManager.State.Ended && Time.realtimeSinceStartup < deadline) yield return null;
             Time.timeScale = savedScale;
             Check(fm != null && fm.state == FightManager.State.Ended, "the bout ended on its own");
-            Check(d.quickFights == 1, "...and settled once (quickFights=" + d.quickFights + ")");
+            Check(d.quickFights == qf0 + 1, "...and settled once (quickFights=" + d.quickFights + ")");
             // the debrief's loud button is CONTINUE EXPLORING: back to the map,
             // where the challenge began (owen, 2026-09-10)
             Check(FightManager.quickNextLabel.StartsWith("CONTINUE EXPLORING") && FightManager.quickNext != null, "the debrief's loud button reads CONTINUE EXPLORING (" + FightManager.quickNextLabel + ")");

@@ -5523,11 +5523,13 @@ public partial class BuilderManager : MonoBehaviour
         // player's build — its local drive dir is +Z, so LookRotation(-axis)
         // faces the player. Nothing about the opponent is privileged.
         var entry = EnemyRoster.Find(opponentId);
-        var recipe = quickNext && !string.IsNullOrEmpty(quickArmourMat)
+        var recipe = yardOpponentParts != null ? yardOpponentParts   // Scrapyard: a pool machine's own build (Pool.cs)
+                   : quickNext && !string.IsNullOrEmpty(quickArmourMat)
                    ? EnemyRoster.Recipe(entry.id, palette, quickArmourMat, false)
                    : EnemyRoster.Recipe(entry.id, palette);
+        string enemyLabel = yardOpponentParts != null ? yardOpponentLabel : entry.label;
         RaycastWheelDrive drv;
-        aiRobot = SpawnBot(recipe, entry.label, axis * 4f,
+        aiRobot = SpawnBot(recipe, enemyLabel, axis * 4f,
                            Quaternion.LookRotation(-axis), Vector3.forward, out drv);
         aiDrive = drv;
         aiRobot.controlSource = ControlSource.AI;   // input isolation: never reads Phase0Input (spawn default, said explicitly)
@@ -5551,7 +5553,7 @@ public partial class BuilderManager : MonoBehaviour
 
         var fgo = new GameObject("fight_manager");
         fight = fgo.AddComponent<FightManager>();
-        fight.enemyName = entry.label;
+        fight.enemyName = enemyLabel;
         fight.Setup(this, testRobot, testDrive, aiRobot, aiDrive, aiCtrl);
         aiCtrl.fm = fight;   // round-2 fix 6: desperation reads the clock/cards
 

@@ -726,6 +726,103 @@ namespace RobotBrawl.Phase0
 
         /// <summary>done(displayName, err). On success the token is stored in
         /// Token, so a caller never handles it — one less place to leak it.</summary>
+        // ---- SCRAPYARD (2026-09-10): the pool, yard bouts, the yard board ------
+        public class PoolEntry
+        {
+            public string snapshotId = "", robotId = "", robotName = "", owner = "", category = "", game = "", build = "";
+            public float rating; public bool provisional; public int wins, losses;
+        }
+        /// <summary>GET /v1/pool - anonymous, build-only (never a program).</summary>
+        public static IEnumerator Pool(string category, int n, Action<List<PoolEntry>, string> done)
+        {
+            string path = "/v1/pool?n=" + n + (string.IsNullOrEmpty(category) ? "" : "&category=" + category);
+            using (var req = Get(path))
+            {
+                yield return Send(req);
+                if (req.result != UnityWebRequest.Result.Success)
+                { LastError = req.error; done(null, req.error); yield break; }
+                var rows = new List<PoolEntry>();
+                foreach (string obj in Objects(req.downloadHandler.text, "entries"))
+                {
+                    var e = new PoolEntry();
+                    e.snapshotId = RobotWorker.Field(obj, "snapshotId") ?? "";
+                    e.robotId = RobotWorker.Field(obj, "robotId") ?? "";
+                    e.robotName = RobotWorker.Field(obj, "robotName") ?? "";
+                    e.owner = RobotWorker.Field(obj, "owner") ?? "";
+                    e.category = RobotWorker.Field(obj, "category") ?? "";
+                    e.game = RobotWorker.Field(obj, "game") ?? "";
+                    e.build = RobotWorker.Field(obj, "build") ?? "";
+                    float.TryParse(RobotWorker.Field(obj, "rating") ?? "", System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out e.rating);
+                    e.provisional = string.Equals(RobotWorker.Field(obj, "provisional"), "true", StringComparison.OrdinalIgnoreCase);
+                    int.TryParse(RobotWorker.Field(obj, "wins") ?? "", out e.wins);
+                    int.TryParse(RobotWorker.Field(obj, "losses") ?? "", out e.losses);
+                    if (e.snapshotId.Length > 0 && e.build.Length > 0) rows.Add(e);
+                }
+                done(rows, null);
+            }
+        }
+        public class YardBoutResult { public int awarded, points, wins, bouts; }
+        /// <summary>POST /v1/yard/bouts - the verdict of a bout the player drove
+        /// against a pool machine; the server awards points under its caps.</summary>
+        public static IEnumerator YardBout(string defenderSnapshotId, bool won, Action<YardBoutResult, string> done)
+        {
+            string body = "{\"defenderSnapshotId\":" + RobotWorker.Str(defenderSnapshotId) + ",\"won\":" + (won ? "true" : "false") + "}";
+            var req = new UnityWebRequest(BaseUrl.TrimEnd('/') + "/v1/yard/bouts", "POST");
+            req.uploadHandler = new UploadHandlerRaw(System.Text.Encoding.UTF8.GetBytes(body));
+            req.downloadHandler = new DownloadHandlerBuffer();
+            req.SetRequestHeader("Content-Type", "application/json");
+            if (!string.IsNullOrEmpty(Token)) req.SetRequestHeader("Authorization", "Bearer " + Token);
+            using (req)
+            {
+                yield return Send(req);
+                string text = req.downloadHandler != null ? req.downloadHandler.text : "";
+                if (req.result != UnityWebRequest.Result.Success)
+                { string why = RobotWorker.Field(text, "error") ?? req.error; LastError = why; done(null, why); yield break; }
+                var r = new YardBoutResult();
+                int.TryParse(RobotWorker.Field(text, "awarded") ?? "", out r.awarded);
+                int.TryParse(RobotWorker.Field(text, "points") ?? "", out r.points);
+                int.TryParse(RobotWorker.Field(text, "wins") ?? "", out r.wins);
+                int.TryParse(RobotWorker.Field(text, "bouts") ?? "", out r.bouts);
+                done(r, null);
+            }
+        }
+        public class YardRow { public int rank; public string owner = ""; public int points, wins, bouts; }
+        /// <summary>GET /v1/yard/board - accounts by yard points; `me` when signed in.</summary>
+        public static IEnumerator YardBoard(int n, Action<List<YardRow>, YardRow, string> done)
+        {
+            using (var req = Get("/v1/yard/board?n=" + n))
+            {
+                yield return Send(req);
+                if (req.result != UnityWebRequest.Result.Success)
+                { LastError = req.error; done(null, null, req.error); yield break; }
+                string text = req.downloadHandler.text;
+                var rows = new List<YardRow>();
+                foreach (string obj in Objects(text, "entries"))
+                {
+                    var r = new YardRow();
+                    int.TryParse(RobotWorker.Field(obj, "rank") ?? "", out r.rank);
+                    r.owner = RobotWorker.Field(obj, "owner") ?? "";
+                    int.TryParse(RobotWorker.Field(obj, "points") ?? "", out r.points);
+                    int.TryParse(RobotWorker.Field(obj, "wins") ?? "", out r.wins);
+                    int.TryParse(RobotWorker.Field(obj, "bouts") ?? "", out r.bouts);
+                    rows.Add(r);
+                }
+                YardRow me = null;
+                int mi = text.IndexOf("\"me\":{", StringComparison.Ordinal);
+                if (mi >= 0)
+                {
+                    int end = text.IndexOf('}', mi);
+                    string mobj = end > mi ? text.Substring(mi + 5, end - mi - 5 + 1) : "";
+                    me = new YardRow();
+                    int.TryParse(RobotWorker.Field(mobj, "rank") ?? "", out me.rank);
+                    int.TryParse(RobotWorker.Field(mobj, "points") ?? "", out me.points);
+                    int.TryParse(RobotWorker.Field(mobj, "wins") ?? "", out me.wins);
+                    int.TryParse(RobotWorker.Field(mobj, "bouts") ?? "", out me.bouts);
+                }
+                done(rows, me, null);
+            }
+        }
+
         public static IEnumerator Register(string email, string password, string displayName,
                                            Action<string, string> done)
         {

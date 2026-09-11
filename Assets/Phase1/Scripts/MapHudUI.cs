@@ -27,7 +27,9 @@ public class MapHudUI : MonoBehaviour
     BuilderManager bm; Canvas canvas; RectTransform root, bar, chipsRow, card;
     readonly List<Chip> chips = new List<Chip>();
     Text toast, banner, cardTitle, cardSub;
-    Button garage, challenge;
+    Button garage, challenge, board;
+    // the sign-in gate (a stranger's machine) and the yard board
+    RectTransform signIn, boardPanel; InputField emailIn, passIn, nameIn; Text signStatus, boardTitle, boardBody; bool busy;
     static Font font;
     class Chip { public GameObject go; public Image panel, needleBar, needleTip; public Text label, dist; public RectTransform needleRt; }
     public static readonly Color PANEL_HI = new Color(0.26f, 0.32f, 0.42f, 0.98f);   // the objective's chip
@@ -45,6 +47,11 @@ public class MapHudUI : MonoBehaviour
     public string ObjectiveText { get { return objective != null && objective.gameObject.activeSelf ? objective.text : ""; } }
     public string ToastText { get { return toast != null && toast.gameObject.activeSelf ? toast.text : ""; } }
     public string BannerText { get { return banner != null && banner.gameObject.activeSelf ? banner.text : ""; } }
+    public string CardTitle { get { return cardTitle != null ? cardTitle.text : ""; } }
+    public bool SignInShown { get { return signIn != null && signIn.gameObject.activeSelf; } }
+    public Button BoardButton { get { return board; } }
+    public bool BoardShown { get { return boardPanel != null && boardPanel.gameObject.activeSelf; } }
+    public string BoardText { get { return boardBody != null ? boardBody.text : ""; } }
 
     public static MapHudUI Ensure(BuilderManager bm)
     {
@@ -100,6 +107,12 @@ public class MapHudUI : MonoBehaviour
         var grt = garage.GetComponent<RectTransform>();
         grt.anchorMin = new Vector2(1f, 0f); grt.anchorMax = new Vector2(1f, 1f); grt.pivot = new Vector2(1f, 0.5f);
         grt.anchoredPosition = new Vector2(-8f, 0f); grt.sizeDelta = new Vector2(112f, 0f);
+        board = MkButton("board", bar, "BOARD", 18, () => ShowBoard());
+        var brt0 = board.GetComponent<RectTransform>();
+        brt0.anchorMin = new Vector2(1f, 0f); brt0.anchorMax = new Vector2(1f, 1f); brt0.pivot = new Vector2(1f, 0.5f);
+        brt0.anchoredPosition = new Vector2(-128f, 0f); brt0.sizeDelta = new Vector2(100f, 0f);
+        chipsRow.offsetMax = new Vector2(-240f, 0f);
+        BuildSignIn(); BuildBoard();
 
         // under the bar: the banner (a place) or the toast (a reward)
         banner = MkText("banner", root, "", 17, TextAnchor.MiddleCenter);
@@ -137,6 +150,114 @@ public class MapHudUI : MonoBehaviour
         chr.anchoredPosition = new Vector2(0f, 10f); chr.sizeDelta = new Vector2(-48f, ROW);
         card.gameObject.SetActive(false);
         toast.gameObject.SetActive(false); banner.gameObject.SetActive(false);
+    }
+
+    // ---- the sign-in gate: the game's only login, and only to challenge a stranger
+    void BuildSignIn()
+    {
+        signIn = MkPanel("signin", root, PANEL).GetComponent<RectTransform>();
+        signIn.anchorMin = signIn.anchorMax = new Vector2(0.5f, 0.5f); signIn.pivot = new Vector2(0.5f, 0.5f);
+        signIn.sizeDelta = new Vector2(420f, 300f);
+        var t = MkText("title", signIn, "SIGN IN TO CHALLENGE", 20, TextAnchor.MiddleCenter); t.fontStyle = FontStyle.Bold;
+        Place(t.rectTransform, 0f, -10f, -16f, 28f);
+        var sub = MkText("sub", signIn, "another player's machine - points go on the board under your name", 13, TextAnchor.MiddleCenter);
+        sub.color = new Color(0.75f, 0.80f, 0.88f); Place(sub.rectTransform, 0f, -38f, -16f, 20f);
+        emailIn = MkInput("email", signIn, "email", false); Place(emailIn.GetComponent<RectTransform>(), 0f, -66f, -48f, ROW);
+        passIn = MkInput("password", signIn, "password", true); Place(passIn.GetComponent<RectTransform>(), 0f, -66f - ROW - 8f, -48f, ROW);
+        nameIn = MkInput("name", signIn, "display name (new accounts)", false); Place(nameIn.GetComponent<RectTransform>(), 0f, -66f - 2f * (ROW + 8f), -48f, ROW);
+        signStatus = MkText("status", signIn, "", 13, TextAnchor.MiddleCenter); signStatus.color = AMBER;
+        Place(signStatus.rectTransform, 0f, -66f - 3f * (ROW + 8f) + 2f, -16f, 20f);
+        var login = MkButton("login", signIn, "SIGN IN", 17, () => DoSignIn(false));
+        login.GetComponent<Image>().color = AMBER; login.GetComponentInChildren<Text>().color = new Color(0.12f, 0.08f, 0.02f);
+        var lr = login.GetComponent<RectTransform>(); lr.anchorMin = new Vector2(0f, 0f); lr.anchorMax = new Vector2(0f, 0f); lr.pivot = new Vector2(0f, 0f);
+        lr.anchoredPosition = new Vector2(16f, 12f); lr.sizeDelta = new Vector2(120f, ROW);
+        var create = MkButton("create", signIn, "CREATE ACCOUNT", 15, () => DoSignIn(true));
+        var cr = create.GetComponent<RectTransform>(); cr.anchorMin = new Vector2(0.5f, 0f); cr.anchorMax = new Vector2(0.5f, 0f); cr.pivot = new Vector2(0.5f, 0f);
+        cr.anchoredPosition = new Vector2(8f, 12f); cr.sizeDelta = new Vector2(150f, ROW);
+        var cancel = MkButton("cancel", signIn, "NOT NOW", 15, () => HideSignIn());
+        var xr = cancel.GetComponent<RectTransform>(); xr.anchorMin = new Vector2(1f, 0f); xr.anchorMax = new Vector2(1f, 0f); xr.pivot = new Vector2(1f, 0f);
+        xr.anchoredPosition = new Vector2(-16f, 12f); xr.sizeDelta = new Vector2(96f, ROW);
+        signIn.gameObject.SetActive(false);
+    }
+    public void ShowSignIn() { if (signIn == null) return; signStatus.text = ""; busy = false; signIn.gameObject.SetActive(true); }
+    public void HideSignIn() { if (signIn != null) signIn.gameObject.SetActive(false); }
+    void DoSignIn(bool create)
+    {
+        if (busy || bm == null) return;
+        string email = emailIn.text.Trim(), pass = passIn.text, name = nameIn.text.Trim();
+        if (email.Length < 3 || !email.Contains("@")) { signStatus.text = "an email address, please"; return; }
+        if (pass.Length < 6) { signStatus.text = "a password of at least 6 characters"; return; }
+        if (create && name.Length < 2) { signStatus.text = "a display name of at least 2 characters"; return; }
+        busy = true; signStatus.text = create ? "creating..." : "signing in...";
+        System.Action<string, string> done = (displayName, err) =>
+        {
+            busy = false;
+            if (err != null) { signStatus.text = err; return; }
+            LadderClient.SaveSession(displayName ?? name);
+            HideSignIn();
+            bm.OnSignedIn(displayName ?? name);
+        };
+        if (create) bm.StartCoroutine(LadderClient.Register(email, pass, name, done));
+        else bm.StartCoroutine(LadderClient.Login(email, pass, done));
+    }
+
+    // ---- the board: accounts by yard points
+    void BuildBoard()
+    {
+        boardPanel = MkPanel("board_panel", root, PANEL).GetComponent<RectTransform>();
+        boardPanel.anchorMin = boardPanel.anchorMax = new Vector2(0.5f, 0.5f); boardPanel.pivot = new Vector2(0.5f, 0.5f);
+        boardPanel.sizeDelta = new Vector2(440f, 400f);
+        boardTitle = MkText("title", boardPanel, "YARD BOARD", 20, TextAnchor.MiddleCenter); boardTitle.fontStyle = FontStyle.Bold;
+        Place(boardTitle.rectTransform, 0f, -10f, -16f, 28f);
+        boardBody = MkText("body", boardPanel, "", 15, TextAnchor.UpperLeft);
+        boardBody.horizontalOverflow = HorizontalWrapMode.Wrap; boardBody.verticalOverflow = VerticalWrapMode.Truncate;
+        var br = boardBody.rectTransform; br.anchorMin = new Vector2(0f, 0f); br.anchorMax = new Vector2(1f, 1f);
+        br.offsetMin = new Vector2(20f, 12f + ROW + 8f); br.offsetMax = new Vector2(-20f, -44f);
+        var close = MkButton("close", boardPanel, "CLOSE", 16, () => HideBoard());
+        var xr = close.GetComponent<RectTransform>(); xr.anchorMin = new Vector2(0.5f, 0f); xr.anchorMax = new Vector2(0.5f, 0f); xr.pivot = new Vector2(0.5f, 0f);
+        xr.anchoredPosition = new Vector2(0f, 12f); xr.sizeDelta = new Vector2(140f, ROW);
+        boardPanel.gameObject.SetActive(false);
+    }
+    public void ShowBoard()
+    {
+        if (boardPanel == null || bm == null) return;
+        boardPanel.gameObject.SetActive(true);
+        boardBody.text = "reading the board...";
+        bm.StartCoroutine(LadderClient.YardBoard(20, (rows, me, err) =>
+        {
+            if (boardBody == null) return;
+            if (rows == null) { boardBody.text = "the board is out of reach right now\n(" + err + ")\n\nchallenge a stranger's machine and your points go here"; return; }
+            var sb = new System.Text.StringBuilder();
+            if (rows.Count == 0) sb.Append("nobody on the board yet - challenge a stranger's machine\n");
+            foreach (var r in rows) sb.Append(r.rank.ToString().PadLeft(3)).Append("   ").Append(r.owner).Append("   ").Append(r.points).Append(" pts   ").Append(r.wins).Append("/").Append(r.bouts).Append(" won\n");
+            if (me != null) sb.Append("\nyou: rank ").Append(me.rank).Append("  ·  ").Append(me.points).Append(" pts  ·  ").Append(me.wins).Append("/").Append(me.bouts).Append(" won");
+            else if (!LadderClient.SignedIn) sb.Append("\nsign in (challenge a stranger) to get on the board");
+            boardBody.text = sb.ToString();
+        }));
+    }
+    public void HideBoard() { if (boardPanel != null) boardPanel.gameObject.SetActive(false); }
+
+    static void Place(RectTransform rt, float x, float top, float wDelta, float h)
+    {
+        rt.anchorMin = new Vector2(0f, 1f); rt.anchorMax = new Vector2(1f, 1f); rt.pivot = new Vector2(0.5f, 1f);
+        rt.anchoredPosition = new Vector2(x, top); rt.sizeDelta = new Vector2(wDelta, h);
+    }
+    static InputField MkInput(string name, Transform parent, string placeholder, bool password)
+    {
+        var go = new GameObject(name, typeof(RectTransform), typeof(Image), typeof(InputField));
+        go.transform.SetParent(parent, false);
+        go.GetComponent<Image>().color = new Color(0.13f, 0.14f, 0.18f, 1f);
+        var border = MkPanel("border", go.transform, new Color(0.42f, 0.44f, 0.50f, 1f)); border.GetComponent<Image>().raycastTarget = false;
+        var brt = border.GetComponent<RectTransform>(); brt.anchorMin = new Vector2(0f, 0f); brt.anchorMax = new Vector2(1f, 0f); brt.pivot = new Vector2(0.5f, 0f);
+        brt.anchoredPosition = Vector2.zero; brt.sizeDelta = new Vector2(0f, 2f);
+        var t = MkText("text", go.transform, "", 16, TextAnchor.MiddleLeft); Stretch(t.rectTransform); t.rectTransform.offsetMin = new Vector2(10f, 0f); t.rectTransform.offsetMax = new Vector2(-10f, 0f);
+        t.supportRichText = false;
+        var ph = MkText("placeholder", go.transform, placeholder, 16, TextAnchor.MiddleLeft); Stretch(ph.rectTransform); ph.rectTransform.offsetMin = new Vector2(10f, 0f); ph.rectTransform.offsetMax = new Vector2(-10f, 0f);
+        ph.color = new Color(0.55f, 0.58f, 0.66f); ph.fontStyle = FontStyle.Italic;
+        var f = go.GetComponent<InputField>();
+        f.textComponent = t; f.placeholder = ph;
+        f.contentType = password ? InputField.ContentType.Password : InputField.ContentType.Standard;
+        return f;
     }
 
     Chip MkChip(int i)

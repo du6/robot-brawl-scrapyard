@@ -193,6 +193,7 @@ public partial class BuilderManager
     {
         if (!yardStickFight || mode != Mode.Fight || testRobot == null || testDrive == null) return;
         var fm = Object.FindFirstObjectByType<FightManager>();
+        PumpBoutReport(fm);
         if (fm == null || fm.state != FightManager.State.Fighting) return;
         PointDrive(testRobot, testDrive, driveDir, cam.transform);
         bool fire = Phase0Input.FireHeld();

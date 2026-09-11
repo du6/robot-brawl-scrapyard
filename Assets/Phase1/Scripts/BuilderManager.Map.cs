@@ -63,6 +63,7 @@ public partial class BuilderManager
         public readonly List<Vector3> shopPads = new List<Vector3>();
         public ArenaShow arena;
         public int scatter, pools;                                              // WorldFar
+        public CompoundRobot poolBot; public LadderClient.PoolEntry poolEntry;  // Pool: another player's machine
     }
     readonly Dictionary<long, Chunk> chunks = new Dictionary<long, Chunk>();
     GameObject worldRoot;
@@ -214,6 +215,9 @@ public partial class BuilderManager
             SpawnStructure(ch.root.transform, kind, x, z, TerrainHeight(x, z), rng);
         }
 
+        // a stranger's machine, sometimes, out past the first minute (Pool)
+        MaybeSpawnPoolBot(ch, cx, cz, dHome, rng);
+
         // places: any whose centre lies in this chunk (Places)
         BuildPlacesInChunk(ch, cx, cz, rng);
         // life and pools (WorldFar)
@@ -350,7 +354,7 @@ public partial class BuilderManager
         {
             var c = kv.Value;
             if (Mathf.Abs(c.cx - pcx) <= VIEW_CHUNKS + 1 && Mathf.Abs(c.cz - pcz) <= VIEW_CHUNKS + 1) continue;
-            if (c.enemy != null && c.enemy == cardBot) continue;     // never under a live card
+            if (cardBot != null && (c.enemy == cardBot || c.poolBot == cardBot)) continue;     // never under a live card
             if (drop == null) drop = new List<long>();
             drop.Add(kv.Key);
         }
@@ -363,6 +367,7 @@ public partial class BuilderManager
         if (!chunks.TryGetValue(k, out c)) return;
         chunks.Remove(k);
         if (c.enemy != null && c.enemy.gameObject != null) { c.enemy.gameObject.SetActive(false); Destroy(c.enemy.gameObject); }
+        if (c.poolBot != null && c.poolBot.gameObject != null) { c.poolBot.gameObject.SetActive(false); Destroy(c.poolBot.gameObject); }
         foreach (var b in c.extraBots) if (b != null && b.gameObject != null) { b.gameObject.SetActive(false); Destroy(b.gameObject); }
         foreach (var pad in c.shopPads) shopPads.Remove(pad);
         if (c.root != null) Destroy(c.root);
@@ -452,6 +457,8 @@ public partial class BuilderManager
         AddHeadlight(testRobot, driveDir);
 
         MapHudUI.Ensure(this);
+        FetchPoolOnce();
+        FlushPendingToast();
         RBTelemetry.Once(RBTelemetry.MAP);
     }
 
@@ -488,9 +495,8 @@ public partial class BuilderManager
         CompoundRobot best = null; float bd = float.MaxValue;
         foreach (var c in chunks.Values)
         {
-            if (c.enemy == null) continue;
-            float d = (c.enemy.rb.position - me).sqrMagnitude;
-            if (d < bd) { bd = d; best = c.enemy; }
+            if (c.enemy != null) { float d = (c.enemy.rb.position - me).sqrMagnitude; if (d < bd) { bd = d; best = c.enemy; } }
+            if (c.poolBot != null) { float d = (c.poolBot.rb.position - me).sqrMagnitude; if (d < bd) { bd = d; best = c.poolBot; } }
         }
         return best;
     }
@@ -600,6 +606,7 @@ public partial class BuilderManager
     /// next pass; for now the bout is in the standard ring.</summary>
     public void ChallengeParked()
     {
+        if (ChallengePool()) return;   // a stranger's machine: the sign-in gate, then their build (Pool.cs)
         if (mode != Mode.Map || cardBot == null) return;
         string opp = string.IsNullOrEmpty(cardBotId) ? YARD_BOT : cardBotId;
         LeaveMap();
@@ -631,6 +638,7 @@ public partial class BuilderManager
         }
         var entry = EnemyRoster.Find(oppId);
         if (entry == null) return;
+        bool poolBout = yardOpponentParts != null;   // a stranger's build (Pool.cs): the roster id is only the tier's placeholder
 
         Career.fightBuildValue = BuildValueCareer();
         var recipe = EnemyRoster.Recipe(entry.id, palette);
@@ -641,7 +649,7 @@ public partial class BuilderManager
         Career.targetLeagueIdx = Career.FurthestLeague();
         CrowdAudio.SetVenue(Career.targetLeagueIdx);
         opponentId = entry.id;
-        opponentTier = entry.tier;
+        opponentTier = poolBout ? AiTier.Veteran : entry.tier;
         quickArmourMat = "";
         Progression.activeRungIndex = -1;
         Progression.activeChallengeIdx = -1;
@@ -783,10 +791,20 @@ public partial class BuilderManager
         }
         if (yardCard && cardBot != null)
         {
-            var entry = EnemyRoster.Find(string.IsNullOrEmpty(cardBotId) ? YARD_BOT : cardBotId);
+            var pe = PoolEntryOf(cardBot);
             m.card = true;
-            m.cardTitle = entry != null ? entry.label + "   ·   " + entry.tier.ToString().ToUpper() : cardBot.name;
-            m.cardSub = "30-second bout  ·  you drive: stick to move, FIRE for the weapon  ·  drive away to decline";
+            if (pe != null)
+            {
+                m.cardTitle = cardBot.name + "   ·   by " + (string.IsNullOrEmpty(pe.owner) ? "another player" : pe.owner);
+                m.cardSub = LadderClient.SignedIn ? "another player's machine  ·  30-second bout, you drive  ·  points at the bell"
+                                                  : "another player's machine  ·  sign in to challenge  ·  drive away to decline";
+            }
+            else
+            {
+                var entry = EnemyRoster.Find(string.IsNullOrEmpty(cardBotId) ? YARD_BOT : cardBotId);
+                m.cardTitle = entry != null ? entry.label + "   ·   " + entry.tier.ToString().ToUpper() : cardBot.name;
+                m.cardSub = "30-second bout  ·  you drive: stick to move, FIRE for the weapon  ·  drive away to decline";
+            }
         }
         return m;
     }
