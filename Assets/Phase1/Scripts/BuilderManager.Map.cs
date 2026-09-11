@@ -451,6 +451,7 @@ public partial class BuilderManager
         followCam.SnapNow();
         AddHeadlight(testRobot, driveDir);
 
+        MapHudUI.Ensure(this);
         RBTelemetry.Once(RBTelemetry.MAP);
     }
 
@@ -459,6 +460,7 @@ public partial class BuilderManager
     public void LeaveMap()
     {
         if (mode != Mode.Map) return;
+        MapHudUI.Drop();
         if (testRobot != null) { lastMapPos = testRobot.rb.position; lastMapYaw = testRobot.transform.eulerAngles.y; resumeSeed = worldSeed; hasResume = true; }
         DropCamPivot();
         farRoot = null; farGround = null; landmarks.Clear();   // swept with the world root
@@ -656,88 +658,57 @@ public partial class BuilderManager
 
 
     // ------------------------------------------------------------ the HUD
-    void MapHud()
+    /// <summary>What the HUD shows this frame (MapHudUI draws it): compass
+    /// chips for the nearest crate, the nearest enemy, the nearest place and
+    /// home, each with a bearing from the machine's nose; a toast or a place
+    /// banner; the encounter card.</summary>
+    public struct HudEntry { public string label; public float angle; public float dist; public Color tint; }
+    public class MapHudModel
     {
-        float s = GuiScale;
-        Matrix4x4 saved = GUI.matrix;
-        GUI.matrix = Matrix4x4.Scale(new Vector3(s, s, 1f));
-        float w = Screen.width / s, h = Screen.height / s;
-        float top = 8f + Screen.safeArea.y / s;
-        int fs = GUI.skin.button.fontSize;
-        GUI.skin.button.fontSize = 16;
-        bool garage = GUI.Button(new Rect(w - 106f, top, 96f, 40f), "GARAGE");
-        GUI.skin.button.fontSize = fs;
-
-        // the compass strip: bearings to the nearest crate, the nearest enemy, home
-        var st = new GUIStyle(GUI.skin.label); st.fontSize = 20; st.fontStyle = FontStyle.Bold;
-        st.normal.textColor = new Color(0.95f, 0.97f, 1f);
-        GUI.Box(new Rect(8f, top, w - 124f, 40f), "");
-        if (testRobot != null)
+        public readonly List<HudEntry> compass = new List<HudEntry>();
+        public string toast = "", banner = "";
+        public bool card; public string cardTitle = "", cardSub = "";
+    }
+    readonly MapHudModel hudModel = new MapHudModel();
+    public static readonly Color HUD_TREASURE = new Color(1f, 0.84f, 0.40f), HUD_ENEMY = new Color(1f, 0.55f, 0.50f),
+                                 HUD_PLACE = new Color(0.55f, 0.90f, 1f), HUD_HOME = new Color(0.92f, 0.94f, 1f);
+    public MapHudModel HudModel()
+    {
+        var m = hudModel;
+        m.compass.Clear(); m.toast = ""; m.banner = ""; m.card = false;
+        if (mode != Mode.Map || testRobot == null) return m;
+        Vector3 me = testRobot.rb.position;
+        Vector3 fwd = testRobot.transform.TransformDirection(driveDir); fwd.y = 0f;
+        if (fwd.sqrMagnitude < 0.01f) fwd = Vector3.forward;
+        Vector3 nearestCrate = Vector3.zero; float best = float.MaxValue; bool any = false;
+        foreach (var c in chunks.Values) foreach (var g in c.crates) if (g != null)
+        { float d = (g.transform.position - me).sqrMagnitude; if (d < best) { best = d; nearestCrate = g.transform.position; any = true; } }
+        if (any) m.compass.Add(Entry("TREASURE", nearestCrate - me, fwd, HUD_TREASURE));
+        var en = NearestEnemy(me);
+        if (en != null) m.compass.Add(Entry(en.name.ToUpper(), en.rb.position - me, fwd, HUD_ENEMY));
+        var np = NearestPlaceNow;
+        if (np != null) m.compass.Add(Entry(np.name, np.centre - me, fwd, HUD_PLACE));
+        m.compass.Add(Entry("HOME", homePos - me, fwd, HUD_HOME));
+        if (yardToastT > 0f && yardToast.Length > 0) m.toast = yardToast;
+        else if (np != null)
         {
-            Vector3 me = testRobot.rb.position;
-            Vector3 fwd = testRobot.transform.TransformDirection(driveDir); fwd.y = 0f;
-            if (fwd.sqrMagnitude < 0.01f) fwd = Vector3.forward;
-            var sb = new System.Text.StringBuilder();
-            Vector3 nearestCrate = Vector3.zero; float best = float.MaxValue; bool any = false;
-            foreach (var c in chunks.Values) foreach (var g in c.crates) if (g != null)
-            { float d = (g.transform.position - me).sqrMagnitude; if (d < best) { best = d; nearestCrate = g.transform.position; any = true; } }
-            sb.Append(any ? Bearing("TREASURE", nearestCrate - me, fwd) : "no treasure in sight - drive on");
-            var en = NearestEnemy(me);
-            if (en != null) sb.Append("     ").Append(Bearing(en.name.ToUpper(), en.rb.position - me, fwd));
-            var np = NearestPlaceNow;
-            if (np != null) sb.Append("     ").Append(Bearing(np.name, np.centre - me, fwd));
-            sb.Append("     ").Append(Bearing("HOME", homePos - me, fwd));
-            GUI.Label(new Rect(20f, top + 6f, w - 140f, 28f), sb.ToString(), st);
-            // inside a place: its name and what it is for, under the strip
-            if (np != null && (yardToastT <= 0f || yardToast.Length == 0))
-            {
-                float pd = Vector2.Distance(new Vector2(me.x, me.z), new Vector2(np.centre.x, np.centre.z));
-                if (pd < np.radius + 6f)
-                {
-                    var ps = new GUIStyle(GUI.skin.label); ps.fontSize = 16; ps.alignment = TextAnchor.MiddleCenter;
-                    ps.normal.textColor = new Color(0.62f, 0.90f, 1f);
-                    GUI.Label(new Rect(0f, top + 48f, w, 26f), np.name + "  -  " + np.Hint, ps);
-                }
-            }
+            float pd = Vector2.Distance(new Vector2(me.x, me.z), new Vector2(np.centre.x, np.centre.z));
+            if (pd < np.radius + 6f) m.banner = np.name + "  -  " + np.Hint;
         }
-        if (yardToastT > 0f && yardToast.Length > 0)
-        {
-            var ts = new GUIStyle(GUI.skin.label); ts.fontSize = 20; ts.fontStyle = FontStyle.Bold; ts.alignment = TextAnchor.MiddleCenter;
-            ts.normal.textColor = new Color(1f, 0.87f, 0.46f);
-            GUI.Label(new Rect(0f, top + 48f, w, 30f), yardToast, ts);
-        }
-        bool challenge = false;
         if (yardCard && cardBot != null)
         {
             var entry = EnemyRoster.Find(string.IsNullOrEmpty(cardBotId) ? YARD_BOT : cardBotId);
-            float cw = Mathf.Min(380f, w - 24f), ch = 112f;
-            var box = new Rect((w - cw) * 0.5f, h - ch - 16f - Screen.safeArea.y / s, cw, ch);
-            GUI.Box(box, "");
-            var hs = new GUIStyle(GUI.skin.label); hs.fontSize = 18; hs.fontStyle = FontStyle.Bold; hs.alignment = TextAnchor.MiddleCenter;
-            hs.normal.textColor = Color.white;
-            GUI.Label(new Rect(box.x, box.y + 6f, box.width, 26f),
-                      (entry != null ? entry.label + "   ·   " + entry.tier.ToString().ToUpper() : cardBot.name), hs);
-            var cs = new GUIStyle(GUI.skin.label); cs.fontSize = 13; cs.alignment = TextAnchor.MiddleCenter;
-            cs.normal.textColor = new Color(0.75f, 0.80f, 0.88f);
-            GUI.Label(new Rect(box.x, box.y + 32f, box.width, 20f), "30-second bout  ·  you drive: stick to move, FIRE for the weapon  ·  drive away to decline", cs);
-            GUI.skin.button.fontSize = 18;
-            challenge = GUI.Button(new Rect(box.x + 24f, box.y + 58f, box.width - 48f, 44f), "CHALLENGE");
-            GUI.skin.button.fontSize = fs;
+            m.card = true;
+            m.cardTitle = entry != null ? entry.label + "   ·   " + entry.tier.ToString().ToUpper() : cardBot.name;
+            m.cardSub = "30-second bout  ·  you drive: stick to move, FIRE for the weapon  ·  drive away to decline";
         }
-        GUI.matrix = saved;
-        if (garage) { LeaveMap(); return; }
-        if (challenge) ChallengeParked();
+        return m;
     }
-
-    static string Bearing(string what, Vector3 to, Vector3 fwd)
+    static HudEntry Entry(string label, Vector3 to, Vector3 fwd, Color tint)
     {
         to.y = 0f;
-        float dist = to.magnitude;
-        float ang = Vector3.SignedAngle(fwd, to, Vector3.up);
-        // ASCII on purpose: the arrow glyphs (U+2191 etc.) are not in the IMGUI
-        // font and drew as nothing - seen live 2026-09-10, "TREASURE   17 m".
-        string arrow = Mathf.Abs(ang) < 25f ? "^" : ang > 0f ? (ang > 135f ? "v" : ">") : (ang < -135f ? "v" : "<");
-        return what + " " + arrow + " " + Mathf.RoundToInt(dist) + " m";
+        return new HudEntry { label = label, dist = to.magnitude, angle = Vector3.SignedAngle(fwd, to, Vector3.up), tint = tint };
     }
+
 }
 }

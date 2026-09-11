@@ -3,6 +3,11 @@ PASS  ...with the rookie under the stick
 PASS  GARAGE is the door back to the workshop
 PASS  DRIVE OUT enters the yard
 PASS  ...and the funnel hears `map`
+PASS  the map's HUD is a UGUI canvas, not IMGUI
+PASS  ...compass chips: TREASURE first, HOME last (4 chips: TREASURE 8 m | SCOUT 31 m)
+PASS  ...each with a distance in metres
+PASS  ...and a GARAGE button
+PASS  ...no encounter card at home
 PASS  the player's machine is on the map, combat off
 PASS  the world around home is loaded: 25 chunks of 25
 PASS  the world's seed was rolled and saved (4242)
@@ -35,6 +40,7 @@ PASS  ...its surface above the crater floor, below the rim
 PASS  home is flat
 PASS  ...and the world is not (3.4 m, -1.5 m)
 PASS  GARAGE returns to the garage
+PASS  ...and the map's HUD is gone with the map
 PASS  ...and the garage gets its own sky and no fog back
 PASS  leaving and re-entering gives the same world (the seed persists)
 PASS  driving into a crate opens it (19 of 20 left)
@@ -50,23 +56,24 @@ PASS  an opened crate never respawns (19)
 PASS  400 m out, the world is still 25 chunks around you (25)
 PASS  ...and you are on the ground there (y -0.8 vs ground -1.0)
 PASS  the card comes up within 4 m of the parked bot
+PASS  ...on the HUD, with a CHALLENGE button
 PASS  ...and the funnel hears `meet`
 PASS  drive away and the card folds - decline is free
-      trace: 12.3s err -1 steer -0.04 | 12.7s err 0 steer 0.02 | 13.1s err 1 steer 0.02 | 13.5s err 1 steer 0.02 | 13.9s err 1 steer 0.02 | 
+      trace: 12.5s err -1 steer -0.04 | 12.9s err 0 steer 0.02 | 13.3s err 1 steer 0.02 | 13.7s err 1 steer 0.02 | 14.1s err 1 steer 0.02 | 
 PASS  stick up for 2 s moves the machine (9.5 m)
 PASS  ...straight away from the camera (-0.1 deg off)
 PASS  ...the wobble reads as part of one stick vector, not a steer
-      turn trace: 0.0s yaw 94 err 0 st 0.02 thr 1.00 w 1 v 6.3 | 0.2s yaw 98 err 32 st 0.26 thr -0.25 w 41 v 5.9 | 0.3s yaw 105 err 25 st 0.19 thr -0.25 w 53 v 5.4 | 0.5s yaw 113 err 17 st 0.16 thr -0.25 w 43 v 4.8 | 0.6s yaw 118 err 12 st 0.11 thr 0.84 w 45 v 5.0 | 0.8s yaw 126 err 4 st 0.02 thr 0.95 w 44 v 5.9 | 0.9s yaw 131 err -1 st 0.05 thr 0.98 w 8 v 6.5 | 1.1s yaw 131 err -1 st 0.08 thr 0.98 w -4 v 6.6 | 1.2s yaw 130 err 0 st 0.11 thr 1.00 w -10 v 6.5 | 1.4s yaw 129 err 0 st 0.10 thr 1.00 w -4 v 6.4 | 1.5s yaw 129 err 1 st 0.13 thr 0.98 w -7 v 6.4 | 
-      40 deg hold: cam 94 want 130 yaw 128 -> 127 err 2
-PASS  a held 40 deg stick turns the machine TO the heading, within 6 deg by 2.4 s (2 deg left)
+      turn trace: 0.0s yaw 94 err 0 st 0.02 thr 1.00 w 1 v 6.3 | 0.2s yaw 98 err 32 st 0.27 thr -0.25 w 39 v 5.9 | 0.3s yaw 105 err 25 st 0.19 thr -0.25 w 52 v 5.4 | 0.5s yaw 113 err 17 st 0.16 thr -0.25 w 44 v 4.9 | 0.6s yaw 119 err 11 st 0.09 thr 0.85 w 47 v 5.1 | 0.8s yaw 126 err 4 st 0.02 thr 0.95 w 43 v 5.9 | 0.9s yaw 130 err -1 st 0.05 thr 0.99 w 8 v 6.5 | 1.1s yaw 131 err -1 st 0.09 thr 0.98 w -4 v 6.6 | 1.2s yaw 130 err 0 st 0.11 thr 1.00 w -9 v 6.5 | 1.4s yaw 129 err 0 st 0.10 thr 1.00 w -3 v 6.4 | 1.5s yaw 128 err 1 st 0.13 thr 0.98 w -7 v 6.4 | 
+      40 deg hold: cam 94 want 129 yaw 127 -> 127 err 3
+PASS  a held 40 deg stick turns the machine TO the heading, within 6 deg by 2.4 s (3 deg left)
 PASS  ...briskly, and without breaking grip into a spin (peak 53 deg/s; a spin measured 200-290)
-PASS  ...and stops turning once there, apart from the camera's slow recentre (0 deg in 0.8 s)
+PASS  ...and stops turning once there, apart from the camera's slow recentre (-1 deg in 0.8 s)
 PASS  ...to the RIGHT of where the camera looked (34 deg)
 PASS  let go and the throttle is off (braking while rolling), the steer centred (-0.35, 0.00)
 PASS  ...a centred stick is zero (the touch layer's 0.001 sentinel included)
 PASS  released, the machine brakes to rest inside 6 s (0.2 m/s)
 PASS  stick straight back from rest = reverse
-PASS  ...and the machine backs up (-3.2 m along its nose)
+PASS  ...and the machine backs up (-3.3 m along its nose)
 PASS  the stick is big and honest: the ring's edge is full lock (travel 140, ring 280), and it takes a mouse on every platform
 PASS  the nearest place to home is a TRADING POST, under 80 m (TRADING POST 57)
 PASS  the next cell east is a ROBOT PARK
@@ -91,6 +98,7 @@ PASS  ...inside the ring
 PASS  the spectator is not in the fight
 PASS  the loaded world's places carry machines (2)
 PASS  drive home and the arena's machines unload with their chunk
+PASS  the card is up before CHALLENGE
 PASS  CHALLENGE enters a fight
 PASS  ...a Quick bout, settled as a quick fight
 PASS  ...with YOU at the stick, on the AI channel, not a program (AI)
@@ -100,9 +108,9 @@ PASS  ...and the funnel hears `challenge`
 PASS  ...the stick is up for the bout
 PASS  the bell rings (Fighting)
 PASS  ...and at the bell your machine is on the AI channel the stick feeds (AI)
-      fight trace: 0.00s src AI err 0 st 0.00 thr 0.00 w 0 v 0.0 up 1.00 enemy 8.0 m | 0.25s src AI err -67 st -0.24 thr 0.35 w -161 v 0.9 up 1.00 enemy 7.3 m | 0.50s src AI err -10 st 0.14 thr 0.87 w -131 v 2.2 up 0.99 enemy 6.0 m | 0.75s src AI err 17 st 0.27 thr 0.78 w -25 v 3.6 up 0.98 enemy 4.5 m | 1.00s src AI err 8 st -0.02 thr 0.89 w 55 v 4.7 up 1.00 enemy 3.5 m | 1.25s src AI err -4 st -0.10 thr 0.95 w 24 v 6.8 up 0.98 enemy 4.2 m | 
-PASS  a held stick drives your machine in the ring (6.2 m in 1.5 s)
-PASS  ...toward the stick's heading, camera-relative, as on the map (best 0 deg off in the last 0.75 s)
+      fight trace: 0.00s src AI err 0 st 0.00 thr 0.00 w 0 v 0.0 up 1.00 enemy 8.0 m | 0.25s src AI err -64 st -0.21 thr 0.35 w -164 v 0.9 up 1.00 enemy 7.3 m | 0.50s src AI err -12 st 0.12 thr 0.85 w -129 v 2.2 up 0.99 enemy 6.1 m | 0.75s src AI err 14 st 0.28 thr 0.81 w -44 v 3.5 up 0.98 enemy 4.7 m | 1.00s src AI err -16 st -0.50 thr -0.25 w 82 v 6.4 up 0.98 enemy 4.0 m | 1.25s src AI err -12 st -0.22 thr 0.84 w -48 v 6.1 up 1.00 enemy 5.6 m | 
+PASS  a held stick drives your machine in the ring (6.3 m in 1.5 s)
+PASS  ...toward the stick's heading, camera-relative, as on the map (best 1 deg off in the last 0.75 s)
 PASS  the bout ended on its own
 PASS  ...and settled once (quickFights=1)
 PASS  the debrief's loud button reads CONTINUE EXPLORING (CONTINUE EXPLORING >)

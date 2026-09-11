@@ -6567,7 +6567,7 @@ public partial class BuilderManager : MonoBehaviour
             // BACK on top of a working one.
             if (scoutRoot != null) { if (!MobileBuilderUI.ScoutCardLive) ScoutHud(); return; }
             if (mode == Mode.Test) MobileTestHud();
-            else if (mode == Mode.Map) MapHud();
+            else if (mode == Mode.Map) { }   // the map's HUD is UGUI (MapHudUI)
             return;
         }
         // A BuilderManager that SURVIVES A DOMAIN RELOAD comes back with a null
@@ -6593,7 +6593,7 @@ public partial class BuilderManager : MonoBehaviour
         }
         if (scoutRoot != null) { ScoutHud(); return; }   // C3: scouting overlay
         if (mode == Mode.Fight) return;  // FightManager draws the fight HUD/results
-        if (mode == Mode.Map) { MapHud(); return; }
+        if (mode == Mode.Map) return;      // the map's HUD is UGUI (MapHudUI)
         if (mode == Mode.Test)
         {
             EnsureStyles();

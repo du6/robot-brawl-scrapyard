@@ -22,6 +22,7 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.UI;
 
 namespace RobotBrawl.Phase0
 {
@@ -82,6 +83,15 @@ namespace RobotBrawl.Phase0
             bm.EnterMap(); yield return null; yield return null;
             Check(bm.mode == BuilderManager.Mode.Map, "DRIVE OUT enters the yard");
             Check(RBTelemetry.Has(RBTelemetry.MAP), "...and the funnel hears `map`");
+            // ---- the HUD is UGUI, in the dock's style (MapHudUI) ---------------------
+            yield return null;
+            var hud = MapHudUI.inst;
+            Check(hud != null && GameObject.Find("map_hud_canvas") != null, "the map's HUD is a UGUI canvas, not IMGUI");
+            Check(hud != null && hud.ChipsShown >= 3 && hud.ChipText(0).StartsWith("TREASURE") && hud.ChipText(hud.ChipsShown - 1).StartsWith("HOME"),
+                  "...compass chips: TREASURE first, HOME last (" + (hud != null ? hud.ChipsShown : 0) + " chips: " + (hud != null ? hud.ChipText(0) + " | " + hud.ChipText(1) : "") + ")");
+            Check(hud != null && hud.ChipText(0).EndsWith(" m"), "...each with a distance in metres");
+            Check(hud != null && hud.GarageButton != null && hud.GarageButton.GetComponentInChildren<Text>().text == "GARAGE", "...and a GARAGE button");
+            Check(hud != null && !hud.CardShown, "...no encounter card at home");
             Check(bm.testRobot != null && !bm.testRobot.combatEnabled, "the player's machine is on the map, combat off");
             int loaded = bm.WorldChunksLoaded, want = (2 * BuilderManager.VIEW_CHUNKS + 1) * (2 * BuilderManager.VIEW_CHUNKS + 1);
             Check(loaded == want, "the world around home is loaded: " + loaded + " chunks of " + want);
@@ -165,8 +175,9 @@ namespace RobotBrawl.Phase0
             Check(Mathf.Abs(hA - hB) > 0.05f || Mathf.Abs(hA) > 0.05f, "...and the world is not (" + hA.ToString("0.0") + " m, " + hB.ToString("0.0") + " m)");
 
             // ---- 2. the seed is the date --------------------------------------
-            bm.LeaveMap(); yield return null;
+            MapHudUI.inst.GarageButton.onClick.Invoke(); yield return null;   // the BUTTON, not the seam
             Check(bm.mode == BuilderManager.Mode.Build, "GARAGE returns to the garage");
+            Check(MapHudUI.inst == null, "...and the map's HUD is gone with the map");
             Check(!bm.PlanetLookOn && !RenderSettings.fog, "...and the garage gets its own sky and no fog back");
             bm.EnterMap(); yield return null; yield return null;
             var crates2 = bm.YardCratePositions();
@@ -211,6 +222,7 @@ namespace RobotBrawl.Phase0
             bm.TeleportPlayer(parked.rb.position + new Vector3(2.5f, 0f, 0f));
             yield return null; yield return null;
             Check(bm.YardCardShown, "the card comes up within " + BuilderManager.CARD_REACH + " m of the parked bot");
+            Check(MapHudUI.inst != null && MapHudUI.inst.CardShown && MapHudUI.inst.ChallengeButton.GetComponentInChildren<Text>().text == "CHALLENGE", "...on the HUD, with a CHALLENGE button");
             Check(RBTelemetry.Has(RBTelemetry.MEET), "...and the funnel hears `meet`");
             bm.TeleportPlayer(bm.YardGarageDoor + new Vector3(0f, 0f, -6f));
             yield return null; yield return null;
@@ -384,7 +396,8 @@ namespace RobotBrawl.Phase0
             bm.TeleportPlayer(parked.rb.position + new Vector3(2.5f, 0f, 0f));
             yield return null; yield return null;
             Vector3 chalAt = bm.testRobot.rb.position;
-            bm.ChallengeParked();
+            Check(MapHudUI.inst != null && MapHudUI.inst.CardShown, "the card is up before CHALLENGE");
+            MapHudUI.inst.ChallengeButton.onClick.Invoke();   // the BUTTON, not the seam
             yield return null; yield return null;
             var fm = Object.FindFirstObjectByType<FightManager>();
             Check(bm.mode == BuilderManager.Mode.Fight && fm != null, "CHALLENGE enters a fight");
