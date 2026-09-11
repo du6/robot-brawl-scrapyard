@@ -256,31 +256,30 @@ robot, `yard bot` for ours), CHALLENGE.
 
 **Decline is free.** Drive away and the card folds. Nothing attacks you.
 
-### 3.6 The challenge, and the auto-brain
+### 3.6 The challenge — you drive
 
-Accept and the pocket arena rises where you stand: `BuildArena()` at the
-encounter's position with the camera and bounds re-clamped and the wrecks
-under the footprint lifted — or, if that fights the non-idempotent arena
-too long in week one, a cut to the standard arena and back. It is a
-**Quick bout**: 30 s, 5-s count-out, walls at −10 s, `SettleQuickFight()`
-at the bell.
+Accept and it is a **Quick bout**: 30 s, 5-s count-out, walls at −10 s,
+`SettleQuickFight()` at the bell.
 
-**No program is needed.** Both robots fight under an auto-brain chosen by
-what the build carries:
+**You drive the fight** (owen, 2026-09-10: "replace auto fight with manual
+fight"). The same stick that brought you to the encounter drives the bout,
+and FIRE works the weapon; `FightManager.playerSource` stays `Keyboard`
+and no `ProgramRunner` is put on your machine. The opponent is the game's
+`AIController`, as in every fight. One control scheme for the whole game:
+the stick, everywhere.
 
-| build carries | brain | note |
-|---|---|---|
-| compass + wall sensor (the rookie) | `RamHunter` | measured 9/10 vs SCOUT |
-| compass only | `Brawler` | needs a Compass tracker |
-| wall sensor only | `WallShy` | |
-| no sensors | `FirstSteps` | the sensor-free preset |
+**There is no program in this game.** The PROGRAM tab is deleted and the
+auto-brain that briefly drove the challenge (`BrainPick`: RamHunter /
+Brawler / WallShy / FirstSteps by the build's sensors) is deleted with it.
+Robot Brawl keeps autonomy programming; Scrapyard's depth is the build,
+the world, and your driving.
 
-**There is no program in this game** (owen, 2026-09-10). The PROGRAM tab is
-deleted; the auto-brain is the only driver, always. Robot Brawl keeps
-autonomy programming; Scrapyard's depth is the build and the world.
-
-**The player never drives in a fight.** One control scheme per screen: you
-drive on the map, the brain drives in the ring.
+*Open, from this call:* a challenge against a **pool** robot (another
+player's snapshot, §3.5) is fought here, by you, against the snapshot's
+build under the AI — so POINTS for it come from the referee of a fight the
+player drove, and the server-fought `yard` job (§7.3) becomes the path for
+challenges the player is not present for, if any. Decide when the pool
+challenge is built.
 
 ### 3.7 Rewards, points, the board
 
@@ -811,3 +810,11 @@ Nothing in M0 is blocked.
   without re-entering, arena fighters wired at each other and moved 11 m
   / 7.5 m in 1.5 s inside the ring, unloaded with their chunk),
   **TouchSmoke 57/0, QuickFightBench 24/0.**
+- **2026-09-10 — YOU DRIVE THE FIGHT (owen: "Let's replace auto fight with
+  manual fight").** `StartYardFight` no longer adds a `ProgramRunner`;
+  `playerSource` stays `Keyboard`, so the stick and FIRE that brought you
+  to the encounter drive the bout. `BrainPick`/`BrainPickTitle` deleted;
+  the card reads "you drive: stick to move, FIRE for the weapon". §3.6
+  rewritten. MapBench's CHALLENGE section now asserts the Keyboard source,
+  no ProgramRunner, the stick up, the bell, and that a held throttle moves
+  the machine >1 m in a second; the BrainPick section is gone.

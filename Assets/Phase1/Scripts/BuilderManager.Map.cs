@@ -653,7 +653,6 @@ public partial class BuilderManager
         }
         var entry = EnemyRoster.Find(oppId);
         if (entry == null) return;
-        RobotProgram autoProg = BrainPick(placed);
 
         Career.fightBuildValue = BuildValueCareer();
         var recipe = EnemyRoster.Recipe(entry.id, palette);
@@ -674,42 +673,11 @@ public partial class BuilderManager
         StartFight();
         quickNext = false;
         if (mode != Mode.Fight) { Career.quickFight = false; FightManager.quickBout = false; return; }
-        if (testRobot != null)
-        {
-            var afm = Object.FindFirstObjectByType<FightManager>();
-            if (afm != null)
-            {
-                afm.playerSource = ControlSource.Program;
-                var apr = testRobot.gameObject.AddComponent<ProgramRunner>();
-                apr.Init(testRobot, testDrive);
-                apr.program = autoProg;
-                Career.fightAutonomous = true;
-            }
-        }
+        // YOU DRIVE (owen, 2026-09-10: "replace auto fight with manual fight").
+        // FightManager.playerSource stays Keyboard - the stick and FIRE that
+        // drove you here drive the bout. No ProgramRunner, no auto-brain.
     }
 
-    /// <summary>THE AUTO-BRAIN (design §3.6): chosen by what the build carries,
-    /// and validated against it, so "needs a Wall sensor" never fires here.
-    /// There is no program in this game; this is the only driver.</summary>
-    public static RobotProgram BrainPick(List<PlacedPart> build)
-    {
-        var ids = new List<string>();
-        bool compass = false, wall = false;
-        foreach (var p in build)
-        {
-            ids.Add(p.def.id);
-            if (p.def.id == "compass") compass = true;
-            if (p.def.id == "wallsensor") wall = true;
-        }
-        RobotProgram pick = compass && wall ? RobotProgram.RamHunter()
-                          : compass        ? RobotProgram.Brawler()
-                          : wall           ? RobotProgram.WallShy()
-                                           : RobotProgram.FirstSteps();
-        if (pick.Validate(ids) != null) pick = RobotProgram.FirstSteps();
-        if (pick.Validate(ids) != null) pick = RobotProgram.Statue();
-        return pick;
-    }
-    public string BrainPickTitle { get { var p = BrainPick(placed); return p != null ? p.title : ""; } }
 
     // ------------------------------------------------------------ the HUD
     void MapHud()
@@ -775,7 +743,7 @@ public partial class BuilderManager
                       (entry != null ? entry.label + "   ·   " + entry.tier.ToString().ToUpper() : cardBot.name), hs);
             var cs = new GUIStyle(GUI.skin.label); cs.fontSize = 13; cs.alignment = TextAnchor.MiddleCenter;
             cs.normal.textColor = new Color(0.75f, 0.80f, 0.88f);
-            GUI.Label(new Rect(box.x, box.y + 32f, box.width, 20f), "30-second bout  ·  your machine drives itself (" + BrainPickTitle + ")  ·  drive away to decline", cs);
+            GUI.Label(new Rect(box.x, box.y + 32f, box.width, 20f), "30-second bout  ·  you drive: stick to move, FIRE for the weapon  ·  drive away to decline", cs);
             GUI.skin.button.fontSize = 18;
             challenge = GUI.Button(new Rect(box.x + 24f, box.y + 58f, box.width - 48f, 44f), "CHALLENGE");
             GUI.skin.button.fontSize = fs;

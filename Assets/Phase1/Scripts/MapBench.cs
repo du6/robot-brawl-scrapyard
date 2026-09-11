@@ -9,9 +9,11 @@
 //   3. a crate opens once, where it stands, and pays (editor: the grant is
 //      immediate); it does not respawn on re-entry the same day;
 //   4. the encounter card comes up within reach and folds when you leave;
-//   5. CHALLENGE enters a Quick bout with the auto-brain driving, settles as
-//      a quick fight, and the garage is where you land after the bell;
-//   6. BrainPick chooses by the build, and always validates.
+//   5. CHALLENGE enters a Quick bout that YOU drive (stick, not a program),
+//      settles as a quick fight, and the garage is where you land after the
+//      bell;
+//   6. PLACES: the fixed three near home, flat ground, the shop pad, the
+//      arena that fights itself.
 //
 // OWNER STATE IS SACRED: Career.Data is swapped for a fresh career, autosave
 // is held (counted), and everything is restored. Run: BatchSmoke.Map.
@@ -56,7 +58,7 @@ namespace RobotBrawl.Phase0
             var d = Career.Data;
             d.taskFight = d.taskBolt = d.taskWeld = d.taskBuy = true; d.rescueGranted = true; d.guideDone = true;
             d.stable.Add(new CareerRobot { name = "SCRAPPER", snapshot = BuilderManager.STARTER_SNAPSHOT,
-                                           program = "" });   // NO saved program: the auto-brain must drive
+                                           program = "" });   // NO saved program: nothing here needs one
             d.activeRobot = 0;
             d.worldSeed = 4242;   // one world, every run - a rolled seed made the crate layout a coin flip
             Career.TopUpForSnapshot(BuilderManager.STARTER_SNAPSHOT);
@@ -212,14 +214,6 @@ namespace RobotBrawl.Phase0
             Phase0Input.debugThrottle = 0f; Phase0Input.debugSteer = 0f;
             for (int i = 0; i < 30; i++) yield return null;
 
-            // ---- 6. the auto-brain, before the fight uses it ----------------------
-            Check(BuilderManager.BrainPick(bm.placed).title == "Ram Hunter", "SCRAPPER (compass + wall sensor) gets Ram Hunter");
-            var bare = new List<BuilderManager.PlacedPart>();
-            foreach (var pp in bm.placed) if (pp.def.id != "compass" && pp.def.id != "wallsensor") bare.Add(pp);
-            var bp = BuilderManager.BrainPick(bare);
-            var bareIds = new List<string>(); foreach (var pp in bare) bareIds.Add(pp.def.id);
-            Check(bp.title == "First Steps" && bp.Validate(bareIds) == null, "no sensors gets First Steps, and it validates (" + bp.title + ")");
-
             // ---- 6. PLACES -----------------------------------------------------------
             // owen, 2026-09-10: "it looks like a desert with some cubes ... can we
             // add buildings, shops, robot parks, toys, arenas with robots fighting
@@ -305,9 +299,26 @@ namespace RobotBrawl.Phase0
             var fm = Object.FindFirstObjectByType<FightManager>();
             Check(bm.mode == BuilderManager.Mode.Fight && fm != null, "CHALLENGE enters a fight");
             Check(FightManager.quickBout && Career.quickFight, "...a Quick bout, settled as a quick fight");
-            Check(fm != null && fm.playerSource == ControlSource.Program, "...with the auto-brain driving, not the stick");
+            // owen, 2026-09-10: "replace auto fight with manual fight" - the
+            // player's side is the stick, and no program sits on the robot.
+            Check(fm != null && fm.playerSource == ControlSource.Keyboard, "...with YOU at the stick, not a program (" + (fm != null ? fm.playerSource.ToString() : "-") + ")");
+            Check(bm.testRobot != null && bm.testRobot.GetComponent<ProgramRunner>() == null, "...and no ProgramRunner on your machine");
             Check(bm.opponentId == BuilderManager.YARD_BOT, "...against the parked bot (" + bm.opponentId + ")");
             Check(RBTelemetry.Has(RBTelemetry.CHALLENGE), "...and the funnel hears `challenge`");
+            Check(TouchControls.fightActive, "...the stick is up for the bout");
+            // the stick actually drives: wait for the bell, hold the throttle
+            // a second, and the machine has moved. Control leg: released, the
+            // next second moves it much less.
+            float bellBy = Time.realtimeSinceStartup + 8f;
+            while (fm != null && fm.state == FightManager.State.Settling && Time.realtimeSinceStartup < bellBy) yield return null;
+            Check(fm != null && fm.state == FightManager.State.Fighting, "the bell rings (" + (fm != null ? fm.state.ToString() : "-") + ")");
+            Check(bm.testRobot != null && bm.testRobot.controlSource == ControlSource.Keyboard, "...and at the bell your machine takes the keyboard/stick source (" + (bm.testRobot != null ? bm.testRobot.controlSource.ToString() : "-") + ")");
+            Vector3 f0 = bm.testRobot != null ? bm.testRobot.rb.position : Vector3.zero;
+            Phase0Input.debugThrottle = 1f; Phase0Input.debugSteer = 0f;
+            for (int i = 0; i < 60; i++) yield return null;
+            float drove = bm.testRobot != null ? Vector3.Distance(bm.testRobot.rb.position, f0) : 0f;
+            Phase0Input.debugThrottle = 0f;
+            Check(drove > 1.0f, "a held throttle drives your machine in the ring (" + drove.ToString("0.0") + " m in 1 s)");
             Time.timeScale = 4f;
             float deadline = Time.realtimeSinceStartup + 40f;
             while (fm != null && fm.state != FightManager.State.Ended && Time.realtimeSinceStartup < deadline) yield return null;

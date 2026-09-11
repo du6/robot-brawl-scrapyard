@@ -41,15 +41,13 @@ PASS  ...and you are on the ground there (y -0.8 vs ground -1.0)
 PASS  the card comes up within 4 m of the parked bot
 PASS  ...and the funnel hears `meet`
 PASS  drive away and the card folds - decline is free
-      trace: 4.8s yaw 0 steer 0.00 thr 0.00 v 0.2 | 5.2s yaw 0 steer -0.01 thr 1.00 v 2.4 | 5.6s yaw 0 steer 0.00 thr 1.00 v 5.3 | 6.0s yaw 0 steer 0.00 thr 1.00 v 6.4 | 6.4s yaw 0 steer 0.00 thr 1.00 v 6.3 | 
-PASS  full throttle for 2 s moves the machine (9.7 m)
+      trace: 4.8s yaw 0 steer 0.00 thr 0.00 v 0.2 | 5.2s yaw 0 steer -0.01 thr 1.00 v 2.4 | 5.6s yaw 0 steer 0.00 thr 1.00 v 5.1 | 6.0s yaw 0 steer 0.00 thr 1.00 v 6.4 | 6.4s yaw 0 steer 0.00 thr 1.00 v 6.3 | 
+PASS  full throttle for 2 s moves the machine (9.5 m)
 PASS  ...and with the stick inside the dead zone it holds its heading (0.1 deg)
 PASS  ...the dead zone reads as zero stick; only the heading hold steers (0.00)
 PASS  a held full stick still turns it (18 deg in 1.5 s)
 PASS  ...at no more than the map's gain (0.45)
 PASS  the stick is big and honest: the ring's edge is full lock (travel 140, ring 280), and it takes a mouse on every platform
-PASS  SCRAPPER (compass + wall sensor) gets Ram Hunter
-PASS  no sensors gets First Steps, and it validates (First Steps)
 PASS  the nearest place to home is a TRADING POST, under 80 m (TRADING POST 57)
 PASS  the next cell east is a ROBOT PARK
 PASS  the next cell north is an ARENA
@@ -68,16 +66,21 @@ PASS  leave the pad and return: the door works again
 PASS  by the stands the compass names the ARENA (ARENA)
 PASS  the arena holds two machines (2)
 PASS  ...each driven by an AIController aimed at the other, combat armed
-PASS  ...and they fight: a machine moved in 1.5 s (11.0 m, 7.5 m)
+PASS  ...and they fight: a machine moved in 1.5 s (11.3 m, 7.3 m)
 PASS  ...inside the ring
 PASS  the spectator is not in the fight
 PASS  the loaded world's places carry machines (2)
 PASS  drive home and the arena's machines unload with their chunk
 PASS  CHALLENGE enters a fight
 PASS  ...a Quick bout, settled as a quick fight
-PASS  ...with the auto-brain driving, not the stick
+PASS  ...with YOU at the stick, not a program (Keyboard)
+PASS  ...and no ProgramRunner on your machine
 PASS  ...against the parked bot (scout)
 PASS  ...and the funnel hears `challenge`
+PASS  ...the stick is up for the bout
+PASS  the bell rings (Fighting)
+PASS  ...and at the bell your machine takes the keyboard/stick source (Keyboard)
+PASS  a held throttle drives your machine in the ring (4.6 m in 1 s)
 PASS  the bout ended on its own
 PASS  ...and settled once (quickFights=1)
 PASS  after the bell, the garage
