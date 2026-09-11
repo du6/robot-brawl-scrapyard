@@ -1495,6 +1495,7 @@ public class MobileBuilderUI : MonoBehaviour
     // BuilderManager's derived accounting; -1 means unlimited (career off).
     int careerSeenPlaced = -1;
     string careerSeenMat = "";
+    int careerSeenInvSeq = -1;   // a purchase, a sale, a grant: the tiles and their badges follow (Career.inventorySeq)
     bool careerSeenActive;
     string PartTileText(int i)
     {
@@ -5091,8 +5092,9 @@ public class MobileBuilderUI : MonoBehaviour
         // tracks active, not FreeParts, so it would miss draft entirely).
         if ((!Career.active || Career.FreeParts) != paletteSeenShowAll) ArrangePalette();
         if (Career.active != careerSeenActive
-            || (Career.active && (careerSeenPlaced != bm.PlacedCount || careerSeenMat != bm.ActiveMatKey)))
+            || (Career.active && (careerSeenPlaced != bm.PlacedCount || careerSeenMat != bm.ActiveMatKey || careerSeenInvSeq != Career.inventorySeq)))
         {
+            careerSeenInvSeq = Career.inventorySeq;
             bool placedMore = Career.active && careerSeenPlaced >= 0 && bm.PlacedCount > careerSeenPlaced;
             careerSeenActive = Career.active;
             careerSeenPlaced = bm.PlacedCount;

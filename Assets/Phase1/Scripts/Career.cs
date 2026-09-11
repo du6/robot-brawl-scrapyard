@@ -674,8 +674,16 @@ public static class Career
         return 0;
     }
 
+    /// <summary>Bumped by every inventory mutation, so a UI can repaint what it
+    /// owns without a gesture to hang it on. owen, 2026-09-10: "I bought a long
+    /// beam ... it is not immediately available in my build package" - the BUILD
+    /// palette only re-arranged on a placed-count / material / career change,
+    /// and a purchase is none of those.</summary>
+    public static int inventorySeq;
+
     public static void AddItem(string partId, string mat, int n)
     {
+        inventorySeq++;
         foreach (var it in Data.inventory)
             if (it.partId == partId && it.mat == mat) { it.count += n; return; }
         Data.inventory.Add(new CareerItem { partId = partId, mat = mat, count = n });
@@ -688,6 +696,7 @@ public static class Career
             {
                 if (it.count < n) return false;
                 it.count -= n;
+                inventorySeq++;
                 return true;
             }
         return false;

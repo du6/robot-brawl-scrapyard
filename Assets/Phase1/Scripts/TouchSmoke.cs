@@ -476,6 +476,25 @@ public class TouchSmoke : MonoBehaviour
         Tap("UNDO"); yield return null; yield return null;
         Check(bm.PlacedCount == nc && bm.CareerRemaining(bi) == 1,
               "career: undo returns the part to stock");
+        // owen, 2026-09-10: "I bought a long beam ... not immediately available
+        // in my build package". A purchase must show on the BUILD palette at
+        // once - the tile appears and its badge reads 1 free - with nothing
+        // placed or removed in between.
+        {
+            var longBefore = Btn("Long beam");
+            bool hiddenBefore = longBefore == null || !longBefore.gameObject.activeInHierarchy;
+            Career.AddItem("beamlong", "Aluminum", 1);   // TryBuy's mutator (scrap aside)
+            yield return null; yield return null;
+            var longAfter = Btn("Long beam");
+            bool shown = longAfter != null && longAfter.gameObject.activeInHierarchy;
+            string badge = longAfter != null ? longAfter.GetComponentInChildren<Text>().text.Replace("\n", " / ") : "(no tile)";
+            Check(hiddenBefore && shown, "buy a part you did not own and its tile appears on BUILD at once, nothing placed (hidden before " + hiddenBefore + ", shown after " + shown + ")");
+            Check(shown && badge.Contains(" 1 free"), "...with its badge reading 1 free (" + badge + ")");
+            Check(Career.TryConsume("beamlong", "Aluminum", 1), "(sell it back)");
+            yield return null; yield return null;
+            var longGone = Btn("Long beam");
+            Check(longGone == null || !longGone.gameObject.activeInHierarchy, "...and selling the last one hides the tile again at once");
+        }
         Career.active = false;
         Career.Data = savedCareer;
         yield return null;
