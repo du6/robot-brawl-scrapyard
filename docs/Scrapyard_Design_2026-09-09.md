@@ -147,18 +147,35 @@ new fight, gangs, real-time anything, a second server.
 
 ## 3. The design
 
-### 3.1 The first minute
+### 3.1 The first minute — led, not explained
 
-Boot lands in the **garage**: the rookie on the turntable, dock closed,
-one loud button, DRIVE OUT. The door opens; the stick appears under the
-thumb; the first crate is **eight metres away, in view**. The first
-encounter is parked thirty metres past it, facing away, and it is **SCOUT,
-not another rookie** — see §10 on mirror lock.
+Boot lands **on the map**, at home, the rookie under the stick; the first
+crate is **eight metres away, in view**, the first encounter parked thirty
+metres past it (**SCOUT**, not another rookie — see §10 on mirror lock),
+the trading post 57 m out.
+
+**A stranger does the loop without thinking** (2026-09-10, after the
+CrazyGames rejection): the save carries `yardStep`, and until the loop is
+done three things point at the current objective —
+an **objective line** under the compass bar ("NEXT · drive into the
+treasure chest"), the matching **compass chip highlighted**, and a **cyan
+ring and beam** standing on the objective in the world.
+
+| step | objective line | marker on |
+|---|---|---|
+| 0 | drive into the treasure chest | the nearest chest |
+| 1 | find the parked robot | the nearest parked machine |
+| 2 | tap CHALLENGE — you drive the bout | (the card is up) |
+| 3 | drive onto the trading post's lit pad | the nearest pad |
+| 4 | *(nothing — the world is yours)* | — |
+
+Steps only advance, so a player who finds the pad before the challenge is
+never sent back. Measured (MapBench): the objective, chip and marker at
+every step, the save at 4 after the pad, no line and no marker after.
 
 The rookie is Robot Brawl's `STARTER_SNAPSHOT` (core, two beams, four
-wheels, battery, spike, compass, wall sensor). It is a proven fighter
-(`StarterBench`, 9/10 vs SCOUT under RamHunter) and its sensors are what
-make the auto-brain good; a new game does not need a new rookie.
+wheels, battery, spike, compass, wall sensor). A new game does not need a
+new rookie.
 
 Target, from the funnel: a new player opens a crate within 30 s of `map`
 and finishes a fight within 3 minutes.
@@ -917,3 +934,10 @@ Nothing in M0 is blocked.
   road's crown at 1.00 and open ground 30 m beside it, 342 scatter props
   over 25 chunks batched, a pool in the nearest big crater between floor
   and rim).
+- **2026-09-10 — THE CRAZYGAMES PLAN, steps 2 and 1.** After the "overall
+  quality" rejection: (2) the map's HUD is UGUI in the dock's style
+  (`MapHudUI`: compass chips with drawn needles, GARAGE, banner/toast, the
+  encounter card; the IMGUI HUD deleted; MapBench fires the buttons'
+  onClicks). (1) the guided first minute — `yardStep`, the objective line,
+  the highlighted chip, the ring-and-beam marker (§3.1). **Measured:
+  MapBench 127/0, TouchSmoke 61/0.**

@@ -400,6 +400,7 @@ public static class CareerDB
     /// they never respawn.</summary>
     public int worldSeed;
     public List<string> worldOpened = new List<string>();
+    public int yardStep;              // the first minute: 0 chest, 1 meet, 2 challenge, 3 the trading post, 4 explore
     public int fights; public int fightWins; public int sessions;   // telemetry
     public int tutorialStep;
     /// <summary>C4: index into stable of the robot being edited; -1 = none.</summary>

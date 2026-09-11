@@ -92,6 +92,15 @@ namespace RobotBrawl.Phase0
             Check(hud != null && hud.ChipText(0).EndsWith(" m"), "...each with a distance in metres");
             Check(hud != null && hud.GarageButton != null && hud.GarageButton.GetComponentInChildren<Text>().text == "GARAGE", "...and a GARAGE button");
             Check(hud != null && !hud.CardShown, "...no encounter card at home");
+            Check(hud != null && hud.ChipHasDrawnNeedle(0), "...the needle is drawn, not a glyph (a glyph rendered as nothing on the web)");
+            float needle0 = hud != null ? hud.ChipNeedleDeg(0) : 0f, want0 = Mathf.Repeat(-bm.HudModel().compass[0].angle, 360f);
+            Check(hud != null && Mathf.Abs(Mathf.DeltaAngle(needle0, want0)) < 1f, "...and it points at the bearing (" + needle0.ToString("0") + " vs " + want0.ToString("0") + ")");
+            // ---- the first minute: objective line, chip, marker (CrazyGames step 1) ----
+            Check(bm.YardStep == BuilderManager.STEP_CHEST && hud != null && hud.ObjectiveText.Contains("chest"), "a fresh career's first objective is the chest (" + (hud != null ? hud.ObjectiveText : "") + ")");
+            Check(hud != null && hud.ChipHighlighted(0), "...the TREASURE chip is highlighted");
+            var crates0 = bm.YardCratePositions();
+            Check(bm.ObjectiveMarkerShown && crates0.Count > 0 && Vector2.Distance(new Vector2(bm.ObjectiveMarkerPos.x, bm.ObjectiveMarkerPos.z), new Vector2(crates0[0].x, crates0[0].z)) < 0.5f,
+                  "...and a ring and beam stand on the nearest chest");
             Check(bm.testRobot != null && !bm.testRobot.combatEnabled, "the player's machine is on the map, combat off");
             int loaded = bm.WorldChunksLoaded, want = (2 * BuilderManager.VIEW_CHUNKS + 1) * (2 * BuilderManager.VIEW_CHUNKS + 1);
             Check(loaded == want, "the world around home is loaded: " + loaded + " chunks of " + want);
@@ -205,6 +214,12 @@ namespace RobotBrawl.Phase0
             if (thumb != null) Object.Destroy(thumb); if (coinsTex != null) Object.Destroy(coinsTex);
             Check(GameObject.Find("reward_studio") == null, "...and the studio is torn down after the photograph");
             Check(d.worldOpened.Count == 1 && d.worldOpened[0].Contains(":"), "...and the save remembers which crate, by chunk (" + d.worldOpened[0] + ")");
+            yield return null;
+            Check(bm.YardStep == BuilderManager.STEP_MEET && MapHudUI.inst.ObjectiveText.Contains("parked robot"), "the chest opened: the objective moves to the parked robot (" + MapHudUI.inst.ObjectiveText + ")");
+            var en0 = bm.YardParked;
+            Check(en0 != null && bm.ObjectiveMarkerShown && Vector2.Distance(new Vector2(bm.ObjectiveMarkerPos.x, bm.ObjectiveMarkerPos.z), new Vector2(en0.rb.position.x, en0.rb.position.z)) < 0.5f,
+                  "...and the marker stands on it");
+            Check(MapHudUI.inst.ChipHighlighted(1), "...with the enemy's chip highlighted");
             bm.LeaveMap(); yield return null;
             bm.EnterMap(); yield return null; yield return null;
             Check(bm.YardCratesLeft == before - 1, "an opened crate never respawns (" + bm.YardCratesLeft + ")");
@@ -223,6 +238,7 @@ namespace RobotBrawl.Phase0
             yield return null; yield return null;
             Check(bm.YardCardShown, "the card comes up within " + BuilderManager.CARD_REACH + " m of the parked bot");
             Check(MapHudUI.inst != null && MapHudUI.inst.CardShown && MapHudUI.inst.ChallengeButton.GetComponentInChildren<Text>().text == "CHALLENGE", "...on the HUD, with a CHALLENGE button");
+            Check(bm.YardStep == BuilderManager.STEP_CHALLENGE && MapHudUI.inst.ObjectiveText.Contains("CHALLENGE"), "the card came up: the objective says tap CHALLENGE (" + MapHudUI.inst.ObjectiveText + ")");
             Check(RBTelemetry.Has(RBTelemetry.MEET), "...and the funnel hears `meet`");
             bm.TeleportPlayer(bm.YardGarageDoor + new Vector3(0f, 0f, -6f));
             yield return null; yield return null;
@@ -354,8 +370,10 @@ namespace RobotBrawl.Phase0
             Check(bm.mode == BuilderManager.Mode.Map, "9 m short of the pad, still on the map");
             bm.TeleportPlayer(new Vector3(pad0.x, 0f, pad0.z)); for (int i = 0; i < 4; i++) yield return null;
             Check(bm.mode == BuilderManager.Mode.Build && bm.LastShopOpened, "drive onto the pad and the workshop opens (" + bm.mode + ")");
+            Check(d.yardStep == BuilderManager.STEP_EXPLORE, "...the first minute is done and the save says so (step " + d.yardStep + ")");
             if (MobileBuilderUI.inst != null) Check(MobileBuilderUI.inst.Tab == 3 && MobileBuilderUI.inst.DockOpen, "...on the SHOP tab, dock open (tab " + MobileBuilderUI.inst.Tab + ")");
             bm.EnterMap(); for (int i = 0; i < 8; i++) yield return null;
+            Check(MapHudUI.inst != null && MapHudUI.inst.ObjectiveText == "" && !bm.ObjectiveMarkerShown, "...no objective line, no marker: the world is yours");
             Vector3 back = bm.testRobot.rb.position;
             Check(bm.mode == BuilderManager.Mode.Map && Vector2.Distance(new Vector2(back.x, back.z), new Vector2(pad0.x, pad0.z)) < 3f, "DRIVE OUT puts you back at the pad, not home (" + Vector2.Distance(new Vector2(back.x, back.z), new Vector2(pad0.x, pad0.z)).ToString("0.0") + " m)");
             Check(bm.mode == BuilderManager.Mode.Map, "...and standing on the pad does not walk you straight back in");

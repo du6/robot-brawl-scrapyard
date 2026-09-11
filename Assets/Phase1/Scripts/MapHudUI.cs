@@ -29,7 +29,9 @@ public class MapHudUI : MonoBehaviour
     Text toast, banner, cardTitle, cardSub;
     Button garage, challenge;
     static Font font;
-    class Chip { public GameObject go; public Text needle, label, dist; public RectTransform needleRt; }
+    class Chip { public GameObject go; public Image panel, needleBar, needleTip; public Text label, dist; public RectTransform needleRt; }
+    public static readonly Color PANEL_HI = new Color(0.26f, 0.32f, 0.42f, 0.98f);   // the objective's chip
+    Text objective;
 
     // bench seams
     public Button GarageButton { get { return garage; } }
@@ -38,6 +40,9 @@ public class MapHudUI : MonoBehaviour
     public int ChipsShown { get { int n = 0; foreach (var c in chips) if (c.go.activeSelf) n++; return n; } }
     public string ChipText(int i) { return i < chips.Count && chips[i].go.activeSelf ? chips[i].label.text + " " + chips[i].dist.text : ""; }
     public float ChipNeedleDeg(int i) { return i < chips.Count ? chips[i].needleRt.localEulerAngles.z : 0f; }
+    public bool ChipHasDrawnNeedle(int i) { return i < chips.Count && chips[i].needleBar != null && chips[i].needleBar.sprite == null && chips[i].needleTip != null; }
+    public bool ChipHighlighted(int i) { return i < chips.Count && chips[i].panel.color == PANEL_HI; }
+    public string ObjectiveText { get { return objective != null && objective.gameObject.activeSelf ? objective.text : ""; } }
     public string ToastText { get { return toast != null && toast.gameObject.activeSelf ? toast.text : ""; } }
     public string BannerText { get { return banner != null && banner.gameObject.activeSelf ? banner.text : ""; } }
 
@@ -106,6 +111,14 @@ public class MapHudUI : MonoBehaviour
         var trt = toast.rectTransform; trt.anchorMin = new Vector2(0f, 1f); trt.anchorMax = new Vector2(1f, 1f); trt.pivot = new Vector2(0.5f, 1f);
         trt.anchoredPosition = new Vector2(0f, -8f - ROW - 6f); trt.sizeDelta = new Vector2(-32f, 32f);
         AddShadow(toast.gameObject); AddShadow(banner.gameObject);
+        // the objective: what to do next, right under the bar (the first minute)
+        objective = MkText("objective", root, "", 19, TextAnchor.MiddleCenter);
+        objective.fontStyle = FontStyle.Bold; objective.color = AMBER;
+        var ort = objective.rectTransform; ort.anchorMin = new Vector2(0f, 1f); ort.anchorMax = new Vector2(1f, 1f); ort.pivot = new Vector2(0.5f, 1f);
+        ort.anchoredPosition = new Vector2(0f, -8f - ROW - 6f); ort.sizeDelta = new Vector2(-32f, 30f);
+        AddShadow(objective.gameObject);
+        // the banner and the toast sit a row lower when there is an objective
+        objective.gameObject.SetActive(false);
 
         // the encounter card, bottom centre
         card = MkPanel("card", root, PANEL).GetComponent<RectTransform>();
@@ -131,12 +144,25 @@ public class MapHudUI : MonoBehaviour
         var c = new Chip();
         c.go = MkPanel("chip_" + i, chipsRow, PANEL);
         var le = c.go.AddComponent<LayoutElement>(); le.preferredWidth = 170f; le.minWidth = 120f;
-        // the needle: a triangle glyph if the font has one, a caret if not, rotated to the bearing
-        string glyph = Fnt() != null && Fnt().HasCharacter('▲') ? "▲" : "^";
-        c.needle = MkText("needle", c.go.transform, glyph, 20, TextAnchor.MiddleCenter);
-        c.needleRt = c.needle.rectTransform;
-        c.needleRt.anchorMin = new Vector2(0f, 0.5f); c.needleRt.anchorMax = new Vector2(0f, 0.5f); c.needleRt.pivot = new Vector2(0.5f, 0.5f);
-        c.needleRt.anchoredPosition = new Vector2(18f, 0f); c.needleRt.sizeDelta = new Vector2(28f, 28f);
+        c.panel = c.go.GetComponent<Image>();
+        // the needle is DRAWN - a bar from the centre with a bright tip -
+        // rotated to the bearing. A glyph (U+25B2) rendered as nothing in the
+        // web build: the font has no such character and WebGL has no OS
+        // fallback to borrow one from (live, 2026-09-10).
+        var pivot = new GameObject("needle", typeof(RectTransform)).GetComponent<RectTransform>();
+        pivot.SetParent(c.go.transform, false);
+        pivot.anchorMin = new Vector2(0f, 0.5f); pivot.anchorMax = new Vector2(0f, 0.5f); pivot.pivot = new Vector2(0.5f, 0.5f);
+        pivot.anchoredPosition = new Vector2(18f, 0f); pivot.sizeDelta = new Vector2(28f, 28f);
+        c.needleRt = pivot;
+        var bar = MkPanel("bar", pivot, Color.white); c.needleBar = bar.GetComponent<Image>(); c.needleBar.raycastTarget = false;
+        var brt = bar.GetComponent<RectTransform>(); brt.anchorMin = brt.anchorMax = new Vector2(0.5f, 0.5f); brt.pivot = new Vector2(0.5f, 0f);
+        brt.anchoredPosition = new Vector2(0f, -3f); brt.sizeDelta = new Vector2(3f, 14f);
+        var tip = MkPanel("tip", pivot, Color.white); c.needleTip = tip.GetComponent<Image>(); c.needleTip.raycastTarget = false;
+        var trt2 = tip.GetComponent<RectTransform>(); trt2.anchorMin = trt2.anchorMax = new Vector2(0.5f, 0.5f); trt2.pivot = new Vector2(0.5f, 0.5f);
+        trt2.anchoredPosition = new Vector2(0f, 11f); trt2.sizeDelta = new Vector2(7f, 7f); trt2.localRotation = Quaternion.Euler(0f, 0f, 45f);
+        var dot = MkPanel("dot", pivot, new Color(1f, 1f, 1f, 0.35f)); dot.GetComponent<Image>().raycastTarget = false;
+        var drt2 = dot.GetComponent<RectTransform>(); drt2.anchorMin = drt2.anchorMax = new Vector2(0.5f, 0.5f); drt2.pivot = new Vector2(0.5f, 0.5f);
+        drt2.anchoredPosition = Vector2.zero; drt2.sizeDelta = new Vector2(5f, 5f);
         c.label = MkText("label", c.go.transform, "", 15, TextAnchor.MiddleLeft); c.label.fontStyle = FontStyle.Bold;
         var lr = c.label.rectTransform; lr.anchorMin = new Vector2(0f, 0.5f); lr.anchorMax = new Vector2(1f, 1f); lr.pivot = new Vector2(0f, 1f);
         lr.anchoredPosition = new Vector2(36f, -2f); lr.sizeDelta = new Vector2(-40f, 0f);
@@ -171,9 +197,17 @@ public class MapHudUI : MonoBehaviour
             var e = m.compass[i];
             chips[i].label.text = e.label; chips[i].label.color = e.tint;
             chips[i].dist.text = Mathf.RoundToInt(e.dist) + " m";
-            chips[i].needle.color = e.tint;
+            chips[i].needleBar.color = e.tint; chips[i].needleTip.color = e.tint;
             chips[i].needleRt.localRotation = Quaternion.Euler(0f, 0f, -e.angle);   // + = to the right = clockwise
+            bool hi = i == m.objectiveChip;
+            chips[i].panel.color = hi ? PANEL_HI : PANEL;
         }
+        bool hasObj = !string.IsNullOrEmpty(m.objective);
+        if (objective.gameObject.activeSelf != hasObj) objective.gameObject.SetActive(hasObj);
+        if (hasObj) objective.text = m.objective;
+        float under = -8f - row - 6f - (hasObj ? 30f : 0f);
+        toast.rectTransform.anchoredPosition = new Vector2(0f, under);
+        banner.rectTransform.anchoredPosition = new Vector2(0f, under);
         bool hasToast = !string.IsNullOrEmpty(m.toast);
         if (toast.gameObject.activeSelf != hasToast) toast.gameObject.SetActive(hasToast);
         if (hasToast) toast.text = m.toast;

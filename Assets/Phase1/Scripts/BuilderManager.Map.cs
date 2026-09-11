@@ -463,6 +463,7 @@ public partial class BuilderManager
         MapHudUI.Drop();
         if (testRobot != null) { lastMapPos = testRobot.rb.position; lastMapYaw = testRobot.transform.eulerAngles.y; resumeSeed = worldSeed; hasResume = true; }
         DropCamPivot();
+        objectiveMarker = null;                                 // swept with the world root
         farRoot = null; farGround = null; landmarks.Clear();   // swept with the world root
         chunks.Clear();
         cardBot = null; cardBotId = ""; yardCard = false;
@@ -508,6 +509,7 @@ public partial class BuilderManager
         Vector3 me = testRobot.rb.position;
         PumpChunks(me);
         PumpFar(me);
+        PumpObjective(me);
         MapSteer();
         PlaceSkyBodies();
         PumpArenas();
@@ -540,7 +542,7 @@ public partial class BuilderManager
         // the encounter card: the nearest enemy within reach
         var near = NearestEnemy(me);
         bool show = near != null && (near.rb.position - me).sqrMagnitude < CARD_REACH * CARD_REACH;
-        if (show && !yardCard) RBTelemetry.Once(RBTelemetry.MEET);
+        if (show && !yardCard) { RBTelemetry.Once(RBTelemetry.MEET); AdvanceYardStep(STEP_CHALLENGE); }
         yardCard = show;
         cardBot = show ? near : null;
         cardBotId = show ? EnemyIdOf(near) : "";
@@ -587,6 +589,7 @@ public partial class BuilderManager
         if (Career.autosave) Career.Save();
         yardToast = "TREASURE  ·  " + string.Join("  ·  ", lines);
         yardToastT = 3.5f;
+        AdvanceYardStep(STEP_MEET);
         SfxSynth.Place();
         RBTelemetry.Once(RBTelemetry.CRATE);
     }
@@ -643,6 +646,7 @@ public partial class BuilderManager
         Progression.activeRungIndex = -1;
         Progression.activeChallengeIdx = -1;
         quickNext = true;
+        AdvanceYardStep(STEP_SHOP);
         RBTelemetry.Once(RBTelemetry.CHALLENGE);
         RBTelemetry.Once(RBTelemetry.QUICK);
         StartFight();
@@ -668,15 +672,97 @@ public partial class BuilderManager
         public readonly List<HudEntry> compass = new List<HudEntry>();
         public string toast = "", banner = "";
         public bool card; public string cardTitle = "", cardSub = "";
+        public string objective = ""; public int objectiveChip = -1;
     }
     readonly MapHudModel hudModel = new MapHudModel();
+
+    // ---- THE FIRST MINUTE (CrazyGames plan, step 1). A stranger must do the
+    // loop without thinking: the objective line says what, the highlighted
+    // chip says which way, the ring and beam in the world say where.
+    public const int STEP_CHEST = 0, STEP_MEET = 1, STEP_CHALLENGE = 2, STEP_SHOP = 3, STEP_EXPLORE = 4;
+    public int YardStep { get { return Career.Data != null ? Career.Data.yardStep : STEP_EXPLORE; } }
+    GameObject objectiveMarker; Vector3 objectivePos; bool objectiveHas;
+    public bool ObjectiveMarkerShown { get { return objectiveMarker != null && objectiveMarker.activeSelf; } }
+    public Vector3 ObjectiveMarkerPos { get { return objectiveMarker != null ? objectiveMarker.transform.position : Vector3.zero; } }
+    /// <summary>Steps only advance (max), so a player who does things out of
+    /// order - the pad before the challenge - is never asked to go back.</summary>
+    void AdvanceYardStep(int reached)
+    {
+        if (Career.Data == null || Career.Data.yardStep >= reached) return;
+        Career.Data.yardStep = reached;
+        if (Career.autosave) Career.Save();
+    }
+    static string ObjectiveLine(int step)
+    {
+        switch (step)
+        {
+            case STEP_CHEST:     return "NEXT  ·  drive into the treasure chest";
+            case STEP_MEET:      return "NEXT  ·  find the parked robot";
+            case STEP_CHALLENGE: return "NEXT  ·  tap CHALLENGE - you drive the bout";
+            case STEP_SHOP:      return "NEXT  ·  drive onto the trading post's lit pad";
+            default:             return "";
+        }
+    }
+    /// <summary>Where the objective is this frame (a crate, the parked
+    /// machine, a shop pad), and the chip that points at it.</summary>
+    void PumpObjective(Vector3 me)
+    {
+        int step = YardStep;
+        objectiveHas = false; int chip = -1;
+        if (step == STEP_CHEST)
+        {
+            float best = float.MaxValue;
+            foreach (var c in chunks.Values) foreach (var g in c.crates) if (g != null)
+            { float d = (g.transform.position - me).sqrMagnitude; if (d < best) { best = d; objectivePos = g.transform.position; objectiveHas = true; } }
+            chip = 0;
+        }
+        else if (step == STEP_MEET || step == STEP_CHALLENGE)
+        {
+            var en = NearestEnemy(me);
+            if (en != null) { objectivePos = en.rb.position; objectiveHas = true; }
+        }
+        else if (step == STEP_SHOP)
+        {
+            float best = float.MaxValue;
+            foreach (var pad in shopPads) { float d = (pad - me).sqrMagnitude; if (d < best) { best = d; objectivePos = pad; objectiveHas = true; } }
+            if (!objectiveHas) { float pd; var np = NearestPlace(me, out pd); if (np != null && np.kind == PlaceKind.Shop) { objectivePos = np.centre; objectiveHas = true; } }
+        }
+        objectiveChip = chip;
+        if (objectiveHas && step != STEP_CHEST)
+        {
+            // the chip that points at the objective: the enemy's, or the place's
+            var m = HudModel();
+            for (int i = 0; i < m.compass.Count; i++)
+            {
+                bool enemyChip = (step == STEP_MEET || step == STEP_CHALLENGE) && i == 1 && m.compass.Count > 2;
+                bool placeChip = step == STEP_SHOP && m.compass[i].label == "TRADING POST";
+                if (enemyChip || placeChip) { objectiveChip = i; break; }
+            }
+        }
+        if (objectiveMarker == null && worldRoot != null)
+        {
+            EnsureLookMats();
+            objectiveMarker = new GameObject("objective_marker");
+            objectiveMarker.transform.SetParent(worldRoot.transform, false);
+            Prim(PrimitiveType.Cylinder, objectiveMarker.transform, new Vector3(0f, 0.06f, 0f), new Vector3(3.6f, 0.03f, 3.6f), Quaternion.identity, matCyan, false);
+            Prim(PrimitiveType.Cylinder, objectiveMarker.transform, new Vector3(0f, 0.10f, 0f), new Vector3(2.6f, 0.03f, 2.6f), Quaternion.identity, matBody, false);
+            Prim(PrimitiveType.Cylinder, objectiveMarker.transform, new Vector3(0f, 9f, 0f), new Vector3(0.16f, 9f, 0.16f), Quaternion.identity, matCyan, false);   // the beam
+        }
+        if (objectiveMarker != null)
+        {
+            if (objectiveMarker.activeSelf != objectiveHas) objectiveMarker.SetActive(objectiveHas);
+            if (objectiveHas) objectiveMarker.transform.position = new Vector3(objectivePos.x, TerrainHeight(objectivePos.x, objectivePos.z), objectivePos.z);
+        }
+    }
+    int objectiveChip = -1;
     public static readonly Color HUD_TREASURE = new Color(1f, 0.84f, 0.40f), HUD_ENEMY = new Color(1f, 0.55f, 0.50f),
                                  HUD_PLACE = new Color(0.55f, 0.90f, 1f), HUD_HOME = new Color(0.92f, 0.94f, 1f);
     public MapHudModel HudModel()
     {
         var m = hudModel;
-        m.compass.Clear(); m.toast = ""; m.banner = ""; m.card = false;
+        m.compass.Clear(); m.toast = ""; m.banner = ""; m.card = false; m.objective = ""; m.objectiveChip = -1;
         if (mode != Mode.Map || testRobot == null) return m;
+        m.objective = ObjectiveLine(YardStep); m.objectiveChip = objectiveChip;
         Vector3 me = testRobot.rb.position;
         Vector3 fwd = testRobot.transform.TransformDirection(driveDir); fwd.y = 0f;
         if (fwd.sqrMagnitude < 0.01f) fwd = Vector3.forward;
