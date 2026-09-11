@@ -475,8 +475,12 @@ namespace RobotBrawl.Phase0
                   "...shifted so the encounter is at the origin the ring assumes (world at " + (worldGo != null ? worldGo.transform.position.ToString("0.0") : "-") + ")");
             var floorGo = GameObject.Find("arena_floor"); var skirtGo = GameObject.Find("arena_skirt");
             Check(floorGo != null && Mathf.Abs(floorGo.transform.position.y) < 0.01f && skirtGo != null, "...the ring is a pad on the ground with a skirt under it");
-            float padH = bm.TerrainHeight(chalAt.x, chalAt.z);
-            Check(Mathf.Abs(bm.WorldShiftNow.y + padH) < 3.5f, "...its floor at the highest ground inside the ring (shift " + bm.WorldShiftNow.y.ToString("0.0") + ", ground " + padH.ToString("0.0") + ")");
+            // the floor is ABOVE every point of ground inside the ring, never on it
+            // (owen, 2026-09-11: a coplanar floor z-fought and read as blurry)
+            float ringTop = float.MinValue;
+            for (int i = 0; i < 24; i++) { float a = i * Mathf.PI / 12f; for (float rr = 0f; rr <= 7.5f; rr += 2.5f) ringTop = Mathf.Max(ringTop, bm.TerrainHeight(chalAt.x + Mathf.Cos(a) * rr, chalAt.z + Mathf.Sin(a) * rr)); }
+            float floorAbove = -bm.WorldShiftNow.y - ringTop;   // the floor's height in world terms minus the highest ground
+            Check(floorAbove >= BuilderManager.PAD_LIFT - 0.01f && floorAbove < 3.5f, "...its floor a hair above the highest ground inside the ring, never coplanar (" + floorAbove.ToString("0.00") + " m)");
             Check(bm.PlanetLookOn && RenderSettings.fog, "...under the planet's sky, not the garage's");
             Check(bm.testRobot != null && bm.testRobot.rb.position.magnitude < 8f, "...with you in it");
             Check(GameObject.Find("far_terrain") != null, "...and the horizon still out there");

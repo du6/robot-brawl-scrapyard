@@ -492,7 +492,10 @@ public partial class BuilderManager
         // the pad sits on the highest ground inside the ring
         float pad = TerrainHeight(at.x, at.z);
         for (int i = 0; i < 16; i++) { float a = i * Mathf.PI / 8f; pad = Mathf.Max(pad, TerrainHeight(at.x + Mathf.Cos(a) * (ARENA_FIGHT_HALF + 0.5f), at.z + Mathf.Sin(a) * (ARENA_FIGHT_HALF + 0.5f))); }
-        worldShift = new Vector3(-at.x, -pad, -at.z);
+        // ...and a hair ABOVE it. owen, 2026-09-11: "the arena ground looks
+        // blurry" - on the home flat the pad and the terrain were coplanar
+        // (both y=0) and z-fought, which reads as a shimmering floor.
+        worldShift = new Vector3(-at.x, -(pad + PAD_LIFT), -at.z);
         if (worldRoot != null) worldRoot.transform.position += worldShift;
         // the map's machines are not under the world root: they go now (the
         // fight spawns its own pair, and the world is rebuilt after the bell)
@@ -513,6 +516,7 @@ public partial class BuilderManager
         ARENA_HALF = ARENA_FIGHT_HALF;
     }
     public const float ARENA_FIGHT_HALF = 7f;
+    public const float PAD_LIFT = 0.18f;   // the ring's floor stands this far above the highest ground inside it
 
     /// <summary>The world comes down: the root (chunks, far mesh, landmarks,
     /// marker) and every reference into it; the garage's look returns.</summary>
