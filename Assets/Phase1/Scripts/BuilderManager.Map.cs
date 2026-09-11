@@ -851,7 +851,8 @@ public partial class BuilderManager
             if (pe != null)
             {
                 m.cardTitle = cardBot.name + "   ·   by " + (string.IsNullOrEmpty(pe.owner) ? "another player" : pe.owner);
-                m.cardSub = LadderClient.SignedIn ? "another player's machine  ·  30-second bout, you drive  ·  points at the bell"
+                m.cardSub = PortalBuild ? "another player's machine  ·  30-second bout, you drive  ·  drive away to decline"
+                          : LadderClient.SignedIn ? "another player's machine  ·  30-second bout, you drive  ·  points at the bell"
                                                   : "another player's machine  ·  sign in to challenge  ·  drive away to decline";
             }
             else

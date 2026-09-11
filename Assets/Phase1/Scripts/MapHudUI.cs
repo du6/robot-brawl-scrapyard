@@ -108,6 +108,7 @@ public class MapHudUI : MonoBehaviour
         grt.anchorMin = new Vector2(1f, 0f); grt.anchorMax = new Vector2(1f, 1f); grt.pivot = new Vector2(1f, 0.5f);
         grt.anchoredPosition = new Vector2(-8f, 0f); grt.sizeDelta = new Vector2(112f, 0f);
         board = MkButton("board", bar, "BOARD", 18, () => ShowBoard());
+        if (BuilderManager.PortalBuild) board.gameObject.SetActive(false);   // no board on a portal build (no login there)
         var brt0 = board.GetComponent<RectTransform>();
         brt0.anchorMin = new Vector2(1f, 0f); brt0.anchorMax = new Vector2(1f, 1f); brt0.pivot = new Vector2(1f, 0.5f);
         brt0.anchoredPosition = new Vector2(-128f, 0f); brt0.sizeDelta = new Vector2(100f, 0f);

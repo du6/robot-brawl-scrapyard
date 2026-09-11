@@ -33,6 +33,15 @@ public partial class BuilderManager
     public bool LastBoutWon { get; private set; }
     public bool SignInWanted { get; private set; }
     public int PoolCount { get { return pool.Count; } }
+    /// <summary>A PORTAL build (CrazyGames, `-executeMethod BuildPortal`, define
+    /// RB_PORTAL): their Basic Launch rule is "no external login options", so
+    /// there is no sign-in gate - a stranger's machine is challenged like any
+    /// other, no verdict is reported, and the HUD shows no BOARD.</summary>
+#if RB_PORTAL
+    public const bool PortalBuild = true;
+#else
+    public const bool PortalBuild = false;
+#endif
 
     // ---- bench seams
     public void TestInjectPool(List<LadderClient.PoolEntry> entries) { pool.Clear(); pool.AddRange(entries); poolFetched = true; }
@@ -160,7 +169,7 @@ public partial class BuilderManager
     {
         var e = CardPoolEntry;
         if (e == null) return false;
-        if (!LadderClient.SignedIn)
+        if (!LadderClient.SignedIn && !PortalBuild)
         {
             SignInWanted = true;
             if (MapHudUI.inst != null) MapHudUI.inst.ShowSignIn();
@@ -170,7 +179,7 @@ public partial class BuilderManager
         var parts = SnapshotParts(e.build);
         if (parts == null) { yardToast = "that machine would not stand - the server sent a bad build"; yardToastT = 3f; return true; }
         yardOpponentParts = parts; yardOpponentLabel = string.IsNullOrEmpty(e.robotName) ? "VISITOR" : e.robotName;
-        pendingBoutDefender = e.snapshotId; boutPosted = false;
+        pendingBoutDefender = PortalBuild ? null : e.snapshotId; boutPosted = false;
         StartYardFight(YARD_BOT);          // the roster id is only the tier's placeholder; the parts above are the machine
         yardOpponentParts = null;
         if (mode != Mode.Fight) pendingBoutDefender = null;

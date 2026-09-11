@@ -135,3 +135,4 @@ build/
 
 # the fork's player builds (BuildWebGL/BuildWorker output)
 build/
+crazygames_pack/
