@@ -205,6 +205,29 @@ and finishes a fight within 3 minutes.
   park to the east, an arena to the north — so the first ten minutes
   have somewhere to go. Random structures and parked enemies keep out of
   a place's plaza.
+- **The horizon, landmarks, roads, life, pools** (2026-09-10, owen:
+  "investigate how other popular games design the game map and improve
+  our game's visual experience"). What the best open worlds share —
+  Breath of the Wild's "triangle rule" and its roots in Kevin Lynch's
+  landmarks, Genshin's massive structures kept visible from afar, Disney's
+  "weenies" — is that you can always *see* somewhere worth going, the
+  land has districts with their own silhouette, paths make it read as a
+  place people use, and there is life at ground level. So
+  (`BuilderManager.WorldFar.cs`):
+  - **The horizon**: a coarse far mesh (73×73, 25 m cells) out to 900 m
+    under haze (fog 70→640 m) instead of a 116 m fog wall — mesas and
+    craters on the skyline. One draw, no collider, recentred every 150 m.
+  - **Landmarks**: one per 600 m cell from the seed — a 150 m tower with
+    a lit ring, a 90 m ring gate, a crashed hull with a debris field, a
+    cluster of crystal spires — built within 1.1 km, seen through the
+    haze, never within 120 m of home.
+  - **Roads**: vertex-coloured lanes (4.6 m, a pale crown line) from each
+    place to its east and north neighbours.
+  - **Life by biome**: boulders and scrap piles on the rust flats, tufts
+    and crystal shards on the steppe, obsidian and glowing vents on the
+    ash — 14–25 per chunk, kept off places, roads and home, static-batched.
+  - **Pools**: the deeper craters (radius ≥ 26 m) hold a glowing coolant
+    pool, its surface 45% up the bowl.
 - **A compass strip** across the top: bearings to the nearest crate, the
   nearest enemy, **the nearest place**, and HOME; inside a place its name
   and a one-line hint sit under the strip. No minimap in v1.
@@ -883,3 +906,14 @@ Nothing in M0 is blocked.
   of where the challenge began.
   Also today: a purchase shows on the BUILD palette at once
   (`Career.inventorySeq`; TouchSmoke 61/0).
+- **2026-09-10 — THE HORIZON (owen: "investigate how other popular games
+  design the game map and improve our game's visual experience").**
+  Researched BotW's triangle rule / Lynch's landmarks, Genshin's visible
+  massive structures, Disney's weenies, and the legibility literature.
+  `BuilderManager.WorldFar.cs`: a far mesh to 900 m under haze, landmarks
+  per 600 m cell, roads between neighbouring places, biome scatter
+  (static-batched), crater pools — §3.2. **Measured: MapBench 107/0**
+  (5329-vert far mesh, fog 70→640, 12 landmarks in view, the shop→park
+  road's crown at 1.00 and open ground 30 m beside it, 342 scatter props
+  over 25 chunks batched, a pool in the nearest big crater between floor
+  and rim).

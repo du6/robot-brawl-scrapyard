@@ -62,6 +62,7 @@ public partial class BuilderManager
         public readonly List<CompoundRobot> extraBots = new List<CompoundRobot>();   // a place's machines (Places)
         public readonly List<Vector3> shopPads = new List<Vector3>();
         public ArenaShow arena;
+        public int scatter, pools;                                              // WorldFar
     }
     readonly Dictionary<long, Chunk> chunks = new Dictionary<long, Chunk>();
     GameObject worldRoot;
@@ -122,22 +123,18 @@ public partial class BuilderManager
         // plateau, with an edge you can drive (4 m over ~14 m).
         float mesa = Mathf.PerlinNoise(nx / 150f + 31f, nz / 150f + 17f);
         h += Mathf.SmoothStep(0f, 1f, (mesa - 0.62f) / 0.10f) * 4.2f;
-        // CRATERS: one per 160 m cell, half the time, a bowl with a rim.
+        // CRATERS: one per 160 m cell, half the time, a bowl with a rim
+        // (CraterInCell in WorldFar is the one definition; the pools use it).
         float cell = 160f;
         int cx = Mathf.FloorToInt(nx / cell), cz = Mathf.FloorToInt(nz / cell);
         for (int dz = -1; dz <= 1; dz++)
             for (int dx = -1; dx <= 1; dx++)
             {
-                int gx = cx + dx, gz = cz + dz;
-                float hsh = Mathf.Abs(Mathf.Sin(gx * 127.1f + gz * 311.7f) * 43758.5453f);
-                float f = hsh - Mathf.Floor(hsh);
-                if (f > 0.5f) continue;
-                float rad = 12f + f * 34f;
-                float ox = (gx + 0.2f + f * 0.6f) * cell, oz = (gz + 0.25f + (f * 7.3f - Mathf.Floor(f * 7.3f)) * 0.5f) * cell;
-                float d = Vector2.Distance(new Vector2(nx, nz), new Vector2(ox, oz)) / rad;
+                Vector2 cw; float rad, depth;
+                if (!CraterInCell(cx + dx, cz + dz, out cw, out rad, out depth)) continue;
+                float d = Vector2.Distance(new Vector2(x, z), cw) / rad;
                 if (d < 1.15f)
                 {
-                    float depth = rad * 0.16f;
                     if (d < 1f) h -= depth * (1f - d * d);
                     float rim = (d - 0.98f) / 0.10f;
                     h += depth * 0.35f * Mathf.Exp(-rim * rim);
@@ -219,6 +216,9 @@ public partial class BuilderManager
 
         // places: any whose centre lies in this chunk (Places)
         BuildPlacesInChunk(ch, cx, cz, rng);
+        // life and pools (WorldFar)
+        ScatterProps(ch, cx, cz, rng);
+        SpawnPools(ch, cx, cz);
 
         // crates: the spawn chunk's first is 8 m from home, in view; others by chance
         int crates = spawnChunk ? 2 : rng.Next(3);
@@ -417,6 +417,7 @@ public partial class BuilderManager
         worldRoot = new GameObject("world");
         sandboxRoot = worldRoot;             // BackToBuild's sweep destroys it
         SetupPlanetLook();
+        EnsureFar(spawnAt);                  // the horizon and the landmarks (WorldFar)
         // home: a glowing pad you can find again
         var pad = PartVisualFactory.Deco(PrimitiveType.Cylinder, worldRoot.transform, homePos + new Vector3(0f, 0.02f, 0f),
             new Vector3(3.5f, 0.02f, 3.5f), Vector3.zero, PartVisualFactory.CyanGlow, "home_pad");
@@ -450,6 +451,7 @@ public partial class BuilderManager
         if (mode != Mode.Map) return;
         if (testRobot != null) { lastMapPos = testRobot.rb.position; lastMapYaw = testRobot.transform.eulerAngles.y; resumeSeed = worldSeed; hasResume = true; }
         DropCamPivot();
+        farRoot = null; farGround = null; landmarks.Clear();   // swept with the world root
         chunks.Clear();
         cardBot = null; cardBotId = ""; yardCard = false;
         RestoreLook();
@@ -493,6 +495,7 @@ public partial class BuilderManager
 
         Vector3 me = testRobot.rb.position;
         PumpChunks(me);
+        PumpFar(me);
         MapSteer();
         PlaceSkyBodies();
         PumpArenas();

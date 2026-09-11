@@ -93,8 +93,10 @@ public partial class BuilderManager
         RenderSettings.fog = true;
         RenderSettings.fogMode = FogMode.Linear;
         RenderSettings.fogColor = new Color(0.74f, 0.66f, 0.70f);
-        RenderSettings.fogStartDistance = 45f;
-        RenderSettings.fogEndDistance = CHUNK * (VIEW_CHUNKS + 0.5f) - 4f;   // 116 m: the last loaded chunk fades out
+        // the far mesh (WorldFar) carries the land to 900 m, so the fog can be
+        // haze rather than a wall - the skyline is the point
+        RenderSettings.fogStartDistance = FOG_START;
+        RenderSettings.fogEndDistance = FOG_END;
 
         // ambient: sky-lit from above, warm from the ground
         savedAmbientMode = RenderSettings.ambientMode; savedAmbientSky = RenderSettings.ambientSkyColor;
@@ -187,6 +189,14 @@ public partial class BuilderManager
         float dHome = Vector2.Distance(new Vector2(x, z), new Vector2(homePos.x, homePos.z));
         float plaza = 1f - Mathf.Clamp01((dHome - 10f) / 6f);
         c = Color.Lerp(c, new Color(0.36f, 0.40f, 0.48f), plaza);
+        // roads between places (WorldFar): a dark lane with a pale crown line
+        float road = RoadAt(x, z);
+        if (road > 0f)
+        {
+            Color lane = new Color(0.17f, 0.18f, 0.21f);
+            c = Color.Lerp(c, lane, road);
+            if (road > 0.97f) c = Color.Lerp(c, new Color(0.62f, 0.66f, 0.72f), 0.35f);
+        }
         return c;
     }
 

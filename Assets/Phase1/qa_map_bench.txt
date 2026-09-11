@@ -21,6 +21,16 @@ PASS  the sky is the planet's, with fog to the edge of the loaded world
 PASS  a sister planet and a moon hang on the horizon
 PASS  the home chunk has its plaza and structures (5)
 PASS  the land has mesas and craters (high 4.1 m, low -2.1 m)
+PASS  a far mesh carries the land to 900 m, one draw, no collider (5329 verts)
+PASS  ...under haze, not a wall (fog 70 -> 640 m)
+PASS  landmarks stand on the skyline, one per 600 m cell in view (12)
+PASS  a road runs from the trading post to the park (crown 1.00)
+PASS  ...and 30 m beside it is open ground
+PASS  the loaded world carries ground life, sparse (7-13 a chunk) - boulders, tufts, shards, vents (166 over 25 chunks)
+PASS  ...static-batched into a few draws (454 renderers)
+PASS  a pool-sized crater exists within 13 x 13 cells of home
+PASS  ...and it holds a glowing pool once its chunk is in (1)
+PASS  ...its surface above the crater floor, below the rim
 PASS  home is flat
 PASS  ...and the world is not (3.4 m, -1.5 m)
 PASS  GARAGE returns to the garage
@@ -41,21 +51,21 @@ PASS  ...and you are on the ground there (y -0.8 vs ground -1.0)
 PASS  the card comes up within 4 m of the parked bot
 PASS  ...and the funnel hears `meet`
 PASS  drive away and the card folds - decline is free
-      trace: 5.1s err -2 steer -0.04 | 5.5s err 0 steer 0.02 | 5.9s err 1 steer 0.02 | 6.3s err 1 steer 0.01 | 6.7s err 0 steer 0.01 | 
-PASS  stick up for 2 s moves the machine (9.4 m)
+      trace: 7.9s err -2 steer -0.04 | 8.3s err 0 steer 0.02 | 8.7s err 1 steer 0.02 | 9.1s err 1 steer 0.02 | 9.5s err 1 steer 0.02 | 
+PASS  stick up for 2 s moves the machine (9.6 m)
 PASS  ...straight away from the camera (-0.1 deg off)
 PASS  ...the wobble reads as part of one stick vector, not a steer
-      turn trace: 0.0s yaw 93 err 0 st 0.01 thr 1.00 w 1 v 6.3 | 0.2s yaw 97 err 32 st 0.26 thr -0.25 w 39 v 5.9 | 0.3s yaw 104 err 25 st 0.19 thr -0.25 w 51 v 5.4 | 0.5s yaw 111 err 17 st 0.16 thr -0.25 w 42 v 4.9 | 0.6s yaw 118 err 11 st 0.10 thr 0.85 w 45 v 5.0 | 0.8s yaw 124 err 4 st 0.02 thr 0.94 w 44 v 5.8 | 0.9s yaw 131 err -2 st 0.00 thr 0.98 w 19 v 6.4 | 1.1s yaw 131 err -2 st 0.07 thr 0.97 w -7 v 6.6 | 1.2s yaw 131 err -2 st 0.05 thr 0.97 w -4 v 6.6 | 1.4s yaw 131 err -2 st 0.05 thr 0.98 w -4 v 6.4 | 1.5s yaw 130 err -1 st 0.08 thr 0.99 w -9 v 6.4 | 
+      turn trace: 0.0s yaw 93 err 0 st 0.02 thr 1.00 w 1 v 6.3 | 0.2s yaw 97 err 32 st 0.27 thr -0.25 w 39 v 5.9 | 0.3s yaw 104 err 25 st 0.19 thr -0.25 w 52 v 5.4 | 0.5s yaw 112 err 17 st 0.16 thr -0.25 w 43 v 4.8 | 0.6s yaw 118 err 11 st 0.10 thr 0.85 w 44 v 4.9 | 0.8s yaw 125 err 4 st 0.01 thr 0.95 w 44 v 5.7 | 0.9s yaw 131 err -3 st -0.04 thr 0.97 w 31 v 6.3 | 1.1s yaw 133 err -4 st 0.00 thr 0.94 w 3 v 6.6 | 1.2s yaw 132 err -3 st 0.07 thr 0.96 w -13 v 6.5 | 1.4s yaw 130 err -2 st 0.05 thr 0.98 w -3 v 6.4 | 1.5s yaw 130 err -1 st 0.07 thr 0.99 w -8 v 6.4 | 
       40 deg hold: cam 93 want 129 yaw 129 -> 126 err 3
 PASS  a held 40 deg stick turns the machine TO the heading, within 6 deg by 2.4 s (3 deg left)
-PASS  ...briskly, and without breaking grip into a spin (peak 52 deg/s; a spin measured 200-290)
+PASS  ...briskly, and without breaking grip into a spin (peak 53 deg/s; a spin measured 200-290)
 PASS  ...and stops turning once there, apart from the camera's slow recentre (-3 deg in 0.8 s)
 PASS  ...to the RIGHT of where the camera looked (35 deg)
 PASS  let go and the throttle is off (braking while rolling), the steer centred (-0.35, 0.00)
 PASS  ...a centred stick is zero (the touch layer's 0.001 sentinel included)
-PASS  released, the machine brakes to rest inside 6 s (0.1 m/s)
+PASS  released, the machine brakes to rest inside 6 s (0.3 m/s)
 PASS  stick straight back from rest = reverse
-PASS  ...and the machine backs up (-2.4 m along its nose)
+PASS  ...and the machine backs up (-2.7 m along its nose)
 PASS  the stick is big and honest: the ring's edge is full lock (travel 140, ring 280), and it takes a mouse on every platform
 PASS  the nearest place to home is a TRADING POST, under 80 m (TRADING POST 57)
 PASS  the next cell east is a ROBOT PARK
@@ -75,7 +85,7 @@ PASS  leave the pad and return: the door works again
 PASS  by the stands the compass names the ARENA (ARENA)
 PASS  the arena holds two machines (2)
 PASS  ...each driven by an AIController aimed at the other, combat armed
-PASS  ...and they fight: a machine moved in 1.5 s (11.5 m, 7.5 m)
+PASS  ...and they fight: a machine moved in 1.5 s (10.9 m, 8.3 m)
 PASS  ...inside the ring
 PASS  the spectator is not in the fight
 PASS  the loaded world's places carry machines (2)
@@ -89,8 +99,8 @@ PASS  ...and the funnel hears `challenge`
 PASS  ...the stick is up for the bout
 PASS  the bell rings (Fighting)
 PASS  ...and at the bell your machine is on the AI channel the stick feeds (AI)
-      fight trace: 0.00s src AI err 0 st 0.00 thr 0.00 w 0 v 0.0 up 1.00 enemy 8.0 m | 0.25s src AI err -70 st -0.27 thr 0.35 w -153 v 0.8 up 1.00 enemy 7.4 m | 0.50s src AI err -18 st 0.09 thr 0.75 w -151 v 1.9 up 0.99 enemy 6.3 m | 0.75s src AI err 13 st 0.30 thr 0.83 w -65 v 3.2 up 0.98 enemy 4.9 m | 1.00s src AI err 14 st 0.09 thr 0.81 w 42 v 3.8 up 1.00 enemy 3.8 m | 1.25s src AI err 0 st -0.07 thr 1.00 w 34 v 5.9 up 0.98 enemy 3.7 m | 
-PASS  a held stick drives your machine in the ring (5.4 m in 1.5 s)
+      fight trace: 0.00s src AI err 0 st 0.00 thr 0.00 w 0 v 0.0 up 1.00 enemy 8.0 m | 0.25s src AI err -70 st -0.27 thr 0.35 w -152 v 0.8 up 1.00 enemy 7.4 m | 0.50s src AI err -16 st 0.11 thr 0.79 w -143 v 2.0 up 0.99 enemy 6.2 m | 0.75s src AI err 15 st 0.28 thr 0.80 w -41 v 3.5 up 0.98 enemy 4.6 m | 1.00s src AI err 12 st 0.04 thr 0.84 w 50 v 4.1 up 1.00 enemy 3.6 m | 1.25s src AI err -2 st -0.08 thr 0.98 w 29 v 6.3 up 0.98 enemy 3.9 m | 
+PASS  a held stick drives your machine in the ring (6.3 m in 1.5 s)
 PASS  ...toward the stick's heading, camera-relative, as on the map (best 0 deg off in the last 0.75 s)
 PASS  the bout ended on its own
 PASS  ...and settled once (quickFights=1)

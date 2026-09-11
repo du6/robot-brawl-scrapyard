@@ -117,6 +117,43 @@ namespace RobotBrawl.Phase0
                 for (int sz = -600; sz <= 600; sz += 40)
                 { float hh = bm.TerrainHeight(sx, sz); if (hh > mesaH) mesaH = hh; if (hh < craterH) craterH = hh; }
             Check(mesaH > 3.5f && craterH < -2f, "the land has mesas and craters (high " + mesaH.ToString("0.0") + " m, low " + craterH.ToString("0.0") + " m)");
+            // ---- the horizon, landmarks, roads, life, pools (WorldFar) --------------
+            // owen, 2026-09-10: "investigate how other popular games design the
+            // game map and improve our game's visual experience"
+            var farG = bm.FarGround;
+            var farMesh = farG != null ? farG.GetComponent<MeshFilter>().sharedMesh : null;
+            Check(farMesh != null && farMesh.vertexCount == (BuilderManager.FAR_RES + 1) * (BuilderManager.FAR_RES + 1) && farG.GetComponent<Collider>() == null,
+                  "a far mesh carries the land to " + BuilderManager.FAR_RADIUS + " m, one draw, no collider (" + (farMesh != null ? farMesh.vertexCount : 0) + " verts)");
+            Check(RenderSettings.fogEndDistance >= 500f && RenderSettings.fogStartDistance >= 60f, "...under haze, not a wall (fog " + RenderSettings.fogStartDistance + " -> " + RenderSettings.fogEndDistance + " m)");
+            var farGo = GameObject.Find("far");
+            int lmCount = 0; if (farGo != null) foreach (Transform tr in farGo.transform) if (tr.name.StartsWith("landmark_")) lmCount++;
+            Check(bm.LandmarksBuilt >= 4 && lmCount == bm.LandmarksBuilt, "landmarks stand on the skyline, one per 600 m cell in view (" + lmCount + ")");
+            var hp0 = bm.YardGarageDoor;
+            int hcx0 = Mathf.FloorToInt(hp0.x / BuilderManager.PLACE_CELL), hcz0 = Mathf.FloorToInt(hp0.z / BuilderManager.PLACE_CELL);
+            var shopR = bm.PlaceInCell(hcx0, hcz0); var parkR = bm.PlaceInCell(hcx0 + 1, hcz0);
+            Vector3 midR = (shopR.centre + parkR.centre) * 0.5f;
+            Vector3 dirR = (parkR.centre - shopR.centre).normalized; Vector3 sideR = Vector3.Cross(Vector3.up, dirR);
+            Check(bm.RoadAt(midR.x, midR.z) > 0.95f, "a road runs from the trading post to the park (crown " + bm.RoadAt(midR.x, midR.z).ToString("0.00") + ")");
+            Check(bm.RoadAt(midR.x + sideR.x * 30f, midR.z + sideR.z * 30f) == 0f, "...and 30 m beside it is open ground");
+            Check(bm.YardScatterLoaded >= 100 && bm.YardScatterLoaded <= 400, "the loaded world carries ground life, sparse (7-13 a chunk) - boulders, tufts, shards, vents (" + bm.YardScatterLoaded + " over " + bm.WorldChunksLoaded + " chunks)");
+            bool batched = false; int scatterR = 0;
+            foreach (var mr in Object.FindObjectsByType<MeshRenderer>(FindObjectsSortMode.None))
+                if (mr.transform.name.StartsWith("scatter_") || (mr.transform.parent != null && mr.transform.parent.name.StartsWith("scatter_"))) { scatterR++; if (mr.isPartOfStaticBatch) batched = true; }
+            Check(scatterR > 0 && batched, "...static-batched into a few draws (" + scatterR + " renderers)");
+            Vector2 poolC;
+            bool anyPool = bm.NearestPool(hp0, out poolC);
+            Check(anyPool, "a pool-sized crater exists within 13 x 13 cells of home");
+            if (anyPool)
+            {
+                bm.TeleportPlayer(new Vector3(poolC.x, 0f, poolC.y + 10f));
+                for (int i = 0; i < 40; i++) yield return null;
+                var poolGo = GameObject.Find("pool");
+                Check(bm.YardPoolsLoaded >= 1 && poolGo != null, "...and it holds a glowing pool once its chunk is in (" + bm.YardPoolsLoaded + ")");
+                Check(poolGo != null && poolGo.transform.position.y > bm.TerrainHeight(poolC.x, poolC.y) + 0.5f && poolGo.transform.position.y < bm.TerrainHeight(poolC.x, poolC.y) + 8f,
+                      "...its surface above the crater floor, below the rim");
+                bm.TeleportPlayer(new Vector3(hp0.x, 0f, hp0.z));
+                for (int i = 0; i < 40; i++) yield return null;
+            }
             var hp = bm.YardGarageDoor;
             Check(Mathf.Abs(bm.TerrainHeight(hp.x, hp.z)) < 0.01f && Mathf.Abs(bm.TerrainHeight(hp.x + 10f, hp.z + 10f)) < 0.01f, "home is flat");
             float hA = bm.TerrainHeight(300f, 300f), hB = bm.TerrainHeight(-260f, 410f);
