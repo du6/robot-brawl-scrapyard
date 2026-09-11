@@ -480,10 +480,15 @@ regress each other, and from now on every such fix lands twice.
 The rule: **backport fixes, never features**, in both directions, by
 commit reference in the message ("port of robot-brawl `abc1234`"). A
 change to any file in the list above is not done until it is in both
-repos with both suites green. `RaycastWheelDrive`'s map retune (§3.3) is
-the first deliberate divergence and is kept behind a `MapMode.Enabled`
-check inside the file rather than a fork of it, so the fight's wheel
-behaviour stays identical across games and the referee's bouts stay fair.
+repos with both suites green. `RaycastWheelDrive` was never touched in the
+end: the map's steering lives entirely on the drive's AI channel (§3.3), so
+the wheel model is identical across games and the referee's bouts stay
+fair. `FightManager` (not in the list, but identical so far) carries two
+hooks for the debrief's loud button, `quickNextLabel` / `quickNext`
+(defaults: NEXT FIGHT, another quick bout — Robot Brawl's card unchanged),
+which the fork's `BuilderManager.Awake` sets to CONTINUE EXPLORING → back
+to the map. Port the hooks to Robot Brawl and the two files are identical
+again.
 
 ### 7.3 The shared server
 
@@ -870,3 +875,11 @@ Nothing in M0 is blocked.
   the reverse check pressed back while still coasting, the camera had not
   settled after a facing teleport. §3.3 rewritten. **Measured: MapBench
   94/0, TouchSmoke 57/0, QuickFightBench 24/0.**
+- **2026-09-10 — CONTINUE EXPLORING (owen: "replace the next fight button
+  with continue exploring").** The debrief's loud button now goes back to
+  the map where the challenge began (`FightManager.quickNextLabel` /
+  `quickNext`, defaults unchanged for Robot Brawl; set in the fork's
+  `BuilderManager.Awake`). MapBench drives the hook: mode Map, within 6 m
+  of where the challenge began.
+  Also today: a purchase shows on the BUILD palette at once
+  (`Career.inventorySeq`; TouchSmoke 61/0).

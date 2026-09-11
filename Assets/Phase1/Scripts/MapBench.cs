@@ -341,6 +341,7 @@ namespace RobotBrawl.Phase0
             // ---- 5. CHALLENGE ------------------------------------------------------
             bm.TeleportPlayer(parked.rb.position + new Vector3(2.5f, 0f, 0f));
             yield return null; yield return null;
+            Vector3 chalAt = bm.testRobot.rb.position;
             bm.ChallengeParked();
             yield return null; yield return null;
             var fm = Object.FindFirstObjectByType<FightManager>();
@@ -381,6 +382,14 @@ namespace RobotBrawl.Phase0
             Time.timeScale = savedScale;
             Check(fm != null && fm.state == FightManager.State.Ended, "the bout ended on its own");
             Check(d.quickFights == 1, "...and settled once (quickFights=" + d.quickFights + ")");
+            // the debrief's loud button is CONTINUE EXPLORING: back to the map,
+            // where the challenge began (owen, 2026-09-10)
+            Check(FightManager.quickNextLabel.StartsWith("CONTINUE EXPLORING") && FightManager.quickNext != null, "the debrief's loud button reads CONTINUE EXPLORING (" + FightManager.quickNextLabel + ")");
+            FightManager.quickNext(bm); yield return null; yield return null;
+            Vector3 backAt = bm.testRobot != null ? bm.testRobot.rb.position : Vector3.zero;
+            Check(bm.mode == BuilderManager.Mode.Map && Object.FindFirstObjectByType<FightManager>() == null, "...and it puts you back on the map (" + bm.mode + ")");
+            Check(Vector2.Distance(new Vector2(backAt.x, backAt.z), new Vector2(chalAt.x, chalAt.z)) < 6f, "...where the challenge began, not at home (" + Vector2.Distance(new Vector2(backAt.x, backAt.z), new Vector2(chalAt.x, chalAt.z)).ToString("0.0") + " m off)");
+            bm.LeaveMap(); yield return null;
             bm.BackToBuild(); yield return null;
             Check(bm.mode == BuilderManager.Mode.Build && Object.FindFirstObjectByType<FightManager>() == null, "after the bell, the garage");
             Check(Career.TxnSum() == d.scrap, "the ledger still audits");

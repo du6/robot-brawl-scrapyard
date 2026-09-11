@@ -395,6 +395,11 @@ public partial class BuilderManager : MonoBehaviour
     {
         Application.runInBackground = true;
         if (palette == null) palette = P1PartDef.Palette();
+        // Scrapyard: after a challenge the loud button goes back to the map,
+        // where you left it (owen, 2026-09-10: "replace the next fight button
+        // with continue exploring")
+        FightManager.quickNextLabel = "CONTINUE EXPLORING >";
+        FightManager.quickNext = b => { b.BackToBuild(); b.EnterMap(); };
     }
 
     void Start()

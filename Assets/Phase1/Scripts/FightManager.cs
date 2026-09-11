@@ -100,6 +100,13 @@ public class FightManager : MonoBehaviour
     // QUICK FIGHT profile (plan step 1): a 30-s bout, a 5-s count, and the
     // walls close in for the last 10 s so nothing ends on the judges.
     public static bool quickBout;
+    /// <summary>The quick loop's loud button on the debrief card: its label,
+    /// and what it does. Defaults are Robot Brawl's NEXT FIGHT (back to the
+    /// workshop, another quick bout). Scrapyard sets CONTINUE EXPLORING and
+    /// a return to the map (owen, 2026-09-10) from its BuilderManager.Awake -
+    /// this file stays the same in both games.</summary>
+    public static string quickNextLabel = "NEXT FIGHT >";
+    public static System.Action<BuilderManager> quickNext;
     public static float QUICK_MATCH_TIME = 30f, QUICK_COUNT_OUT = 5f, QUICK_CRUSH_AT = 10f;
     bool crushStarted; float crushToast;
     public bool CrushStarted { get { return crushStarted; } }
@@ -1604,13 +1611,17 @@ public class FightManager : MonoBehaviour
         }
         if (cIsQuick)
         {
-            // The quick loop's card: BACK, and NEXT FIGHT as the loud one.
+            // The quick loop's card: BACK, and the loud one (quickNextLabel / quickNext).
             bool qback = GUI.Button(new Rect(cx - bw - 10f, by, bw, bh), "BACK TO WORKSHOP", btnStyle);
             GUI.backgroundColor = new Color(1f, 0.62f, 0.24f);
-            bool qnext = GUI.Button(new Rect(cx + 10f, by, bw, bh), "NEXT FIGHT >", btnStyle);
+            bool qnext = GUI.Button(new Rect(cx + 10f, by, bw, bh), quickNextLabel, btnStyle);
             GUI.backgroundColor = Color.white;
             if (qback && bm != null) { bm.BackToBuild(); return; }
-            if (qnext && bm != null) { bm.BackToBuild(); bm.StartQuickFight(-1); return; }
+            if (qnext && bm != null)
+            {
+                if (quickNext != null) quickNext(bm); else { bm.BackToBuild(); bm.StartQuickFight(-1); }
+                return;
+            }
             return;
         }
         bool back = GUI.Button(oneRow ? new Rect(cx - bw * 1.5f - 10f, by, bw, bh) : new Rect(cx - bw - 10f, by, bw, bh),
