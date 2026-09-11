@@ -181,8 +181,33 @@ and finishes a fight within 3 minutes.
   rookies (SCOUT, TIPPER); to ~300 m veterans (MAULER, RIPPER, MILLSTONE);
   beyond, champions (BULWARK, WIDOWMAKER, BASTION). The world is its own
   weight class.
+- **Places worth driving to** (2026-09-10, owen: "it looks like a desert
+  with some cubes… add buildings, shops, robot parks, toys, arenas with
+  robots fighting each other"). One 150 m cell in five holds nothing; the
+  rest hold a PLACE from the seed — a composition, not a prop, that
+  **flattens the ground under it** (blended over 14 m), lays a plaza and
+  four roads, and does something:
+  - **TOWN** — 9–14 buildings with lit window bands, roof masts, a beacon.
+  - **TRADING POST** — a shopfront with an amber sign and a **lit pad**;
+    drive onto it and the workshop opens on SHOP where you stand.
+    GARAGE/DRIVE OUT resume where you left, not at home; the pad re-arms
+    only once you are clear of it.
+  - **ROBOT PARK** — a fenced garden with a fountain, benches, three
+    roster machines on pedestals.
+  - **ARENA** — a 12 m ring with walls, stands on two sides, floodlights,
+    and **two roster machines fighting each other live** on the game's
+    own `AIController`, combat armed, no `FightManager`; a referee
+    respawns the pair five seconds after one dies, leaves the ring or
+    stays flipped for six. Tougher pairs further from home.
+  - **PLAYGROUND** — two ramps, three pushable balls, a turnstile that
+    shoves, domes to bounce over.
+  The three cells nearest home are fixed — a trading post ~57 m out, a
+  park to the east, an arena to the north — so the first ten minutes
+  have somewhere to go. Random structures and parked enemies keep out of
+  a place's plaza.
 - **A compass strip** across the top: bearings to the nearest crate, the
-  nearest enemy, and HOME. No minimap in v1.
+  nearest enemy, **the nearest place**, and HOME; inside a place its name
+  and a one-line hint sit under the strip. No minimap in v1.
 
 ### 3.3 Driving
 
@@ -768,3 +793,21 @@ Nothing in M0 is blocked.
   Then owen made all five calls (§9): the game is **Robot Brawl:
   Scrapyard**. Nothing built. Next: M0 step 1, the server changes, in
   this repo.
+- **2026-09-10 — PLACES (owen: "Can we make the planet look more
+  realistic? Now it looks like a desert with some cubes and other shapes,
+  which feels boring to explore. For example, can we add buildings, shops,
+  robot parks, toys, arenas with robots fighting each other, etc.?").**
+  `BuilderManager.Places.cs`: a 150 m place grid from the seed (towns,
+  trading posts, robot parks, arenas, playgrounds — §3.2), each flattening
+  its ground through `TerrainHeight` (now `RawHeight × HomeFlat`, then
+  `FlattenForPlaces`), built by the chunk that holds its centre and torn
+  down with it. The trading post's pad opens the workshop on SHOP
+  (`EnterShop`); the map resumes where you left (`lastMapPos`). The arena
+  runs two roster machines on `AIController` against each other with no
+  `FightManager` — the first time this project has fought outside one —
+  and `PumpArenas` is the referee. Compass names the nearest place.
+  **Measured: MapBench 83/0** (48 places in 81 cells, all five kinds, the
+  three fixed places flat to 5 cm, pad opens SHOP and resumes at the pad
+  without re-entering, arena fighters wired at each other and moved 11 m
+  / 7.5 m in 1.5 s inside the ring, unloaded with their chunk),
+  **TouchSmoke 57/0, QuickFightBench 24/0.**

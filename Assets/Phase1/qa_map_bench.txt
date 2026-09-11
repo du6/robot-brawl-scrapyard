@@ -6,7 +6,7 @@ PASS  ...and the funnel hears `map`
 PASS  the player's machine is on the map, combat off
 PASS  the world around home is loaded: 25 chunks of 25
 PASS  the world's seed was rolled and saved (4242)
-PASS  crates stand in the loaded world (21)
+PASS  crates stand in the loaded world (20)
 PASS  ...every crate sits on the terrain
 PASS  a crate stands 8 m from home, in view (8.0)
 PASS  an enemy is parked on the terrain
@@ -26,7 +26,7 @@ PASS  ...and the world is not (3.4 m, -1.5 m)
 PASS  GARAGE returns to the garage
 PASS  ...and the garage gets its own sky and no fog back
 PASS  leaving and re-entering gives the same world (the seed persists)
-PASS  driving into a crate opens it (20 of 21 left)
+PASS  driving into a crate opens it (19 of 20 left)
 PASS  ...and it paid scrap and a part at once (+40 scrap, +1 part)
 PASS  ...and the funnel hears `crate`
 PASS  ...coins fly from the chest where it stood (10)
@@ -35,14 +35,14 @@ PASS  a reward's picture renders to a 64 px texture (the part built by the game'
 PASS  ...and scrap's picture is a coin stack
 PASS  ...and the studio is torn down after the photograph
 PASS  ...and the save remembers which crate, by chunk (0,0:0)
-PASS  an opened crate never respawns (20)
+PASS  an opened crate never respawns (19)
 PASS  400 m out, the world is still 25 chunks around you (25)
 PASS  ...and you are on the ground there (y -0.8 vs ground -1.0)
 PASS  the card comes up within 4 m of the parked bot
 PASS  ...and the funnel hears `meet`
 PASS  drive away and the card folds - decline is free
-      trace: 4.9s yaw 0 steer 0.00 thr 0.00 v 0.2 | 5.3s yaw 0 steer -0.01 thr 1.00 v 2.5 | 5.7s yaw 0 steer 0.00 thr 1.00 v 5.2 | 6.1s yaw 0 steer 0.00 thr 1.00 v 6.4 | 6.5s yaw 0 steer 0.00 thr 1.00 v 6.3 | 
-PASS  full throttle for 2 s moves the machine (9.6 m)
+      trace: 4.8s yaw 0 steer 0.00 thr 0.00 v 0.2 | 5.2s yaw 0 steer -0.01 thr 1.00 v 2.4 | 5.6s yaw 0 steer 0.00 thr 1.00 v 5.3 | 6.0s yaw 0 steer 0.00 thr 1.00 v 6.4 | 6.4s yaw 0 steer 0.00 thr 1.00 v 6.3 | 
+PASS  full throttle for 2 s moves the machine (9.7 m)
 PASS  ...and with the stick inside the dead zone it holds its heading (0.1 deg)
 PASS  ...the dead zone reads as zero stick; only the heading hold steers (0.00)
 PASS  a held full stick still turns it (18 deg in 1.5 s)
@@ -50,6 +50,29 @@ PASS  ...at no more than the map's gain (0.45)
 PASS  the stick is big and honest: the ring's edge is full lock (travel 140, ring 280), and it takes a mouse on every platform
 PASS  SCRAPPER (compass + wall sensor) gets Ram Hunter
 PASS  no sensors gets First Steps, and it validates (First Steps)
+PASS  the nearest place to home is a TRADING POST, under 80 m (TRADING POST 57)
+PASS  the next cell east is a ROBOT PARK
+PASS  the next cell north is an ARENA
+PASS  81 cells around home hold 35..70 places (48)
+PASS  ...of all five kinds (5)
+PASS  a cell's place is one object, asked twice
+PASS  the ground under each of the three is flat to 5 cm 
+PASS  the trading post has a lit pad (2)
+PASS  ...at the shopfront
+PASS  9 m short of the pad, still on the map
+PASS  drive onto the pad and the workshop opens (Build)
+PASS  ...on the SHOP tab, dock open (tab 3)
+PASS  DRIVE OUT puts you back at the pad, not home (0.0 m)
+PASS  ...and standing on the pad does not walk you straight back in
+PASS  leave the pad and return: the door works again
+PASS  by the stands the compass names the ARENA (ARENA)
+PASS  the arena holds two machines (2)
+PASS  ...each driven by an AIController aimed at the other, combat armed
+PASS  ...and they fight: a machine moved in 1.5 s (11.0 m, 7.5 m)
+PASS  ...inside the ring
+PASS  the spectator is not in the fight
+PASS  the loaded world's places carry machines (2)
+PASS  drive home and the arena's machines unload with their chunk
 PASS  CHALLENGE enters a fight
 PASS  ...a Quick bout, settled as a quick fight
 PASS  ...with the auto-brain driving, not the stick

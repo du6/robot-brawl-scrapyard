@@ -220,6 +220,83 @@ namespace RobotBrawl.Phase0
             var bareIds = new List<string>(); foreach (var pp in bare) bareIds.Add(pp.def.id);
             Check(bp.title == "First Steps" && bp.Validate(bareIds) == null, "no sensors gets First Steps, and it validates (" + bp.title + ")");
 
+            // ---- 6. PLACES -----------------------------------------------------------
+            // owen, 2026-09-10: "it looks like a desert with some cubes ... can we
+            // add buildings, shops, robot parks, toys, arenas with robots fighting
+            // each other". A place flattens its ground, the first three are fixed
+            // near home, the shop's pad opens the workshop, the arena fights itself.
+            float pd; var np = bm.NearestPlace(hp, out pd);
+            Check(np != null && np.kind == BuilderManager.PlaceKind.Shop && pd < 80f, "the nearest place to home is a TRADING POST, under 80 m (" + (np != null ? np.name + " " + pd.ToString("0") : "none") + ")");
+            int hcx = Mathf.FloorToInt(hp.x / BuilderManager.PLACE_CELL), hcz = Mathf.FloorToInt(hp.z / BuilderManager.PLACE_CELL);
+            var parkP = bm.PlaceInCell(hcx + 1, hcz); var arenaP = bm.PlaceInCell(hcx, hcz + 1);
+            Check(parkP != null && parkP.kind == BuilderManager.PlaceKind.Park, "the next cell east is a ROBOT PARK");
+            Check(arenaP != null && arenaP.kind == BuilderManager.PlaceKind.Arena, "the next cell north is an ARENA");
+            int nPlaces = 0; var kinds = new HashSet<BuilderManager.PlaceKind>();
+            for (int dz = -4; dz <= 4; dz++) for (int dx = -4; dx <= 4; dx++) { var q = bm.PlaceInCell(hcx + dx, hcz + dz); if (q != null) { nPlaces++; kinds.Add(q.kind); } }
+            Check(nPlaces >= 35 && nPlaces <= 70, "81 cells around home hold 35..70 places (" + nPlaces + ")");
+            Check(kinds.Count == 5, "...of all five kinds (" + kinds.Count + ")");
+            Check(bm.PlaceInCell(hcx + 3, hcz - 2) == bm.PlaceInCell(hcx + 3, hcz - 2), "a cell's place is one object, asked twice");
+            bool flatAll = true; string flatWhy = "";
+            foreach (var q in new[] { np, parkP, arenaP })
+            {
+                if (q == null) { flatAll = false; continue; }
+                float lo = float.MaxValue, hi = float.MinValue;
+                for (int i = 0; i < 12; i++)
+                {
+                    float a = i * Mathf.PI / 6f, r = (i % 2 == 0) ? q.radius * 0.85f : q.radius * 0.4f;
+                    float hh = bm.TerrainHeight(q.centre.x + Mathf.Cos(a) * r, q.centre.z + Mathf.Sin(a) * r);
+                    lo = Mathf.Min(lo, hh); hi = Mathf.Max(hi, hh);
+                }
+                if (hi - lo > 0.05f) { flatAll = false; flatWhy += q.name + " spread " + (hi - lo).ToString("0.00") + "; "; }
+            }
+            Check(flatAll, "the ground under each of the three is flat to 5 cm " + flatWhy);
+            // the shop pad
+            var pads = bm.YardShopPads();
+            Check(pads.Count >= 1, "the trading post has a lit pad (" + pads.Count + ")");
+            Vector3 pad0 = pads.Count > 0 ? pads[0] : hp;
+            Check(Vector2.Distance(new Vector2(pad0.x, pad0.z), new Vector2(np.centre.x, np.centre.z)) < 12f, "...at the shopfront");
+            bm.TeleportPlayer(new Vector3(pad0.x, 0f, pad0.z - 9f)); for (int i = 0; i < 6; i++) yield return null;
+            Check(bm.mode == BuilderManager.Mode.Map, "9 m short of the pad, still on the map");
+            bm.TeleportPlayer(new Vector3(pad0.x, 0f, pad0.z)); for (int i = 0; i < 4; i++) yield return null;
+            Check(bm.mode == BuilderManager.Mode.Build && bm.LastShopOpened, "drive onto the pad and the workshop opens (" + bm.mode + ")");
+            if (MobileBuilderUI.inst != null) Check(MobileBuilderUI.inst.Tab == 3 && MobileBuilderUI.inst.DockOpen, "...on the SHOP tab, dock open (tab " + MobileBuilderUI.inst.Tab + ")");
+            bm.EnterMap(); for (int i = 0; i < 8; i++) yield return null;
+            Vector3 back = bm.testRobot.rb.position;
+            Check(bm.mode == BuilderManager.Mode.Map && Vector2.Distance(new Vector2(back.x, back.z), new Vector2(pad0.x, pad0.z)) < 3f, "DRIVE OUT puts you back at the pad, not home (" + Vector2.Distance(new Vector2(back.x, back.z), new Vector2(pad0.x, pad0.z)).ToString("0.0") + " m)");
+            Check(bm.mode == BuilderManager.Mode.Map, "...and standing on the pad does not walk you straight back in");
+            bm.TeleportPlayer(new Vector3(pad0.x, 0f, pad0.z - 9f)); for (int i = 0; i < 4; i++) yield return null;
+            bm.TeleportPlayer(new Vector3(pad0.x, 0f, pad0.z)); for (int i = 0; i < 4; i++) yield return null;
+            Check(bm.mode == BuilderManager.Mode.Build, "leave the pad and return: the door works again");
+            bm.EnterMap(); for (int i = 0; i < 4; i++) yield return null;
+            // the arena: two machines, fighting each other
+            bm.TeleportPlayer(new Vector3(arenaP.centre.x, 0f, arenaP.centre.z - 19f));
+            for (int i = 0; i < 40; i++) yield return null;
+            Check(bm.NearestPlaceNow != null && bm.NearestPlaceNow.kind == BuilderManager.PlaceKind.Arena && (bm.NearestPlaceNow.centre - arenaP.centre).sqrMagnitude < 1f, "by the stands the compass names the ARENA (" + (bm.NearestPlaceNow != null ? bm.NearestPlaceNow.name : "none") + ")");
+            var fighters = bm.YardArenaFighters();
+            Check(fighters.Count == 2, "the arena holds two machines (" + fighters.Count + ")");
+            bool wired = fighters.Count == 2;
+            if (wired)
+            {
+                var aiA = fighters[0].GetComponent<AIController>(); var aiB = fighters[1].GetComponent<AIController>();
+                wired = aiA != null && aiB != null && aiA.target == fighters[1] && aiB.target == fighters[0] && fighters[0].combatEnabled && fighters[1].combatEnabled;
+            }
+            Check(wired, "...each driven by an AIController aimed at the other, combat armed");
+            Vector3 fa0 = fighters.Count > 0 ? fighters[0].rb.position : Vector3.zero, fb0 = fighters.Count > 1 ? fighters[1].rb.position : Vector3.zero;
+            for (int i = 0; i < 90; i++) yield return null;
+            var f2 = bm.YardArenaFighters();
+            float movedA = f2.Count > 0 && f2[0] != null ? Vector3.Distance(f2[0].rb.position, fa0) : 0f, movedB = f2.Count > 1 && f2[1] != null ? Vector3.Distance(f2[1].rb.position, fb0) : 0f;
+            Check(movedA > 0.5f || movedB > 0.5f, "...and they fight: a machine moved in 1.5 s (" + movedA.ToString("0.0") + " m, " + movedB.ToString("0.0") + " m)");
+            bool inRing = true; foreach (var f in f2) if (f != null && Vector3.Distance(f.rb.position, arenaP.centre) > 16f) inRing = false;
+            Check(inRing, "...inside the ring");
+            Check(bm.testRobot.combatEnabled == false, "the spectator is not in the fight");
+            Check(bm.YardPlaceBots >= 2, "the loaded world's places carry machines (" + bm.YardPlaceBots + ")");
+            bm.TeleportPlayer(new Vector3(hp.x, 0f, hp.z)); for (int i = 0; i < 40; i++) yield return null;
+            // (another arena may sit inside home's view - a random cell - so the
+            // check is that THESE two are gone, not that none are loaded)
+            bool gone = true; foreach (var f in f2) if (f != null) gone = false;
+            Check(gone, "drive home and the arena's machines unload with their chunk");
+            parked = bm.YardParked;
+
             // ---- 5. CHALLENGE ------------------------------------------------------
             bm.TeleportPlayer(parked.rb.position + new Vector3(2.5f, 0f, 0f));
             yield return null; yield return null;

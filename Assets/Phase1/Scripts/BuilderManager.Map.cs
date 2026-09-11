@@ -76,10 +76,14 @@ public partial class BuilderManager
         public readonly List<GameObject> crates = new List<GameObject>();
         public readonly List<string> crateKeys = new List<string>();
         public CompoundRobot enemy; public string enemyId = "";
+        public readonly List<CompoundRobot> extraBots = new List<CompoundRobot>();   // a place's machines (Places)
+        public readonly List<Vector3> shopPads = new List<Vector3>();
+        public ArenaShow arena;
     }
     readonly Dictionary<long, Chunk> chunks = new Dictionary<long, Chunk>();
     GameObject worldRoot;
     int worldSeed;
+    int resumeSeed, placeSeed; float lastMapYaw; bool padArmed;
     float noiseOx, noiseOz;                  // seed-derived offsets into the noise field
     Vector3 homePos = Vector3.zero;          // where you spawn; the compass calls it HOME
     CompoundRobot cardBot; string cardBotId = "";
@@ -114,6 +118,18 @@ public partial class BuilderManager
     /// drive and not a climb. Deterministic: the same seed is the same world.</summary>
     public float TerrainHeight(float x, float z)
     {
+        float h = RawHeight(x, z) * HomeFlat(x, z);
+        return FlattenForPlaces(x, z, h);
+    }
+    /// <summary>The world is flat this far from home (0 at home, 1 beyond SPAWN_FLAT+30).</summary>
+    float HomeFlat(float x, float z)
+    {
+        float dHome = Vector2.Distance(new Vector2(x, z), new Vector2(homePos.x, homePos.z));
+        return Mathf.Clamp01((dHome - SPAWN_FLAT) / 30f);
+    }
+    /// <summary>The land before home and the places flatten it.</summary>
+    float RawHeight(float x, float z)
+    {
         float nx = x + noiseOx, nz = z + noiseOz;
         float h = 6.0f * Mathf.PerlinNoise(nx / 220f, nz / 220f)
                 + 2.5f * Mathf.PerlinNoise(nx / 60f + 3.7f, nz / 60f + 1.3f)
@@ -144,9 +160,7 @@ public partial class BuilderManager
                     h += depth * 0.35f * Mathf.Exp(-rim * rim);
                 }
             }
-        float dHome = Vector2.Distance(new Vector2(x, z), new Vector2(homePos.x, homePos.z));
-        float flat = Mathf.Clamp01((dHome - SPAWN_FLAT) / 30f);
-        return h * flat;
+        return h;
     }
     /// <summary>0..1: rust flats, scrap steppe, ash fields.</summary>
     float Biome(float x, float z) { return Mathf.PerlinNoise((x + noiseOx) / 300f + 11f, (z + noiseOz) / 300f + 5f); }
@@ -215,9 +229,13 @@ public partial class BuilderManager
         {
             float x = x0 + 4f + (float)rng.NextDouble() * (CHUNK - 8f), z = z0 + 4f + (float)rng.NextDouble() * (CHUNK - 8f);
             if (Vector2.Distance(new Vector2(x, z), new Vector2(homePos.x, homePos.z)) < 13f) continue;
+            if (InsidePlace(x, z, 5f)) continue;
             int kind = rng.Next(6);
             SpawnStructure(ch.root.transform, kind, x, z, TerrainHeight(x, z), rng);
         }
+
+        // places: any whose centre lies in this chunk (Places)
+        BuildPlacesInChunk(ch, cx, cz, rng);
 
         // crates: the spawn chunk's first is 8 m from home, in view; others by chance
         int crates = spawnChunk ? 2 : rng.Next(3);
@@ -246,8 +264,9 @@ public partial class BuilderManager
                 var pool = dHome < 120f ? rookies : dHome < 300f ? veterans : champs;
                 id = pool[rng.Next(pool.Length)];
                 ex = x0 + 6f + (float)rng.NextDouble() * (CHUNK - 12f); ez = z0 + 6f + (float)rng.NextDouble() * (CHUNK - 12f);
+                if (InsidePlace(ex, ez, 3f)) wantEnemy = false;
             }
-            var entry = EnemyRoster.Find(id);
+            var entry = wantEnemy ? EnemyRoster.Find(id) : null;
             if (entry != null)
             {
                 RaycastWheelDrive edrv;
@@ -339,6 +358,8 @@ public partial class BuilderManager
         if (!chunks.TryGetValue(k, out c)) return;
         chunks.Remove(k);
         if (c.enemy != null && c.enemy.gameObject != null) { c.enemy.gameObject.SetActive(false); Destroy(c.enemy.gameObject); }
+        foreach (var b in c.extraBots) if (b != null && b.gameObject != null) { b.gameObject.SetActive(false); Destroy(b.gameObject); }
+        foreach (var pad in c.shopPads) shopPads.Remove(pad);
         if (c.root != null) Destroy(c.root);
     }
 
@@ -375,6 +396,12 @@ public partial class BuilderManager
         // the player in chunk -1 and the load window loaded two extra chunks
         // before the far ones dropped (MapBench: "27 chunks of 25").
         homePos = new Vector3(CHUNK * 0.5f, 0f, CHUNK * 0.5f);
+        if (placeSeed != worldSeed) { placeCache.Clear(); placeSeed = worldSeed; }   // the same world keeps its places
+        shopPads.Clear(); LastShopOpened = false;
+        // GARAGE and the shop bring you back where you left, not home
+        Vector3 spawnAt = hasResume && resumeSeed == worldSeed ? lastMapPos : homePos;
+        Quaternion spawnRot = hasResume && resumeSeed == worldSeed ? Quaternion.Euler(0f, lastMapYaw, 0f) : Quaternion.identity;
+        padArmed = false;
 
         ARENA_HALF = 100000f;                // no fence: FloorNet is a fall net only
         ArenaHazards.Clear();
@@ -399,15 +426,16 @@ public partial class BuilderManager
         var pad = PartVisualFactory.Deco(PrimitiveType.Cylinder, worldRoot.transform, homePos + new Vector3(0f, 0.02f, 0f),
             new Vector3(3.5f, 0.02f, 3.5f), Vector3.zero, PartVisualFactory.CyanGlow, "home_pad");
         var pc = pad.GetComponent<Collider>(); if (pc != null) Object.Destroy(pc);
-        LoadAround(homePos);
+        LoadAround(spawnAt);
 
-        testRobot = SpawnBot(placed, "PlayerBuild", homePos, Quaternion.identity, driveDir, out testDrive);
+        testRobot = SpawnBot(placed, "PlayerBuild", spawnAt, spawnRot, driveDir, out testDrive);
         if (testRobot == null) { BackToBuild(); message = "the build would not spawn"; return; }
         testRobot.combatEnabled = false;     // nothing on the map fights until you challenge
         testRobot.controlSource = ControlSource.AI;   // the map feeds aiThrottle/aiSteer itself (see STEER_*)
         if (testDrive != null) { testDrive.aiThrottle = 0f; testDrive.aiSteer = 0f; testDrive.maxSpeed = MAP_MAX_SPEED; }
         foreach (var act in testRobot.GetComponentsInChildren<Actuator>(true)) act.playerControlled = false;
         combatArmAt = -1f;
+        LiftToGround(testRobot, TerrainHeight(spawnAt.x, spawnAt.z) + 0.8f);
 
         followCam = cam.gameObject.AddComponent<FollowCamera>();
         followCam.target = testRobot.transform;
@@ -425,6 +453,7 @@ public partial class BuilderManager
     public void LeaveMap()
     {
         if (mode != Mode.Map) return;
+        if (testRobot != null) { lastMapPos = testRobot.rb.position; lastMapYaw = testRobot.transform.eulerAngles.y; resumeSeed = worldSeed; hasResume = true; }
         chunks.Clear();
         cardBot = null; cardBotId = ""; yardCard = false;
         RestoreLook();
@@ -470,6 +499,10 @@ public partial class BuilderManager
         PumpChunks(me);
         MapSteer();
         PlaceSkyBodies();
+        PumpArenas();
+        float placeD; NearestPlaceNow = NearestPlace(me, out placeD);
+        PumpShopPads(me);
+        if (mode != Mode.Map) return;   // the shop took us
 
         // the fall net: under the ground (a seam between chunks, a bad landing)
         // puts you back on it
@@ -707,8 +740,21 @@ public partial class BuilderManager
             sb.Append(any ? Bearing("TREASURE", nearestCrate - me, fwd) : "no treasure in sight - drive on");
             var en = NearestEnemy(me);
             if (en != null) sb.Append("     ").Append(Bearing(en.name.ToUpper(), en.rb.position - me, fwd));
+            var np = NearestPlaceNow;
+            if (np != null) sb.Append("     ").Append(Bearing(np.name, np.centre - me, fwd));
             sb.Append("     ").Append(Bearing("HOME", homePos - me, fwd));
             GUI.Label(new Rect(20f, top + 6f, w - 140f, 28f), sb.ToString(), st);
+            // inside a place: its name and what it is for, under the strip
+            if (np != null && (yardToastT <= 0f || yardToast.Length == 0))
+            {
+                float pd = Vector2.Distance(new Vector2(me.x, me.z), new Vector2(np.centre.x, np.centre.z));
+                if (pd < np.radius + 6f)
+                {
+                    var ps = new GUIStyle(GUI.skin.label); ps.fontSize = 16; ps.alignment = TextAnchor.MiddleCenter;
+                    ps.normal.textColor = new Color(0.62f, 0.90f, 1f);
+                    GUI.Label(new Rect(0f, top + 48f, w, 26f), np.name + "  -  " + np.Hint, ps);
+                }
+            }
         }
         if (yardToastT > 0f && yardToast.Length > 0)
         {
