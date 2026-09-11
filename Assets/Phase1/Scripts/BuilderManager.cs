@@ -5623,6 +5623,7 @@ public partial class BuilderManager : MonoBehaviour
     {
         FloorNet(testRobot);
         FloorNet(aiRobot);
+        PumpStickFight();   // Scrapyard: a challenge bout is driven from the stick (Drive.cs)
         if (Phase0Input.BackDown()) { BackToBuild(); return; }
         // R = restart the fight (rematch), same builds — also the REMATCH
         // button on the results screen.
@@ -5788,6 +5789,7 @@ public partial class BuilderManager : MonoBehaviour
 
     public void BackToBuild()
     {
+        yardStickFight = false; // Scrapyard (Drive.cs)
         ArenaHazards.Clear();   // C3A: hazards never outlive the fight
         TouchControls.fightActive = false;   // Phase 5
         CompoundRobot.ClearAll();

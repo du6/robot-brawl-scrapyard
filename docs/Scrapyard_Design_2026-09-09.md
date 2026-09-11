@@ -209,18 +209,56 @@ and finishes a fight within 3 minutes.
   nearest enemy, **the nearest place**, and HOME; inside a place its name
   and a one-line hint sit under the strip. No minimap in v1.
 
-### 3.3 Driving
+### 3.3 Driving — point where you want to go
 
-- Input is the floating stick on the left half (`TouchControls`) and WASD.
-- Retune, and **bench before believing**: `maxSpeed` 10 m/s crosses the
-  yard in 8 s, too fast to read; start at 6. `diffSteer` 0.8 was tuned for
-  shoving; a map drive wants a tighter turn at low speed. Both are fields
-  on `RaycastWheelDrive`; both get **`DriveBench`** (§6). Run it on both
-  legs of every tuning change.
-- Battery does **not** drain on the map in v1 (owen's call, §9).
-- **Righting.** A robot that lands on its back after clipping a wreck must
-  self-right or the run ends in a ditch. On the map, holding the stick 1 s
-  while inverted flips it — a visible mercy the fight does not offer.
+Input is the floating stick on the left half (`TouchControls`, big: the
+ring's edge is full lock, a mouse counts) and WASD.
+
+**The stick is a direction, not a wheel** (2026-09-10; owen: "the driving
+still feels tricky. Can you check popular mobile driving games and see how
+they design the driving experience?"). What the top mobile drivers share —
+Asphalt 9's TouchDrive, Mario Kart Tour's auto-accelerate + smart steering,
+Real Racing 3's assists-on defaults, Brawl Stars' re-anchoring stick — is
+that **the player picks a direction and the game handles the steering**.
+So, in `BuilderManager.Drive.cs`:
+
+- The stick's **angle is a heading in the world, relative to the camera**
+  (up = away from the camera); its **length is speed**. Push straight up
+  and the machine drives straight whatever its nose was doing; a held
+  40° turns *to* 40° and stops turning.
+- The frame is the camera's heading **the moment the stick is pressed**,
+  held until it is released. Measured the other way first: with the frame
+  following an auto-recentring camera, "up" meant "wherever the nose
+  points" and the machine's own veer went uncorrected.
+- **Two control loops**, because the skid-steer's response to steer is
+  wildly speed-dependent (full lock at rest pivots at 250–500 deg/s; at
+  6 m/s 0.50 turns 15 deg/s and 0.55 breaks grip into a spin): heading
+  error → a wanted yaw rate (3 deg/s per degree, capped 140), then a PI on
+  yaw rate → steer, capped by speed (1.0 at rest, 0.5 at 6 m/s).
+- **Slow down to turn**: throttle eases with the heading error, and a turn
+  sharper than 15° above 3.5 m/s brakes first — as a driver does. That is
+  what turned a 2.4-s stalling turn into a 0.9-s clean one.
+- **Straight back reverses** (a 35° cone, from a crawl); **let go and it
+  brakes to a stop** — coasting ran more than 6 s from top speed.
+- The chase camera follows a **pivot** with a lagged heading: it swings
+  behind the machine fast (140 deg/s) with the stick up or released, only
+  slowly (15 deg/s) while the stick points off-axis, so a held angle is a
+  heading, not a pirouette.
+- **The same stick fights.** A challenge bout puts the player's side on
+  the AI channel at the bell and feeds it from here; FIRE goes to the
+  actuators. One control scheme for the whole game.
+
+Measured (MapBench, 2026-09-10): stick up for 2 s → 0.1° off the
+camera's heading; a held 40° → 2° short by 2.4 s, peak 54 deg/s, no
+overshoot; released → at rest inside 6 s; straight back → 2.9 m of
+reverse; in the ring, "up" from a side-on camera → turned to heading and
+drove 6.2 m in 1.5 s.
+
+- Speed cap on the map is 6 m/s (`MAP_MAX_SPEED`; 10 crosses the yard in
+  8 s, too fast to read). Battery does **not** drain on the map in v1
+  (owen's call, §9).
+- **Righting.** On the map, holding the stick 1 s while inverted flips
+  the machine back — a visible mercy the fight does not offer.
 
 ### 3.4 Treasure crates
 
@@ -818,3 +856,17 @@ Nothing in M0 is blocked.
   rewritten. MapBench's CHALLENGE section now asserts the Keyboard source,
   no ProgramRunner, the stick up, the bell, and that a held throttle moves
   the machine >1 m in a second; the BrainPick section is gone.
+- **2026-09-10 — POINT WHERE YOU WANT TO GO (owen: "the driving still
+  feels tricky… check popular mobile driving games").** Researched (Asphalt
+  9 TouchDrive, Mario Kart Tour, Real Racing 3, Hill Climb Racing, the
+  Brawl Stars stick): direction from the player, steering from the game.
+  `BuilderManager.Drive.cs` replaces the tank stick: camera-relative
+  heading + speed on one stick, the frame latched at press, a
+  heading→yaw-rate→steer two-loop controller, brake-into-turn, brake on
+  release, reverse straight back, a lagged camera pivot; the challenge
+  bout runs on the same stick (AI channel + `aiFire`). Fourteen bench
+  iterations, most of them the CHECK: two run-out spots drove into the
+  home plaza's monolith and relay hub (the second read as a 25° "drift"),
+  the reverse check pressed back while still coasting, the camera had not
+  settled after a facing teleport. §3.3 rewritten. **Measured: MapBench
+  94/0, TouchSmoke 57/0, QuickFightBench 24/0.**

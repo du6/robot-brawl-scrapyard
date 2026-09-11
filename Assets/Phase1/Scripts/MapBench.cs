@@ -174,44 +174,91 @@ namespace RobotBrawl.Phase0
             yield return null; yield return null;
             Check(!bm.YardCardShown, "drive away and the card folds - decline is free");
 
-            // ---- 5b. the drive: straight when you mean straight, and it still turns ---
-            // owen, 2026-09-10: "turning is too sensitive, making it hard to
-            // drive straight". Full throttle, no steer, for two seconds must hold
-            // a heading; a small stick wobble inside the dead zone must not
-            // steer; a held full stick must still turn.
-            bm.TeleportPlayer(new Vector3(hp.x - 9f, 0f, hp.z - 8f));   // FLAT and WRECK-FREE (inside 12 m of home), off the crate lane
-            for (int i = 0; i < 30; i++) yield return null;                 // settle after the drop
-            Vector3 fwd0 = bm.testRobot.transform.TransformDirection(bm.TestDriveDir); fwd0.y = 0f;
+            // ---- 5b. the drive: point where you want to go -------------------------
+            // owen, 2026-09-10: "the driving still feels tricky" -> the stick's
+            // angle is a heading relative to the camera, its length is speed
+            // (Drive.cs). Up = straight away from the camera and it holds; a
+            // held 40 deg turns to 40 deg and STOPS turning; the dead zone is
+            // centred; straight back reverses; let go and it coasts.
+            // ON THE TRADING POST'S PLAZA, FACING EAST: flat by construction and
+            // nothing random spawns inside a place (Places.cs), the building sits
+            // north of the run-out. Two home-plaza spots failed first: one turned
+            // into the left monolith ("stalled at 0.0 m/s"), the next drove south
+            // straight through the relay hub at (0,-9) - a 25 deg kick at 1.2 s
+            // that read as a heading drift (measured 2026-09-10, both).
+            float pdd; var shopP = bm.NearestPlace(hp, out pdd);
+            Vector3 runOut = shopP != null ? shopP.centre + new Vector3(-12f, 0f, -14f) : new Vector3(hp.x + 2f, 0f, hp.z - 6f);
+            bm.TeleportPlayer(runOut, 90f);
+            float settleBy = Time.time + 4f;   // the camera swings behind the new facing (140 deg/s) - wait for it
+            while (Time.time < settleBy && Mathf.Abs(Mathf.DeltaAngle(bm.CamYawNow, BuilderManager.HeadingYaw(bm.testRobot.transform.TransformDirection(bm.TestDriveDir)))) > 2f) yield return null;
+            for (int i = 0; i < 20; i++) yield return null;
             Vector3 pos0 = bm.testRobot.rb.position;
-            Phase0Input.debugThrottle = 1f; Phase0Input.debugSteer = 0.12f;   // a wobble inside the dead zone
+            Phase0Input.debugThrottle = 1f; Phase0Input.debugSteer = 0.08f;   // up, with a wobble inside the dead zone
+            yield return null;
+            float camYaw0 = bm.DriveWantYaw;   // the frame latched at the press: the camera's heading then
             float tEnd = Time.time + 2.0f; float tNext = Time.time;
             var trace = new System.Text.StringBuilder();
             while (Time.time < tEnd)
             {
                 if (Time.time >= tNext)
                 {
-                    Vector3 f = bm.testRobot.transform.TransformDirection(bm.TestDriveDir); f.y = 0f;
-                    trace.Append(Time.time.ToString("0.0")).Append("s yaw ").Append(Vector3.SignedAngle(fwd0, f, Vector3.up).ToString("0")).Append(" steer ").Append(bm.MapSteerNow.ToString("0.00")).Append(" thr ").Append(bm.testDrive.CurrentThrottle().ToString("0.00")).Append(" v ").Append(VelUtil.GetLinearVelocity(bm.testRobot.rb).magnitude.ToString("0.0")).Append(" | ");
+                    trace.Append(Time.time.ToString("0.0")).Append("s err ").Append(bm.DriveErrNow.ToString("0")).Append(" steer ").Append(bm.MapSteerNow.ToString("0.00")).Append(" | ");
                     tNext += 0.4f;
                 }
                 yield return null;
             }
             log.Add("      trace: " + trace);
-            Vector3 fwd1 = bm.testRobot.transform.TransformDirection(bm.TestDriveDir); fwd1.y = 0f;
-            float turned = Vector3.Angle(fwd0, fwd1);
+            float yaw1 = BuilderManager.HeadingYaw(bm.testRobot.transform.TransformDirection(bm.TestDriveDir));
             float went = Vector3.Distance(pos0, bm.testRobot.rb.position);
-            Check(went > 3f, "full throttle for 2 s moves the machine (" + went.ToString("0.0") + " m)");
-            Check(turned < 8f, "...and with the stick inside the dead zone it holds its heading (" + turned.ToString("0.0") + " deg)");
-            Check(Mathf.Abs(bm.MapSteerNow) <= BuilderManager.HOLD_MAX + 0.001f, "...the dead zone reads as zero stick; only the heading hold steers (" + bm.MapSteerNow.ToString("0.00") + ")");
-            Phase0Input.debugSteer = 1f;
-            tEnd = Time.time + 1.5f;
-            while (Time.time < tEnd) yield return null;
-            Vector3 fwd2 = bm.testRobot.transform.TransformDirection(bm.TestDriveDir); fwd2.y = 0f;
-            Check(Vector3.Angle(fwd1, fwd2) > 15f, "a held full stick still turns it (" + Vector3.Angle(fwd1, fwd2).ToString("0") + " deg in 1.5 s)");
-            Check(bm.MapSteerNow > 0f && bm.MapSteerNow <= BuilderManager.STEER_GAIN + 0.001f, "...at no more than the map's gain (" + bm.MapSteerNow.ToString("0.00") + ")");
+            Check(went > 3f, "stick up for 2 s moves the machine (" + went.ToString("0.0") + " m)");
+            Check(Mathf.Abs(Mathf.DeltaAngle(camYaw0, yaw1)) < 8f, "...straight away from the camera (" + Mathf.DeltaAngle(camYaw0, yaw1).ToString("0.0") + " deg off)");
+            Check(BuilderManager.StickNow().y > 0.9f && Mathf.Abs(BuilderManager.StickNow().x) < 0.1f, "...the wobble reads as part of one stick vector, not a steer");
+            // a held angle: turn TO it and stop turning
+            float camYaw1 = bm.CamYawNow;
+            Phase0Input.debugThrottle = Mathf.Cos(40f * Mathf.Deg2Rad); Phase0Input.debugSteer = Mathf.Sin(40f * Mathf.Deg2Rad);
+            tEnd = Time.time + 1.6f; tNext = Time.time; var tr2 = new System.Text.StringBuilder(); float peakW = 0f;
+            while (Time.time < tEnd)
+            {
+                peakW = Mathf.Max(peakW, Mathf.Abs(bm.testRobot.rb.angularVelocity.y * Mathf.Rad2Deg));
+                if (Time.time >= tNext)
+                {
+                    float yy = BuilderManager.HeadingYaw(bm.testRobot.transform.TransformDirection(bm.TestDriveDir));
+                    tr2.Append((Time.time - tEnd + 1.6f).ToString("0.0")).Append("s yaw ").Append(yy.ToString("0")).Append(" err ").Append(bm.DriveErrNow.ToString("0")).Append(" st ").Append(bm.MapSteerNow.ToString("0.00")).Append(" thr ").Append(bm.testDrive.aiThrottle.ToString("0.00")).Append(" w ").Append((bm.testRobot.rb.angularVelocity.y * Mathf.Rad2Deg).ToString("0")).Append(" v ").Append(VelUtil.GetLinearVelocity(bm.testRobot.rb).magnitude.ToString("0.0")).Append(" | ");
+                    tNext += 0.15f;
+                }
+                yield return null;
+            }
+            log.Add("      turn trace: " + tr2);
+            float yawA = BuilderManager.HeadingYaw(bm.testRobot.transform.TransformDirection(bm.TestDriveDir));
+            tEnd = Time.time + 0.8f; while (Time.time < tEnd) yield return null;
+            float yawB = BuilderManager.HeadingYaw(bm.testRobot.transform.TransformDirection(bm.TestDriveDir));
+            float wantYaw = Mathf.DeltaAngle(0f, bm.DriveWantYaw);
+            log.Add("      40 deg hold: cam " + camYaw1.ToString("0") + " want " + wantYaw.ToString("0") + " yaw " + yawA.ToString("0") + " -> " + yawB.ToString("0") + " err " + bm.DriveErrNow.ToString("0"));
+            Check(Mathf.Abs(bm.DriveErrNow) < 6f, "a held 40 deg stick turns the machine TO the heading, within 6 deg by 2.4 s (" + bm.DriveErrNow.ToString("0") + " deg left)");
+            Check(peakW > 25f && peakW < 150f, "...briskly, and without breaking grip into a spin (peak " + peakW.ToString("0") + " deg/s; a spin measured 200-290)");
+            Check(Mathf.Abs(Mathf.DeltaAngle(yawA, yawB)) < 12f, "...and stops turning once there, apart from the camera's slow recentre (" + Mathf.DeltaAngle(yawA, yawB).ToString("0") + " deg in 0.8 s)");
+            Check(Mathf.DeltaAngle(camYaw1, yawA) > 15f, "...to the RIGHT of where the camera looked (" + Mathf.DeltaAngle(camYaw1, yawA).ToString("0") + " deg)");
+            // let go: it coasts, no steer input
+            Phase0Input.debugThrottle = 0f; Phase0Input.debugSteer = 0f;
+            for (int i = 0; i < 30; i++) yield return null;
+            Check(bm.testDrive.aiThrottle <= 0f && Mathf.Abs(bm.MapSteerNow) < 0.05f, "let go and the throttle is off (braking while rolling), the steer centred (" + bm.testDrive.aiThrottle.ToString("0.00") + ", " + bm.MapSteerNow.ToString("0.00") + ")");
+            Check(BuilderManager.StickNow() == Vector2.zero, "...a centred stick is zero (the touch layer's 0.001 sentinel included)");
+            // straight back: reverse - FROM REST (a fixed 60-frame wait pressed
+            // back while still coasting at speed, and 0.75 s of braking read as
+            // "does not back up"; the check's premise, not the drive)
+            float restBy = Time.time + 6f;
+            while (VelUtil.GetLinearVelocity(bm.testRobot.rb).magnitude > 0.3f && Time.time < restBy) yield return null;
+            Check(VelUtil.GetLinearVelocity(bm.testRobot.rb).magnitude <= 0.3f, "released, the machine brakes to rest inside 6 s (" + VelUtil.GetLinearVelocity(bm.testRobot.rb).magnitude.ToString("0.0") + " m/s)");
+            Vector3 fwdR = bm.testRobot.transform.TransformDirection(bm.TestDriveDir); fwdR.y = 0f;
+            Vector3 posR = bm.testRobot.rb.position;
+            Phase0Input.debugThrottle = -1f; Phase0Input.debugSteer = 0f;
+            for (int i = 0; i < 45; i++) yield return null;
+            Check(bm.DriveReversing, "stick straight back from rest = reverse");
+            float backed = Vector3.Dot(bm.testRobot.rb.position - posR, fwdR.normalized);
+            Check(backed < -0.5f, "...and the machine backs up (" + backed.ToString("0.0") + " m along its nose)");
+            Phase0Input.debugThrottle = 0f; Phase0Input.debugSteer = 0f;
             Check(TouchControls.RANGE >= 130f && Mathf.Approximately(TouchControls.RING, 2f * TouchControls.RANGE) && Mathf.Approximately(TouchControls.KNOB_TRAVEL, TouchControls.RANGE) && TouchControls.MouseAccepted,
                   "the stick is big and honest: the ring's edge is full lock (travel " + TouchControls.RANGE + ", ring " + TouchControls.RING + "), and it takes a mouse on every platform");
-            Phase0Input.debugThrottle = 0f; Phase0Input.debugSteer = 0f;
             for (int i = 0; i < 30; i++) yield return null;
 
             // ---- 6. PLACES -----------------------------------------------------------
@@ -301,7 +348,7 @@ namespace RobotBrawl.Phase0
             Check(FightManager.quickBout && Career.quickFight, "...a Quick bout, settled as a quick fight");
             // owen, 2026-09-10: "replace auto fight with manual fight" - the
             // player's side is the stick, and no program sits on the robot.
-            Check(fm != null && fm.playerSource == ControlSource.Keyboard, "...with YOU at the stick, not a program (" + (fm != null ? fm.playerSource.ToString() : "-") + ")");
+            Check(fm != null && fm.playerSource == ControlSource.AI && bm.YardStickFight, "...with YOU at the stick, on the AI channel, not a program (" + (fm != null ? fm.playerSource.ToString() : "-") + ")");
             Check(bm.testRobot != null && bm.testRobot.GetComponent<ProgramRunner>() == null, "...and no ProgramRunner on your machine");
             Check(bm.opponentId == BuilderManager.YARD_BOT, "...against the parked bot (" + bm.opponentId + ")");
             Check(RBTelemetry.Has(RBTelemetry.CHALLENGE), "...and the funnel hears `challenge`");
@@ -312,13 +359,22 @@ namespace RobotBrawl.Phase0
             float bellBy = Time.realtimeSinceStartup + 8f;
             while (fm != null && fm.state == FightManager.State.Settling && Time.realtimeSinceStartup < bellBy) yield return null;
             Check(fm != null && fm.state == FightManager.State.Fighting, "the bell rings (" + (fm != null ? fm.state.ToString() : "-") + ")");
-            Check(bm.testRobot != null && bm.testRobot.controlSource == ControlSource.Keyboard, "...and at the bell your machine takes the keyboard/stick source (" + (bm.testRobot != null ? bm.testRobot.controlSource.ToString() : "-") + ")");
+            Check(bm.testRobot != null && bm.testRobot.controlSource == ControlSource.AI, "...and at the bell your machine is on the AI channel the stick feeds (" + (bm.testRobot != null ? bm.testRobot.controlSource.ToString() : "-") + ")");
             Vector3 f0 = bm.testRobot != null ? bm.testRobot.rb.position : Vector3.zero;
-            Phase0Input.debugThrottle = 1f; Phase0Input.debugSteer = 0f;
-            for (int i = 0; i < 60; i++) yield return null;
+            Phase0Input.debugThrottle = 1f; Phase0Input.debugSteer = 0f;   // "up" = away from the fight camera, which looks from the side: a turn first
+            var ftr = new System.Text.StringBuilder(); float fErrLate = 999f;
+            for (int i = 0; i < 90; i++)
+            {
+                if (i >= 45 && bm.testRobot != null) fErrLate = Mathf.Min(fErrLate, Mathf.Abs(bm.DriveErrNow));   // the SCOUT rams at the bell; the best of the last 0.75 s
+                if (i % 15 == 0 && bm.testRobot != null)
+                    ftr.Append((i / 60f).ToString("0.00")).Append("s src ").Append(bm.testRobot.controlSource).Append(" err ").Append(bm.DriveErrNow.ToString("0")).Append(" st ").Append(bm.testDrive.aiSteer.ToString("0.00")).Append(" thr ").Append(bm.testDrive.aiThrottle.ToString("0.00")).Append(" w ").Append((bm.testRobot.rb.angularVelocity.y * Mathf.Rad2Deg).ToString("0")).Append(" v ").Append(VelUtil.GetLinearVelocity(bm.testRobot.rb).magnitude.ToString("0.0")).Append(" up ").Append(Vector3.Dot(bm.testRobot.transform.up, Vector3.up).ToString("0.00")).Append(bm.aiRobot != null ? " enemy " + Vector3.Distance(bm.aiRobot.rb.position, bm.testRobot.rb.position).ToString("0.0") + " m" : "").Append(" | ");
+                yield return null;
+            }
+            log.Add("      fight trace: " + ftr);
             float drove = bm.testRobot != null ? Vector3.Distance(bm.testRobot.rb.position, f0) : 0f;
             Phase0Input.debugThrottle = 0f;
-            Check(drove > 1.0f, "a held throttle drives your machine in the ring (" + drove.ToString("0.0") + " m in 1 s)");
+            Check(drove > 1.0f, "a held stick drives your machine in the ring (" + drove.ToString("0.0") + " m in 1.5 s)");
+            Check(fErrLate < 30f, "...toward the stick's heading, camera-relative, as on the map (best " + fErrLate.ToString("0") + " deg off in the last 0.75 s)");
             Time.timeScale = 4f;
             float deadline = Time.realtimeSinceStartup + 40f;
             while (fm != null && fm.state != FightManager.State.Ended && Time.realtimeSinceStartup < deadline) yield return null;
