@@ -264,7 +264,7 @@ public partial class BuilderManager
             if (entry == null) continue;
             RaycastWheelDrive drv;
             var bot = SpawnBot(EnemyRoster.Recipe(entry.id, palette), entry.label, t.position + pos, Quaternion.Euler(0f, a + 180f, 0f), Vector3.forward, out drv);
-            if (bot != null) { bot.combatEnabled = false; bot.controlSource = ControlSource.AI; LiftToGround(bot, p.baseH + 0.9f); ch.extraBots.Add(bot); }
+            if (bot != null) { bot.combatEnabled = false; bot.controlSource = ControlSource.AI; LiftToGround(bot, p.baseH + 0.9f); ParkBot(bot); ch.extraBots.Add(bot); }
         }
     }
     Material matPlazaLightCached;

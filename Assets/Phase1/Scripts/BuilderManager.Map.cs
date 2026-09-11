@@ -260,6 +260,7 @@ public partial class BuilderManager
                     bot.combatEnabled = false;
                     bot.controlSource = ControlSource.AI;      // no controller: it idles by its wreck
                     LiftToGround(bot, TerrainHeight(ex, ez) + 0.6f);
+                    ParkBot(bot);
                     ch.enemy = bot; ch.enemyId = entry.id;
                 }
             }
@@ -309,6 +310,15 @@ public partial class BuilderManager
         t.RotateAround(t.position, Vector3.up, Mathf.DeltaAngle(have, faceYaw));
         foreach (var rb in testRobot.GetComponentsInChildren<Rigidbody>()) { rb.linearVelocity = Vector3.zero; rb.angularVelocity = Vector3.zero; }
         Physics.SyncTransforms();
+    }
+
+    /// <summary>A parked machine stays parked. Seen live (2026-09-10): the
+    /// SCOUT at 30 m sat where the home flat begins to roll and crept 10 m
+    /// downhill in ten seconds, the compass counting it away. Heavy damping on
+    /// every body; a challenge spawns fresh machines, so nothing is lost.</summary>
+    static void ParkBot(CompoundRobot bot)
+    {
+        foreach (var rb in bot.GetComponentsInChildren<Rigidbody>()) { rb.linearDamping = 6f; rb.angularDamping = 6f; }
     }
 
     static void LiftToGround(CompoundRobot bot, float y)

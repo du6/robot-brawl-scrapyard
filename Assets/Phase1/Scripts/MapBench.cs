@@ -96,6 +96,11 @@ namespace RobotBrawl.Phase0
             Check(d0 > 0f, "a crate stands 8 m from home, in view (" + d0.ToString("0.0") + ")");
             var parked = bm.YardParked;
             Check(parked != null && OnGround(bm, parked.rb.position), "an enemy is parked on the terrain");
+            // ...and it stays parked (live, 2026-09-10: the SCOUT crept 10 m downhill in 10 s)
+            Vector3 parked0 = parked != null ? parked.rb.position : Vector3.zero;
+            for (int i = 0; i < 180; i++) yield return null;
+            float crept = parked != null ? Vector2.Distance(new Vector2(parked.rb.position.x, parked.rb.position.z), new Vector2(parked0.x, parked0.z)) : 99f;
+            Check(crept < 0.5f, "...and stays put for 3 s (" + crept.ToString("0.00") + " m)");
             Check(parked != null && parked.name.ToUpper().Contains("SCOUT"), "...the nearest is SCOUT, not another rookie (" + (parked != null ? parked.name : "-") + ")");
             Check(parked != null && Vector3.Distance(parked.rb.position, bm.YardGarageDoor) > 20f, "...far enough from home to be a drive");
             Check(!bm.YardCardShown, "no card at home");
