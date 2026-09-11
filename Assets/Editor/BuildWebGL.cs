@@ -51,6 +51,35 @@ namespace RobotBrawl.Editor
         /// so it can never leak into the next build (the RB_DEV_SERVER lesson,
         /// BuildIOSSim.cs).</summary>
         public static bool Portal;
+        /// <summary>The WebGL linker's code optimisation (Build Times / Runtime
+        /// Speed / Disk Size, with or without LTO), by reflection: the property is
+        /// `codeOptimization` on a static settings class in the WebGL editor
+        /// extension, and its enum's type name is not stable across versions.</summary>
+        static void SetWasmCodeOptimization(string valueName)
+        {
+            foreach (var asm in System.AppDomain.CurrentDomain.GetAssemblies())
+            {
+                if (!asm.GetName().Name.StartsWith("UnityEditor.WebGL")) continue;
+                System.Type[] types;
+                try { types = asm.GetTypes(); } catch { continue; }
+                foreach (var t in types)
+                {
+                    var p = t.GetProperty("codeOptimization", System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic);
+                    if (p == null || !p.PropertyType.IsEnum) continue;
+                    try
+                    {
+                        var v = System.Enum.Parse(p.PropertyType, valueName);
+                        p.SetValue(null, v);
+                        Debug.Log("[BuildWebGL] codeOptimization=" + valueName + " via " + t.FullName);
+                        return;
+                    }
+                    catch (System.Exception e) { Debug.LogWarning("[BuildWebGL] codeOptimization " + valueName + " refused on " + t.FullName + ": " + e.Message); }
+                }
+            }
+            Debug.LogWarning("[BuildWebGL] no codeOptimization property found - linker left at its default");
+        }
+        /// <summary>`-rbClean` on the command line: a clean build, whose log lists every asset by size.</summary>
+        static bool Clean { get { return System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "-rbClean") >= 0; } }
         public static void BuildPortal() { Portal = true; Build(); }
 
         public static void Build()
@@ -90,6 +119,10 @@ namespace RobotBrawl.Editor
             PlayerSettings.WebGL.exceptionSupport      = WebGLExceptionSupport.None;
             PlayerSettings.SetManagedStrippingLevel(NamedBuildTarget.WebGL,
                                                     ManagedStrippingLevel.High);
+            // SIZE (CrazyGames plan step 5, 2026-09-10): the wasm is 6.6 of the
+            // 10.4 MB. IL2CPP for size, and the linker for disk size with LTO.
+            PlayerSettings.SetIl2CppCodeGeneration(NamedBuildTarget.WebGL, Il2CppCodeGeneration.OptimizeSize);
+            SetWasmCodeOptimization("DiskSizeLTO");
             // ! The stock template hard-codes a 960x600 LANDSCAPE canvas and
             // only goes full-viewport for a phone user agent - so a
             // portrait-only mobile UI rendered as a squeezed box on a white
@@ -111,8 +144,9 @@ namespace RobotBrawl.Editor
                 locationPathName = outDir,
                 target           = BuildTarget.WebGL,
                 targetGroup      = BuildTargetGroup.WebGL,
-                options          = BuildOptions.None,   // release, so the 44 harness
-                                                        // files stay compiled OUT
+                options          = Clean ? BuildOptions.CleanBuildCache : BuildOptions.None,   // release, so the 44 harness
+                                                        // files stay compiled OUT; -rbClean rebuilds player data
+                                                        // so the log carries the asset size report
             };
 
             Debug.Log("[BuildWebGL] building " + outDir + " from " + scenes.Count + " scene(s)");
