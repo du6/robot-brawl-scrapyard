@@ -335,7 +335,40 @@ public partial class BuilderManager
             made.Add(g);
         }
         ch.scatter = made.Count;
-        if (made.Count > 0) StaticBatchingUtility.Combine(made.ToArray(), ch.root);
+        if (made.Count > 0) CombineScatter(ch, made);
+    }
+
+    /// <summary>One mesh per material for a chunk's scatter, as a child of the
+    /// chunk root. Not StaticBatchingUtility: a static batch bakes world
+    /// positions and does not follow its parent, and the world MOVES for a
+    /// fight (Map.cs, LeaveMapForFight). Colliders stay on the originals'
+    /// emptied objects.</summary>
+    void CombineScatter(Chunk ch, List<GameObject> made)
+    {
+        var byMat = new Dictionary<Material, List<CombineInstance>>();
+        var toStrip = new List<MeshRenderer>();
+        foreach (var g in made)
+            foreach (var mr in g.GetComponentsInChildren<MeshRenderer>())
+            {
+                var mf = mr.GetComponent<MeshFilter>();
+                if (mf == null || mf.sharedMesh == null) continue;
+                List<CombineInstance> l;
+                if (!byMat.TryGetValue(mr.sharedMaterial, out l)) { l = new List<CombineInstance>(); byMat[mr.sharedMaterial] = l; }
+                l.Add(new CombineInstance { mesh = mf.sharedMesh, transform = ch.root.transform.worldToLocalMatrix * mr.transform.localToWorldMatrix });
+                toStrip.Add(mr);
+            }
+        foreach (var kv in byMat)
+        {
+            var mesh = new Mesh { name = "scatter_" + kv.Key.name };
+            mesh.indexFormat = UnityEngine.Rendering.IndexFormat.UInt32;
+            mesh.CombineMeshes(kv.Value.ToArray(), true, true);
+            var go = new GameObject("scatter_combined");
+            go.transform.SetParent(ch.root.transform, false);
+            go.AddComponent<MeshFilter>().sharedMesh = mesh;
+            go.AddComponent<MeshRenderer>().sharedMaterial = kv.Key;
+        }
+        foreach (var mr in toStrip) { var mf = mr.GetComponent<MeshFilter>(); Destroy(mr); if (mf != null) Destroy(mf); }
+        ch.scatterDraws = byMat.Count;
     }
 
     // ------------------------------------------------------------ pools
@@ -393,5 +426,6 @@ public partial class BuilderManager
     }
     public int YardPoolsLoaded { get { int n = 0; foreach (var c in chunks.Values) n += c.pools; return n; } }
     public int YardScatterLoaded { get { int n = 0; foreach (var c in chunks.Values) n += c.scatter; return n; } }
+    public int YardScatterDraws { get { int n = 0; foreach (var c in chunks.Values) n += c.scatterDraws; return n; } }
 }
 }

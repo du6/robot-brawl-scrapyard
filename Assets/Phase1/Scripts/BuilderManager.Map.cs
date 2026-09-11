@@ -62,7 +62,7 @@ public partial class BuilderManager
         public readonly List<CompoundRobot> extraBots = new List<CompoundRobot>();   // a place's machines (Places)
         public readonly List<Vector3> shopPads = new List<Vector3>();
         public ArenaShow arena;
-        public int scatter, pools;                                              // WorldFar
+        public int scatter, pools, scatterDraws;                                // WorldFar
         public CompoundRobot poolBot; public LadderClient.PoolEntry poolEntry;  // Pool: another player's machine
     }
     readonly Dictionary<long, Chunk> chunks = new Dictionary<long, Chunk>();
@@ -462,22 +462,73 @@ public partial class BuilderManager
         RBTelemetry.Once(RBTelemetry.MAP);
     }
 
-    /// <summary>GARAGE. BackToBuild's sweep tears down every CompoundRobot and
-    /// the world root.</summary>
+    /// <summary>GARAGE. The world comes down, then BackToBuild's sweep takes
+    /// every CompoundRobot with it.</summary>
     public void LeaveMap()
     {
         if (mode != Mode.Map) return;
-        MapHudUI.Drop();
         if (testRobot != null) { lastMapPos = testRobot.rb.position; lastMapYaw = testRobot.transform.eulerAngles.y; resumeSeed = worldSeed; hasResume = true; }
+        TeardownWorld();
+        BackToBuild();
+    }
+
+    // ---- FIGHT WHERE YOU STAND (CrazyGames plan, step 4, 2026-09-10). The
+    // ring's code assumes the origin - FloorNet, the crush walls, the camera
+    // clamp, BuildArena - so the WORLD moves to the fight: the world root
+    // shifts so the encounter is at (0,0,0) with the highest ground under the
+    // ring at y=0, the planet stays as the backdrop (sky, fog, horizon,
+    // landmarks), the map's machines go, and the ring rises as a pad on the
+    // terrain. After the bell BackToBuild tears the world down; CONTINUE
+    // EXPLORING rebuilds it where you stood.
+    Vector3 worldShift; bool fightInWorld;
+    public Vector3 WorldShiftNow { get { return worldShift; } }
+    public bool FightInWorld { get { return fightInWorld; } }
+    void LeaveMapForFight()
+    {
+        if (mode != Mode.Map) return;
+        Vector3 at = testRobot != null ? testRobot.rb.position : homePos;
+        lastMapPos = at; lastMapYaw = testRobot != null ? testRobot.transform.eulerAngles.y : 0f; resumeSeed = worldSeed; hasResume = true;
+        MapHudUI.Drop(); DropCamPivot();
+        // the pad sits on the highest ground inside the ring
+        float pad = TerrainHeight(at.x, at.z);
+        for (int i = 0; i < 16; i++) { float a = i * Mathf.PI / 8f; pad = Mathf.Max(pad, TerrainHeight(at.x + Mathf.Cos(a) * (ARENA_FIGHT_HALF + 0.5f), at.z + Mathf.Sin(a) * (ARENA_FIGHT_HALF + 0.5f))); }
+        worldShift = new Vector3(-at.x, -pad, -at.z);
+        if (worldRoot != null) worldRoot.transform.position += worldShift;
+        // the map's machines are not under the world root: they go now (the
+        // fight spawns its own pair, and the world is rebuilt after the bell)
+        foreach (var c in chunks.Values)
+        {
+            if (c.enemy != null && c.enemy.gameObject != null) { c.enemy.gameObject.SetActive(false); Destroy(c.enemy.gameObject); }
+            if (c.poolBot != null && c.poolBot.gameObject != null) { c.poolBot.gameObject.SetActive(false); Destroy(c.poolBot.gameObject); }
+            foreach (var b in c.extraBots) if (b != null && b.gameObject != null) { b.gameObject.SetActive(false); Destroy(b.gameObject); }
+            c.enemy = null; c.poolBot = null; c.extraBots.Clear();
+            if (c.arena != null) { c.arena.a = null; c.arena.b = null; }
+        }
+        cardBot = null; cardBotId = ""; yardCard = false;
+        if (followCam != null) { followCam.enabled = false; Destroy(followCam); followCam = null; }
+        if (testRobot != null) { testRobot.gameObject.SetActive(false); Destroy(testRobot.gameObject); testRobot = null; testDrive = null; }
+        sandboxRoot = null;      // the ring gets its own sandbox; the world is not swept with it
+        fightInWorld = true;
+        mode = Mode.Build;       // StartFight's precondition; it hides the build root itself
+        ARENA_HALF = ARENA_FIGHT_HALF;
+    }
+    public const float ARENA_FIGHT_HALF = 7f;
+
+    /// <summary>The world comes down: the root (chunks, far mesh, landmarks,
+    /// marker) and every reference into it; the garage's look returns.</summary>
+    void TeardownWorld()
+    {
+        MapHudUI.Drop();
         DropCamPivot();
-        objectiveMarker = null;                                 // swept with the world root
-        farRoot = null; farGround = null; landmarks.Clear();   // swept with the world root
+        objectiveMarker = null;
+        farRoot = null; farGround = null; landmarks.Clear();
         chunks.Clear();
         cardBot = null; cardBotId = ""; yardCard = false;
-        RestoreLook();
-        BackToBuild();
+        if (worldRoot != null) { Destroy(worldRoot); }
         worldRoot = null;
+        RestoreLook();
         ARENA_HALF = 7f;
+        fightInWorld = false; worldShift = Vector3.zero;
     }
 
     /// <summary>Called from Update while in Build mode: the one-shot boot.</summary>
@@ -602,14 +653,14 @@ public partial class BuilderManager
 
     // ------------------------------------------------------------ the challenge
     /// <summary>CHALLENGE, from the card. Leaves the world and starts a Quick
-    /// bout against that enemy under the auto-brain. Fighting in place is the
-    /// next pass; for now the bout is in the standard ring.</summary>
+    /// bout against that enemy, driven from the stick, where you stand.</summary>
     public void ChallengeParked()
     {
         if (ChallengePool()) return;   // a stranger's machine: the sign-in gate, then their build (Pool.cs)
         if (mode != Mode.Map || cardBot == null) return;
         string opp = string.IsNullOrEmpty(cardBotId) ? YARD_BOT : cardBotId;
-        LeaveMap();
+        // no LeaveMap: StartFight leaves the map FOR THE FIGHT and keeps the
+        // world standing around the ring (LeaveMapForFight)
         StartYardFight(opp);
     }
 

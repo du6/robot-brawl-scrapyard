@@ -5470,7 +5470,7 @@ public partial class BuilderManager : MonoBehaviour
         // Phase 5 fix: a fight must never stack on top of a live test drive
         // (the touch dock used to stay tappable during TEST DRIVE).
         if (mode == Mode.Test) BackToBuild();
-        if (mode == Mode.Map) LeaveMap();
+        if (mode == Mode.Map) LeaveMapForFight();   // Scrapyard: the ring rises where you stand (Map.cs)
 
         // ---- Phase 4: fight context. A ladder fight (StartLadderFight) has
         // already set activeRungIndex; every other entry point is an
@@ -5493,6 +5493,18 @@ public partial class BuilderManager : MonoBehaviour
         mode = Mode.Fight;
         message = "";
         BuildArena();
+        if (fightInWorld)
+        {
+            // the ring is a PAD on the planet: a dark skirt under the floor
+            // hides the ground falling away beneath it (Scrapyard, Map.cs)
+            var skirt = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            skirt.name = "arena_skirt";
+            skirt.transform.SetParent(sandboxRoot.transform, false);
+            skirt.transform.position = new Vector3(0f, -1.6f, 0f);
+            skirt.transform.localScale = new Vector3(2f * ARENA_HALF + 0.6f, 3.2f, 2f * ARENA_HALF + 0.6f);
+            skirt.GetComponent<Renderer>().sharedMaterial = PartVisualFactory.Mat(new Color(0.12f, 0.12f, 0.14f), 0.3f, 0.3f);
+            Object.Destroy(skirt.GetComponent<Collider>());
+        }
         // C3A: per-contest hazard arenas - career contests only; exhibitions
         // and the ladder keep the clean box.
         ArenaHazards.Clear();
@@ -5797,6 +5809,7 @@ public partial class BuilderManager : MonoBehaviour
     public void BackToBuild()
     {
         yardStickFight = false; // Scrapyard (Drive.cs)
+        if (fightInWorld) TeardownWorld();   // Scrapyard: the world that stood around the ring comes down (Map.cs)
         ArenaHazards.Clear();   // C3A: hazards never outlive the fight
         TouchControls.fightActive = false;   // Phase 5
         CompoundRobot.ClearAll();

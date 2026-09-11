@@ -160,10 +160,11 @@ namespace RobotBrawl.Phase0
             Check(bm.RoadAt(midR.x, midR.z) > 0.95f, "a road runs from the trading post to the park (crown " + bm.RoadAt(midR.x, midR.z).ToString("0.00") + ")");
             Check(bm.RoadAt(midR.x + sideR.x * 30f, midR.z + sideR.z * 30f) == 0f, "...and 30 m beside it is open ground");
             Check(bm.YardScatterLoaded >= 100 && bm.YardScatterLoaded <= 400, "the loaded world carries ground life, sparse (7-13 a chunk) - boulders, tufts, shards, vents (" + bm.YardScatterLoaded + " over " + bm.WorldChunksLoaded + " chunks)");
-            bool batched = false; int scatterR = 0;
+            yield return null;   // the originals' renderers are destroyed at end of frame
+            int scatterR = 0;
             foreach (var mr in Object.FindObjectsByType<MeshRenderer>(FindObjectsSortMode.None))
-                if (mr.transform.name.StartsWith("scatter_") || (mr.transform.parent != null && mr.transform.parent.name.StartsWith("scatter_"))) { scatterR++; if (mr.isPartOfStaticBatch) batched = true; }
-            Check(scatterR > 0 && batched, "...static-batched into a few draws (" + scatterR + " renderers)");
+                if (mr.transform.name.StartsWith("scatter_") || (mr.transform.parent != null && mr.transform.parent.name.StartsWith("scatter_"))) scatterR++;
+            Check(scatterR == bm.YardScatterDraws && scatterR <= bm.WorldChunksLoaded * 4, "...combined into a few draws per chunk that move with the world, not static batches (" + scatterR + " renderers for " + bm.YardScatterLoaded + " props)");
             Vector2 poolC;
             bool anyPool = bm.NearestPool(hp0, out poolC);
             Check(anyPool, "a pool-sized crater exists within 13 x 13 cells of home");
@@ -467,6 +468,18 @@ namespace RobotBrawl.Phase0
             yield return null; yield return null;
             var fm = Object.FindFirstObjectByType<FightManager>();
             Check(bm.mode == BuilderManager.Mode.Fight && fm != null, "CHALLENGE enters a fight");
+            // ---- the ring rises where you stand (CrazyGames plan, step 4) ------------
+            var worldGo = GameObject.Find("world");
+            Check(worldGo != null && bm.FightInWorld, "...and the world stays standing around the ring");
+            Check(worldGo != null && Mathf.Abs(worldGo.transform.position.x + chalAt.x) < 0.01f && Mathf.Abs(worldGo.transform.position.z + chalAt.z) < 0.01f,
+                  "...shifted so the encounter is at the origin the ring assumes (world at " + (worldGo != null ? worldGo.transform.position.ToString("0.0") : "-") + ")");
+            var floorGo = GameObject.Find("arena_floor"); var skirtGo = GameObject.Find("arena_skirt");
+            Check(floorGo != null && Mathf.Abs(floorGo.transform.position.y) < 0.01f && skirtGo != null, "...the ring is a pad on the ground with a skirt under it");
+            float padH = bm.TerrainHeight(chalAt.x, chalAt.z);
+            Check(Mathf.Abs(bm.WorldShiftNow.y + padH) < 3.5f, "...its floor at the highest ground inside the ring (shift " + bm.WorldShiftNow.y.ToString("0.0") + ", ground " + padH.ToString("0.0") + ")");
+            Check(bm.PlanetLookOn && RenderSettings.fog, "...under the planet's sky, not the garage's");
+            Check(bm.testRobot != null && bm.testRobot.rb.position.magnitude < 8f, "...with you in it");
+            Check(GameObject.Find("far_terrain") != null, "...and the horizon still out there");
             Check(FightManager.quickBout && Career.quickFight, "...a Quick bout, settled as a quick fight");
             // owen, 2026-09-10: "replace auto fight with manual fight" - the
             // player's side is the stick, and no program sits on the robot.
@@ -509,6 +522,7 @@ namespace RobotBrawl.Phase0
             FightManager.quickNext(bm); yield return null; yield return null;
             Vector3 backAt = bm.testRobot != null ? bm.testRobot.rb.position : Vector3.zero;
             Check(bm.mode == BuilderManager.Mode.Map && Object.FindFirstObjectByType<FightManager>() == null, "...and it puts you back on the map (" + bm.mode + ")");
+            Check(!bm.FightInWorld && bm.WorldChunksLoaded == want && GameObject.Find("arena_floor") == null, "...the ring gone, the world rebuilt around you (" + bm.WorldChunksLoaded + " chunks)");
             Check(Vector2.Distance(new Vector2(backAt.x, backAt.z), new Vector2(chalAt.x, chalAt.z)) < 6f, "...where the challenge began, not at home (" + Vector2.Distance(new Vector2(backAt.x, backAt.z), new Vector2(chalAt.x, chalAt.z)).ToString("0.0") + " m off)");
             bm.LeaveMap(); yield return null;
             bm.BackToBuild(); yield return null;
