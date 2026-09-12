@@ -125,6 +125,13 @@ namespace RobotBrawl.Phase0
             Check(!bm.YardCardShown, "no card at home");
             // ---- the look (WorldLook): a planet, not a plane ----------------------
             Check(Shader.Find("Scrapyard/PlanetGround") != null && Shader.Find("Scrapyard/SkyBody") != null, "both planet shaders exist");
+            // owen, 2026-09-12: the chest beam drew as a matte rod ("a vertical bar
+            // on top of every item") because emissive needs a bloom nothing does.
+            // It is a light shaft now: additive, fading out with height.
+            Check(Shader.Find("Scrapyard/Beacon") != null, "the beacon shader exists");
+            var beamMat = bm.BeaconMat(false);
+            Check(beamMat != null && beamMat.shader.name == "Scrapyard/Beacon", "...and the chest's beam uses it (" + (beamMat != null ? beamMat.shader.name : "-") + ")");
+            Check(beamMat != null && beamMat.GetTag("Queue", false, "") != "Geometry", "...drawn as transparent light, not solid geometry");
             Check(bm.GroundMaterial != null && bm.GroundMaterial.shader.name == "Scrapyard/PlanetGround", "the ground draws with the planet shader");
             var hpl = bm.YardGarageDoor;
             var groundGo = GameObject.Find("chunk_" + Mathf.FloorToInt(hpl.x / BuilderManager.CHUNK) + "_" + Mathf.FloorToInt(hpl.z / BuilderManager.CHUNK) + "/ground");

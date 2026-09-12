@@ -809,7 +809,7 @@ public partial class BuilderManager
             objectiveMarker.transform.SetParent(worldRoot.transform, false);
             Prim(PrimitiveType.Cylinder, objectiveMarker.transform, new Vector3(0f, 0.06f, 0f), new Vector3(3.6f, 0.03f, 3.6f), Quaternion.identity, matCyan, false);
             Prim(PrimitiveType.Cylinder, objectiveMarker.transform, new Vector3(0f, 0.10f, 0f), new Vector3(2.6f, 0.03f, 2.6f), Quaternion.identity, matBody, false);
-            Prim(PrimitiveType.Cylinder, objectiveMarker.transform, new Vector3(0f, 9f, 0f), new Vector3(0.16f, 9f, 0.16f), Quaternion.identity, matCyan, false);   // the beam
+            Prim(PrimitiveType.Cylinder, objectiveMarker.transform, new Vector3(0f, 9f, 0f), new Vector3(0.55f, 9f, 0.55f), Quaternion.identity, BeaconMat(true), false);   // the beam (Scrapyard/Beacon: light, not a rod). Narrow: you stand right next to this one.
         }
         if (objectiveMarker != null)
         {

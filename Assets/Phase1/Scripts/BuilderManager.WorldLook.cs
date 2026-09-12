@@ -304,7 +304,25 @@ public partial class BuilderManager
     /// <summary>A TREASURE CHEST (owen, 2026-09-10: "treasure box doesn't look
     /// like treasure right now"): a dark chest with a domed lid, gold bands, a
     /// lit clasp, a glowing seam, and the beam you can see from a way off.</summary>
-    Material matChest, matChestLid, matGold;
+    Material matChest, matChestLid, matGold, matBeaconAmber, matBeaconCyan;
+    /// <summary>A shaft of LIGHT, not a rod (Scrapyard/Beacon: additive, fading
+    /// out with height, soft at the silhouette). owen, 2026-09-12: "why does
+    /// each item on the planet have a vertical bar on top of it" - the old beam
+    /// was an emissive cylinder, and emissive reads as light only when
+    /// something blooms it; nothing does since the build dropped URP's
+    /// post-processing. It drew as a matte stick on every chest.</summary>
+    public Material BeaconMat(bool cyan)
+    {
+        ref Material slot = ref cyan ? ref matBeaconCyan : ref matBeaconAmber;
+        if (slot != null) return slot;
+        var sh = Shader.Find("Scrapyard/Beacon");
+        if (sh == null) return cyan ? matCyan : matAmber;   // editor without the shader: the old look, never a pink error
+        slot = new Material(sh);
+        slot.SetColor("_Color", cyan ? new Color(0.35f, 0.85f, 1f) : new Color(1f, 0.66f, 0.22f));
+        slot.SetFloat("_Intensity", cyan ? 0.60f : 0.70f);
+        slot.SetFloat("_Pulse", cyan ? 0.22f : 0.14f);
+        return slot;
+    }
     GameObject MakePod(Transform parent, float x, float gy, float z, string key)
     {
         if (matChest == null)
@@ -324,7 +342,8 @@ public partial class BuilderManager
         Prim(PrimitiveType.Cube, t, new Vector3(0.36f, 0.45f, 0f), new Vector3(0.10f, 0.95f, 0.82f), Quaternion.identity, matGold, false);
         Prim(PrimitiveType.Cube, t, new Vector3(0f, 0.60f, 0.40f), new Vector3(0.18f, 0.20f, 0.08f), Quaternion.identity, matAmber, false);   // the clasp
         Prim(PrimitiveType.Cube, t, new Vector3(0f, 0.625f, 0.395f), new Vector3(1.10f, 0.03f, 0.02f), Quaternion.identity, matAmber, false);  // light in the seam
-        Prim(PrimitiveType.Cylinder, t, new Vector3(0f, 3.2f, 0f), new Vector3(0.10f, 2.2f, 0.12f), Quaternion.identity, matAmber, false);  // the beam
+        // the beam: wide enough to read as light at 100 m, gone by its top
+        Prim(PrimitiveType.Cylinder, t, new Vector3(0f, 3.6f, 0f), new Vector3(0.55f, 3.0f, 0.55f), Quaternion.identity, BeaconMat(false), false);
         return chest;
     }
 
