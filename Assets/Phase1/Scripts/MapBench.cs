@@ -461,6 +461,28 @@ namespace RobotBrawl.Phase0
             while (Time.realtimeSinceStartup < bdead && MapHudUI.inst.BoardText == "reading the board...") yield return null;
             Check(MapHudUI.inst.BoardText.Length > 0 && MapHudUI.inst.BoardText != "reading the board...", "...and says what it can (offline here: " + MapHudUI.inst.BoardText.Split('\n')[0] + ")");
             MapHudUI.inst.HideBoard();
+
+            // owen, 2026-09-12: "it asked me to sign in to get on the board, but
+            // where is the sign in button". The board asked for something only a
+            // challenge could give. Signed out, the board carries its own.
+            string tokenHold = LadderClient.Token; LadderClient.Token = null;
+            MapHudUI.inst.BoardButton.onClick.Invoke(); yield return null;
+            Check(MapHudUI.inst.BoardSignInShown, "signed out, the board offers SIGN IN");
+            MapHudUI.inst.BoardSignInButton.onClick.Invoke(); yield return null;   // the BUTTON, not the seam
+            Check(MapHudUI.inst.SignInShown && !MapHudUI.inst.BoardShown, "...and it opens the sign-in panel over the board");
+            Check(MapHudUI.inst.SignInTitle.Contains("BOARD"), "...worded for the board, not for a challenge (" + MapHudUI.inst.SignInTitle + ")");
+            MapHudUI.inst.SignInCancelButton.onClick.Invoke(); yield return null;
+            Check(!MapHudUI.inst.SignInShown && MapHudUI.inst.BoardShown, "...and NOT NOW puts you back on the board, not on the map");
+            MapHudUI.inst.HideBoard();
+            // this leg needs a token of its OWN: tokenHold is whatever the bench
+            // started with, which headless is nothing, so restoring it would test
+            // the signed-OUT board twice and read as a product failure.
+            LadderClient.Token = "bench-session-token";
+            MapHudUI.inst.BoardButton.onClick.Invoke(); yield return null;
+            Check(!MapHudUI.inst.BoardSignInShown, "signed in, the board does not ask again");
+            MapHudUI.inst.HideBoard();
+            LadderClient.Token = tokenHold;
+
             bm.TestUnparkPool();
             bm.TeleportPlayer(new Vector3(hp.x, 0f, hp.z)); for (int i = 0; i < 10; i++) yield return null;
             int qf0 = d.quickFights;

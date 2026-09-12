@@ -30,6 +30,11 @@ public class MapHudUI : MonoBehaviour
     Button garage, challenge, board;
     // the sign-in gate (a stranger's machine) and the yard board
     RectTransform signIn, boardPanel; InputField emailIn, passIn, nameIn; Text signStatus, boardTitle, boardBody; bool busy;
+    // owen, 2026-09-12: "when I click board it asked me to sign in, but where is
+    // the sign in button" - there wasn't one. The panel was reachable only by
+    // challenging a stranger's machine, so the board asked for something the
+    // board could not give. It carries its own SIGN IN now.
+    Button boardSignIn, boardClose, signCancel; Text signTitle, signSub; bool signFromBoard;
     static Font font;
     class Chip { public GameObject go; public Image panel, needleBar, needleTip; public Text label, dist; public RectTransform needleRt; }
     public static readonly Color PANEL_HI = new Color(0.26f, 0.32f, 0.42f, 0.98f);   // the objective's chip
@@ -50,7 +55,11 @@ public class MapHudUI : MonoBehaviour
     public string CardTitle { get { return cardTitle != null ? cardTitle.text : ""; } }
     public bool SignInShown { get { return signIn != null && signIn.gameObject.activeSelf; } }
     public Button BoardButton { get { return board; } }
+    public Button BoardSignInButton { get { return boardSignIn; } }
+    public Button SignInCancelButton { get { return signCancel; } }
     public bool BoardShown { get { return boardPanel != null && boardPanel.gameObject.activeSelf; } }
+    public bool BoardSignInShown { get { return boardSignIn != null && boardSignIn.gameObject.activeSelf; } }
+    public string SignInTitle { get { return signTitle != null ? signTitle.text : ""; } }
     public string BoardText { get { return boardBody != null ? boardBody.text : ""; } }
 
     public static MapHudUI Ensure(BuilderManager bm)
@@ -159,10 +168,10 @@ public class MapHudUI : MonoBehaviour
         signIn = MkPanel("signin", root, PANEL).GetComponent<RectTransform>();
         signIn.anchorMin = signIn.anchorMax = new Vector2(0.5f, 0.5f); signIn.pivot = new Vector2(0.5f, 0.5f);
         signIn.sizeDelta = new Vector2(420f, 300f);
-        var t = MkText("title", signIn, "SIGN IN TO CHALLENGE", 20, TextAnchor.MiddleCenter); t.fontStyle = FontStyle.Bold;
-        Place(t.rectTransform, 0f, -10f, -16f, 28f);
-        var sub = MkText("sub", signIn, "another player's machine - points go on the board under your name", 13, TextAnchor.MiddleCenter);
-        sub.color = new Color(0.75f, 0.80f, 0.88f); Place(sub.rectTransform, 0f, -38f, -16f, 20f);
+        signTitle = MkText("title", signIn, "SIGN IN TO CHALLENGE", 20, TextAnchor.MiddleCenter); signTitle.fontStyle = FontStyle.Bold;
+        Place(signTitle.rectTransform, 0f, -10f, -16f, 28f);
+        signSub = MkText("sub", signIn, "another player's machine - points go on the board under your name", 13, TextAnchor.MiddleCenter);
+        signSub.color = new Color(0.75f, 0.80f, 0.88f); Place(signSub.rectTransform, 0f, -38f, -16f, 20f);
         emailIn = MkInput("email", signIn, "email", false); Place(emailIn.GetComponent<RectTransform>(), 0f, -66f, -48f, ROW);
         passIn = MkInput("password", signIn, "password", true); Place(passIn.GetComponent<RectTransform>(), 0f, -66f - ROW - 8f, -48f, ROW);
         nameIn = MkInput("name", signIn, "display name (new accounts)", false); Place(nameIn.GetComponent<RectTransform>(), 0f, -66f - 2f * (ROW + 8f), -48f, ROW);
@@ -175,12 +184,26 @@ public class MapHudUI : MonoBehaviour
         var create = MkButton("create", signIn, "CREATE ACCOUNT", 15, () => DoSignIn(true));
         var cr = create.GetComponent<RectTransform>(); cr.anchorMin = new Vector2(0.5f, 0f); cr.anchorMax = new Vector2(0.5f, 0f); cr.pivot = new Vector2(0.5f, 0f);
         cr.anchoredPosition = new Vector2(8f, 12f); cr.sizeDelta = new Vector2(150f, ROW);
-        var cancel = MkButton("cancel", signIn, "NOT NOW", 15, () => HideSignIn());
+        var cancel = signCancel = MkButton("cancel", signIn, "NOT NOW", 15, () => { HideSignIn(); if (signFromBoard) { signFromBoard = false; ShowBoard(); } });
         var xr = cancel.GetComponent<RectTransform>(); xr.anchorMin = new Vector2(1f, 0f); xr.anchorMax = new Vector2(1f, 0f); xr.pivot = new Vector2(1f, 0f);
         xr.anchoredPosition = new Vector2(-16f, 12f); xr.sizeDelta = new Vector2(96f, ROW);
         signIn.gameObject.SetActive(false);
     }
-    public void ShowSignIn() { if (signIn == null) return; signStatus.text = ""; busy = false; signIn.gameObject.SetActive(true); }
+    public void ShowSignIn() { ShowSignIn(false); }
+    /// <summary>fromBoard: opened by the board's own button rather than by a
+    /// challenge, so the wording is about the board and NOT NOW goes back to it.</summary>
+    public void ShowSignIn(bool fromBoard)
+    {
+        if (signIn == null) return;
+        signFromBoard = fromBoard;
+        if (fromBoard) HideBoard();
+        if (signTitle != null) signTitle.text = fromBoard ? "SIGN IN TO GET ON THE BOARD" : "SIGN IN TO CHALLENGE";
+        if (signSub != null) signSub.text = fromBoard ? "your yard points are posted under your name"
+                                                     : "another player's machine - points go on the board under your name";
+        signStatus.text = ""; busy = false;
+        signIn.gameObject.SetActive(true);
+        signIn.SetAsLastSibling();
+    }
     public void HideSignIn() { if (signIn != null) signIn.gameObject.SetActive(false); }
     void DoSignIn(bool create)
     {
@@ -197,6 +220,7 @@ public class MapHudUI : MonoBehaviour
             LadderClient.SaveSession(displayName ?? name);
             HideSignIn();
             bm.OnSignedIn(displayName ?? name);
+            if (signFromBoard) { signFromBoard = false; ShowBoard(); }
         };
         if (create) bm.StartCoroutine(LadderClient.Register(email, pass, name, done));
         else bm.StartCoroutine(LadderClient.Login(email, pass, done));
@@ -214,15 +238,24 @@ public class MapHudUI : MonoBehaviour
         boardBody.horizontalOverflow = HorizontalWrapMode.Wrap; boardBody.verticalOverflow = VerticalWrapMode.Truncate;
         var br = boardBody.rectTransform; br.anchorMin = new Vector2(0f, 0f); br.anchorMax = new Vector2(1f, 1f);
         br.offsetMin = new Vector2(20f, 12f + ROW + 8f); br.offsetMax = new Vector2(-20f, -44f);
-        var close = MkButton("close", boardPanel, "CLOSE", 16, () => HideBoard());
-        var xr = close.GetComponent<RectTransform>(); xr.anchorMin = new Vector2(0.5f, 0f); xr.anchorMax = new Vector2(0.5f, 0f); xr.pivot = new Vector2(0.5f, 0f);
+        boardClose = MkButton("close", boardPanel, "CLOSE", 16, () => HideBoard());
+        var xr = boardClose.GetComponent<RectTransform>(); xr.anchorMin = new Vector2(0.5f, 0f); xr.anchorMax = new Vector2(0.5f, 0f); xr.pivot = new Vector2(0.5f, 0f);
         xr.anchoredPosition = new Vector2(0f, 12f); xr.sizeDelta = new Vector2(140f, ROW);
+        boardSignIn = MkButton("board_signin", boardPanel, "SIGN IN", 16, () => ShowSignIn(true));
+        boardSignIn.GetComponent<Image>().color = AMBER; boardSignIn.GetComponentInChildren<Text>().color = new Color(0.12f, 0.08f, 0.02f);
+        var sr = boardSignIn.GetComponent<RectTransform>(); sr.anchorMin = new Vector2(0.5f, 0f); sr.anchorMax = new Vector2(0.5f, 0f); sr.pivot = new Vector2(0.5f, 0f);
+        sr.anchoredPosition = new Vector2(-76f, 12f); sr.sizeDelta = new Vector2(140f, ROW);
+        boardSignIn.gameObject.SetActive(false);
         boardPanel.gameObject.SetActive(false);
     }
     public void ShowBoard()
     {
         if (boardPanel == null || bm == null) return;
         boardPanel.gameObject.SetActive(true);
+        boardPanel.SetAsLastSibling();
+        bool wantSignIn = !LadderClient.SignedIn && !BuilderManager.PortalBuild;
+        if (boardSignIn != null) boardSignIn.gameObject.SetActive(wantSignIn);
+        if (boardClose != null)  boardClose.GetComponent<RectTransform>().anchoredPosition = new Vector2(wantSignIn ? 76f : 0f, 12f);
         boardBody.text = "reading the board...";
         bm.StartCoroutine(LadderClient.YardBoard(20, (rows, me, err) =>
         {
@@ -232,7 +265,7 @@ public class MapHudUI : MonoBehaviour
             if (rows.Count == 0) sb.Append("nobody on the board yet - challenge a stranger's machine\n");
             foreach (var r in rows) sb.Append(r.rank.ToString().PadLeft(3)).Append("   ").Append(r.owner).Append("   ").Append(r.points).Append(" pts   ").Append(r.wins).Append("/").Append(r.bouts).Append(" won\n");
             if (me != null) sb.Append("\nyou: rank ").Append(me.rank).Append("  ·  ").Append(me.points).Append(" pts  ·  ").Append(me.wins).Append("/").Append(me.bouts).Append(" won");
-            else if (!LadderClient.SignedIn) sb.Append("\nsign in (challenge a stranger) to get on the board");
+            else if (!LadderClient.SignedIn) sb.Append("\nsign in below, then beat a stranger's machine, and your name lands here");
             boardBody.text = sb.ToString();
         }));
     }
