@@ -515,6 +515,31 @@ public class TouchSmoke : MonoBehaviour
                       "a line that needs two rows still gets them");
         }
 
+        // ---- AND IN ORDINARY BUILDING IT IS NOT THERE AT ALL -------------
+        // owen: "the bar is still big. Do we need it? How about just removing
+        // it." In the workshop, with nothing held and the build inside its
+        // cap, it now goes away entirely - and the camera's top inset has to
+        // agree, or the robot is framed under a bar that is not drawn.
+        {
+            bool careerHold = Career.active;
+            Career.active = true;                       // ModeTag is DEV SANDBOX otherwise, and that must never hide
+            if (bm.HasSelection) bm.SelectPart(bm.SelectedPart);
+            ui.ShowTab(0);
+            yield return null; yield return null;
+            bool over = bm.BuildMassInt > CareerDB.Leagues[Mathf.Clamp(Career.targetLeagueIdx, 0, CareerDB.Leagues.Length - 1)].weightCap;
+            if (!over)
+            {
+                Check(!ui.StatsBandShown, "building with nothing held, the top band is gone");
+                Check(ui.TopCoverUnits < ui.TouchRowUnits, "...and the camera is told the top is clear (" + ui.TopCoverUnits.ToString("0") + " units)");
+            }
+            Tap("Beam"); yield return null; yield return null;
+            Check(ui.StatsBandShown, "hold a part and it comes back to say where to put it");
+            Check(ui.TopCoverUnits >= ui.TouchRowUnits - 1f, "...and the camera is told so");
+            if (bm.HasSelection) bm.SelectPart(bm.SelectedPart);
+            yield return null; yield return null;
+            Career.active = careerHold;
+        }
+
         // ---- SENSORS ARE GONE FROM THE GARAGE ----------------------------
         // owen, 2026-09-13: "given that there is no program in this version,
         // sensors are redundant - hide all sensors from garage, including both

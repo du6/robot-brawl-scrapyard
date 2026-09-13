@@ -10,6 +10,7 @@ public partial class MobileBuilderUI
     float userUiScale = 1f;
     readonly Dictionary<Text, int> desktopTypeSizes = new Dictionary<Text, int>();
     RectTransform garageTools;
+    Text garageMass;
     Button garageFit, garageZoomOut, garageZoomIn, uiScaleButton;
     static int browserMetricsFrame = -1;
     static float browserPixelRatio = 1f;
@@ -90,6 +91,13 @@ public partial class MobileBuilderUI
         group.spacing = 4f;
         group.childForceExpandWidth = true;
         group.childForceExpandHeight = true;
+        // owen's phone, 2026-09-13: "the bar is still big. Do we need it? How
+        // about just removing it". The workshop's top band is gone; the two
+        // numbers it was really carrying - what the robot weighs against its
+        // cap, and how many parts it has - ride here instead, beside FIT,
+        // where they cost a strip of the tool row and none of the workspace.
+        garageMass = MkText("garage_mass", go.transform, "", 14, TextAnchor.MiddleCenter);
+        garageMass.color = new Color(0.78f, 0.84f, 0.93f);
         garageFit = MkButton("garage_fit", go.transform, "FIT", 14, () => { if (bm != null) bm.FitGarageView(); });
         garageZoomOut = MkButton("garage_zoom_out", go.transform, "-", 18, () => { if (bm != null) bm.ZoomGarageView(1.18f); });
         garageZoomIn = MkButton("garage_zoom_in", go.transform, "+", 18, () => { if (bm != null) bm.ZoomGarageView(1f / 1.18f); });
@@ -122,7 +130,17 @@ public partial class MobileBuilderUI
         if (!visible) return;
         float row = TouchRow();
         float px = !PhysicalTouchSizing ? browserPixelRatio * userUiScale / Mathf.Max(0.01f, canvas.scaleFactor) : row / 44f;
-        float width = (build ? 164f : 0f) + (uiScaleButton.gameObject.activeSelf ? 120f : 0f);
+        garageMass.gameObject.SetActive(build && bm != null && Career.active);
+        if (garageMass.gameObject.activeSelf && bm != null)
+        {
+            var lg = CareerDB.Leagues[Mathf.Clamp(Career.targetLeagueIdx, 0, CareerDB.Leagues.Length - 1)];
+            bool over = bm.BuildMassInt > lg.weightCap;
+            garageMass.text = bm.BuildMassInt + "/" + Mathf.RoundToInt(lg.weightCap) + " kg · " + bm.PlacedCount + "p"
+                            + (over ? "  OVER" : "");
+            garageMass.color = over ? new Color(1f, 0.82f, 0.25f) : new Color(0.78f, 0.84f, 0.93f);
+        }
+        float width = (build ? 164f : 0f) + (garageMass.gameObject.activeSelf ? 168f : 0f)
+                    + (uiScaleButton.gameObject.activeSelf ? 120f : 0f);
         garageTools.sizeDelta = new Vector2(width * px, row);
         garageTools.anchoredPosition = new Vector2(-(safeR + 8f), dockRt.sizeDelta.y);
         uiScaleButton.GetComponentInChildren<Text>().text = "UI " + Mathf.RoundToInt(userUiScale * 100f) + "%";

@@ -338,6 +338,8 @@ public partial class MobileBuilderUI : MonoBehaviour
     /// text that happens to be in it.</summary>
     public float StatsBarHeight { get { return statsRt != null ? statsRt.sizeDelta.y : 0f; } }
     public float TouchRowUnits { get { return TouchRow(); } }
+    public bool StatsBandShown { get { return statsRt != null && statsRt.gameObject.activeSelf; } }
+    public float TopCoverUnits { get { return TopInset(); } }
     public bool StatsLineFitsOneRow
     {
         get
@@ -2594,9 +2596,7 @@ public partial class MobileBuilderUI : MonoBehaviour
         float ch = 0f;
         if (canvas != null) { var crt = canvas.GetComponent<RectTransform>(); if (crt != null) ch = crt.rect.height; }
         if (ch < 100f) return 470f;               // canvas not laid out yet
-        float top = BarH
-                  + ((msgBar != null && msgBar.activeSelf) ? MsgH : 0f)
-                  + ((tipBar != null && tipBar.activeSelf) ? TipH : 0f);
+        float top = TopInset();
         // - HANDLE_H: the list tabs used to take EVERY unit down to the top
         // bar, which left the handle nowhere to go. Floating it above the dock
         // put it across the status line; tucking it inside put it across the
@@ -2661,9 +2661,7 @@ public partial class MobileBuilderUI : MonoBehaviour
         float ch = 0f;
         if (canvas != null) { var crt = canvas.GetComponent<RectTransform>(); if (crt != null) ch = crt.rect.height; }
         if (ch < 100f) { coverBottom = coverTop = 0f; return; }
-        float top = BarH
-                  + ((msgBar != null && msgBar.activeSelf) ? MsgH : 0f)
-                  + ((tipBar != null && tipBar.activeSelf) ? TipH : 0f);
+        float top = TopInset();
         coverBottom = Mathf.Clamp01(dockH / ch);
         coverTop = Mathf.Clamp01(top / ch);
     }
@@ -5005,9 +5003,7 @@ public partial class MobileBuilderUI : MonoBehaviour
         // R4: the top band is now up to three stacked bars, and SKIP TIPS is a
         // real button in the third one - a tap there must not also drag the
         // build camera.
-        float top = BarH
-                  + ((msgBar != null && msgBar.activeSelf) ? MsgH : 0f)
-                  + ((tipBar != null && tipBar.activeSelf) ? TipH : 0f);
+        float top = TopInset();
         // The handle floats ABOVE the dock, so the dock's height does not cover
         // it. Without this, tapping SHOW PANEL would also drop a part on the
         // robot behind it - the exact class of fall-through the R1 note above
@@ -5471,6 +5467,16 @@ public partial class MobileBuilderUI : MonoBehaviour
     /// budgets two FontUnits lines, so everything stacking under it must read
     /// this rather than the 46-unit constant — the MsgH pattern exactly.</summary>
     float BarH { get { return statsRt != null ? statsRt.sizeDelta.y : BAR_H; } }
+    /// <summary>What the top of the screen is actually covered by. A band that
+    /// is hidden covers NOTHING, and three places read this - the camera's
+    /// framing among them, so a stale reading here parks the robot under a bar
+    /// that is not there.</summary>
+    float TopInset()
+    {
+        return ((statsRt != null && statsRt.gameObject.activeSelf) ? BarH : 0f)
+             + ((msgBar != null && msgBar.activeSelf) ? MsgH : 0f)
+             + ((tipBar != null && tipBar.activeSelf) ? TipH : 0f);
+    }
 
     /// <summary>Give the top band the rows its text actually needs. It used to
     /// reserve TWO unconditionally, which on a phone is a deep dark strip
@@ -5478,9 +5484,34 @@ public partial class MobileBuilderUI : MonoBehaviour
     /// 2026-09-13: "the top bar is too big, partially blocking the robot").
     /// Measured against the real width, so it needs no device breakpoint, and
     /// two rows are still available the moment a line genuinely needs them.</summary>
+    /// <summary>Does the top band have anything worth a strip of the screen?
+    /// owen's phone, 2026-09-13: "do we need it? how about just removing it".
+    /// In the workshop it mostly restated what the tool row and the SAVE
+    /// button already say, so it is gone from there - and comes back only
+    /// while it has something a player cannot get anywhere else: a held part
+    /// waiting to be put somewhere, a build over its weight cap, or a mode
+    /// that is not ordinary play.</summary>
+    bool StatsBandEarnsItsPlace()
+    {
+        if (bm == null) return true;
+        if (bm.mode != BuilderManager.Mode.Build) return true;     // the map and the fight draw their own
+        if (tab != 0) return true;                                 // ROBOTS / SHOP still caption themselves
+        if (bm.HasSelection) return true;                          // "tap the robot to place" is the whole instruction
+        if (ModeTag().Length > 0) return true;                     // DEV SANDBOX / DRAFT must never hide
+        if (Career.active)
+        {
+            var lg = CareerDB.Leagues[Mathf.Clamp(Career.targetLeagueIdx, 0, CareerDB.Leagues.Length - 1)];
+            if (bm.BuildMassInt > lg.weightCap) return true;       // OVER is a blocking condition, not a statistic
+        }
+        return false;
+    }
+
     void FitStatsBar()
     {
         if (statsRt == null || statsText == null) return;
+        bool earns = StatsBandEarnsItsPlace();
+        if (statsRt.gameObject.activeSelf != earns) statsRt.gameObject.SetActive(earns);
+        if (!earns) return;
         float avail = statsText.rectTransform.rect.width;
         int rows = (avail > 20f && statsText.preferredWidth > avail) ? 2 : 1;
         float want = Mathf.Max(BAR_H, FontUnits(13f) * rows + 14f);
