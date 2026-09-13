@@ -3275,6 +3275,7 @@ public partial class BuilderManager : MonoBehaviour
     public string PartLabel(int i) { return (i >= 0 && i < PaletteCount) ? palette[i].label : ""; }
     public string PartCategory(int i) { return (i >= 0 && i < PaletteCount) ? palette[i].category.ToString() : ""; }
     public bool PartIsActuator(int i) { return i >= 0 && i < PaletteCount && palette[i].actuator; }
+    public bool PartIsSensor(int i) { return i >= 0 && i < PaletteCount && palette[i].sensor; }
     public int PartCost(int i) { if (i < 0 || i >= PaletteCount) return 0; var d = palette[i]; return d.CostOf(d.EffectiveMat(activeMat)); }
     public int PartMass(int i) { if (i < 0 || i >= PaletteCount) return 0; return Mathf.RoundToInt(palette[i].MassOf(activeMat)); }
     // ---- C1: career inventory. DERIVED accounting: the inventory is never
@@ -3331,6 +3332,23 @@ public partial class BuilderManager : MonoBehaviour
     /// <summary>Player-side retirement flag for palette index i — the tile
     /// hides, the shop skips, the def lives on for the roster.</summary>
     public bool PartRosterOnly(int i) { return i >= 0 && i < PaletteCount && palette[i].rosterOnly; }
+    /// <summary>SCRAPYARD, owen 2026-09-13: "there is no program in this
+    /// version, sensors are redundant - hide all sensors from garage, both
+    /// BUILD and SHOP". A sensor is an eye that feeds SensorBus, and nothing
+    /// reads the bus here: this fork has no PROGRAM tab and the fight is
+    /// driven by the player's own stick. So a sensor is mass, cost and a
+    /// decision with no payoff.
+    ///
+    /// This is the rosterOnly retirement wearing a second hat, and it is
+    /// deliberately NOT a change to the part table: Phase1Parts is shared with
+    /// Robot Brawl, where sensors are the whole point. Every hide goes through
+    /// this one predicate, so a sensor already bolted to a robot still loads,
+    /// still renders and can still be removed - only the tile and the shop row
+    /// are gone.</summary>
+    public bool PartHiddenInGarage(int i)
+    {
+        return PartRosterOnly(i) || (i >= 0 && i < PaletteCount && palette[i].sensor);
+    }
     bool CareerAllowsMat(PlacedPart pp, string newMat)
     {
         if (!Career.active || Career.FreeParts) return true;
@@ -5948,8 +5966,10 @@ public partial class BuilderManager : MonoBehaviour
       + "wheel|-0.370,0.700,-0.250|0|-1.00,0.00,0.00|Rubber\n"
       + "battery|0.000,0.975,0.000|0|0.00,0.00,0.00|Aluminum\n"
       + "spike|0.000,0.700,0.500|0|0.00,0.00,1.00|Aluminum|G:32\n"
-      + "compass|0.250,0.700,0.000|0|0.00,0.00,0.00|Aluminum\n"
-      + "wallsensor|-0.250,0.700,0.000|0|0.00,0.00,0.00|Aluminum\n";
+      // The compass and the wall sensor came off with the PROGRAM tab: this
+      // fork has nothing to read them, and a part you cannot refit after
+      // removing it is a trap on the starter machine (owen, 2026-09-13).
+      ;
 
     public const float GUSSET_KG = 10f;
     /// <summary>How much a welded seam holds, versus the same seam bare.

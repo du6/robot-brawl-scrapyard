@@ -498,6 +498,28 @@ public class TouchSmoke : MonoBehaviour
         Career.active = false;
         Career.Data = savedCareer;
         yield return null;
+        // ---- SENSORS ARE GONE FROM THE GARAGE ----------------------------
+        // owen, 2026-09-13: "given that there is no program in this version,
+        // sensors are redundant - hide all sensors from garage, including both
+        // BUILD and SHOP". Driven off the part table, not a hand-written list,
+        // so a sensor added later cannot slip back onto the shelf.
+        {
+            int sensors = 0, tileShown = 0, shopShown = 0;
+            for (int i = 0; i < bm.PaletteCount; i++)
+            {
+                if (!bm.PartIsSensor(i)) continue;
+                sensors++;
+                if (!bm.PartHiddenInGarage(i)) tileShown++;
+                var head = GameObject.Find("shophead_" + i);
+                if (head != null && head.activeInHierarchy) shopShown++;
+            }
+            Check(sensors >= 5, "the part table still HAS sensors - they are hidden, not deleted (" + sensors + ")");
+            Check(tileShown == 0, "no sensor is offered in BUILD (" + tileShown + " still shown)");
+            Check(shopShown == 0, "no sensor is offered in SHOP (" + shopShown + " still shown)");
+            Check(!BuilderManager.STARTER_SNAPSHOT.Contains("compass") && !BuilderManager.STARTER_SNAPSHOT.Contains("sensor"),
+                  "the starter machine carries no sensor either");
+        }
+
         // ---- CLIP SWEEP -------------------------------------------------
         // owen, 2026-08-07: "in the build tab the text of the bottom rows of
         // buttons looks cutoff a bit." It was: the 4-row part palette needed

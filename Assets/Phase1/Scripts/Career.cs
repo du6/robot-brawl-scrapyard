@@ -197,8 +197,9 @@ public static class CareerDB
             // SCRAPPER carries a Compass tracker and a Wall sensor so its
             // autopilot HUNTS (RamHunter, StarterBench 9/10 vs SCOUT). Granted
             // so the pre-built machine is fully owned on a fresh career.
-            new KitItem("compass",  "Aluminum", 1),
-            new KitItem("wallsensor","Aluminum", 1),
+            // compass + wallsensor dropped with the PROGRAM tab (owen,
+            // 2026-09-13): granting a part the garage will not show is an
+            // invisible item and a hole in the kit budget.
             // The starter robot ships with its spike seam WELDED (StarterBench,
             // 2026-09-03: unwelded, the aluminum spike sheared in 10/10 bouts
             // and every fight ended in a mutual-disarm draw; welded, 6/10 wins).

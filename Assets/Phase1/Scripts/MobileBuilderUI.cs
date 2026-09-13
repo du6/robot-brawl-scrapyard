@@ -1098,7 +1098,7 @@ public partial class MobileBuilderUI : MonoBehaviour
             // index-parallel to the palette — the tab-renumbering trap) and
             // then hidden, so no player path reaches the part while every
             // index-keyed site keeps its numbering.
-            if (bm.PartRosterOnly(i)) pb.gameObject.SetActive(false);
+            if (bm.PartHiddenInGarage(i)) pb.gameObject.SetActive(false);
             // R4: MkText defaults to HorizontalWrapMode.Overflow, so the longest
             // tiles ("Gyro stabilizer / 47 kg Aluminum / 1 free") ran straight
             // over their neighbour instead of being clipped or wrapped - two
@@ -1471,7 +1471,7 @@ public partial class MobileBuilderUI : MonoBehaviour
         for (int i = 0; i < partButtons.Count && i < bm.PaletteCount; i++)
         {
             if (partButtons[i] == null) continue;
-            bool show = !bm.PartRosterOnly(i)
+            bool show = !bm.PartHiddenInGarage(i)
                         && (showAll || bm.PartId(i) == "core" || PlayerOwnsAny(i));
             if (partButtons[i].gameObject.activeSelf != show)
                 partButtons[i].gameObject.SetActive(show);
@@ -2798,7 +2798,7 @@ public partial class MobileBuilderUI : MonoBehaviour
         int n = bm != null ? bm.PaletteCount : 0;
         for (int i = 1; i < n; i++)   // 0 = core: not for sale
         {
-            if (bm.PartRosterOnly(i)) continue;   // retired player-side, roster keeps it
+            if (bm.PartHiddenInGarage(i)) continue;   // retired player-side (or a sensor: no program here), roster keeps it
             int idx = i;
             // The part HEADER is itself the disclosure control: tapping it opens
             // that part's materials. One accordion, so the 18-part shelf stays
