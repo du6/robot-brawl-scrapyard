@@ -394,6 +394,12 @@ public static class CareerDB
     /// on boxes instead of a wait timer. JsonUtility hands older saves zeros.</summary>
     public int quickFights, quickWins, quickStreak, quickBestStreak, crowns, quickBoxesToday, quickWinsToBox;
     public string quickBoxDay = "";
+    // owen, 2026-09-12: "looks like I can keep challenging the same robot and
+    // keep getting rewards". The toolboxes were capped per day, the SCRAP purse
+    // was not, so one parked machine was an unlimited money printer. A machine
+    // you have already beaten pays nothing more today; the list rolls over with
+    // the box cap, so tomorrow it is worth fighting again.
+    public List<string> yardBeaten = new List<string>();
     /// <summary>SCRAPYARD: the world is generated from this seed (0 = not yet
     /// rolled; rolled on the first drive out and saved - your world is yours
     /// and it persists), and the crates opened, keyed "cx,cz:i" per chunk, so
@@ -401,6 +407,13 @@ public static class CareerDB
     public int worldSeed;
     public List<string> worldOpened = new List<string>();
     public int yardStep;              // the first minute: 0 chest, 1 meet, 2 challenge, 3 the trading post, 4 explore
+    public int yardActions, yardGuideVersion;
+    public int yardUpgradeAtFight = -1;
+    // Last safe expedition checkpoint. A different seed must never resume it.
+    // Primitives keep this additive schema compatible with existing JSON saves.
+    public bool expeditionHasPosition;
+    public int expeditionWorldSeed;
+    public float expeditionX, expeditionY, expeditionZ, expeditionYaw;
     public int fights; public int fightWins; public int sessions;   // telemetry
     public int tutorialStep;
     /// <summary>C4: index into stable of the robot being edited; -1 = none.</summary>
@@ -490,17 +503,39 @@ public static class Career
     // already differs from Robot Brawl's (Unity derives it from company +
     // product name, and the product is "Robot Brawl: Scrapyard"); the file
     // name differs too so the two saves can never be confused for each other.
-    static string PathFile { get { return Application.persistentDataPath + "/scrapyard_save.json"; } }
+    static string PathFile
+    {
+        get
+        {
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            // Batch runners set this BEFORE boot, so even Load and starter-kit
+            // migration cannot touch the owner's save. Never available in release.
+            var args = System.Environment.GetCommandLineArgs();
+            for (int i = 0; i + 1 < args.Length; i++)
+                if (args[i] == "-scrapyardSaveDir" && System.IO.Path.IsPathRooted(args[i + 1]))
+                    return System.IO.Path.Combine(args[i + 1], "scrapyard_save.json");
+#endif
+            return Application.persistentDataPath + "/scrapyard_save.json";
+        }
+    }
+    public static string SaveNotice { get; private set; } = "";
+    public static bool SaveBlocked { get; private set; }
 
     public static void Load()
     {
-        try
+        var loaded = CareerSaveStore.Read(PathFile);
+        SaveBlocked = loaded.blocked;
+        SaveNotice = loaded.notice;
+        if (loaded.data != null) Data = loaded.data;
+        else if (!loaded.blocked) Data = new CareerData();
+        else
         {
-            if (System.IO.File.Exists(PathFile))
-                Data = JsonUtility.FromJson<CareerData>(System.IO.File.ReadAllText(PathFile)) ?? new CareerData();
-            else Data = new CareerData();
+            // Keep an existing in-memory session if a reload fails. On cold
+            // boot the new session is temporary; the UI must show SaveNotice.
+            if (Data == null) Data = new CareerData();
+            Debug.LogWarning("Career.Load: " + SaveNotice);
         }
-        catch (System.Exception e) { Debug.LogWarning("Career.Load failed: " + e.Message); Data = new CareerData(); }
+        if (!string.IsNullOrEmpty(loaded.notice) && !loaded.blocked) Debug.LogWarning("Career.Load: " + loaded.notice);
         if (!Data.kitGranted) GrantStarterKit();
         MigrateInventory();
         GrantPendingRewards();   // boxes that never got opened last session
@@ -601,7 +636,17 @@ public static class Career
     }
 
     public static void Save()
-    { System.IO.File.WriteAllText(PathFile, JsonUtility.ToJson(Data)); }
+    {
+        // Holds guard explicit Save calls too, not only callers' autosave checks.
+        if (!autosave || autosaveHolds > 0 || SaveBlocked || Data == null) return;
+        string error;
+        if (!CareerSaveStore.Write(PathFile, Data, out error))
+        {
+            SaveNotice = "Progress could not be saved. Keep this tab open and try saving again.";
+            Debug.LogWarning("Career.Save: " + error);
+        }
+        else if (SaveNotice.StartsWith("Progress could not")) SaveNotice = "";
+    }
 
     /// <summary>Rookie checklist grants - each fires once per career and pays
     /// a fixed 10, so the whole checklist is bounded at +40 total. Quiet on
@@ -963,10 +1008,12 @@ public static class Career
         if (Data == null || id == null || !Data.pendingRewards.Remove(id)) return;
         if (id.StartsWith("qbox:"))
         {
-            // qbox:<scrap>:<partId>:<mat>:<count> - rolled at queue time, granted here
+            // Optional sixth field identifies the source chest. Equal loot
+            // from different unopened chests must remain separate rewards.
             var f = id.Split(':');
             int scrap, count;
-            if (f.Length == 5 && int.TryParse(f[1], out scrap) && int.TryParse(f[4], out count))
+            if ((f.Length == 5 || f.Length == 6) && int.TryParse(f[1], out scrap) && int.TryParse(f[4], out count)
+                && scrap >= 0 && count > 0 && CareerDB.Def(f[2]) != null)
             {
                 Txn(scrap, "toolbox");
                 AddItem(f[2], f[3], count);
@@ -999,6 +1046,99 @@ public static class Career
     public static int lastQuickPay;
     public static string lastQuickLine = "";
     public struct QuickOffer { public string oppId; public AiTier tier; public string armourMat; public string label; }
+    internal static int yardRewardLevel = -1;
+    /// <summary>Matches the map's 120 m veteran and 300 m champion bands;
+    /// farther expeditions add better materials and larger drops.</summary>
+    public static int YardRewardTier(float distanceFromHome)
+    {
+        if (float.IsNaN(distanceFromHome) || distanceFromHome < 120f) return 0;
+        return distanceFromHome < 300f ? 1 : distanceFromHome < 500f ? 2 : distanceFromHome < 800f ? 3 : 4;
+    }
+    public static string YardRegionHint(float distanceFromHome)
+    {
+        switch (YardRewardTier(distanceFromHome))
+        {
+            case 0: return "OUTSKIRTS · aluminum salvage · richer crates beyond 120 m";
+            case 1: return "SCRAP FIELDS · richer crates · steel and powered parts beyond 300 m";
+            case 2: return "DEEP YARD · steel and powered parts · double parts beyond 500 m";
+            case 3: return "OUTER WASTES · double parts · titanium salvage beyond 800 m";
+            default: return "FAR WASTES · titanium salvage · double parts";
+        }
+    }
+    /// <summary>Call only once a yard encounter passes its start gates.
+    /// Settlement consumes the context, so it cannot affect a later Quick bout.</summary>
+    public static void SetYardRewardContext(float distanceFromHome, AiTier opponentTier) { SetYardRewardContext(distanceFromHome, opponentTier, null); }
+    /// <summary>defenderKey names the MACHINE, so settlement can tell a fresh
+    /// opponent from one this player has already collected on today.</summary>
+    public static void SetYardRewardContext(float distanceFromHome, AiTier opponentTier, string defenderKey)
+    { yardRewardLevel = Mathf.Max(YardRewardTier(distanceFromHome), Mathf.Clamp((int)opponentTier, 0, 2)); yardDefenderKey = defenderKey; }
+    public static void ClearYardRewardContext() { yardRewardLevel = -1; yardDefenderKey = null; }
+    internal static string yardDefenderKey;
+    /// <summary>Has this machine already paid out today? The card asks before
+    /// the player commits thirty seconds to a bout worth nothing.</summary>
+    public static bool YardAlreadyBeaten(string defenderKey)
+    {
+        if (Data == null || string.IsNullOrEmpty(defenderKey)) return false;
+        if (Today() != Data.quickBoxDay) return false;          // a new day has cleared it
+        return Data.yardBeaten.Contains(defenderKey);
+    }
+
+    static int LootSeed(int seed, string source)
+    {
+        // String.GetHashCode changes across runtimes. FNV makes a chest stable
+        // across editor, IL2CPP and WebGL, independent of the fight counters.
+        unchecked
+        {
+            uint h = 2166136261u;
+            for (int i = 0; i < 4; i++) h = (h ^ ((uint)seed >> (i * 8) & 255u)) * 16777619u;
+            foreach (char c in source ?? "") h = (h ^ c) * 16777619u;
+            return (int)(h & 0x7fffffffu);
+        }
+    }
+    static string BoxReward(int scrap, string part, string mat, int count, string source, out string[] lines)
+    {
+        mat = CareerDB.ResolveMat(part, mat);
+        var def = CareerDB.Def(part);
+        string name = def != null ? def.label : part;
+        lines = new[] { "+" + scrap + " SCRAP", count + " x " + name.ToUpperInvariant() + " (" + mat + ")" };
+        return "qbox:" + scrap + ":" + part + ":" + mat + ":" + count + (source == null ? "" : ":" + source);
+    }
+    /// <summary>Each opened chest has its own random stream and reward key.
+    /// The first three chests supply a nose, a weld and armor; later drops
+    /// follow the danger of their location, without obsolete league gates.
+    /// Pass the collected count BEFORE marking this chest opened.</summary>
+    public static string ChestBoxRoll(int worldSeed, string chestId, float distanceFromHome, int openedBefore, out string[] lines)
+    {
+        int tier = YardRewardTier(distanceFromHome);
+        var rng = new System.Random(LootSeed(worldSeed, chestId));
+        string[] basic = { "beam", "plate", "wedge", "gusset", "spike", "beamlong", "wheel", "battery", "cube" };
+        string[] advanced = { "plate", "gusset", "wedge", "spike", "beamlong", "wheel", "battery", "spindle", "spinner", "ram", "blade" };
+        string[] parts = tier >= 2 ? advanced : basic;
+        string part = parts[rng.Next(parts.Length)];
+        int count = tier >= 3 ? 2 : 1;
+        if (openedBefore >= 0 && openedBefore < 3)
+        {
+            part = new[] { "wedge", "gusset", "plate" }[openedBefore];
+            count = openedBefore == 2 ? 2 : 1;
+        }
+        string mat = tier >= 4 ? "Titanium" : tier >= 2 ? "Steel" : "Aluminum";
+        int scrap = 40 + 30 * tier + 5 * rng.Next(5);
+        // Base64 has no colon and retains the full chest key, not a collision-
+        // prone hash. Equal contents from two chests therefore both grant.
+        string source = "chest-" + worldSeed + "-" + System.Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(chestId ?? ""));
+        return BoxReward(scrap, part, mat, count, source, out lines);
+    }
+    static string YardFightBoxRoll(int tier, int crownsUsed, out string[] lines)
+    {
+        var rng = new System.Random(LootSeed(Data.worldSeed, "fight-" + Data.quickFights));
+        string[] parts = tier >= 2
+            ? new[] { "plate", "gusset", "spindle", "spinner", "ram", "blade", "wheel", "battery" }
+            : new[] { "beam", "plate", "wedge", "gusset", "spike", "beamlong", "wheel", "battery" };
+        string part = parts[rng.Next(parts.Length)];
+        string mat = tier >= 4 ? "Titanium" : tier >= 2 ? "Steel" : "Aluminum";
+        return BoxReward(40 + 30 * tier + 20 * crownsUsed, part, mat,
+            1 + crownsUsed + (tier >= 3 ? 1 : 0), "fight-" + Data.quickFights, out lines);
+    }
     static string Today() { return System.DateTime.UtcNow.ToString("yyyy-MM-dd"); }
     /// <summary>The furthest league the player has unlocked (0-based).</summary>
     public static int FurthestLeague()
@@ -1060,13 +1200,31 @@ public static class Career
     public static void SettleQuickFight(bool win, float dealt)
     {
         if (Data == null) return;
-        int lvl = FurthestLeague();
-        int pay = win ? 20 + 10 * lvl + Mathf.RoundToInt(Mathf.Min(dealt, 300f) * 0.1f) : 5;
-        Txn(pay, (win ? "quick win" : "quick loss"));
+        bool yard = yardRewardLevel >= 0;
+        int lvl = yard ? yardRewardLevel : FurthestLeague();
+        string defender = yardDefenderKey;
+        ClearYardRewardContext();
+        // the day roll comes FIRST now: the beaten list turns over with the box
+        // cap, so "come back tomorrow" means the same thing for both.
+        if (Today() != Data.quickBoxDay) { Data.quickBoxDay = Today(); Data.quickBoxesToday = 0; Data.yardBeaten.Clear(); }
+        // a rematch against a machine already beaten today is free to play and
+        // pays nothing: no purse, no streak, no progress towards a toolbox.
+        bool spent = yard && !string.IsNullOrEmpty(defender) && Data.yardBeaten.Contains(defender);
+        int pay = spent ? 0 : win ? 20 + 10 * lvl + Mathf.RoundToInt(Mathf.Min(dealt, 300f) * 0.1f) : 5;
+        if (pay > 0) Txn(pay, (win ? "quick win" : "quick loss"));
         lastQuickPay = pay;
         Data.quickFights++;
         Data.fights++;
-        if (Today() != Data.quickBoxDay) { Data.quickBoxDay = Today(); Data.quickBoxesToday = 0; }
+        if (spent)
+        {
+            if (win) Data.quickWins++;
+            if (win) Data.fightWins++;
+            lastQuickLine = "you already beat this machine today  -  it pays nothing more";
+            uiDirtySeq++;
+            if (autosave) Save();   // NEVER a bare Save(): a bench holding SuspendAutosave owns this file
+            return;
+        }
+        if (win && yard && !string.IsNullOrEmpty(defender)) Data.yardBeaten.Add(defender);
         string line;
         if (win)
         {
@@ -1084,7 +1242,7 @@ public static class Career
                     Data.quickBoxesToday++;
                     int use = Data.crowns; Data.crowns = 0;
                     string[] lines;
-                    string id = QuickBoxRoll(use, out lines);
+                    string id = yard ? YardFightBoxRoll(lvl, use, out lines) : QuickBoxRoll(use, out lines);
                     QueueReward(id, use > 0 ? "CROWNED TOOLBOX" : "TOOLBOX",
                                 use > 0 ? "Five in a row. The crown made it heavier." : "Three wins. The Yard pays in parts.", lines);
                     RBTelemetry.Once(RBTelemetry.BOX);
@@ -1100,7 +1258,7 @@ public static class Career
             Data.quickStreak = 0;
             line = "streak reset  ·  " + (QUICK_BOX_WINS - Data.quickWinsToBox) + " more win" + (QUICK_BOX_WINS - Data.quickWinsToBox == 1 ? "" : "s") + " to a toolbox";
         }
-        lastQuickLine = line;
+        lastQuickLine = yard ? "SALVAGE TIER " + (lvl + 1) + "  ·  " + line : line;
         if (!Data.taskFight)
         {
             Data.taskFight = true;

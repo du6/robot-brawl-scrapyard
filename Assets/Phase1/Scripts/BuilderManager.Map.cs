@@ -193,6 +193,7 @@ public partial class BuilderManager
         var ground = new GameObject("ground");
         ground.transform.SetParent(ch.root.transform, false);
         ground.AddComponent<MeshFilter>().sharedMesh = mesh;
+        WorldMeshOwner.Own(ground, mesh);
         ground.AddComponent<MeshRenderer>().sharedMaterial = matGround != null ? matGround : BiomeMat(Biome(x0 + CHUNK * 0.5f, z0 + CHUNK * 0.5f));
         ground.AddComponent<MeshCollider>().sharedMesh = mesh;
 
@@ -408,7 +409,9 @@ public partial class BuilderManager
         homePos = new Vector3(CHUNK * 0.5f, 0f, CHUNK * 0.5f);
         if (placeSeed != worldSeed) { placeCache.Clear(); placeSeed = worldSeed; }   // the same world keeps its places
         shopPads.Clear(); LastShopOpened = false;
-        // GARAGE and the shop bring you back where you left, not home
+        // GARAGE and a fresh session resume the last safe expedition checkpoint.
+        MigrateYardGuide();
+        RestoreExpedition();
         Vector3 spawnAt = hasResume && resumeSeed == worldSeed ? lastMapPos : homePos;
         Quaternion spawnRot = hasResume && resumeSeed == worldSeed ? Quaternion.Euler(0f, lastMapYaw, 0f) : Quaternion.identity;
         padArmed = false;
@@ -467,7 +470,7 @@ public partial class BuilderManager
     public void LeaveMap()
     {
         if (mode != Mode.Map) return;
-        if (testRobot != null) { lastMapPos = testRobot.rb.position; lastMapYaw = testRobot.transform.eulerAngles.y; resumeSeed = worldSeed; hasResume = true; }
+        CaptureExpedition(true);
         TeardownWorld();
         BackToBuild();
     }
@@ -486,6 +489,7 @@ public partial class BuilderManager
     void LeaveMapForFight()
     {
         if (mode != Mode.Map) return;
+        CaptureExpedition(true);
         Vector3 at = testRobot != null ? testRobot.rb.position : homePos;
         lastMapPos = at; lastMapYaw = testRobot != null ? testRobot.transform.eulerAngles.y : 0f; resumeSeed = worldSeed; hasResume = true;
         MapHudUI.Drop(); DropCamPivot();
@@ -497,6 +501,7 @@ public partial class BuilderManager
         // (both y=0) and z-fought, which reads as a shimmering floor.
         worldShift = new Vector3(-at.x, -(pad + PAD_LIFT), -at.z);
         if (worldRoot != null) worldRoot.transform.position += worldShift;
+        ClearArenaFootprint();
         // the map's machines are not under the world root: they go now (the
         // fight spawns its own pair, and the world is rebuilt after the bell)
         foreach (var c in chunks.Values)
@@ -525,7 +530,7 @@ public partial class BuilderManager
         MapHudUI.Drop();
         DropCamPivot();
         objectiveMarker = null;
-        farRoot = null; farGround = null; landmarks.Clear();
+        farRoot = null; farGround = null; farMesh = null; landmarks.Clear();
         chunks.Clear();
         cardBot = null; cardBotId = ""; yardCard = false;
         if (worldRoot != null) { Destroy(worldRoot); }
@@ -568,6 +573,8 @@ public partial class BuilderManager
         if (yardToastT > 0f) yardToastT -= Time.deltaTime;
 
         Vector3 me = testRobot.rb.position;
+        PumpExpeditionSave();
+        FetchPoolOnce();
         PumpChunks(me);
         PumpFar(me);
         PumpObjective(me);
@@ -603,7 +610,7 @@ public partial class BuilderManager
         // the encounter card: the nearest enemy within reach
         var near = NearestEnemy(me);
         bool show = near != null && (near.rb.position - me).sqrMagnitude < CARD_REACH * CARD_REACH;
-        if (show && !yardCard) { RBTelemetry.Once(RBTelemetry.MEET); AdvanceYardStep(STEP_CHALLENGE); }
+        if (show && !yardCard) { RBTelemetry.Once(RBTelemetry.MEET); RecordYardAction(YARD_MEET); }
         yardCard = show;
         cardBot = show ? near : null;
         cardBotId = show ? EnemyIdOf(near) : "";
@@ -641,16 +648,18 @@ public partial class BuilderManager
         c.crates[i] = null;
         Vector3 chestAt = g.transform.position;
         Object.Destroy(g);
+        int openedBefore = Career.Data != null ? Career.Data.worldOpened.Count : 0;
         if (Career.Data != null && !Career.Data.worldOpened.Contains(c.crateKeys[i])) Career.Data.worldOpened.Add(c.crateKeys[i]);
         string[] lines;
-        string id = Career.QuickBoxRoll(0, out lines);
+        float distance = Vector2.Distance(new Vector2(chestAt.x, chestAt.z), new Vector2(homePos.x, homePos.z));
+        string id = Career.ChestBoxRoll(worldSeed, c.crateKeys[i], distance, openedBefore, out lines);
         var idf = id.Split(':');
-        SpawnTreasureBurst(chestAt, idf.Length == 5 ? idf[2] : null, idf.Length == 5 ? idf[3] : null);
+        SpawnTreasureBurst(chestAt, idf.Length >= 5 ? idf[2] : null, idf.Length >= 5 ? idf[3] : null);
         Career.QueueReward(id, "TREASURE", "found in the wastes", lines);   // editor: granted at once; device: the box opens here
         if (Career.autosave) Career.Save();
         yardToast = "TREASURE  ·  " + string.Join("  ·  ", lines);
         yardToastT = 3.5f;
-        AdvanceYardStep(STEP_MEET);
+        RecordYardAction(YARD_CHEST);
         SfxSynth.Place();
         RBTelemetry.Once(RBTelemetry.CRATE);
     }
@@ -709,12 +718,13 @@ public partial class BuilderManager
         Progression.activeRungIndex = -1;
         Progression.activeChallengeIdx = -1;
         quickNext = true;
-        AdvanceYardStep(STEP_SHOP);
+        float rewardDistance = testRobot != null ? Vector2.Distance(new Vector2(testRobot.rb.position.x, testRobot.rb.position.z), new Vector2(homePos.x, homePos.z)) : 0f;
+        Career.SetYardRewardContext(rewardDistance, opponentTier, DefenderKeyOf(cardBot));
         RBTelemetry.Once(RBTelemetry.CHALLENGE);
         RBTelemetry.Once(RBTelemetry.QUICK);
         StartFight();
         quickNext = false;
-        if (mode != Mode.Fight) { Career.quickFight = false; FightManager.quickBout = false; return; }
+        if (mode != Mode.Fight) { Career.ClearYardRewardContext(); Career.quickFight = false; FightManager.quickBout = false; return; }
         // YOU DRIVE (owen, 2026-09-10: "replace auto fight with manual fight"),
         // and with the SAME stick as the map: the player's side takes the AI
         // channel at the bell and PumpStickFight feeds it (Drive.cs). No
@@ -747,14 +757,6 @@ public partial class BuilderManager
     GameObject objectiveMarker; Vector3 objectivePos; bool objectiveHas;
     public bool ObjectiveMarkerShown { get { return objectiveMarker != null && objectiveMarker.activeSelf; } }
     public Vector3 ObjectiveMarkerPos { get { return objectiveMarker != null ? objectiveMarker.transform.position : Vector3.zero; } }
-    /// <summary>Steps only advance (max), so a player who does things out of
-    /// order - the pad before the challenge - is never asked to go back.</summary>
-    void AdvanceYardStep(int reached)
-    {
-        if (Career.Data == null || Career.Data.yardStep >= reached) return;
-        Career.Data.yardStep = reached;
-        if (Career.autosave) Career.Save();
-    }
     static string ObjectiveLine(int step)
     {
         switch (step)
@@ -763,6 +765,8 @@ public partial class BuilderManager
             case STEP_MEET:      return "NEXT  ·  find the parked robot";
             case STEP_CHALLENGE: return "NEXT  ·  tap CHALLENGE - you drive the bout";
             case STEP_SHOP:      return "NEXT  ·  drive onto the trading post's lit pad";
+            case STEP_UPGRADE:   return "NEXT  ·  GARAGE: fit your wedge low at the front";
+            case STEP_REMATCH:   return "NEXT  ·  challenge a rookie and try your upgrade";
             default:             return "";
         }
     }
@@ -779,7 +783,7 @@ public partial class BuilderManager
             { float d = (g.transform.position - me).sqrMagnitude; if (d < best) { best = d; objectivePos = g.transform.position; objectiveHas = true; } }
             chip = 0;
         }
-        else if (step == STEP_MEET || step == STEP_CHALLENGE)
+        else if (step == STEP_MEET || step == STEP_CHALLENGE || step == STEP_REMATCH)
         {
             var en = NearestEnemy(me);
             if (en != null) { objectivePos = en.rb.position; objectiveHas = true; }
@@ -797,7 +801,7 @@ public partial class BuilderManager
             var m = HudModel();
             for (int i = 0; i < m.compass.Count; i++)
             {
-                bool enemyChip = (step == STEP_MEET || step == STEP_CHALLENGE) && i == 1 && m.compass.Count > 2;
+                bool enemyChip = (step == STEP_MEET || step == STEP_CHALLENGE || step == STEP_REMATCH) && i == 1 && m.compass.Count > 2;
                 bool placeChip = step == STEP_SHOP && m.compass[i].label == "TRADING POST";
                 if (enemyChip || placeChip) { objectiveChip = i; break; }
             }
@@ -844,6 +848,9 @@ public partial class BuilderManager
             float pd = Vector2.Distance(new Vector2(me.x, me.z), new Vector2(np.centre.x, np.centre.z));
             if (pd < np.radius + 6f) m.banner = np.name + "  -  " + np.Hint;
         }
+        if (m.banner.Length == 0 && m.toast.Length == 0 && YardStep == STEP_EXPLORE)
+            m.banner = Career.YardRegionHint(Vector2.Distance(new Vector2(me.x, me.z), new Vector2(homePos.x, homePos.z)));
+        if (!string.IsNullOrEmpty(Career.SaveNotice)) m.toast = Career.SaveNotice;
         if (yardCard && cardBot != null)
         {
             var pe = PoolEntryOf(cardBot);
@@ -859,11 +866,28 @@ public partial class BuilderManager
             {
                 var entry = EnemyRoster.Find(string.IsNullOrEmpty(cardBotId) ? YARD_BOT : cardBotId);
                 m.cardTitle = entry != null ? entry.label + "   ·   " + entry.tier.ToString().ToUpper() : cardBot.name;
-                m.cardSub = "30-second bout  ·  you drive: stick to move, FIRE for the weapon  ·  drive away to decline";
+                m.cardSub = "30-second bout  ·  " + YardWeaponHint();
             }
+            if (Career.YardAlreadyBeaten(DefenderKeyOf(cardBot)))
+                m.cardSub = "you beat this one today  ·  a rematch pays nothing  ·  new machines do";
         }
         return m;
     }
+    /// <summary>A name for one parked machine that survives leaving and coming
+    /// back: a stranger is their snapshot, a yard bot is its chunk, because the
+    /// world is generated from the seed and that chunk always holds that bot.</summary>
+    public string DefenderKeyOf(CompoundRobot bot)
+    {
+        if (bot == null) return null;
+        foreach (var c in chunks.Values)
+        {
+            if (c.poolBot == bot) return c.poolEntry != null && !string.IsNullOrEmpty(c.poolEntry.snapshotId) ? "p:" + c.poolEntry.snapshotId : null;
+            if (c.enemy == bot) return "y:" + c.cx + ":" + c.cz;
+        }
+        return null;
+    }
+    public bool CardAlreadyBeaten { get { return yardCard && cardBot != null && Career.YardAlreadyBeaten(DefenderKeyOf(cardBot)); } }
+
     static HudEntry Entry(string label, Vector3 to, Vector3 fwd, Color tint)
     {
         to.y = 0f;

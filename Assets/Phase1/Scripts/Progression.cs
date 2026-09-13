@@ -118,7 +118,18 @@ public static class Progression
     static ProfileData data;
 
     static string FilePath()
-    { return Path.Combine(Application.persistentDataPath, "scrapyard_profile.json"); }
+    {
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+        var args = Environment.GetCommandLineArgs();
+        for (int i = 0; i + 1 < args.Length; i++)
+            if (args[i] == "-scrapyardSaveDir" && Path.IsPathRooted(args[i + 1]))
+            {
+                Directory.CreateDirectory(args[i + 1]);
+                return Path.Combine(args[i + 1], "scrapyard_profile.json");
+            }
+#endif
+        return Path.Combine(Application.persistentDataPath, "scrapyard_profile.json");
+    }
 
     public static ProfileData Data
     {

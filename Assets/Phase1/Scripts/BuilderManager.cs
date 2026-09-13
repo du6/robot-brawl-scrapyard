@@ -1285,14 +1285,7 @@ public partial class BuilderManager : MonoBehaviour
 
     void UpdateBuild()
     {
-        // Orbit camera.
-        orbitYaw += Phase0Input.OrbitAxis() * 80f * Time.deltaTime;
-        orbitDist = Mathf.Clamp(orbitDist - Phase0Input.Scroll() * 0.5f, 2.2f, 9f);
-        Vector3 target = new Vector3(0f, 0.7f, 0f);
-        orbitPitch = Mathf.Clamp(orbitPitch - Phase0Input.Throttle() * 55f * Time.deltaTime, -70f, 80f);
-        Quaternion rot = Quaternion.Euler(orbitPitch, orbitYaw, 0f);
-        cam.transform.position = target + rot * new Vector3(0f, 0f, -orbitDist);
-        cam.transform.LookAt(target + Vector3.up * 0.1f);
+        UpdateGarageCamera();
 
         // ROUND-UP2 FIX B (round-2 critic MODERATE: "ghostYaw leaks across
         // palette selections"). ghostYaw is a property of the part you are
@@ -1459,6 +1452,7 @@ public partial class BuilderManager : MonoBehaviour
             // building itself as a player building something.
             RobotBrawl.Phase0.RBTelemetry.Once(RobotBrawl.Phase0.RBTelemetry.BUILD);
             Career.RookieTaskBolt();
+            RecordYardUpgrade();
             message = "";
             RefreshOverlay();
             SfxSynth.Place();
@@ -1559,6 +1553,7 @@ public partial class BuilderManager : MonoBehaviour
         PushUndo();
         hit.gussetFaces |= 1 << bit;
         Career.RookieTaskWeld();
+        RecordYardUpgrade();
         RefreshGussetFaces(hit);
         // Last gusset used: put the tool down, like a part's auto-done - a
         // HELD empty weld kit turned every stray tap into "No Gusset left"
@@ -5500,7 +5495,9 @@ public partial class BuilderManager : MonoBehaviour
             var skirt = GameObject.CreatePrimitive(PrimitiveType.Cube);
             skirt.name = "arena_skirt";
             skirt.transform.SetParent(sandboxRoot.transform, false);
-            skirt.transform.position = new Vector3(0f, -1.6f, 0f);
+            // Keep its top below the arena floor (y=0); coplanar faces
+            // produced horizontal z-fighting bands across the whole ring.
+            skirt.transform.position = new Vector3(0f, -1.68f, 0f);
             skirt.transform.localScale = new Vector3(2f * ARENA_HALF + 0.6f, 3.2f, 2f * ARENA_HALF + 0.6f);
             skirt.GetComponent<Renderer>().sharedMaterial = PartVisualFactory.Mat(new Color(0.12f, 0.12f, 0.14f), 0.3f, 0.3f);
             Object.Destroy(skirt.GetComponent<Collider>());

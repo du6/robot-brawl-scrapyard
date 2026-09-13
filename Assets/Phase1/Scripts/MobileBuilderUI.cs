@@ -65,7 +65,7 @@ public class FieldScrollRelay : MonoBehaviour, IBeginDragHandler, IDragHandler, 
 /// drive BuilderManager's existing pipeline via the Phase0Input.debugPointer
 /// seam. Activates only on touchscreens (or forceMobileUI in the editor);
 /// desktop keeps the IMGUI panel.</summary>
-public class MobileBuilderUI : MonoBehaviour
+public partial class MobileBuilderUI : MonoBehaviour
 {
     public static bool forceMobileUI;
 
@@ -636,6 +636,7 @@ public class MobileBuilderUI : MonoBehaviour
         if (Career.active) BuildProgramTab();
         // LAST, so it is the final sibling and therefore draws over every
         // panel above. A modal that renders under the dock is not a modal.
+        BuildGarageTools();
         BuildSaveDialog();
     }
 
@@ -1927,6 +1928,9 @@ public class MobileBuilderUI : MonoBehaviour
     /// in landscape, so the threshold is not near anything real.</summary>
     static bool ScreenIsTallEnoughForAnOpenDock()
     {
+        ReadBrowserMetrics();
+        if (!PhysicalTouchSizing)
+            return !browserCoarsePointer || Screen.height / browserPixelRatio >= 650f;
         float dpi = UnityEngine.Device.Screen.dpi;
         if (dpi < 1f) return true;                       // unknown: behave as before
         return UnityEngine.Device.Screen.height / dpi >= 4f;
@@ -2116,6 +2120,7 @@ public class MobileBuilderUI : MonoBehaviour
     /// one reports the editor window, which is the wrong physical device.</summary>
     float TouchRow()
     {
+        if (!PhysicalTouchSizing) return DesktopRow();
         float sf = canvas != null ? canvas.scaleFactor : 0f;
         float dpi = UnityEngine.Device.Screen.dpi;
         if (sf < 0.01f || dpi < 1f) return 44f;         // unknown: previous behaviour
@@ -2147,6 +2152,11 @@ public class MobileBuilderUI : MonoBehaviour
     /// I had written measured rectangles, so nothing failed.</summary>
     int FontUnits(float pt)
     {
+        if (!PhysicalTouchSizing)
+        {
+            ReadBrowserMetrics();
+            return DesktopFontUnits(pt, canvas != null ? canvas.scaleFactor : 1f, browserPixelRatio, userUiScale);
+        }
         float sf = canvas != null ? canvas.scaleFactor : 0f;
         float dpi = UnityEngine.Device.Screen.dpi;
         if (sf < 0.01f || dpi < 1f) return Mathf.RoundToInt(pt);
@@ -2159,7 +2169,11 @@ public class MobileBuilderUI : MonoBehaviour
         if (root == null) return;
         int u = FontUnits(pt);
         var ts = root.GetComponentsInChildren<UnityEngine.UI.Text>(true);
-        for (int i = 0; i < ts.Length; i++) ts[i].fontSize = u;
+        for (int i = 0; i < ts.Length; i++)
+        {
+            ts[i].fontSize = u;
+            if (!PhysicalTouchSizing) ts[i].resizeTextForBestFit = false;
+        }
     }
 
     /// <summary>Push the finger-sized row into every control that is one.
@@ -2275,7 +2289,13 @@ public class MobileBuilderUI : MonoBehaviour
     void ApplyTouchSizes()
     {
         ReadSafeArea();
+        ApplyDesktopType();
         float R = TouchRow();
+        if (driveOutBtn != null)
+        {
+            driveOutBtn.GetComponent<RectTransform>().sizeDelta = new Vector2(-4f, R);
+            SetFont(driveOutBtn.transform, 15f);
+        }
         foreach (var tb in tabBtns)
         {
             if (tb == null) continue;
@@ -2421,6 +2441,8 @@ public class MobileBuilderUI : MonoBehaviour
         if (handleRt != null) handleRt.sizeDelta = new Vector2(300f, R);
         ApplyDockH();
         FitPaletteRows(R);
+        FitShopRows();
+        LayoutGarageTools();
     }
 
     /// <summary>Size the palette's cell HEIGHT to the viewport it actually
@@ -2453,7 +2475,7 @@ public class MobileBuilderUI : MonoBehaviour
         if (partGrid == null || partScrollRt == null) return;
 
         float vh = partScrollRt.rect.height - 10f;      // the scrollbar's lane
-        if (vh <= 50f) return;                          // not laid out yet; leave it alone
+        if (vh <= 1f) return;                           // not laid out yet; leave it alone
         int rows = Mathf.Max(1, partGrid.constraintCount);
         float spacing = partGrid.spacing.y;
         // ⚠ THE FLOOR IS R, NOT 44 — and the literal was a UNIT BUG that cost
@@ -2540,7 +2562,13 @@ public class MobileBuilderUI : MonoBehaviour
             // overstates its dpi cannot turn this into a dock that swallows
             // the screen.
             float want = 6f * R + 38f + safeB;
-            return ch1 > 100f ? Mathf.Min(want, ch1 * 0.68f) : want;
+            float buildTop = BarH
+                      + ((msgBar != null && msgBar.activeSelf) ? MsgH : 0f)
+                      + ((tipBar != null && tipBar.activeSelf) ? TipH : 0f);
+            // A larger interface or a live coaching line also consumes height.
+            // Preserve a workspace above the dock; the palette already scrolls.
+            float limit = Mathf.Min(ch1 * 0.68f, ch1 - buildTop - HANDLE_H - ch1 * 0.15f);
+            return ch1 > 100f ? Mathf.Min(want, Mathf.Max(2f * R + 24f + safeB, limit)) : want;
         }
         if (!Career.active) return 210f;
         // R5 (critic finding 4, filed in R2/R3/R4/R5): a content-sized dock left
@@ -2561,7 +2589,7 @@ public class MobileBuilderUI : MonoBehaviour
         // tab strip. Both were the same mistake - moving a control instead of
         // making room for it. The dock now reserves the handle's height, so
         // there is exactly one rule and nothing overlaps anything.
-        return Mathf.Clamp(ch - top - 8f - HANDLE_H, 400f, ch);
+        return Mathf.Max(R + 24f + safeB, ch - top - 8f - HANDLE_H);
     }
 
     /// <summary>R5: the dock height depends on which of the top bars are live,
@@ -2591,6 +2619,7 @@ public class MobileBuilderUI : MonoBehaviour
                 ht.text = dockOpen ? "\u25bc  HIDE PANEL" : "\u25b2  SHOW PANEL";
         }
 
+        LayoutGarageTools();
         PublishCover(dh + (handleRt != null ? HANDLE_H : 0f));
     }
 
@@ -2764,6 +2793,7 @@ public class MobileBuilderUI : MonoBehaviour
         var csf = content.AddComponent<ContentSizeFitter>(); csf.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
         scroll.viewport = vp; scroll.content = crt;
         AddListOverflow(scrollGO, scroll, vp);   // R2 finding 8: SHOP
+        BuildShopSuggestions(content.transform);
         shopParts.Clear(); shopMats.Clear();
         int n = bm != null ? bm.PaletteCount : 0;
         for (int i = 1; i < n; i++)   // 0 = core: not for sale
@@ -2785,7 +2815,7 @@ public class MobileBuilderUI : MonoBehaviour
             var htxt = MkText("lbl", head.transform, "", 14, TextAnchor.MiddleLeft);
             Stretch(htxt.rectTransform);
             htxt.rectTransform.offsetMin = new Vector2(10f, 0f); htxt.rectTransform.offsetMax = new Vector2(-10f, 0f);
-            var pr = new ShopPartRow(); pr.part = i; pr.go = head; pr.lbl = htxt; pr.open = (i == 1);
+            var pr = new ShopPartRow(); pr.part = i; pr.go = head; pr.lbl = htxt; pr.open = false;
             // The DESCRIPTION gets its own row rather than a second line on the
             // header (owen, 2026-08-05). Two lines in the header label spilled
             // OUT of its panel and drew over the 3D view: the label measured
@@ -4279,10 +4309,11 @@ public class MobileBuilderUI : MonoBehaviour
             shopHeader.text = !string.IsNullOrEmpty(shopNote)
                 ? (shopNoteBad ? "\u26a0 " : "") + shopNote + "   \u00b7   SCRAP " + Career.Data.scrap
                 : "SCRAP " + Career.Data.scrap
-                  + "   \u00b7   tap a part to compare its materials   \u00b7   HP/kg is what a weight cap buys"
-                  + "   \u00b7   a part you buy is yours for good - there is no selling back";
+                  + "   \u00b7   fit spare parts for free, or compare an upgrade below"
+                  + "   \u00b7   purchases are permanent";
         }
         shopHeader.color = shopNoteBad ? new Color(1f, 0.82f, 0.25f) : new Color(0.80f, 0.88f, 1f);
+        RefreshShopSuggestions();
 
         for (int k = 0; k < shopParts.Count; k++)
         {
@@ -4951,6 +4982,7 @@ public class MobileBuilderUI : MonoBehaviour
         // The save dialog is modal: while it is up the entire screen is UI, or
         // a tap that misses the card places a part in the build room behind it.
         if (saveDlg != null && saveDlg.activeSelf) return true;
+        if (GarageToolsHit(p)) return true;
         float sf = canvas != null ? canvas.scaleFactor : 1f;
         // R1 fix 2: NEVER re-introduce a literal here. The dock height is
         // per-tab; a stale 210 lets taps in the expanded panel fall through
@@ -4978,6 +5010,8 @@ public class MobileBuilderUI : MonoBehaviour
 
     void Update()
     {
+        ReadBrowserMetrics();
+        ObserveNewParts();
         if (bm == null) { bm = Object.FindFirstObjectByType<BuilderManager>(); if (bm == null) return; }
         ConsumePendingTab();
         RewardBox.Tick();            // hand over anything earned, one box at a time
@@ -5041,7 +5075,7 @@ public class MobileBuilderUI : MonoBehaviour
             float saSig = sa.x * 13f + sa.y * 29f + sa.width * 3f + sa.height * 5f;
             float sig = canvas.scaleFactor * 1000f
                       + (crt0 != null ? crt0.rect.width + crt0.rect.height * 7f : 0f)
-                      + saSig;
+                      + saSig + userUiScale * 100f + browserPixelRatio * 200f;
             if (Mathf.Abs(sig - lastLayoutSig) > 0.5f)
             {
                 lastLayoutSig = sig;
@@ -5061,6 +5095,8 @@ public class MobileBuilderUI : MonoBehaviour
             // Cheap enough to do unconditionally: a handful of float ops, and
             // it assigns only when the value actually moved.
             FitPaletteRows(TouchRow());
+            LayoutGarageTools();
+            if (tab == 3 && dockOpen) FitShopRows();
         }
         bool fighting = FightManager.current != null
                      || bm.mode == BuilderManager.Mode.Test   // fix: dock stayed up over TEST DRIVE
@@ -5199,7 +5235,7 @@ public class MobileBuilderUI : MonoBehaviour
         if (P.Count >= 2)
         {
             float dist = (P[0] - P[1]).magnitude;
-            if (pinchPrev > 0f) bm.TestOrbitDist -= (dist - pinchPrev) * 0.02f;
+            if (pinchPrev > 0f) bm.ZoomGarageView(Mathf.Exp(-(dist - pinchPrev) * 0.003f));
             pinchPrev = dist;
             Vector2 avg = (P[0] + P[1]) * 0.5f;
             if (dragging) { Vector2 d = avg - lastP; bm.TestOrbitYaw += d.x * 0.3f; bm.TestOrbitPitch = Mathf.Clamp(bm.TestOrbitPitch - d.y * 0.3f, -70f, 80f); }
@@ -5455,36 +5491,7 @@ public class MobileBuilderUI : MonoBehaviour
 
     void PumpTip()
     {
-        if (tipBar == null || tipText == null) return;
-        int ts = TutorialStep();
-        // Real progress moved - stop previewing and show what to do NOW. This
-        // is what keeps the arrows from stranding a player on a tip they have
-        // already completed.
-        if (ts != tipStepSeen) { tipStepSeen = ts; tipView = -1; }
-        // CareerTipStep returns TIP_COUNT for "nothing left to say", which
-        // covers career-off, skipped, and finished in one test.
-        // SCRAPYARD (2026-09-10): Robot Brawl's seven league tips ("open the
-        // LEAGUE tab to enter your first contest") are not this game's
-        // onboarding - the yard is. The bar never shows.
-        bool show = false && ts < BuilderManager.TIP_COUNT;
-        int view = tipView < 0 ? ts : Mathf.Clamp(tipView, 0, BuilderManager.TIP_COUNT - 1);
-        if (show)
-        {
-            // Reading ahead or back is marked, so a previewed tip is never
-            // mistaken for the thing the game is currently waiting on.
-            tipText.text = TutorialTip(view)
-                         + (view == ts ? "" : "   \u00b7   (reading ahead - you are on " + (ts + 1) + "/" + BuilderManager.TIP_COUNT + ")");
-            tipText.color = view == ts ? new Color(0.62f, 0.84f, 1f) : new Color(0.72f, 0.72f, 0.80f);
-            tipViewNow = view;
-            SetArrow(tipPrev, view > 0);
-            SetArrow(tipNext, view < BuilderManager.TIP_COUNT - 1);
-        }
-        if (tipBar.activeSelf != show) { tipBar.SetActive(show); ApplyDockH(); }
-        if (!show) return;
-        var prt = tipBar.GetComponent<RectTransform>();
-        FitTipBar();
-        float y = -(BarH + ((msgBar != null && msgBar.activeSelf) ? MsgH : 0f));
-        if (Mathf.Abs(prt.anchoredPosition.y - y) > 0.5f) prt.anchoredPosition = new Vector2(0f, y);
+        PumpGarageGuidance();
     }
 
     /// <summary>An arrow at the end of the run reads dead instead of vanishing:
@@ -5702,6 +5709,7 @@ public class MobileBuilderUI : MonoBehaviour
         var go = new GameObject(name, typeof(RectTransform), typeof(Text));
         go.transform.SetParent(parent, false);
         var t = go.GetComponent<Text>(); t.font = Fnt(); t.text = s; t.fontSize = size; t.alignment = anchor; t.color = Color.white; t.raycastTarget = false; t.horizontalOverflow = HorizontalWrapMode.Wrap; t.verticalOverflow = VerticalWrapMode.Overflow;
+        RegisterDesktopType(t, size);
         return t;   // R5: wrap is the safe default for list rows; the four callers that need Truncate override it, and MkButton forces Overflow on button faces
     }
     Button MkButton(string name, Transform parent, string label, int size, System.Action onClick)

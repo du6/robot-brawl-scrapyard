@@ -61,14 +61,17 @@ public partial class BuilderManager
     /// <summary>Once per session: ask the server for a dozen strangers' machines.
     /// Anonymous. Offline or in the editor with no dev API, the pool is simply
     /// empty and the world is roster machines only.</summary>
+    float nextPoolAttempt;
+    int poolFailures;
     void FetchPoolOnce()
     {
-        if (poolFetched || poolFetching) return;
+        if (poolFetched || poolFetching || Time.unscaledTime < nextPoolAttempt) return;
         poolFetching = true;
         StartCoroutine(LadderClient.Pool(null, 12, (rows, err) =>
         {
-            poolFetching = false; poolFetched = true;
-            if (rows != null) { pool.Clear(); pool.AddRange(rows); }
+            poolFetching = false; poolFetched = rows != null;
+            if (rows != null) { pool.Clear(); pool.AddRange(rows); poolFailures = 0; }
+            else { poolFailures++; nextPoolAttempt = Time.unscaledTime + Mathf.Min(60f, 5f * Mathf.Pow(2f, Mathf.Min(poolFailures, 4))); }
         }));
     }
 

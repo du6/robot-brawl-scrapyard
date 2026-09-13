@@ -9,19 +9,8 @@
   <meta name="description" content="Drive a rookie robot across a planet, find parts in treasure chests, and challenge the machines you meet. Free, no ads.">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🤖</text></svg>">
   <style>
-    /* ⚠ THE DEFAULT TEMPLATE IS WHY THE WEB BUILD LOOKED UNPROFESSIONAL.
-       It hard-codes canvas width=960 height=600 — a LANDSCAPE box — and only
-       goes full-viewport when the user agent matches a phone. This game's UI
-       is portrait-phone-only, so on any desktop it was a squeezed portrait UI
-       inside a landscape frame, centred on a white page, under a Unity logo
-       footer and a title reading "Unity Web Player | ...".
-
-       This template does three things instead:
-        1. the canvas fills the viewport on EVERY device, not just phones;
-        2. the page ground is the game's own near-black (#0A0C11, the site's
-           colour), so letterboxing reads as intentional framing rather than
-           as a broken layout;
-        3. no Unity chrome, real title, real favicon.  */
+    /* Full viewport on desktop and touch devices; the game lays out its
+       own controls against the available width and height. */
     html, body { margin: 0; padding: 0; height: 100%; background: #0A0C11; overflow: hidden; }
     body { font: 15px/1.4 -apple-system, "Helvetica Neue", system-ui, sans-serif; color: #D9DEE8; }
     /* PORTAL REQUIREMENT (CrazyGames technical requirements, 2026-09-08): on
@@ -57,6 +46,9 @@
     #priv { font-size: 11px; color: #5C657A; }
     #priv a { color: #7C8698; }
     #err { display: none; max-width: 520px; padding: 0 24px; text-align: center; color: #FF8A80; }
+    #retry { display: none; min-height: 44px; padding: 10px 24px; border: 0; border-radius: 6px;
+      background: #E8C11C; color: #0A0C11; font: inherit; font-weight: 700; cursor: pointer; }
+    #retry:focus-visible { outline: 3px solid #fff; outline-offset: 4px; }
   </style>
 </head>
 <body>
@@ -72,7 +64,8 @@
     <div id="bar"><div id="barfill"></div></div>
     <p id="pct">loading…</p>
     <p id="tip"></p>
-    <div id="err"></div>
+    <div id="err" role="alert"></div>
+    <button id="retry" type="button">RETRY LOADING</button>
     <!-- The game counts anonymous progress milestones with an id that lives in
          memory for the tab and is never stored. Portals require the notice. -->
     <p id="priv">anonymous play counts, no account needed &middot;
@@ -82,8 +75,9 @@
   <script>
     // ── SOMETHING TO WATCH WHILE IT LOADS ────────────────────────────────
     // Two robots charge, collide, spark, reset. Tips rotate underneath.
-    (function () {
+    var stopBootPresentation = (function () {
       var c = document.getElementById("warm"), g = c.getContext("2d");
+      var running = true, frameId = null, tipTimer = null;
       var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
       var W = c.width, H = c.height, t0 = null, sparks = [];
       function bot(x, y, dir, body, accent) {
@@ -95,6 +89,7 @@
         g.moveTo(x + dir * 34, y - 22); g.lineTo(x + dir * 58, y - 13); g.lineTo(x + dir * 34, y - 4); g.fill();
       }
       function frame(ts) {
+        if (!running || !g) return;
         if (t0 === null) t0 = ts;
         var p = ((ts - t0) % 2600) / 2600;                                 // one bout per 2.6 s
         var gap = p < 0.55 ? (1 - p / 0.55) : 0;                           // charge, then locked
@@ -110,20 +105,27 @@
           if (s.a <= 0) { sparks.splice(j, 1); continue; }
           g.fillStyle = "rgba(255,200,60," + s.a + ")"; g.fillRect(s.x, s.y, 4, 4);
         }
-        if (!reduce) requestAnimationFrame(frame);
+        if (!reduce) frameId = requestAnimationFrame(frame);
       }
-      requestAnimationFrame(frame);
+      frameId = requestAnimationFrame(frame);
       var tips = [
-        "Your robot HUNTS by compass - no driving needed.",
-        "Tap a part, then tap the robot: the first tap aims, the second bolts.",
-        "Losing pays: the Yard salvages rookies with a crate.",
-        "Welded seams hold 4x. Weld the spike.",
-        "Heavy parts mounted LOW keep a machine on its wheels.",
-        "Every finished task drops a box. Open it."
+        "You drive the fight: use WASD, arrow keys, or the on-screen stick.",
+        "Your starter spike works on impact. Ram with the front, then reverse to line up another hit.",
+        "FIRE (Space) is for powered weapons. Your starter spike needs no FIRE button.",
+        "Drive into treasure chests to collect scrap and parts for your robot.",
+        "Heavy parts mounted LOW help keep a machine on its wheels.",
+        "Open GARAGE to fit your new parts, save, then drive out and challenge another robot."
       ];
       var tipEl = document.getElementById("tip"), ti = Math.floor(Math.random() * tips.length);
       tipEl.textContent = tips[ti];
-      setInterval(function () { ti = (ti + 1) % tips.length; tipEl.textContent = tips[ti]; }, 3500);
+      tipTimer = setInterval(function () { ti = (ti + 1) % tips.length; tipEl.textContent = tips[ti]; }, 3500);
+      return function () {
+        running = false;
+        if (frameId !== null) cancelAnimationFrame(frameId);
+        if (tipTimer !== null) clearInterval(tipTimer);
+        frameId = tipTimer = null;
+        sparks.length = 0;
+      };
     })();
 
     // hazard stripe, drawn rather than shipped as an image
@@ -153,9 +155,9 @@
     //  * keepalive lets the "open" hit survive a visitor who leaves during
     //    the 33 MB download — which is exactly the visitor we most want to
     //    count.
-    //  * NO identifier of any kind is sent: no id, no cookie, no fingerprint.
-    //    The privacy policy promises "no third-party analytics, no tracking
-    //    across apps or websites" and this keeps that literally true.
+    //  * Only the tab's ephemeral id and coarse progress fields are sent;
+    //    no cookies, account details, error messages or fingerprint. The id
+    //    described below is never persisted or shared across sites.
     var BEACON = "https://rb-api-902243335343.us-central1.run.app/v1/beacon/scrapyard-play";
 
     // ── THE EPHEMERAL SESSION ID ─────────────────────────────────────────
@@ -180,7 +182,8 @@
     function beacon(ev, extra) {
       try {
         fetch(BEACON + "?e=" + encodeURIComponent(ev) + "&i=" + RBID + (extra || ""),
-              { mode: "no-cors", keepalive: true, cache: "no-store" });
+              { mode: "no-cors", keepalive: true, cache: "no-store", credentials: "omit" })
+          .catch(function () { /* offline counting must not become a JS error */ });
       } catch (e) { /* counting must never break the game */ }
     }
     window.rbBeacon = function (ev, extra) { if (ev === "boot") notePhase("boot"); beacon(ev, extra); };
@@ -213,13 +216,29 @@
     window.addEventListener("pagehide", leave);
     document.addEventListener("visibilitychange", function () { if (document.visibilityState === "hidden") leave(); });
     var jsErrSent = false;
-    window.addEventListener("error", function () { if (!jsErrSent) { jsErrSent = true; beacon("error", "&k=js&at=" + phase); } });
+    window.addEventListener("error", function () {
+      if (!jsErrSent) { jsErrSent = true; beacon("error", "&k=js&at=" + phase); }
+      if (phase !== "ready") showLoadError("The game could not start. Retry loading; if it keeps happening, try an updated browser.");
+    });
 
     var canvas = document.querySelector("#unity-canvas");
     var boot = document.getElementById("boot");
     var fill = document.getElementById("barfill");
     var pct  = document.getElementById("pct");
     var err  = document.getElementById("err");
+    var retry = document.getElementById("retry"), hideBootTimer = null;
+    retry.addEventListener("click", function () { window.location.reload(); });
+    function showLoadError(message, kind) {
+      stopBootPresentation();
+      if (hideBootTimer !== null) { clearTimeout(hideBootTimer); hideBootTimer = null; }
+      boot.classList.remove("done");
+      boot.style.display = "flex";
+      pct.textContent = "Loading stopped";
+      err.style.display = "block";
+      err.textContent = message;
+      retry.style.display = "block";
+      if (kind) beacon("error", "&k=" + kind + "&at=" + phase); // coarse kind only; never raw error text
+    }
 
     // ⚠ Unity 6 substitutes {{{ MACRO }}}, NOT the older %UNITY_…% form.
     // Using the old syntax produces a page that loads nothing and says
@@ -246,13 +265,13 @@
       productName: {{{ JSON.stringify(PRODUCT_NAME) }}},
       productVersion: {{{ JSON.stringify(PRODUCT_VERSION) }}},
       showBanner: function (msg, type) {
-        if (type === "error") { err.style.display = "block"; err.textContent = msg; beacon("error", "&k=banner&at=" + phase); }
+        if (type === "error" && phase !== "ready")
+          showLoadError("The game could not finish loading. Retry loading; if it keeps happening, try an updated browser.", "banner");
         else { console.log("[unity] " + msg); }
       },
     };
 
-    // Match the drawing buffer to the real viewport so the phone-shaped UI is
-    // laid out against the actual window rather than a fixed 960x600 box.
+    // Match the drawing buffer to the real viewport on desktop and touch.
     function fit() {
       var dpr = Math.min(window.devicePixelRatio || 1, 2);
       canvas.width  = Math.floor(window.innerWidth  * dpr);
@@ -264,25 +283,31 @@
     var script = document.createElement("script");
     script.src = buildUrl + "/{{{ LOADER_FILENAME }}}";
     script.onload = function () {
-      createUnityInstance(canvas, config, function (p) {
+      // Promise wrapping catches a missing/throwing loader as well as an
+      // asynchronous engine failure; both leave the same usable retry door.
+      Promise.resolve().then(function () {
+        return createUnityInstance(canvas, config, function (p) {
         var n = Math.round(p * 100);
         if (n >= 25) milestone("25"); if (n >= 50) milestone("50"); if (n >= 75) milestone("75");
         if (n >= 100) { milestone("starting"); }   // download done, engine starting - the phase the silent sessions die in
         fill.style.width = n + "%";
         pct.textContent = n < 100 ? ("loading… " + n + "%") : "starting the engine… (on phones this is the slow part)";
+        });
       }).then(function () {
         // How many who opened the page actually got a playable game, and how
         // long it took them. On a 33 MB payload this ratio is the single most
         // useful number about the port.
         phase = "ready"; notePhase("ready");
         beacon("ready", "&s=" + Math.round((Date.now() - tOpen) / 1000));
+        stopBootPresentation();
         boot.classList.add("done");
-        setTimeout(function () { boot.style.display = "none"; }, 400);
-      }).catch(function (e) {
-        beacon("error", "&k=loader&at=" + phase);   // kind only - never the message
-        err.style.display = "block";
-        err.textContent = "Could not start: " + e;
+        hideBootTimer = setTimeout(function () { boot.style.display = "none"; hideBootTimer = null; }, 400);
+      }).catch(function () {
+        showLoadError("The game could not start. Retry loading; if it keeps happening, try an updated browser.", "loader");
       });
+    };
+    script.onerror = function () {
+      showLoadError("The game files could not be downloaded. Check your connection, then retry loading.", "download");
     };
     document.body.appendChild(script);
   </script>

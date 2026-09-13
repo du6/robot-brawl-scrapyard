@@ -378,10 +378,10 @@ namespace RobotBrawl.Phase0
             Check(bm.mode == BuilderManager.Mode.Map, "9 m short of the pad, still on the map");
             bm.TeleportPlayer(new Vector3(pad0.x, 0f, pad0.z)); for (int i = 0; i < 4; i++) yield return null;
             Check(bm.mode == BuilderManager.Mode.Build && bm.LastShopOpened, "drive onto the pad and the workshop opens (" + bm.mode + ")");
-            Check(d.yardStep == BuilderManager.STEP_EXPLORE, "...the first minute is done and the save says so (step " + d.yardStep + ")");
+            Check(d.yardStep == BuilderManager.STEP_CHALLENGE, "...visiting the shop does not skip the first bout (step " + d.yardStep + ")");
             if (MobileBuilderUI.inst != null) Check(MobileBuilderUI.inst.Tab == 3 && MobileBuilderUI.inst.DockOpen, "...on the SHOP tab, dock open (tab " + MobileBuilderUI.inst.Tab + ")");
             bm.EnterMap(); for (int i = 0; i < 8; i++) yield return null;
-            Check(MapHudUI.inst != null && MapHudUI.inst.ObjectiveText == "" && !bm.ObjectiveMarkerShown, "...no objective line, no marker: the world is yours");
+            Check(MapHudUI.inst != null && MapHudUI.inst.ObjectiveText.Contains("CHALLENGE") && bm.ObjectiveMarkerShown, "...the pending fight remains marked after the shop");
             Vector3 back = bm.testRobot.rb.position;
             Check(bm.mode == BuilderManager.Mode.Map && Vector2.Distance(new Vector2(back.x, back.z), new Vector2(pad0.x, pad0.z)) < 3f, "DRIVE OUT puts you back at the pad, not home (" + Vector2.Distance(new Vector2(back.x, back.z), new Vector2(pad0.x, pad0.z)).ToString("0.0") + " m)");
             Check(bm.mode == BuilderManager.Mode.Map, "...and standing on the pad does not walk you straight back in");
@@ -504,6 +504,13 @@ namespace RobotBrawl.Phase0
                   "...shifted so the encounter is at the origin the ring assumes (world at " + (worldGo != null ? worldGo.transform.position.ToString("0.0") : "-") + ")");
             var floorGo = GameObject.Find("arena_floor"); var skirtGo = GameObject.Find("arena_skirt");
             Check(floorGo != null && Mathf.Abs(floorGo.transform.position.y) < 0.01f && skirtGo != null, "...the ring is a pad on the ground with a skirt under it");
+            Check(skirtGo != null && skirtGo.GetComponent<Renderer>().bounds.max.y < floorGo.transform.position.y - 0.04f, "the skirt top is below the floor, never coplanar");
+            Check(!bm.ObjectiveMarkerShown, "exploration beam is hidden inside combat");
+            bool footprintClear = true;
+            var arenaFootprint = new Bounds(Vector3.zero, new Vector3(16f, 20000f, 16f));
+            foreach (var r in worldGo.GetComponentsInChildren<Renderer>())
+                if (r.enabled && r.name != "ground" && r.name != "far_terrain" && arenaFootprint.Intersects(r.bounds)) footprintClear = false;
+            Check(footprintClear, "map props cannot obscure the combat footprint");
             // the floor is ABOVE every point of ground inside the ring, never on it
             // (owen, 2026-09-11: a coplanar floor z-fought and read as blurry)
             float ringTop = float.MinValue;

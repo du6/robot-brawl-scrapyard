@@ -18,6 +18,28 @@ namespace RobotBrawl.EditorTools
         public static void FightWorker() { Arm("fightworker"); }
         public static void Map() { Arm("map"); }
         public static void Touch()  { Arm("touch"); }
+        public static void Journey() { Arm("journey"); }
+        public static void ReviewPure()
+        {
+            bool rewards = RobotBrawl.Phase0.CareerRewardsBench.RunPure();
+            bool combat = RobotBrawl.Phase0.CombatReadabilityBench.RunPure();
+            bool garage = RobotBrawl.Phase0.GarageUXBench.RunPure();
+            Debug.Log(RobotBrawl.Phase0.CareerRewardsBench.report);
+            Debug.Log(RobotBrawl.Phase0.CombatReadabilityBench.report);
+            Debug.Log(RobotBrawl.Phase0.GarageUXBench.report);
+            Debug.Log("[ReviewPure] rewards=" + rewards + " combat=" + combat + " garage=" + garage);
+            if (Application.isBatchMode) EditorApplication.Exit(rewards && combat && garage ? 0 : 1);
+        }
+        /// <summary>CareerRewardsBench is PURE - no scene, no play mode - so it
+        /// runs and reports in one call instead of arming the frame loop.</summary>
+        public static void Rewards()
+        {
+            bool ok = RobotBrawl.Phase0.CareerRewardsBench.RunPure();
+            Debug.Log(RobotBrawl.Phase0.CareerRewardsBench.report);
+            Debug.Log("[CareerRewardsBench] RESULT: " + RobotBrawl.Phase0.CareerRewardsBench.passed + " pass, "
+                      + RobotBrawl.Phase0.CareerRewardsBench.failed + " fail - " + (ok ? "ALL GREEN" : "FIX NEEDED"));
+            if (Application.isBatchMode) EditorApplication.Exit(ok ? 0 : 1);
+        }
         static void Arm(string which)
         {
             SessionState.SetString("rb_smoke", which);
@@ -42,7 +64,8 @@ namespace RobotBrawl.EditorTools
         }
         static bool Finished()
         {
-            return which == "quick" ? RobotBrawl.Phase0.QuickFightBench.finished
+            return which == "journey" ? RobotBrawl.Phase0.JourneyBench.finished
+                                     : which == "quick" ? RobotBrawl.Phase0.QuickFightBench.finished
                                      : which == "fightworker" ? (fw != null && fw.finished)
                                      : which == "map" ? RobotBrawl.Phase0.MapBench.finished
                                      : (touch != null && touch.finished);
@@ -54,7 +77,9 @@ namespace RobotBrawl.EditorTools
             // it means on a phone and the 20 ms physics step actually happens
             // between a placement and the tap that raycasts at it.
             if (launched && Application.isPlaying) System.Threading.Thread.Sleep(16);
-            if (Application.isPlaying && !launched)
+            // isPlaying can turn true before the runtime scene reload finishes.
+            // Objects created then are discarded, leaving a bench waiting forever.
+            if (Application.isPlaying && Time.frameCount >= 2 && !launched)
             {
                 launched = true;
                 Debug.Log("[BatchSmoke] play mode up - launching " + which);
@@ -82,7 +107,8 @@ namespace RobotBrawl.EditorTools
                 RobotBrawl.Phase0.BuilderManager.bootToYard = false;
                 if (which == "fightworker" && Object.FindFirstObjectByType<RobotBrawl.Phase0.BuilderManager>() == null)
                     new GameObject("BuilderManager").AddComponent<RobotBrawl.Phase0.BuilderManager>();
-                if (which == "quick") RobotBrawl.Phase0.QuickFightBench.Run();
+                if (which == "journey") RobotBrawl.Phase0.JourneyBench.Run();
+                else if (which == "quick") RobotBrawl.Phase0.QuickFightBench.Run();
                 else if (which == "map") mb = RobotBrawl.Phase0.MapBench.Run();
                 else if (which == "fightworker") { RobotBrawl.Phase0.FightWorkerBench.RunPure(); fw = RobotBrawl.Phase0.FightWorkerBench.Run(); }
                 else touch = RobotBrawl.Phase0.TouchSmoke.Run();
@@ -91,7 +117,11 @@ namespace RobotBrawl.EditorTools
             {
                 Debug.Log("[BatchSmoke] " + which + " finished - see the bench's own summary lines above");
                 SessionState.SetString("rb_smoke", "");
-                if (Application.isBatchMode) EditorApplication.Exit(0);
+                int failures = which == "map" ? RobotBrawl.Phase0.MapBench.failed
+                             : which == "journey" ? RobotBrawl.Phase0.JourneyBench.failed
+                             : which == "quick" ? RobotBrawl.Phase0.QuickFightBench.failed
+                             : touch != null ? touch.failed : 0;
+                if (Application.isBatchMode) EditorApplication.Exit(failures == 0 ? 0 : 1);
                 EditorApplication.update -= Tick;
             }
             if (EditorApplication.timeSinceStartup - armedAt > 1200.0)

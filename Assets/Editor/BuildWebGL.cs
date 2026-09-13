@@ -20,8 +20,9 @@
 //   dataCaching          - ON: repeat visits pull from IndexedDB, which is
 //                          the difference between a 40 MB visit and a 40 MB
 //                          FIRST visit.
-//   exceptionSupport None- smallest/fastest. If the build runs but misbehaves,
-//                          raise this before blaming game code.
+//   exceptionSupport ExplicitlyThrownExceptionsOnly - save recovery catches
+//                          filesystem/JSON exceptions, including a missing
+//                          save on first boot; disabling catches halts WebGL.
 //   stripping High       - IL2CPP managed stripping. If something reflective
 //                          breaks at runtime, this is the first suspect and
 //                          link.xml is the fix.
@@ -116,7 +117,7 @@ namespace RobotBrawl.Editor
             // Line runs on every build, so a portal build cannot leave it off.
             PlayerSettings.WebGL.decompressionFallback = !Portal;
             PlayerSettings.WebGL.dataCaching           = true;
-            PlayerSettings.WebGL.exceptionSupport      = WebGLExceptionSupport.None;
+            PlayerSettings.WebGL.exceptionSupport      = WebGLExceptionSupport.ExplicitlyThrownExceptionsOnly;
             PlayerSettings.SetManagedStrippingLevel(NamedBuildTarget.WebGL,
                                                     ManagedStrippingLevel.High);
             // SIZE (CrazyGames plan step 5, 2026-09-10): the wasm is 6.6 of the
@@ -131,7 +132,7 @@ namespace RobotBrawl.Editor
             PlayerSettings.WebGL.template = "PROJECT:RobotBrawl";
 
             Debug.Log("[BuildWebGL] compression=Brotli fallback=" + (Portal ? "off (portal)" : "on") + " dataCaching=on"
-                      + " exceptions=None stripping=High");
+                      + " exceptions=ExplicitlyThrownExceptionsOnly stripping=High");
             Debug.Log("[BuildWebGL] product=" + PlayerSettings.productName
                       + " version=" + PlayerSettings.bundleVersion
                       + " scenes=" + scenes.Count);

@@ -429,7 +429,7 @@ public partial class BuilderManager
     {
         if (mode != Mode.Map) return;
         LastShopOpened = true;
-        AdvanceYardStep(STEP_EXPLORE);
+        RecordYardAction(YARD_SHOP);
         RBTelemetry.Once("shop");
         LeaveMap();
         if (MobileBuilderUI.inst != null) { MobileBuilderUI.inst.SetDockOpen(true); MobileBuilderUI.inst.ShowTab(3); }

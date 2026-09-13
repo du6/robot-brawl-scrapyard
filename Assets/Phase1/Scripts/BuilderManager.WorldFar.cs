@@ -90,6 +90,7 @@ public partial class BuilderManager
             farGround = new GameObject("far_terrain");
             farGround.transform.SetParent(farRoot.transform, false);
             farGround.AddComponent<MeshFilter>().sharedMesh = farMesh;
+            WorldMeshOwner.Own(farGround, farMesh);
             var mr = farGround.AddComponent<MeshRenderer>();
             mr.sharedMaterial = matFar != null ? matFar : matGround;
             mr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
@@ -365,6 +366,7 @@ public partial class BuilderManager
             var go = new GameObject("scatter_combined");
             go.transform.SetParent(ch.root.transform, false);
             go.AddComponent<MeshFilter>().sharedMesh = mesh;
+            WorldMeshOwner.Own(go, mesh);
             go.AddComponent<MeshRenderer>().sharedMaterial = kv.Key;
         }
         foreach (var mr in toStrip) { var mf = mr.GetComponent<MeshFilter>(); Destroy(mr); if (mf != null) Destroy(mf); }

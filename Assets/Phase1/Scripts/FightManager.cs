@@ -188,13 +188,17 @@ public class FightManager : MonoBehaviour
     /// <summary>Build stamp - bumped by hand whenever this file changes, so a
     /// harness can PROVE which assembly the editor actually loaded rather than
     /// inferring it from DLL timestamps (which lied once during round 3).</summary>
-    public static readonly string BuildStamp = "r4-b1";
+    public static readonly string BuildStamp = "scrapyard-readability-2026-09-12";
     /// <summary>Round-3 probe: the HUD header width DrawHud last used, so a
     /// harness can prove from inside play mode which build is really drawing
     /// instead of measuring pixels in a screenshot.</summary>
     public static float lastHudW;
     public Outcome outcome = Outcome.None;
     public string causeLine = "";
+    public string resultSummary = "";
+    bool showResultDetails;
+    Vector2 resultScroll;
+    string judgedOn = "";
     // ROUND-3 (critic CRITICAL 2c): the contest identity and its money, cached
     // in End() because Career.SettleFight() nulls activeLeague/activeContest
     // before DrawResults() ever runs. Read nowhere else.
@@ -932,7 +936,7 @@ public class FightManager : MonoBehaviour
         float eMob = 1f - Mathf.Clamp01(enemy.immobileTime / span);
         string cmp = string.Format(
             "Judges' decision - damage {0:F0} vs {1:F0} ({2:F1}% margin {9}) · pieces incl. wheels {3}/{4} vs {5}/{6}"
-            + " · aggression {10:F0}% vs {11:F0}% · on its back {7:F0}% vs {8:F0}%",
+            + " · mobility {10:F0}% vs {11:F0}% · on its back {7:F0}% vs {8:F0}%",
             player.dealt, enemy.dealt, pct,
             player.partsNow, player.startParts, enemy.partsNow, enemy.startParts,
             100f * pFlip, 100f * eFlip, lead, 100f * pMob, 100f * eMob);
@@ -942,12 +946,16 @@ public class FightManager : MonoBehaviour
         if (Mathf.Abs(player.structFrac - enemy.structFrac) > StructBand())
         {
             bool ps = player.structFrac > enemy.structFrac;
+            judgedOn = "structure";
+            resultSummary = JudgedSummary(judgedOn, ps, player.structFrac * 100f, enemy.structFrac * 100f, enemy.label);
             End(ps ? Outcome.PlayerWin : Outcome.PlayerLoss,
                 cmp + " — decided on structure destroyed");
             return;
         }
         if (Mathf.Abs(diff) >= DrawBand(player.dealt, enemy.dealt))
         {
+            judgedOn = "damage";
+            resultSummary = JudgedSummary(judgedOn, diff > 0f, player.dealt, enemy.dealt, enemy.label);
             End(diff > 0f ? Outcome.PlayerWin : Outcome.PlayerLoss,
                 cmp + " — structure even, decided on damage");
             return;
@@ -968,14 +976,18 @@ public class FightManager : MonoBehaviour
         if (!bothDisarmed && Mathf.Abs(pMob - eMob) > AGGRESSION_BAND)
         {
             bool pa = pMob > eMob;
+            judgedOn = "mobility";
+            resultSummary = JudgedSummary(judgedOn, pa, pMob * 100f, eMob * 100f, enemy.label);
             End(pa ? Outcome.PlayerWin : Outcome.PlayerLoss,
-                cmp + " — structure and damage even, decided on aggression: "
-                + (pa ? "you" : "the enemy") + " kept moving and hunting");
+                cmp + " — structure and damage close, decided on mobility: "
+                + (pa ? "you" : "the enemy") + " spent more time mobile");
             return;
         }
         if (Mathf.Abs(pFlip - eFlip) > CONTROL_BAND)
         {
             bool pc = pFlip < eFlip;
+            judgedOn = "control";
+            resultSummary = JudgedSummary(judgedOn, pc, pFlip * 100f, eFlip * 100f, enemy.label);
             End(pc ? Outcome.PlayerWin : Outcome.PlayerLoss,
                 cmp + " — structure and damage even, decided on control: "
                 + (pc ? "the enemy" : "you") + " spent the match on its back");
@@ -985,6 +997,9 @@ public class FightManager : MonoBehaviour
         // resolving it on a grounded-wheel count sampled on the single expiry
         // frame — which a bot can lose to a mid-bounce, and which is a coin
         // flip dressed as a verdict.
+        judgedOn = "draw";
+        resultSummary = bothDisarmed ? "Both robots lost their weapons; the score was too close to call."
+                                    : "Too close to call — neither robot had a decisive advantage.";
         End(Outcome.Draw, cmp + (bothDisarmed
             ? " — both machines disarmed with nothing left to settle it, scored a draw"
             : " — too close to call, scored a draw"));
@@ -1003,6 +1018,14 @@ public class FightManager : MonoBehaviour
         CrowdAudio.Stop();
         outcome = o;
         causeLine = cause;
+        if (string.IsNullOrEmpty(resultSummary))
+        {
+            resultSummary = cause;
+            if (cause != null && cause.StartsWith("Counted out")) resultSummary = "You were counted out: your robot could not recover.";
+            else if (cause != null && cause.StartsWith("Enemy counted out")) resultSummary = enemy.label + " was counted out: it could not recover.";
+        }
+        showResultDetails = false;
+        resultScroll = Vector2.zero;
         Poll(player);
         Poll(enemy);
         Freeze(player);
@@ -1036,6 +1059,7 @@ public class FightManager : MonoBehaviour
             // Quick fights settle here, before OnMatchEnd's exhibition path can
             // pay a second purse: OnMatchEnd is told it has been handled.
             Career.SettleQuickFight(o == Outcome.PlayerWin, player.dealt);
+            if (bm != null && bm.FightInWorld && Career.active) bm.RecordYardBoutCompleted();
             cPay = Career.lastQuickPay; cQuickLine = Career.lastQuickLine;
             Progression.rewarded = true;
             Career.quickFight = false; quickBout = false;
@@ -1279,6 +1303,7 @@ public class FightManager : MonoBehaviour
         programBannerNow = false;   // P3c: the fight is over; so is the banner
         Color old = GUI.color;
         float H = Screen.height / UIS, W = Screen.width / UIS;
+        if (cIsQuick && !arenaLive) { DrawQuickResults(W, H); return; }
         // SHORT SCREEN (iOS QA 2026-09-05, iPhone landscape = ~402 pt): the
         // stat stack alone filled the height, the money lines sat under the
         // buttons and the orange rookie door was BELOW the screen - the
@@ -1653,6 +1678,110 @@ public class FightManager : MonoBehaviour
         }
         if (back) { if (bm != null) bm.BackToBuild(); return; }
         if (again && bm != null) bm.ResetFight();
+    }
+
+    /// <summary>Presentation of the criterion already chosen by Judge. This
+    /// method never chooses a winner or changes the referee's bands.</summary>
+    public static string JudgedSummary(string criterion, bool playerWon, float mine, float theirs, string opponent)
+    {
+        string winner = playerWon ? "You" : string.IsNullOrEmpty(opponent) ? "The opponent" : opponent;
+        float winning = playerWon ? mine : theirs, losing = playerWon ? theirs : mine;
+        if (criterion == "structure")
+            return string.Format("{0} won on surviving pieces: {1:F0}% vs {2:F0}% intact.", winner, winning, losing);
+        if (criterion == "damage")
+            return string.Format("{0} won on damage: {1:F0} vs {2:F0}. Surviving pieces were close.", winner, winning, losing);
+        if (criterion == "mobility")
+            return string.Format("{0} won on mobility: {1:F0}% vs {2:F0}%. Damage and surviving pieces were close.", winner, winning, losing);
+        return string.Format("{0} won on stability: {1:F0}% vs {2:F0}% of the match flipped.", winner, winning, losing);
+    }
+
+    public string ResultTip()
+    {
+        float span = Mathf.Max(1f, elapsed);
+        if (player.flippedTime / span > CONTROL_BAND || (outcome == Outcome.PlayerLoss && causeLine != null && causeLine.Contains("flipped")))
+            return "Keep heavy parts low and widen the wheel stance so you can recover from a shove.";
+        if (player.wheelsNow < player.startWheels)
+            return "Protect the wheel mounts. A wheel that breaks away cannot help you line up another hit.";
+        if (judgedOn == "mobility" || player.immobileTime / span > 0.35f)
+            return "Reverse out of a stalled push, turn, then ram again with your front weapon.";
+        if (player.startCapKJ > 0.01f && player.capKJ <= 0.01f)
+            return "Move the battery inside the frame so a single hit cannot tear it off.";
+        if (player.brokenSeams > 0)
+            return "Reinforce the front weapon's connection with a gusset so it survives the next exchange.";
+        if (outcome == Outcome.PlayerWin)
+            return "Fit your new parts in the garage, save, then try them against another parked robot.";
+        return "Fit a wedge low at the front to lift a rival, then reverse and line up another ram.";
+    }
+
+    // Quick bouts are Scrapyard's normal result screen. Keep the explanation,
+    // reward and next action above the optional scorecard. The content scrolls;
+    // the two exit buttons stay reachable at every viewport size.
+    void DrawQuickResults(float W, float H)
+    {
+        Color old = GUI.color, oldBackground = GUI.backgroundColor;
+        bool shortH = H < 560f, stacked = W < 620f;
+        float pad = SIDE_PAD(W), contentW = W - pad * 2f - 18f;
+        Color accent = outcome == Outcome.PlayerWin ? new Color(0.35f, 1f, 0.45f)
+                     : outcome == Outcome.PlayerLoss ? new Color(1f, 0.42f, 0.36f) : new Color(1f, 0.85f, 0.30f);
+        GUI.color = new Color(0.006f, 0.009f, 0.014f, 0.99f);
+        GUI.DrawTexture(new Rect(0, 0, W, H), Texture2D.whiteTexture);
+        GUI.color = old;
+        bigStyle.fontSize = shortH ? 34 : 48;
+        bigStyle.normal.textColor = accent;
+        medStyle.fontSize = shortH ? 20 : 24;
+        medStyle.normal.textColor = accent;
+        smallStyle.fontSize = shortH ? 17 : 20;
+        smallStyle.normal.textColor = new Color(0.88f, 0.90f, 0.94f);
+        moneySmall.fontSize = shortH ? 18 : 21;
+        moneySmall.wordWrap = true;
+        moneySmall.normal.textColor = new Color(0.50f, 1f, 0.62f);
+        btnStyle.wordWrap = true;
+        float titleH = shortH ? 52f : 72f;
+        GUI.Label(new Rect(pad, 8f, W - pad * 2f, titleH),
+                  outcome == Outcome.PlayerWin ? "VICTORY" : outcome == Outcome.PlayerLoss ? "DEFEAT" : "DRAW", bigStyle);
+        float buttonH = 48f, footerH = stacked ? 116f : 64f;
+        float viewTop = titleH + 12f, viewH = Mathf.Max(50f, H - viewTop - footerH - 8f);
+        string summary = string.IsNullOrEmpty(resultSummary) ? causeLine : resultSummary;
+        string tip = ResultTip();
+        string reward = "+" + cPay + " SCRAP" + (string.IsNullOrEmpty(cQuickLine) ? "" : "  ·  " + cQuickLine);
+        float summaryH = medStyle.CalcHeight(new GUIContent(summary), contentW);
+        float tipH = smallStyle.CalcHeight(new GUIContent(tip), contentW);
+        float rewardH = moneySmall.CalcHeight(new GUIContent(reward), contentW);
+        float detailsH = 0f;
+        string details = causeLine + "\n\n" + SideLine("YOU", player) + "\n" + SideDetail(player)
+                       + "\n\n" + SideLine(enemy.label, enemy) + "\n" + SideDetail(enemy)
+                       + "\n\nMatch time: " + Mathf.RoundToInt(elapsed) + " seconds";
+        if (showResultDetails) detailsH = smallStyle.CalcHeight(new GUIContent(details), contentW) + 12f;
+        float bodyH = summaryH + tipH + rewardH + 96f + detailsH;
+        resultScroll = GUI.BeginScrollView(new Rect(pad, viewTop, W - pad * 2f, viewH), resultScroll,
+                                           new Rect(0, 0, contentW, Mathf.Max(viewH, bodyH)));
+        float y = 0f;
+        GUI.Label(new Rect(0, y, contentW, summaryH), summary, medStyle); y += summaryH + 16f;
+        GUI.Label(new Rect(0, y, contentW, tipH), tip, smallStyle); y += tipH + 16f;
+        GUI.Label(new Rect(0, y, contentW, rewardH), reward, moneySmall); y += rewardH + 16f;
+        if (GUI.Button(new Rect(0, y, contentW, 40f), showResultDetails ? "HIDE MATCH DETAILS" : "SHOW MATCH DETAILS", btnStyle))
+            showResultDetails = !showResultDetails;
+        y += 48f;
+        if (showResultDetails) GUI.Label(new Rect(0, y, contentW, detailsH), details, smallStyle);
+        GUI.EndScrollView();
+        float footerY = H - footerH + 8f, buttonW = stacked ? W - pad * 2f : (W - pad * 2f - 12f) * 0.5f;
+        GUI.backgroundColor = new Color(1f, 0.62f, 0.24f);
+        bool upgrade = GUI.Button(new Rect(pad, footerY, buttonW, buttonH), "FIT UPGRADES >", btnStyle);
+        GUI.backgroundColor = new Color(0.30f, 0.62f, 0.88f);
+        bool next = GUI.Button(new Rect(stacked ? pad : pad + buttonW + 12f,
+                                       stacked ? footerY + buttonH + 8f : footerY, buttonW, buttonH), quickNextLabel, btnStyle);
+        GUI.backgroundColor = oldBackground;
+        GUI.color = old;
+        if (upgrade && bm != null)
+        {
+            if (bm.FightInWorld) bm.OpenYardUpgradeWorkshop();
+            else { bm.BackToBuild(); MobileBuilderUI.RequestTab(0); bm.Coach(tip); }
+            return;
+        }
+        if (next && bm != null)
+        {
+            if (quickNext != null) quickNext(bm); else { bm.BackToBuild(); bm.StartQuickFight(-1); }
+        }
     }
 
     string SideLine(string label, Side s)
