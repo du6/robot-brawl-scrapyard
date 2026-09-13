@@ -1,6 +1,7 @@
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
 using System.Collections;
 using UnityEngine;
+using UnityEngine.UI;
 
 namespace RobotBrawl.Phase0
 {
@@ -31,9 +32,27 @@ public class PromoAutopilot : MonoBehaviour
         }
     }
 
-    /// <summary>Where the route has got to, so a capture rig can label frames
-    /// and know when the run is over without reading the screen.</summary>
-    public static string Stage = "boot";
+    /// <summary>Where the route has got to. Logged on every change, because
+    /// the capture rig can read the browser console but cannot read a C#
+    /// field - and a run that stalls silently costs a whole take to diagnose.</summary>
+    static string stage = "boot";
+    public static string Stage
+    {
+        get { return stage; }
+        set
+        {
+            if (value == stage) return;
+            stage = value;
+            Debug.Log("[promo] " + value);
+#if UNITY_WEBGL && !UNITY_EDITOR
+            try { ScrapyardUiStage(value); } catch (System.Exception) { }
+#endif
+        }
+    }
+#if UNITY_WEBGL && !UNITY_EDITOR
+    [System.Runtime.InteropServices.DllImport("__Internal")]
+    static extern void ScrapyardUiStage(string s);
+#endif
     public static bool Done;
 
     BuilderManager bm;
@@ -49,9 +68,7 @@ public class PromoAutopilot : MonoBehaviour
     IEnumerator Start()
     {
         Stage = "waiting";
-        // The title screen owns the first frames; wait for a builder and a map.
-        float dead = Time.realtimeSinceStartup + 60f;
-        while (Time.realtimeSinceStartup < dead)
+        for (int f = 0; f < 90 * FPS; f++)
         {
             bm = Object.FindFirstObjectByType<BuilderManager>();
             if (bm != null && bm.mode == BuilderManager.Mode.Map && bm.testRobot != null) break;
@@ -61,33 +78,135 @@ public class PromoAutopilot : MonoBehaviour
 
         StartCoroutine(TendRewardBoxes());
         yield return Hold(1.0f, 0f, 0f, "settle");
-        yield return DriveTo(() => NearestCrate(), 1.2f, 30f, "to-chest");
-        yield return Hold(2.6f, 0f, 0f, "chest-open");     // the burst and the toast
-        // CARD_REACH is 4 m: stopping at 6 left the encounter card unshown and
-        // ChallengeParked with nothing to challenge, so the first take ended
-        // eight metres short of its own fight.
-        yield return DriveTo(() => EnemyAt(), 2.8f, 70f, "to-robot");
-        yield return Hold(1.4f, 0f, 0f, "card");
+        // The workshop FIRST. Assembly and the bout are the two shots the video
+        // actually needs; a chest that happens to be far away must never eat
+        // the budget before either of them is filmed.
+        yield return Garage();
+        Debug.Log("[promo] first crate at " + (bm.NearestCratePos().HasValue ? bm.NearestCratePos().Value.ToString("0") : "NONE"));
+        yield return DriveTo(() => bm.NearestCratePos(), 1.2f, 12f, "to-chest");
+        yield return Hold(2.5f, 0f, 0f, "chest-open");
+
+        // ONE target, held. Asking for the nearest enemy every frame made the
+        // machine swap targets mid-approach and drive past both.
+        target = bm.YardParked;
+        Debug.Log("[promo] target " + (target != null ? target.name : "NONE"));
+        yield return DriveTo(() => target != null ? (Vector3?)target.rb.position : null, 2.6f, 22f, "to-robot");
+        // Parked machines sit on raised pads and the drive cannot always climb
+        // one; thirty-five seconds of nosing at a kerb is not footage, and the
+        // route reached "result" without ever having a fight. Close the last
+        // gap the way every bench does, then let the real encounter happen.
+        if (target != null && bm.testRobot != null
+            && (target.rb.position - bm.testRobot.rb.position).magnitude > 3.2f)
+        {
+            Stage = "close-in";
+            Vector3 at = target.rb.position;
+            Vector3 from = bm.testRobot.rb.position;
+            Vector3 dir = from - at; dir.y = 0f;
+            if (dir.sqrMagnitude < 0.01f) dir = Vector3.forward; else dir.Normalize();
+            Vector3 spot = at + dir * 3.0f;
+            bm.TeleportPlayer(new Vector3(spot.x, 0f, spot.z),
+                              Quaternion.LookRotation(new Vector3(at.x - spot.x, 0f, at.z - spot.z)).eulerAngles.y);
+            yield return WaitRealtime(1.2f);
+        }
+        yield return Hold(2.0f, 0f, 0f, "card");
         Stage = "challenge";
-        for (int tries = 0; tries < 90 && bm.mode != BuilderManager.Mode.Fight; tries++)
+        for (int tries = 0; tries < 120 && bm.mode != BuilderManager.Mode.Fight; tries++)
         {
             bm.ChallengeParked();
             yield return null;
         }
-        // The bout drives itself from here: PumpStickFight feeds the player's
-        // side from this same seam, so a gentle forward lean is a real fight.
-        float t0 = Time.realtimeSinceStartup;
-        while (bm.mode == BuilderManager.Mode.Fight && Time.realtimeSinceStartup - t0 < 40f)
+        for (int f = 0; f < 45 * FPS && bm.mode == BuilderManager.Mode.Fight; f++)
         {
             Stage = "fight";
-            Phase0Input.debugThrottle = 0.85f;
-            Phase0Input.debugSteer = Mathf.Sin((Time.realtimeSinceStartup - t0) * 1.7f) * 0.45f;
+            // Drive AT the other machine, which is what makes a ram fight read
+            // as a fight: a fixed forward lean just drove into a wall.
+            var foe = Object.FindFirstObjectByType<FightManager>();
+            Vector3 aim = Vector3.forward;
+            if (foe != null && foe.enemy != null && foe.enemy.bot != null && bm.testRobot != null)
+                aim = foe.enemy.bot.rb.position - bm.testRobot.rb.position;
+            var cam = Camera.main;
+            Vector3 fwd = cam != null ? cam.transform.forward : Vector3.forward; fwd.y = 0f; fwd.Normalize();
+            Vector3 right = Vector3.Cross(Vector3.up, fwd);
+            aim.y = 0f;
+            if (aim.sqrMagnitude > 0.01f) aim.Normalize(); else aim = fwd;
+            Phase0Input.debugThrottle = Vector3.Dot(aim, fwd);
+            Phase0Input.debugSteer = Vector3.Dot(aim, right);
             yield return null;
         }
         Phase0Input.debugThrottle = 0f; Phase0Input.debugSteer = 0f;
         Stage = "result";
-        yield return Hold(4f, 0f, 0f, "result");
+        yield return Hold(6f, 0f, 0f, "result");
         Stage = "done"; Done = true;
+    }
+
+    CompoundRobot target;
+
+    /// <summary>The workshop: open it, hold a part, put it on the machine, and
+    /// drive back out. Placement goes through Phase0Input's debug pointer, the
+    /// seam TouchSmoke uses, because a synthetic tap reaches nothing here.</summary>
+    IEnumerator Garage()
+    {
+        Stage = "garage-open";
+        var garage = Btn("GARAGE");
+        Debug.Log("[promo] garage button " + (garage != null ? "found" : "MISSING"));
+        if (garage == null) yield break;
+        garage.onClick.Invoke();
+        yield return WaitRealtime(1.6f);
+        Debug.Log("[promo] after GARAGE mode=" + bm.mode);
+        if (bm.mode != BuilderManager.Mode.Build) yield break;
+
+        Stage = "garage-pick";
+        var tile = Btn("Wedge") ?? Btn("Plate") ?? Btn("Beam");
+        if (tile != null) { tile.onClick.Invoke(); yield return WaitRealtime(1.2f); }
+
+        Stage = "garage-place";
+        Vector3 core = CoreOnScreen();
+        if (core != Vector3.zero)
+        {
+            Phase0Input.debugPointer = true;
+            Phase0Input.debugMousePos = core + new Vector3(0f, 46f, 0f);
+            yield return null; yield return null;
+            yield return WaitRealtime(1.0f);         // the ghost sits there to be seen
+            Phase0Input.DebugClick(0);
+            yield return null; yield return null;
+            Phase0Input.debugPointer = false;
+        }
+        yield return WaitRealtime(1.6f);
+        var done = Btn("DONE"); if (done != null) done.onClick.Invoke();
+        yield return WaitRealtime(1.2f);
+        Stage = "garage-out";
+        var out_ = Btn("DRIVE OUT") ?? Btn("DRIVE");
+        if (out_ != null) out_.onClick.Invoke();
+        yield return WaitRealtime(2.0f);
+    }
+
+    static Button Btn(string prefix)
+    {
+        foreach (var b in Object.FindObjectsByType<Button>(FindObjectsSortMode.None))
+        {
+            var t = b.GetComponentInChildren<Text>();
+            if (t != null && t.text != null && t.text.StartsWith(prefix)) return b;
+        }
+        return null;
+    }
+
+    static Vector3 CoreOnScreen()
+    {
+        foreach (var col in Object.FindObjectsByType<Collider>(FindObjectsSortMode.None))
+            if (col.gameObject.name.StartsWith("core") && Camera.main != null)
+                return Camera.main.WorldToScreenPoint(col.bounds.center);
+        return Vector3.zero;
+    }
+
+    /// <summary>FRAMES, not seconds. The capture rig steps the page frame by
+    /// frame, and under stepping the engine's clocks do not advance the way a
+    /// wait expects - every time-based wait blocked forever and a whole take
+    /// sat still on the spot where it was installed. Frame counts cannot lie.</summary>
+    const int FPS = 30;
+    static IEnumerator WaitRealtime(float seconds)
+    {
+        int n = Mathf.Max(1, Mathf.RoundToInt(seconds * FPS));
+        for (int i = 0; i < n; i++) yield return null;
     }
 
     /// <summary>A reward box waits for a tap, and a synthetic tap does not
@@ -101,9 +220,9 @@ public class PromoAutopilot : MonoBehaviour
             var box = RewardBox.active;
             if (box != null)
             {
-                yield return new WaitForSecondsRealtime(1.1f);  // REALTIME: an open box sets timeScale 0, so a scaled wait never returns
+                yield return WaitRealtime(1.1f);   // frames: an open box sets timeScale 0 AND the rig freezes the clocks
                 box.TestTapBody();
-                yield return new WaitForSecondsRealtime(2.3f);  // the reveal
+                yield return WaitRealtime(2.3f);   // the reveal
                 box.TestTapClaim();
             }
             yield return null;
@@ -128,9 +247,9 @@ public class PromoAutopilot : MonoBehaviour
     IEnumerator DriveTo(System.Func<Vector3?> target, float stopAt, float seconds, string stage)
     {
         Stage = stage;
-        float t0 = Time.realtimeSinceStartup;
+        int budget = Mathf.RoundToInt(seconds * FPS);
         var cam = Camera.main;
-        while (Time.realtimeSinceStartup - t0 < seconds)
+        for (int f = 0; f < budget; f++)
         {
             var tp = target();
             if (tp == null) break;
@@ -141,16 +260,27 @@ public class PromoAutopilot : MonoBehaviour
             Vector3 right = Vector3.Cross(Vector3.up, fwd);
             Phase0Input.debugThrottle = Vector3.Dot(flat, fwd);
             Phase0Input.debugSteer = Vector3.Dot(flat, right);
+            // Wedged against a monolith, the machine would push into it until
+            // the budget ran out and the route gave up short of its own fight.
+            if ((me - lastAt).sqrMagnitude < 0.0004f) stuck++; else stuck = 0;
+            lastAt = me;
+            if (stuck > 20)
+            {
+                for (int k = 0; k < 24; k++)
+                { Phase0Input.debugThrottle = -0.9f; Phase0Input.debugSteer = 0.8f; yield return null; }
+                stuck = 0;
+            }
             yield return null;
         }
         Phase0Input.debugThrottle = 0f; Phase0Input.debugSteer = 0f;
     }
+    Vector3 lastAt; int stuck;
 
     IEnumerator Hold(float seconds, float thr, float steer, string stage)
     {
         Stage = stage;
-        float t0 = Time.realtimeSinceStartup;   // realtime throughout: a reward box pauses the game clock
-        while (Time.realtimeSinceStartup - t0 < seconds)
+        int n = Mathf.Max(1, Mathf.RoundToInt(seconds * FPS));
+        for (int i = 0; i < n; i++)
         {
             Phase0Input.debugThrottle = thr; Phase0Input.debugSteer = steer;
             yield return null;
