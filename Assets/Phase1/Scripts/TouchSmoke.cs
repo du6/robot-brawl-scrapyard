@@ -537,6 +537,23 @@ public class TouchSmoke : MonoBehaviour
             Check(ui.TopCoverUnits >= ui.TouchRowUnits - 1f, "...and the camera is told so");
             if (bm.HasSelection) bm.SelectPart(bm.SelectedPart);
             yield return null; yield return null;
+            // owen: "even though the bar is removed the space is still there
+            // being occupied" - the bars below it were parked under a band
+            // nobody was drawing.
+            // The safe-area inset is NOT a gap: a bar must still clear a notch.
+            // The first version of this check compared against zero and read a
+            // legitimate 40-unit inset as the defect it was looking for.
+            if (!ui.StatsBandShown)
+                Check(ui.TopmostBandY <= ui.SafeTopUnits + 2f,
+                      "with the band gone, nothing is left parked where it used to be ("
+                      + ui.TopmostBandY.ToString("0") + " units, safe area " + ui.SafeTopUnits.ToString("0") + ")");
+            // owen: "it is very hard to select a part with the current button
+            // size" - the shelf was squeezed below one tile.
+            Check(ui.PaletteViewportUnits >= 2f * ui.TouchRowUnits - 2f,
+                  "the part shelf shows two whole rows, not a sliver ("
+                  + ui.PaletteViewportUnits.ToString("0") + " units, row " + ui.TouchRowUnits.ToString("0") + ")");
+            if (bm.HasSelection) bm.SelectPart(bm.SelectedPart);
+            yield return null; yield return null;
             Career.active = careerHold;
         }
 

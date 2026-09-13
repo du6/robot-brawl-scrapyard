@@ -340,6 +340,28 @@ public partial class MobileBuilderUI : MonoBehaviour
     public float TouchRowUnits { get { return TouchRow(); } }
     public bool StatsBandShown { get { return statsRt != null && statsRt.gameObject.activeSelf; } }
     public float TopCoverUnits { get { return TopInset(); } }
+    public float SafeTopUnits { get { return safeT; } }
+    /// <summary>How tall the part shelf's window is, in canvas units. A tile is
+    /// one touch row, so anything under two rows is the sliver owen could not
+    /// hit.</summary>
+    public float PaletteViewportUnits
+    {
+        get { return partScroll != null && partScroll.viewport != null ? partScroll.viewport.rect.height : 0f; }
+    }
+    /// <summary>Where the topmost VISIBLE band starts. With the stats band
+    /// hidden this must be the very top of the safe area, not a gap where it
+    /// used to be.</summary>
+    public float TopmostBandY
+    {
+        get
+        {
+            // The NOTICE bar is above the TIP bar, so it has to be asked first;
+            // asking the tip bar first reported the notice's height as a gap.
+            if (msgBarRt != null && msgBar != null && msgBar.activeSelf) return -msgBarRt.anchoredPosition.y;
+            if (tipBarRt != null && tipBar != null && tipBar.activeSelf) return -tipBarRt.anchoredPosition.y;
+            return 0f;
+        }
+    }
     public bool StatsLineFitsOneRow
     {
         get
@@ -1370,8 +1392,7 @@ public partial class MobileBuilderUI : MonoBehaviour
         if (Mathf.Abs(msgBarRt.sizeDelta.y - h) > 0.5f)
         {
             msgBarRt.sizeDelta = new Vector2(0f, h);
-            if (tipBarRt != null && tipBar != null && tipBar.activeSelf)
-                tipBarRt.anchoredPosition = new Vector2(0f, -(BarH + h));
+            RestackBars();
             ApplyDockH();
         }
     }
@@ -1395,6 +1416,25 @@ public partial class MobileBuilderUI : MonoBehaviour
             tipBarRt.sizeDelta = new Vector2(0f, h);
             ApplyDockH();
         }
+        RestackBars();
+    }
+
+    /// <summary>Hang the notice and tip bars off whatever is ACTUALLY above
+    /// them. They used to be positioned once at layout time from a constant
+    /// band height, so when the band learned to hide itself they stayed parked
+    /// where it had been - owen, on his phone: "even though the bar is removed
+    /// the space is still there being occupied".</summary>
+    void RestackBars()
+    {
+        float y = BarH;
+        if (msgBarRt != null)
+        {
+            if (Mathf.Abs(msgBarRt.anchoredPosition.y + y) > 0.5f)
+                msgBarRt.anchoredPosition = new Vector2(msgBarRt.anchoredPosition.x, -y);
+            if (msgBar != null && msgBar.activeSelf) y += msgBarRt.sizeDelta.y;
+        }
+        if (tipBarRt != null && Mathf.Abs(tipBarRt.anchoredPosition.y + y) > 0.5f)
+            tipBarRt.anchoredPosition = new Vector2(tipBarRt.anchoredPosition.x, -y);
     }
 
     void PickMat(string k)
@@ -2407,7 +2447,7 @@ public partial class MobileBuilderUI : MonoBehaviour
         // line fell outside the bar. Budget two lines; the bars below read
         // BarH so the stack follows.
         if (statsRt != null) FitStatsBar();
-        if (msgBarRt != null) msgBarRt.anchoredPosition = new Vector2(0f, -BarH);
+        RestackBars();
         // …and the collapse handle was the one label never re-fonted: built at
         // a literal 18 units, it read 9.6 pt on the sim. Same fix as every
         // other control — physical points through SetFont.
@@ -2578,13 +2618,20 @@ public partial class MobileBuilderUI : MonoBehaviour
             // overstates its dpi cannot turn this into a dock that swallows
             // the screen.
             float want = 6f * R + 38f + safeB;
-            float buildTop = BarH
-                      + ((msgBar != null && msgBar.activeSelf) ? MsgH : 0f)
-                      + ((tipBar != null && tipBar.activeSelf) ? TipH : 0f);
+            float buildTop = TopInset();
             // A larger interface or a live coaching line also consumes height.
             // Preserve a workspace above the dock; the palette already scrolls.
             float limit = Mathf.Min(ch1 * 0.68f, ch1 - buildTop - HANDLE_H - ch1 * 0.15f);
-            return ch1 > 100f ? Mathf.Min(want, Mathf.Max(2f * R + 24f + safeB, limit)) : want;
+            // owen, on his phone: "it is very hard to select a part with the
+            // current button size". The floor was the tab strip plus the action
+            // row and NOTHING else, so on a short landscape screen the palette
+            // was squeezed to a sliver of one tile - the labels were cut in
+            // half and every tap was a guess. The floor now keeps TWO whole
+            // palette rows, which is what makes a tile a target rather than a
+            // stripe. It can exceed the limit above, and should: a workspace
+            // you cannot build in is worth less than a shelf you can hit.
+            float floor = 4f * R + 24f + safeB;
+            return ch1 > 100f ? Mathf.Min(want, Mathf.Max(floor, limit)) : want;
         }
         if (!Career.active) return 210f;
         // R5 (critic finding 4, filed in R2/R3/R4/R5): a content-sized dock left
@@ -5466,7 +5513,18 @@ public partial class MobileBuilderUI : MonoBehaviour
     /// <summary>The stats bar's LIVE height (V2.2 C19 repair): the bar now
     /// budgets two FontUnits lines, so everything stacking under it must read
     /// this rather than the 46-unit constant — the MsgH pattern exactly.</summary>
-    float BarH { get { return statsRt != null ? statsRt.sizeDelta.y : BAR_H; } }
+    /// <summary>The band's height, and ZERO while it is hidden. owen, on his
+    /// phone: "even though the bar is removed the space is still there being
+    /// occupied" - three consumers offset the stack by this, and every one of
+    /// them was reading the height of a bar nobody was drawing.</summary>
+    float BarH
+    {
+        get
+        {
+            if (statsRt == null) return BAR_H;
+            return statsRt.gameObject.activeSelf ? statsRt.sizeDelta.y : 0f;
+        }
+    }
     /// <summary>What the top of the screen is actually covered by. A band that
     /// is hidden covers NOTHING, and three places read this - the camera's
     /// framing among them, so a stale reading here parks the robot under a bar
@@ -5510,7 +5568,12 @@ public partial class MobileBuilderUI : MonoBehaviour
     {
         if (statsRt == null || statsText == null) return;
         bool earns = StatsBandEarnsItsPlace();
-        if (statsRt.gameObject.activeSelf != earns) statsRt.gameObject.SetActive(earns);
+        if (statsRt.gameObject.activeSelf != earns)
+        {
+            statsRt.gameObject.SetActive(earns);
+            RestackBars();          // the bars below hang off this one
+            ApplyDockH();
+        }
         if (!earns) return;
         float avail = statsText.rectTransform.rect.width;
         int rows = (avail > 20f && statsText.preferredWidth > avail) ? 2 : 1;
