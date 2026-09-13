@@ -85,6 +85,23 @@ public partial class BuilderManager
     public bool YardCardShown { get { return mode == Mode.Map && yardCard; } }
     public int  YardCratesLeft { get { int n = 0; foreach (var c in chunks.Values) foreach (var g in c.crates) if (g != null) n++; return n; } }
     public CompoundRobot YardParked { get { return cardBot != null ? cardBot : NearestEnemy(testRobot != null ? testRobot.rb.position : homePos); } }
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+    /// <summary>The nearest unopened chest, for the capture autopilot only
+    /// (PromoAutopilot). Never compiled into a release player.</summary>
+    public Vector3? NearestCratePos()
+    {
+        if (testRobot == null) return null;
+        Vector3 me = testRobot.rb.position; float best = float.MaxValue; Vector3? at = null;
+        foreach (var c in chunks.Values)
+            foreach (var g in c.crates)
+            {
+                if (g == null) continue;
+                float d = (g.transform.position - me).sqrMagnitude;
+                if (d < best) { best = d; at = g.transform.position; }
+            }
+        return at;
+    }
+#endif
     public Vector3 YardGarageDoor { get { return homePos; } }
     public int WorldChunksLoaded { get { return chunks.Count; } }
     public int WorldSeedNow { get { return worldSeed; } }

@@ -51,7 +51,7 @@ namespace RobotBrawl.Phase0
         Image backdrop;
         RectTransform boxRt, lidRt, bodyRt;
         Text title, caption, tapHint;
-        Button claim;
+        Button claim, tapButton;
         readonly List<Text> lines = new List<Text>();
         readonly List<Vector2> lineHome = new List<Vector2>();
         // SCRAPYARD (owen, 2026-09-10): a PICTURE beside each line - the part
@@ -114,6 +114,7 @@ namespace RobotBrawl.Phase0
             body.raycastTarget = true;               // a Button needs a hit-testable graphic (verified: with it false the box never opened)
             var tapBtn = body.gameObject.AddComponent<Button>();
             tapBtn.onClick.AddListener(Open);
+            tapButton = tapBtn;
 
             var lid = MkImage("lid", boxRt, new Color(0.68f, 0.46f, 0.20f));
             lidRt = lid.rectTransform;
@@ -278,6 +279,13 @@ namespace RobotBrawl.Phase0
             }
         }
 
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+        /// <summary>Capture seam (PromoAutopilot): fire the BUTTON, never the
+        /// method behind it, so the recorded footage takes the same path a
+        /// finger takes. Never compiled into a release player.</summary>
+        public void TestTapBody() { if (tapButton != null) tapButton.onClick.Invoke(); }
+        public void TestTapClaim() { if (claim != null) claim.onClick.Invoke(); }
+#endif
         void Open()
         {
             if (phase != Phase.Closed) return;

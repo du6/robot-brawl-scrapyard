@@ -394,6 +394,9 @@ public partial class BuilderManager : MonoBehaviour
     void Awake()
     {
         Application.runInBackground = true;
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+        RobotBrawl.Phase0.PromoAutopilot.Install();   // only with promo=1 in the URL; absent from a release build
+#endif
         if (palette == null) palette = P1PartDef.Palette();
         // Scrapyard: after a challenge the loud button goes back to the map,
         // where you left it (owen, 2026-09-10: "replace the next fight button

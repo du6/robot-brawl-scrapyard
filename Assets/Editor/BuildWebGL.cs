@@ -82,6 +82,13 @@ namespace RobotBrawl.Editor
         /// <summary>`-rbClean` on the command line: a clean build, whose log lists every asset by size.</summary>
         static bool Clean { get { return System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "-rbClean") >= 0; } }
         public static void BuildPortal() { Portal = true; Build(); }
+        /// <summary>A DEVELOPMENT build, for capturing promo footage only. It
+        /// compiles PromoAutopilot in (a release build does not contain it at
+        /// all) so the game can drive itself: the capture tab is hidden, its
+        /// animation loop is suspended, and under stepped frames Unity ignores
+        /// synthetic input - so nothing else can drive it. Never published.</summary>
+        public static bool Promo;
+        public static void BuildPromo() { Promo = true; Build(); }
 
         public static void Build()
         {
@@ -145,7 +152,8 @@ namespace RobotBrawl.Editor
                 locationPathName = outDir,
                 target           = BuildTarget.WebGL,
                 targetGroup      = BuildTargetGroup.WebGL,
-                options          = Clean ? BuildOptions.CleanBuildCache : BuildOptions.None,   // release, so the 44 harness
+                options          = (Clean ? BuildOptions.CleanBuildCache : BuildOptions.None)
+                                   | (Promo ? BuildOptions.Development : BuildOptions.None),   // release, so the 44 harness
                                                         // files stay compiled OUT; -rbClean rebuilds player data
                                                         // so the log carries the asset size report
             };
