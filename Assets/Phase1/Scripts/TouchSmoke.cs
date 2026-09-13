@@ -498,6 +498,23 @@ public class TouchSmoke : MonoBehaviour
         Career.active = false;
         Career.Data = savedCareer;
         yield return null;
+        // ---- THE TOP BAND IS AS DEEP AS ITS TEXT, NO DEEPER --------------
+        // owen's phone, 2026-09-13: "the top bar is too big, partially blocking
+        // the robot". It reserved two rows whatever it said, and said the mass
+        // twice - once on its own and once in the league budget.
+        {
+            yield return null; yield return null;
+            string line = ui.StatsLine;
+            int kg = 0; for (int i = line.IndexOf(" kg"); i >= 0; i = line.IndexOf(" kg", i + 1)) kg++;
+            Check(kg <= 1, "the status line states the mass once, not twice (" + kg + "): " + line);
+            if (ui.StatsLineFitsOneRow)
+                Check(ui.StatsBarHeight <= ui.TouchRowUnits + 20f,
+                      "a one-row line gets a one-row band (" + ui.StatsBarHeight.ToString("0") + " units)");
+            else
+                Check(ui.StatsBarHeight > ui.TouchRowUnits,
+                      "a line that needs two rows still gets them");
+        }
+
         // ---- SENSORS ARE GONE FROM THE GARAGE ----------------------------
         // owen, 2026-09-13: "given that there is no program in this version,
         // sensors are redundant - hide all sensors from garage, including both

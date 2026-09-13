@@ -333,6 +333,21 @@ public partial class MobileBuilderUI : MonoBehaviour
         }
     }
 
+    /// <summary>The top band's height and the rows it is reserving, so a bench
+    /// can measure the thing owen actually complained about rather than the
+    /// text that happens to be in it.</summary>
+    public float StatsBarHeight { get { return statsRt != null ? statsRt.sizeDelta.y : 0f; } }
+    public float TouchRowUnits { get { return TouchRow(); } }
+    public bool StatsLineFitsOneRow
+    {
+        get
+        {
+            if (statsText == null) return true;
+            float avail = statsText.rectTransform.rect.width;
+            return avail <= 20f || statsText.preferredWidth <= avail;
+        }
+    }
+
     /// <summary>OWEN 2026-08-03: "can we detect the device type and skip the
     /// first screen and automatically land user to their device option?"
     ///
@@ -2389,8 +2404,7 @@ public partial class MobileBuilderUI : MonoBehaviour
         // its label is FontUnits-scaled, so on the iPad sim the second wrapped
         // line fell outside the bar. Budget two lines; the bars below read
         // BarH so the stack follows.
-        if (statsRt != null)
-            statsRt.sizeDelta = new Vector2(0f, Mathf.Max(BAR_H, FontUnits(13f) * 2f + 14f));
+        if (statsRt != null) FitStatsBar();
         if (msgBarRt != null) msgBarRt.anchoredPosition = new Vector2(0f, -BarH);
         // …and the collapse handle was the one label never re-fonted: built at
         // a literal 18 units, it read 9.6 pt on the sim. Same fix as every
@@ -5174,6 +5188,19 @@ public partial class MobileBuilderUI : MonoBehaviour
                       : "HOLDING {0} - tap the robot to place  ·  {1} kg · {2} part{3}",
                       bm.PartLabel(bm.SelectedPart), bm.BuildMassInt, bm.PlacedCount, bm.PlacedCount == 1 ? "" : "s")
                 : string.Format("{0} kg · {1} part{2}  ·  {3}", bm.BuildMassInt, bm.PlacedCount, bm.PlacedCount == 1 ? "" : "s", TabHint());
+            // owen's phone, 2026-09-13: "the top bar is too big, partially
+            // blocking the robot". The line carried the mass TWICE - once here
+            // and again in the league budget below - and the held-part hint
+            // explained the gusset at full length, so the band wrapped to two
+            // rows and ate the top of the workspace. The budget keeps the mass;
+            // this half gives it up.
+            if (Career.active && !bm.HasSelection)
+                statsText.text = string.Format("{0} part{1}  ·  {2}", bm.PlacedCount, bm.PlacedCount == 1 ? "" : "s", TabHint());
+            else if (Career.active && bm.HasSelection && tab == 0)
+                statsText.text = string.Format(bm.SelectedApplique
+                        ? "HOLDING {0} - tap a surface to weld it (×" + BuilderManager.GUSSET_SEAM_MULT.ToString("0.#") + ")  ·  {1} part{2}"
+                        : "HOLDING {0} - tap the robot to place  ·  {1} part{2}",
+                        bm.PartLabel(bm.SelectedPart), bm.PlacedCount, bm.PlacedCount == 1 ? "" : "s");
             // C3: live weight-cap readout against the targeted league
             if (Career.active)
             {
@@ -5209,6 +5236,7 @@ public partial class MobileBuilderUI : MonoBehaviour
                 statsText.color = Career.active ? new Color(1f, 0.82f, 0.25f)
                                                 : new Color(1f, 0.45f, 0.38f);
             }
+            FitStatsBar();
             }
         }
         // The edge chevron is a promise that there is more to the right. It
@@ -5443,6 +5471,25 @@ public partial class MobileBuilderUI : MonoBehaviour
     /// budgets two FontUnits lines, so everything stacking under it must read
     /// this rather than the 46-unit constant — the MsgH pattern exactly.</summary>
     float BarH { get { return statsRt != null ? statsRt.sizeDelta.y : BAR_H; } }
+
+    /// <summary>Give the top band the rows its text actually needs. It used to
+    /// reserve TWO unconditionally, which on a phone is a deep dark strip
+    /// across the top of the workspace whatever is written in it (owen,
+    /// 2026-09-13: "the top bar is too big, partially blocking the robot").
+    /// Measured against the real width, so it needs no device breakpoint, and
+    /// two rows are still available the moment a line genuinely needs them.</summary>
+    void FitStatsBar()
+    {
+        if (statsRt == null || statsText == null) return;
+        float avail = statsText.rectTransform.rect.width;
+        int rows = (avail > 20f && statsText.preferredWidth > avail) ? 2 : 1;
+        float want = Mathf.Max(BAR_H, FontUnits(13f) * rows + 14f);
+        if (Mathf.Abs(statsRt.sizeDelta.y - want) > 0.5f)
+        {
+            statsRt.sizeDelta = new Vector2(0f, want);
+            InsetBar(statsRt);
+        }
+    }
     float MsgH { get { return msgBarRt != null ? msgBarRt.sizeDelta.y : MSG_H; } }
     float TipH { get { return tipBarRt != null ? tipBarRt.sizeDelta.y : TIP_H; } }
     RectTransform msgBarRt, tipBarRt;
