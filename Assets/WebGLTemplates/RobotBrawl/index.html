@@ -24,11 +24,47 @@
 
     /* Loading: a 34 MB first visit is a real wait, so it gets a real screen
        rather than a bare progress sliver — the name, and honest progress. */
+    /* ⚠ THE FAILURE SCREEN HAS TO FIT ON A PHONE, AND IT DID NOT.
+
+       MEASURED in a 932x430 iframe — an exact viewport, which a browser window
+       is not — 2026-09-13, reading getBoundingClientRect off the live page:
+
+         normal load      8 children, column 390 px in 430 — fits
+         load FAILED     10 children, column 512 px in 430
+                         RETRY at top 391, BOTTOM 435 — 5 px past the viewport
+
+       showLoadError ADDED the error paragraph and the RETRY button (and two
+       more 18 px gaps) without removing the warm-up canvas, the stripe, the
+       stalled bar or the tip. A centred flex column that overflows is clipped
+       at BOTH ends, and body{overflow:hidden} means nothing scrolls — so a
+       failed download was a dead screen with no way to retry.
+
+       Two independent fixes, because either one alone is a single point of
+       failure on a phone nobody has measured:
+        1. #boot scrolls, and `justify-content: safe center` anchors a column
+           taller than the viewport at the TOP instead of clipping both ends.
+           Browsers that don't understand `safe` drop that line and keep the
+           plain `center` above it, where fix 2 still carries the screen.
+           Measured at a deliberately cruel 932x220: the column starts at the
+           top, #boot scrolls 300 over 220, and scrolling to the end puts RETRY
+           fully in view at 124..168.
+        2. .failed hides the warm-up canvas, the hazard stripe, the stalled
+           progress bar and the tip.
+
+       AFTER, same 932x430 iframe: 6 children, column 268 px, RETRY at
+       269..313 — fully in view with 117 px to spare. */
     #boot {
       position: fixed; inset: 0; display: flex; flex-direction: column;
       align-items: center; justify-content: center; gap: 18px;
+      justify-content: safe center;
+      overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch;
+      padding: 16px 0; box-sizing: border-box;
       background: #0A0C11; z-index: 10; transition: opacity .35s ease;
     }
+    /* Nothing in the column may be squeezed to make room: a flex-shrunk RETRY
+       is the same dead end as an offscreen one. */
+    #boot > * { flex-shrink: 0; }
+    #boot.failed #warm, #boot.failed #hazard, #boot.failed #bar, #boot.failed #tip { display: none; }
     #boot.done { opacity: 0; pointer-events: none; }
     #boot h1 { margin: 0; font-size: 30px; font-weight: 800; letter-spacing: .02em; color: #fff; }
     #boot h2 { margin: -10px 0 0; font-size: 17px; font-weight: 700; color: #E8C11C; letter-spacing: .06em; }
@@ -233,6 +269,10 @@
       if (hideBootTimer !== null) { clearTimeout(hideBootTimer); hideBootTimer = null; }
       boot.classList.remove("done");
       boot.style.display = "flex";
+      // See #boot in the stylesheet: this drops the warm-up, the stripe, the
+      // stalled bar and the tip, which is what keeps RETRY on a 430 px screen.
+      boot.classList.add("failed");
+      boot.scrollTop = 0;
       pct.textContent = "Loading stopped";
       err.style.display = "block";
       err.textContent = message;

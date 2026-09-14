@@ -10,6 +10,7 @@ public partial class MobileBuilderUI
     float userUiScale = 1f;
     readonly Dictionary<Text, int> desktopTypeSizes = new Dictionary<Text, int>();
     RectTransform garageTools;
+    HorizontalLayoutGroup garageToolsGroup;
     Text garageMass;
     Button garageFit, garageZoomOut, garageZoomIn, uiScaleButton;
     static int browserMetricsFrame = -1;
@@ -23,6 +24,21 @@ public partial class MobileBuilderUI
 
     static void ReadBrowserMetrics()
     {
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+        // FORCED BROWSER METRICS, for a bench with no browser. These are the
+        // two values the jslib normally supplies, and they are what the WEB
+        // sizing path is made of: DesktopRow() is 52 * pixelRatio / scaleFactor
+        // and DesktopFontUnits() multiplies by the same ratio. Forcing them -
+        // and NOT forcedRowUnits, which flips PhysicalTouchSizing true - is how
+        // a bench measures the branch the SHIPPED WebGL build actually takes.
+        // See PhoneLayoutBench's header for the two paths and why both exist.
+        if (forcedPixelRatio.HasValue)
+        {
+            browserPixelRatio = Mathf.Clamp(forcedPixelRatio.Value, 0.25f, 4f);
+            browserCoarsePointer = forcedCoarsePointer ?? true;
+            return;
+        }
+#endif
 #if UNITY_WEBGL && !UNITY_EDITOR
         if (browserMetricsFrame == Time.frameCount) return;
         browserMetricsFrame = Time.frameCount;
@@ -35,6 +51,16 @@ public partial class MobileBuilderUI
     {
         get
         {
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            // Forced phone metrics (MobileBuilderUI.forcedRowUnits) answer this
+            // question too, and they have to: every OTHER `!PhysicalTouchSizing`
+            // branch in this file is a DESKTOP affordance - the UI-scale button,
+            // the registered desktop type sizes, resizeTextForBestFit, the
+            // garage tool row's pixel ratio, the dock's open-by-default rule.
+            // Forcing only the row and the font would have left a bench
+            // measuring a phone-sized dock with a desktop control set in it.
+            if (forcedRowUnits.HasValue) return true;
+#endif
 #if UNITY_WEBGL && !UNITY_EDITOR
             return false; // Browsers expose CSS pixels; reported DPI is not physical DPI.
 #else
@@ -42,6 +68,25 @@ public partial class MobileBuilderUI
                 || UnityEngine.Device.SystemInfo.deviceType == DeviceType.Handheld;
 #endif
         }
+    }
+
+    /// <summary>ONE ANSWER TO "HOW BIG IS A FINGER", FOR EVERY CANVAS.
+    ///
+    /// The map HUD is a second canvas with the same problem, and it had been
+    /// restating these two predicates because they were private here — two
+    /// copies of a rule that must never disagree, which is how a dock at 130%
+    /// ends up beside an unscaled HUD. These three are the whole contract:
+    /// whether this device sizes by physical DPI, the row in canvas units for
+    /// a given scale factor, and the user's interface-size preference.
+    ///
+    /// Pure and parameterised on the CALLER's scale factor, because the two
+    /// canvases do not share one.</summary>
+    public static bool SizesByPhysicalDpi { get { return PhysicalTouchSizing; } }
+    public static float UserUiScale { get { return inst != null ? inst.userUiScale : 1f; } }
+    public static float DesktopRowFor(float canvasScale, float pixelRatio, float uiScale)
+    {
+        return 52f * Mathf.Max(0.25f, pixelRatio) * Mathf.Clamp(uiScale, 1f, 1.3f)
+             / Mathf.Max(0.01f, canvasScale);
     }
 
     // Public pure sizing seam: a framebuffer minimum is not a readable CSS
@@ -56,7 +101,7 @@ public partial class MobileBuilderUI
     float DesktopRow()
     {
         ReadBrowserMetrics();
-        return 52f * browserPixelRatio * userUiScale / Mathf.Max(0.01f, canvas != null ? canvas.scaleFactor : 1f);
+        return DesktopRowFor(canvas != null ? canvas.scaleFactor : 1f, browserPixelRatio, userUiScale);
     }
 
     void RegisterDesktopType(Text text, int nominalSize)
@@ -86,8 +131,8 @@ public partial class MobileBuilderUI
         garageTools = go.GetComponent<RectTransform>();
         garageTools.anchorMin = garageTools.anchorMax = new Vector2(1f, 0f);
         garageTools.pivot = new Vector2(1f, 0f);
-        var group = go.AddComponent<HorizontalLayoutGroup>();
-        group.padding = new RectOffset(4, 4, 2, 2);
+        var group = garageToolsGroup = go.AddComponent<HorizontalLayoutGroup>();
+        group.padding = new RectOffset(4, 4, 0, 0);   // 0 vertical: FIT / - / + take the whole row
         group.spacing = 4f;
         group.childForceExpandWidth = true;
         group.childForceExpandHeight = true;
@@ -141,6 +186,8 @@ public partial class MobileBuilderUI
         }
         float width = (build ? 164f : 0f) + (garageMass.gameObject.activeSelf ? 168f : 0f)
                     + (uiScaleButton.gameObject.activeSelf ? 120f : 0f);
+        // row PLUS the group's vertical padding, so FIT / - / + are a full
+        // touch row rather than 65.3 of 69.3 units - see RowWithPad.
         garageTools.sizeDelta = new Vector2(width * px, row);
         garageTools.anchoredPosition = new Vector2(-(safeR + 8f), dockRt.sizeDelta.y);
         uiScaleButton.GetComponentInChildren<Text>().text = "UI " + Mathf.RoundToInt(userUiScale * 100f) + "%";

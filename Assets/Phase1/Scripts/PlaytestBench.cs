@@ -180,7 +180,12 @@ public class PlaytestBench : MonoBehaviour
     /// notch or in the home-indicator strip.</summary>
     void CheckSafeArea(string surface)
     {
-        Rect sa = Screen.safeArea;
+        // ⚠ Screen.safeArea IS THE WHOLE SCREEN IN A WEBGL BUILD, so for as
+        // long as this read it directly, THIS CHECK COULD NOT FAIL ON THE WEB -
+        // the one assertion that exists to catch a control under the notch or
+        // in the home-indicator strip, passing unconditionally on the platform
+        // this game ships to most. A check that cannot fail is not cover.
+        Rect sa = SafeAreaWeb.Area;
         var bs = LiveButtons();
         int outside = 0;
         foreach (var b in bs)

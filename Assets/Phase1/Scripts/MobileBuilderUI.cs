@@ -339,6 +339,73 @@ public partial class MobileBuilderUI : MonoBehaviour
     /// text that happens to be in it.</summary>
     public float StatsBarHeight { get { return statsRt != null ? statsRt.sizeDelta.y : 0f; } }
     public float TouchRowUnits { get { return TouchRow(); } }
+
+    /// <summary>A container that HOLDS a touch row, padding included.
+    ///
+    /// ⚠ THE 44 pt FLOOR IS MET WITH ZERO MARGIN BY DESIGN, so a box sized to
+    /// exactly `TouchRow()` with a layout group padding inward leaves its
+    /// CONTENTS short - measured at 65.3 of 69.3 units on iOS and 74.9 of 78.9
+    /// on the web, i.e. 41.5 pt against a 44 pt floor. Five sites had it:
+    /// the garage tool row (FIT / - / +), and four list rows on ROBOTS
+    /// (LOAD / RENAME / RETIRE, the draft row, the blueprint row, and the
+    /// ARENA account row). One of them did not even ask for a row - it was
+    /// pinned to a bare 30 units on every device.
+    ///
+    /// ⚠ AND PADDING THE CONTAINER WAS NOT ENOUGH. Measured after that fix:
+    /// the control still came out row-4 while the container measured exactly
+    /// one row, i.e. the taller LayoutElement was not reaching the rect. Rather
+    /// than keep arguing with the layout system about WHY, the vertical padding
+    /// is now ZERO at every site that holds a single row: whatever sizes the
+    /// container, the control gets all of it. The rows are still separated -
+    /// the list's own group has 4 units of spacing between them - so the only
+    /// thing lost is padding that was never visible and was costing 2.5 pt of
+    /// touch target.
+    ///
+    /// Check the CONTROL's height, never the box's: a box that is one row and a
+    /// control that is 41.5 pt look identical from outside.</summary>
+    /// (No callers: padding the container was the fix that did NOT work, and
+    /// the note above records why. Kept as documentation of the attempt, not as
+    /// a helper to reach for.)
+
+    /// <summary>Marks a LayoutElement as holding ONE TOUCH ROW, so a metrics
+    /// change can find it again.</summary>
+    public class TouchRowTag : MonoBehaviour { }
+
+    /// <summary>Pin a LayoutElement to one touch row AND remember that is what
+    /// it is.
+    ///
+    /// ⚠ Twenty-eight sites used to write `TouchRow()` into a LayoutElement at
+    /// BUILD time, and ApplyTouchSizes re-applied the row to the action row,
+    /// the tab strip and three named panels - and to no list row at all. So
+    /// every list in the dock kept whatever a finger measured when the list was
+    /// last rebuilt. That is stale after anything that moves the row: the
+    /// interface-size button, a browser zoom, a devicePixelRatio change,
+    /// switching device in a simulator.
+    ///
+    /// ⚠ NOT a rotation, and it is worth saying so because it is the obvious
+    /// guess and it is wrong: with MatchWidthOrHeight 0.5 the scale factor
+    /// depends on width x height, which a rotation leaves alone - 932x430 and
+    /// 430x932 both give the same scale factor and the same row. A rotation
+    /// changes the canvas SHAPE, not the size of a finger.</summary>
+    void RowHeight(LayoutElement le)
+    {
+        if (le == null) return;
+        le.minHeight = le.preferredHeight = TouchRow();
+        if (le.GetComponent<TouchRowTag>() == null) le.gameObject.AddComponent<TouchRowTag>();
+    }
+
+    /// <summary>Re-apply the row to every element that IS one. Paired with
+    /// RowHeight: anything tagged there is found here, so a new list row is
+    /// covered by writing it the same way as the others.</summary>
+    void ReapplyTouchRows(float R)
+    {
+        if (canvas == null) return;
+        foreach (var tag in canvas.GetComponentsInChildren<TouchRowTag>(true))
+        {
+            var le = tag.GetComponent<LayoutElement>();
+            if (le != null) { le.minHeight = R; le.preferredHeight = R; }
+        }
+    }
     public bool StatsBandShown { get { return statsRt != null && statsRt.gameObject.activeSelf; } }
     public float TopCoverUnits { get { return TopInset(); } }
     public float SafeTopUnits { get { return safeT; } }
@@ -958,7 +1025,12 @@ public partial class MobileBuilderUI : MonoBehaviour
         if (canvasRt != null)
         {
             float scale = canvasRt.localScale.y > 0f ? canvasRt.localScale.y : 1f;
-            float safeTop = (Screen.height - Screen.safeArea.yMax) / scale;
+            // SafeAreaWeb, not Screen.safeArea: in a WebGL build Unity's safe
+            // area is the whole screen, so this clamp - the one keeping the save
+            // card's title on screen - was subtracting zero on exactly the
+            // device it exists for. This was the fourth independent copy of the
+            // formula in the codebase; it reads the shared one now.
+            float safeTop = SafeAreaWeb.Top / scale;
             float maxUp = canvasRt.rect.height * 0.5f - saveDlgCard.sizeDelta.y * 0.5f - safeTop - 8f;
             up = Mathf.Min(up, Mathf.Max(0f, maxUp));
         }
@@ -1541,14 +1613,21 @@ public partial class MobileBuilderUI : MonoBehaviour
     void RestackBars()
     {
         float y = BarH;
+        bool moved = false;
         if (msgBarRt != null)
         {
             if (Mathf.Abs(msgBarRt.anchoredPosition.y + y) > 0.5f)
-                msgBarRt.anchoredPosition = new Vector2(msgBarRt.anchoredPosition.x, -y);
+            { msgBarRt.anchoredPosition = new Vector2(msgBarRt.anchoredPosition.x, -y); moved = true; }
             if (msgBar != null && msgBar.activeSelf) y += msgBarRt.sizeDelta.y;
         }
         if (tipBarRt != null && Mathf.Abs(tipBarRt.anchoredPosition.y + y) > 0.5f)
-            tipBarRt.anchoredPosition = new Vector2(tipBarRt.anchoredPosition.x, -y);
+        { tipBarRt.anchoredPosition = new Vector2(tipBarRt.anchoredPosition.x, -y); moved = true; }
+        // MOVING A BAR CHANGES THE TOP INSET, AND THE DOCK IS SIZED FROM IT.
+        // Without this the list tabs kept a height computed against the old
+        // stack: measured on ROBOTS, top cover 121.0 + dock 500.7 + handle 69.3
+        // = 691.0 in a 653-unit canvas, which drew the HIDE PANEL handle straight
+        // across the onboarding tip strip until the player changed tabs.
+        if (moved) ApplyDockH();
     }
 
     void PickMat(string k)
@@ -1875,7 +1954,7 @@ public partial class MobileBuilderUI : MonoBehaviour
         quickMeter.color = new Color(1f, 0.84f, 0.40f);
         quickMeter.gameObject.AddComponent<LayoutElement>().minHeight = 36f;
         var qrow = MkPanel("quickrow", quickPanel.transform, new Color(0f, 0f, 0f, 0f));
-        var qrl = qrow.AddComponent<LayoutElement>(); qrl.minHeight = TouchRow(); qrl.preferredHeight = TouchRow(); qrl.flexibleHeight = 0f;
+        var qrl = qrow.AddComponent<LayoutElement>(); RowHeight(qrl); qrl.flexibleHeight = 0f;
         var qh = qrow.AddComponent<HorizontalLayoutGroup>(); qh.spacing = 6f; qh.childForceExpandWidth = true; qh.childForceExpandHeight = true;
         for (int qi = 0; qi < 3; qi++)
         {
@@ -1884,7 +1963,7 @@ public partial class MobileBuilderUI : MonoBehaviour
             qb.GetComponent<Image>().color = new Color(0.55f, 0.30f, 0.75f, 1f);
             // one touch row tall, no more: on the live site the three offers
             // grew to ~4 rows and ate the league board (2026-09-07)
-            var qbl = qb.gameObject.AddComponent<LayoutElement>(); qbl.minHeight = TouchRow(); qbl.preferredHeight = TouchRow(); qbl.flexibleHeight = 0f; qbl.flexibleWidth = 1f;
+            var qbl = qb.gameObject.AddComponent<LayoutElement>(); RowHeight(qbl); qbl.flexibleHeight = 0f; qbl.flexibleWidth = 1f;
             quickBtns[qi] = qb;
         }
 
@@ -2291,12 +2370,57 @@ public partial class MobileBuilderUI : MonoBehaviour
     /// one reports the editor window, which is the wrong physical device.</summary>
     float TouchRow()
     {
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+        if (forcedRowUnits.HasValue) return forcedRowUnits.Value;
+#endif
         if (!PhysicalTouchSizing) return DesktopRow();
         float sf = canvas != null ? canvas.scaleFactor : 0f;
         float dpi = UnityEngine.Device.Screen.dpi;
         if (sf < 0.01f || dpi < 1f) return 44f;         // unknown: previous behaviour
         return Mathf.Clamp((44f / 163f) * dpi / sf, 34f, 110f);
     }
+
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+    /// <summary>FORCED PHONE METRICS, for a bench with no phone.
+    ///
+    /// Why this exists. A headless editor reports deviceType=Desktop, so
+    /// PhysicalTouchSizing is FALSE and both TouchRow() and FontUnits() take
+    /// the DESKTOP branch - a 52-unit row and near-1:1 type. That is exactly
+    /// the scale at which none of the phone layout defects appear, so every
+    /// bench in this project has been measuring a screen nobody plays on.
+    /// (Measured 2026-09-13: -batchmode -nographics reports 640x480 at
+    /// dpi 266, and neither Screen.SetResolution nor -screen-width/-height
+    /// moves it, so the geometry has to be forced from inside.)
+    ///
+    /// Set both, and a bench gets owen's phone's numbers on a desktop:
+    ///   2532x1170 at 460 dpi, CanvasScaler ref 1280x720 match 0.5
+    ///   -> scaleFactor 1.793, canvas 1412x653 units
+    ///   -> TouchRow  = clamp(44/163*460/1.793, 34, 110) = 110 units (clamped)
+    ///   -> FontUnits = pt * (460/163)/1.793                = pt * 1.574
+    /// PhoneLayoutBench owns those constants; see its header.
+    ///
+    /// UNSET IS THE DEFAULT and leaves every path above byte-identical - the
+    /// check is a HasValue on a static that no product code ever writes. The
+    /// #if is what keeps it out of a release player entirely.</summary>
+    public static float? forcedRowUnits;
+    /// <summary>Multiplier applied to a point size instead of the dpi maths.
+    /// See forcedRowUnits.</summary>
+    public static float? forcedFontScale;
+    /// <summary>The WEB half of the same idea: the browser pixel ratio and the
+    /// coarse-pointer flag that ReadBrowserMetrics normally reads out of the
+    /// jslib. Set these INSTEAD of forcedRowUnits to measure the path a phone
+    /// browser takes - PhysicalTouchSizing stays false, so DesktopRow() and
+    /// DesktopFontUnits() do the arithmetic, which is what ships to a phone
+    /// from THIS repo. forcedRowUnits is the iOS path, which ships from the
+    /// parent repo. The two disagree and both are real.</summary>
+    public static float? forcedPixelRatio;
+    public static bool? forcedCoarsePointer;
+    /// <summary>Drop both back to the real-screen rule. A bench that leaves
+    /// these set poisons every later bench in the same play session, the way
+    /// autoHidePanelOnPick did.</summary>
+    public static void ClearForcedMetrics()
+    { forcedRowUnits = null; forcedFontScale = null; forcedPixelRatio = null; forcedCoarsePointer = null; }
+#endif
 
     // OWEN 2026-08-04 walkthrough: SCOUT and FIGHT on the contest rows were
     // visibly smaller than every control in the builder. C16 measures NAMED
@@ -2323,6 +2447,11 @@ public partial class MobileBuilderUI : MonoBehaviour
     /// I had written measured rectangles, so nothing failed.</summary>
     int FontUnits(float pt)
     {
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+        // See forcedRowUnits. Same floor as the physical branch, so a forced
+        // run cannot invent a legibility pass the real path would not give.
+        if (forcedFontScale.HasValue) return Mathf.Max(8, Mathf.RoundToInt(pt * forcedFontScale.Value));
+#endif
         if (!PhysicalTouchSizing)
         {
             ReadBrowserMetrics();
@@ -2383,13 +2512,19 @@ public partial class MobileBuilderUI : MonoBehaviour
         if (canvas == null) return;
         float sf = canvas.scaleFactor;
         if (sf < 0.01f) return;
-        var sa = UnityEngine.Device.Screen.safeArea;
+        // SafeAreaWeb, not Screen.safeArea directly. On a DEVICE the two are
+        // the same thing - it passes Unity's value straight through - but in a
+        // WebGL build Unity reports the whole screen as safe, while this game's
+        // page deliberately opts the canvas UNDER the notch and the home
+        // indicator with viewport-fit=cover. Every number below was therefore
+        // zero on the web, and this producer feeds about twenty consumers, so
+        // the whole mechanism was inert on the one platform it ships to most.
         float w = UnityEngine.Device.Screen.width, h = UnityEngine.Device.Screen.height;
-        if (w < 1f || h < 1f || sa.width < 1f || sa.height < 1f) return;
-        safeL = Mathf.Max(0f, sa.x) / sf;
-        safeR = Mathf.Max(0f, w - (sa.x + sa.width)) / sf;
-        safeB = Mathf.Max(0f, sa.y) / sf;
-        safeT = Mathf.Max(0f, h - (sa.y + sa.height)) / sf;
+        if (w < 1f || h < 1f) return;
+        safeL = Mathf.Max(0f, SafeAreaWeb.Left) / sf;
+        safeR = Mathf.Max(0f, SafeAreaWeb.Right) / sf;
+        safeB = Mathf.Max(0f, SafeAreaWeb.Bottom) / sf;
+        safeT = Mathf.Max(0f, SafeAreaWeb.Top) / sf;
     }
 
     /// <summary>Inset a full-width bar so its CONTENT clears the notch. The
@@ -2462,6 +2597,9 @@ public partial class MobileBuilderUI : MonoBehaviour
         ReadSafeArea();
         ApplyDesktopType();
         float R = TouchRow();
+        // Every list row in the dock, not just the named panels below. Before
+        // this, a list kept whatever a finger measured when it was last built.
+        ReapplyTouchRows(R);
         if (driveOutBtn != null)
         {
             driveOutBtn.GetComponent<RectTransform>().sizeDelta = new Vector2(-4f, R);
@@ -3012,8 +3150,10 @@ public partial class MobileBuilderUI : MonoBehaviour
             {
                 string mat = mk;
                 var row = MkPanel("shopmat_" + i + "_" + mk, content.transform, new Color(0.07f,0.08f,0.105f,1f));
-                var rle = row.AddComponent<LayoutElement>(); rle.minHeight = TouchRow(); rle.preferredHeight = TouchRow();
-                var rh = row.AddComponent<HorizontalLayoutGroup>(); rh.spacing = 4f; rh.childForceExpandHeight = true; rh.childForceExpandWidth = false; rh.padding = new RectOffset(28,4,2,2);
+                // a SHOP row is a buy button: it must hold a whole touch row
+                // inside its padding, not be one and leave the button short.
+                var rle = row.AddComponent<LayoutElement>(); RowHeight(rle);
+                var rh = row.AddComponent<HorizontalLayoutGroup>(); rh.spacing = 4f; rh.childForceExpandHeight = true; rh.childForceExpandWidth = false; rh.childControlHeight = true; rh.padding = new RectOffset(28,4,0,0);
                 var lbl = MkText("lbl", row.transform, "", 13, TextAnchor.MiddleLeft);
                 // shop1 capture: a FLEXIBLE label flung the buttons to the far
                 // right of a ~1200-unit row, and BUY moved horizontally from row
@@ -3083,7 +3223,7 @@ public partial class MobileBuilderUI : MonoBehaviour
         var secRow = MkPanel("arenasections", arenaPanel.transform, new Color(0f,0f,0f,0f));
         arenaSecLE = secRow.AddComponent<LayoutElement>();
         arenaSecLE.flexibleHeight = 0f;
-        arenaSecLE.minHeight = TouchRow(); arenaSecLE.preferredHeight = TouchRow();
+        RowHeight(arenaSecLE);
         var sh = secRow.AddComponent<HorizontalLayoutGroup>();
         sh.spacing = 4f; sh.childForceExpandWidth = true; sh.childForceExpandHeight = true;
         // ⚠ SIGNED OUT, TWO OF THESE THREE CANNOT WORK — and they used to look
@@ -3153,7 +3293,7 @@ public partial class MobileBuilderUI : MonoBehaviour
         arenaCatRow = catRow;
         arenaCatLE = catRow.AddComponent<LayoutElement>();
         arenaCatLE.flexibleHeight = 0f;                 // see the SHOP switch: -1 eats the dock
-        arenaCatLE.minHeight = TouchRow(); arenaCatLE.preferredHeight = TouchRow();
+        RowHeight(arenaCatLE);
         var ch = catRow.AddComponent<HorizontalLayoutGroup>();
         ch.spacing = 3f; ch.childForceExpandWidth = true; ch.childForceExpandHeight = true;
         arenaCatBtns.Clear();
@@ -3283,7 +3423,7 @@ public partial class MobileBuilderUI : MonoBehaviour
     {
         var row = MkPanel("field_" + label, parent, new Color(0f,0f,0f,0f));
         var rle = row.AddComponent<LayoutElement>();
-        rle.flexibleHeight = 0f; rle.minHeight = TouchRow(); rle.preferredHeight = TouchRow();
+        rle.flexibleHeight = 0f; RowHeight(rle);
         var rh = row.AddComponent<HorizontalLayoutGroup>();
         rh.spacing = 6f; rh.childForceExpandHeight = true; rh.childForceExpandWidth = false;
         rh.padding = new RectOffset(6,6,2,2);
@@ -3390,7 +3530,7 @@ public partial class MobileBuilderUI : MonoBehaviour
 
             var row = MkPanel("accbtns", arenaAccountContent, new Color(0f,0f,0f,0f));
             var rle = row.AddComponent<LayoutElement>();
-            rle.flexibleHeight = 0f; rle.minHeight = TouchRow(); rle.preferredHeight = TouchRow();
+            rle.flexibleHeight = 0f; RowHeight(rle);
             var rh = row.AddComponent<HorizontalLayoutGroup>();
             rh.spacing = 4f; rh.childForceExpandWidth = true; rh.childForceExpandHeight = true;
 
@@ -3472,7 +3612,7 @@ public partial class MobileBuilderUI : MonoBehaviour
             var eb = MkButton("enlistgo", arenaAccountContent, "ENLIST", 14,
                 () => { if (arenaScreen != null) { arenaScreen.EnlistNow(); arenaAccountStamp = ""; } });
             var ele2 = eb.gameObject.AddComponent<LayoutElement>();
-            ele2.flexibleHeight = 0f; ele2.minHeight = TouchRow(); ele2.preferredHeight = TouchRow();
+            ele2.flexibleHeight = 0f; RowHeight(ele2);
             eb.GetComponent<Image>().color = new Color(0.20f,0.45f,0.65f,1f);
         }
 
@@ -3501,11 +3641,12 @@ public partial class MobileBuilderUI : MonoBehaviour
                 string id = m.id;                       // captured per row, not the loop var
                 var row = MkPanel("minerow_" + id, arenaAccountContent, new Color(0.10f,0.11f,0.14f,1f));
                 var rle = row.AddComponent<LayoutElement>();
-                // A full touch row, because it now contains something tappable.
-                rle.flexibleHeight = 0f; rle.minHeight = TouchRow(); rle.preferredHeight = TouchRow();
+                // A full touch row: the group below adds no vertical padding.
+                rle.flexibleHeight = 0f; RowHeight(rle);
                 var rh = row.AddComponent<HorizontalLayoutGroup>();
                 rh.spacing = 4f; rh.childForceExpandHeight = true; rh.childForceExpandWidth = false;
-                rh.padding = new RectOffset(6, 4, 2, 2);
+                rh.childControlHeight = true;
+                rh.padding = new RectOffset(6, 4, 0, 0);   // 0 vertical: the control takes the whole row
 
                 // StatusText lives on MyRobot so this row and ArenaScreen's
                 // OnGUI copy cannot drift. It used to say "waiting to be
@@ -3534,7 +3675,7 @@ public partial class MobileBuilderUI : MonoBehaviour
                                   () => { if (arenaScreen != null) { arenaScreen.RetireTap(id); arenaAccountStamp = ""; } });
                 var ble = rb.gameObject.AddComponent<LayoutElement>();
                 ble.flexibleWidth = 0f; ble.minWidth = 84f; ble.preferredWidth = 84f;
-                ble.minHeight = TouchRow(); ble.preferredHeight = TouchRow();
+                RowHeight(ble);
                 rb.GetComponent<Image>().color = armed
                     ? new Color(0.62f, 0.16f, 0.14f, 0.98f)      // the REMOVE-armed red
                     : new Color(0.24f, 0.26f, 0.31f, 0.96f);
@@ -3555,7 +3696,7 @@ public partial class MobileBuilderUI : MonoBehaviour
             "SIGN OUT" + (string.IsNullOrEmpty(arenaScreen.Who) ? "" : " (" + arenaScreen.Who + ")"), 13,
             () => { if (arenaScreen != null) { arenaScreen.SignOut(); arenaAccountStamp = ""; } });
         var sole = so.gameObject.AddComponent<LayoutElement>();
-        sole.flexibleHeight = 0f; sole.minHeight = TouchRow(); sole.preferredHeight = TouchRow();
+        sole.flexibleHeight = 0f; RowHeight(sole);
         so.GetComponent<Image>().color = new Color(0.16f,0.17f,0.21f,1f);
 
         // ACCOUNT DELETION (App Store 5.1.1(v) — mandatory once accounts gate
@@ -3588,7 +3729,7 @@ public partial class MobileBuilderUI : MonoBehaviour
             }));
         });
         var dle = delBtn.gameObject.AddComponent<LayoutElement>();
-        dle.flexibleHeight = 0f; dle.minHeight = TouchRow(); dle.preferredHeight = TouchRow();
+        dle.flexibleHeight = 0f; RowHeight(dle);
         delBtn.GetComponent<Image>().color = new Color(0.42f, 0.15f, 0.14f, 1f);
     }
 
@@ -3619,7 +3760,7 @@ public partial class MobileBuilderUI : MonoBehaviour
             var stop = MkButton("arenastopreplay", arenaInboxContent, "STOP REPLAY", 14,
                                 () => { if (arenaScreen != null) { arenaScreen.StopReplay(); arenaInboxStamp = ""; } });
             var sle2 = stop.gameObject.AddComponent<LayoutElement>();
-            sle2.flexibleHeight = 0f; sle2.minHeight = TouchRow(); sle2.preferredHeight = TouchRow();
+            sle2.flexibleHeight = 0f; RowHeight(sle2);
             stop.GetComponent<Image>().color = new Color(0.30f,0.18f,0.18f,1f);
         }
 
@@ -3671,7 +3812,7 @@ public partial class MobileBuilderUI : MonoBehaviour
                 win ? new Color(0.12f,0.18f,0.14f,1f)
                     : loss ? new Color(0.18f,0.12f,0.12f,1f)
                            : new Color(0.10f,0.11f,0.14f,1f));
-            var rle = row.AddComponent<LayoutElement>(); rle.minHeight = TouchRow(); rle.preferredHeight = TouchRow();
+            var rle = row.AddComponent<LayoutElement>(); RowHeight(rle);
             var rh = row.AddComponent<HorizontalLayoutGroup>();
             rh.spacing = 4f; rh.childForceExpandHeight = true; rh.childForceExpandWidth = false;
             rh.padding = new RectOffset(8,4,2,2);
@@ -3821,7 +3962,7 @@ public partial class MobileBuilderUI : MonoBehaviour
                 + (eligible.Count > 1 ? "   ·   " + eligible.Count + " eligible" : ""), 13,
                 () => { arenaPickOpen = !arenaPickOpen; arenaCardStamp = ""; });
             var hle = headGO.gameObject.AddComponent<LayoutElement>();
-            hle.flexibleHeight = 0f; hle.minHeight = TouchRow(); hle.preferredHeight = TouchRow();
+            hle.flexibleHeight = 0f; RowHeight(hle);
             var himg = headGO.GetComponent<Image>();
             if (himg != null) himg.color = new Color(0.16f,0.17f,0.21f,1f);
             var htx = headGO.GetComponentInChildren<Text>();
@@ -3848,7 +3989,7 @@ public partial class MobileBuilderUI : MonoBehaviour
                     // bridge had dropped, and an unbuilt commit is exactly how
                     // a one-word mistake reaches someone else's editor.
                     var rowLe = pb.gameObject.AddComponent<LayoutElement>();
-                    rowLe.flexibleHeight = 0f; rowLe.minHeight = TouchRow(); rowLe.preferredHeight = TouchRow();
+                    rowLe.flexibleHeight = 0f; RowHeight(rowLe);
                     var pimg = pb.GetComponent<Image>();
                     if (pimg != null) pimg.color = on ? new Color(0.20f,0.45f,0.65f,1f) : new Color(0.13f,0.14f,0.18f,1f);
                     var pt = pb.GetComponentInChildren<Text>();
@@ -3868,7 +4009,7 @@ public partial class MobileBuilderUI : MonoBehaviour
                                   + (gapUp > 0 ? " · FIGHTING " + gapUp + " UP" : ""), 14,
                                   () => { if (arenaScreen != null) { arenaScreen.ArmChallenge(); arenaCardStamp = ""; } });
                 var cle2 = cb.gameObject.AddComponent<LayoutElement>();
-                cle2.flexibleHeight = 0f; cle2.minHeight = TouchRow(); cle2.preferredHeight = TouchRow();
+                cle2.flexibleHeight = 0f; RowHeight(cle2);
                 cb.GetComponent<Image>().color = new Color(0.20f,0.45f,0.65f,1f);
             }
             else
@@ -3894,7 +4035,7 @@ public partial class MobileBuilderUI : MonoBehaviour
 
                 var row = MkPanel("cardconfirmrow", arenaCardContent, new Color(0f,0f,0f,0f));
                 var rle2 = row.AddComponent<LayoutElement>();
-                rle2.flexibleHeight = 0f; rle2.minHeight = TouchRow(); rle2.preferredHeight = TouchRow();
+                rle2.flexibleHeight = 0f; RowHeight(rle2);
                 var rh = row.AddComponent<HorizontalLayoutGroup>();
                 rh.spacing = 4f; rh.childForceExpandWidth = true; rh.childForceExpandHeight = true;
                 var ok = MkButton("cardconfirm", row.transform, "CONFIRM", 14,
@@ -3909,7 +4050,7 @@ public partial class MobileBuilderUI : MonoBehaviour
         var close = MkButton("cardclose", arenaCardContent, "BACK TO THE BOARD", 13,
                              () => { if (arenaScreen != null) { arenaScreen.CloseCard(); arenaCardStamp = ""; } });
         var xle = close.gameObject.AddComponent<LayoutElement>();
-        xle.flexibleHeight = 0f; xle.minHeight = TouchRow(); xle.preferredHeight = TouchRow();
+        xle.flexibleHeight = 0f; RowHeight(xle);
         close.GetComponent<Image>().color = new Color(0.16f,0.17f,0.21f,1f);
     }
 
@@ -4126,7 +4267,7 @@ public partial class MobileBuilderUI : MonoBehaviour
         {
             var e = board[i];
             var row = MkPanel("arenarow_" + i, arenaBoardContent, new Color(0.10f,0.11f,0.14f,1f));
-            var rle = row.AddComponent<LayoutElement>(); rle.minHeight = TouchRow(); rle.preferredHeight = TouchRow();
+            var rle = row.AddComponent<LayoutElement>(); RowHeight(rle);
             var rh = row.AddComponent<HorizontalLayoutGroup>();
             rh.spacing = 4f; rh.childForceExpandHeight = true; rh.childForceExpandWidth = false;
             rh.padding = new RectOffset(8,4,2,2);
@@ -4311,7 +4452,7 @@ public partial class MobileBuilderUI : MonoBehaviour
         // shop, which had no entry point, so a player with ladder winnings had
         // no way to discover they could be spent in the career at all.
         var vrow = MkPanel("cos_deposit", cosmeticsContent, new Color(0.10f,0.16f,0.13f,0.95f));
-        var vle = vrow.AddComponent<LayoutElement>(); vle.minHeight = TouchRow(); vle.preferredHeight = TouchRow();
+        var vle = vrow.AddComponent<LayoutElement>(); RowHeight(vle);
         var vh = vrow.AddComponent<HorizontalLayoutGroup>();
         vh.spacing = 6f; vh.childForceExpandHeight = true; vh.childForceExpandWidth = false;
         vh.padding = new RectOffset(8,6,2,2);
@@ -4361,7 +4502,7 @@ public partial class MobileBuilderUI : MonoBehaviour
             var c = cosmetics[i];
             var row = MkPanel("cos_" + c.id, cosmeticsContent,
                 c.owned ? new Color(0.14f,0.20f,0.16f,0.95f) : new Color(0.10f,0.11f,0.14f,1f));
-            var rle = row.AddComponent<LayoutElement>(); rle.minHeight = TouchRow(); rle.preferredHeight = TouchRow();
+            var rle = row.AddComponent<LayoutElement>(); RowHeight(rle);
             var rh = row.AddComponent<HorizontalLayoutGroup>();
             rh.spacing = 4f; rh.childForceExpandHeight = true; rh.childForceExpandWidth = false;
             rh.padding = new RectOffset(8,4,2,2);
@@ -4674,7 +4815,7 @@ public partial class MobileBuilderUI : MonoBehaviour
     {
         var v = robotsPanel.AddComponent<VerticalLayoutGroup>(); v.spacing = 4f; v.childForceExpandWidth = true; v.childForceExpandHeight = false; v.padding = new RectOffset(4,4,4,4);
         var row = MkPanel("stablerow", robotsPanel.transform, new Color(0f,0f,0f,0f));
-        var rle0 = row.AddComponent<LayoutElement>(); rle0.minHeight = TouchRow(); rle0.preferredHeight = TouchRow();
+        var rle0 = row.AddComponent<LayoutElement>(); RowHeight(rle0);
         // The row's own HorizontalLayoutGroup reports flexibleHeight = 1
         // (childForceExpandHeight), and LayoutElement leaves flexibleHeight
         // unset by default, so the row competed with the stable list for the
@@ -4857,8 +4998,8 @@ public partial class MobileBuilderUI : MonoBehaviour
         if (Career.Drafting)
         {
             var drow = MkPanel("draftrow", robotsContent, new Color(0.25f,0.16f,0.05f,0.9f));
-            var dle = drow.AddComponent<LayoutElement>(); dle.minHeight = TouchRow(); dle.preferredHeight = TouchRow();
-            var dh = drow.AddComponent<HorizontalLayoutGroup>(); dh.spacing = 4f; dh.childForceExpandHeight = true; dh.childForceExpandWidth = false; dh.padding = new RectOffset(6,4,2,2);
+            var dle = drow.AddComponent<LayoutElement>(); RowHeight(dle);
+            var dh = drow.AddComponent<HorizontalLayoutGroup>(); dh.spacing = 4f; dh.childForceExpandHeight = true; dh.childForceExpandWidth = false; dh.childControlHeight = true; dh.padding = new RectOffset(6,4,0,0);
             var dl = MkText("lbl", drow.transform, "DRAFT MODE - everything unlocked", 13, TextAnchor.MiddleLeft);
             dl.color = new Color(1f, 0.82f, 0.25f);
             dl.gameObject.AddComponent<LayoutElement>().flexibleWidth = 1f;
@@ -4873,8 +5014,8 @@ public partial class MobileBuilderUI : MonoBehaviour
             int ri = i2;
             var rob = Career.Data.stable[i2];
             var row = MkPanel("robot_" + i2, robotsContent, new Color(0.10f,0.11f,0.14f,1f));
-            var rle = row.AddComponent<LayoutElement>(); rle.minHeight = TouchRow(); rle.preferredHeight = TouchRow();
-            var rh = row.AddComponent<HorizontalLayoutGroup>(); rh.spacing = 4f; rh.childForceExpandHeight = true; rh.childForceExpandWidth = false; rh.padding = new RectOffset(6,4,2,2);
+            var rle = row.AddComponent<LayoutElement>(); RowHeight(rle);
+            var rh = row.AddComponent<HorizontalLayoutGroup>(); rh.spacing = 4f; rh.childForceExpandHeight = true; rh.childForceExpandWidth = false; rh.childControlHeight = true; rh.padding = new RectOffset(6,4,0,0);
             // MEDALS (2026-08-02): titles are real now - one per league
             // campaign swept - so the card names the championship instead of
             // printing a bare star nothing explained. Kept to the existing one
@@ -4945,8 +5086,9 @@ public partial class MobileBuilderUI : MonoBehaviour
             int bi = i3;
             var bp = Career.Data.blueprints[i3];
             var row = MkPanel("bp_" + i3, robotsContent, new Color(0.12f,0.10f,0.16f,1f));
-            var rle = row.AddComponent<LayoutElement>(); rle.minHeight = 30f; rle.preferredHeight = 30f;
-            var rh = row.AddComponent<HorizontalLayoutGroup>(); rh.spacing = 4f; rh.childForceExpandHeight = true; rh.childForceExpandWidth = false; rh.padding = new RectOffset(6,4,2,2);
+            // was a bare 30 units on every device - not a row at all.
+            var rle = row.AddComponent<LayoutElement>(); RowHeight(rle);
+            var rh = row.AddComponent<HorizontalLayoutGroup>(); rh.spacing = 4f; rh.childForceExpandHeight = true; rh.childForceExpandWidth = false; rh.childControlHeight = true; rh.padding = new RectOffset(6,4,0,0);
             var lbl = MkText("lbl", row.transform, "* " + bp.name + " (blueprint)", 13, TextAnchor.MiddleLeft);
             lbl.gameObject.AddComponent<LayoutElement>().flexibleWidth = 1f;
             // OWEN 2026-08-02: "what does 'Draft it' button mean?" - it read as
@@ -5242,8 +5384,16 @@ public partial class MobileBuilderUI : MonoBehaviour
             // the old side and real content slid under the notch. safeArea.x/y
             // move on that flip; multipliers are distinct so no two deltas
             // cancel. Found by the UX validation round, 2026-08-15.
-            var sa = Screen.safeArea;
-            float saSig = sa.x * 13f + sa.y * 29f + sa.width * 3f + sa.height * 5f;
+            // ⚠ THIS MUST MIX THE SAME INSETS ReadSafeArea USES, OR THE WHOLE
+            // MECHANISM LAYS OUT ONCE AND NEVER AGAIN. Screen.safeArea is
+            // CONSTANT in a WebGL build - it is the whole screen - so once the
+            // producer started reading the real CSS insets instead, this term
+            // stopped moving with them: the UI would have applied them at boot
+            // and then silently ignored every rotation. Caught in review before
+            // it shipped, and it is the same false-stillness the 2026-08-15
+            // round found on the iPhone's 180° flip.
+            float saSig = SafeAreaWeb.Left * 13f + SafeAreaWeb.Bottom * 29f
+                        + SafeAreaWeb.Right * 3f + SafeAreaWeb.Top * 5f;
             float sig = canvas.scaleFactor * 1000f
                       + (crt0 != null ? crt0.rect.width + crt0.rect.height * 7f : 0f)
                       + saSig + userUiScale * 100f + browserPixelRatio * 200f;

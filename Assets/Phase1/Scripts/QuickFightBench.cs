@@ -8,6 +8,14 @@
 //   2. the settle counts: quickFights, streak, the box meter, a toolbox on
 //      the third win, a crown on the fifth, the daily cap, and the day reset;
 //   3. the box's grant is exact and self-describing (qbox:<scrap>:<part>:<mat>:<n>).
+//   4. THE FIGHT HUD'S GEOMETRY ON A PHONE (2026-09-13): the IMGUI scale,
+//      the three layout thresholds and the QUIT button measured in CSS
+//      pixels on a simulated 932x430 phone at dpr 1, 2 and 3 - with the
+//      desktop-browser control leg beside them, because the whole claim of
+//      the GuiScale change is that a desktop is left where it was. The notch
+//      and the home indicator are POSED through SafeAreaWeb's forcing seam,
+//      so QUIT and the debrief's exit buttons are checked against a real
+//      cut-out rather than against an estimate of one.
 //
 // OWNER STATE IS SACRED: Career.Data is swapped for a fresh career, autosave
 // is held for the whole run (counted hold), and the original is restored.
@@ -133,6 +141,146 @@ namespace RobotBrawl.Phase0
             for (int i = 0; i < 3; i++) Career.SettleQuickFight(true, 100f);
             Check(d.quickBoxesToday == 1 && Career.lastQuickLine.Contains("TOOLBOX"), "a new day resets the cap");
             Check(Career.TxnSum() == d.scrap, "the ledger still audits (sum of txns == scrap)");
+
+            // ---- 4. THE FIGHT HUD ON A PHONE ------------------------------------
+            // Three defects reached a tester's phone on 2026-09-13 and every
+            // bench in this project stayed green, because nothing had ever
+            // asked what the fight's IMGUI units come out at PHYSICALLY.
+            // FightManager scales by BuilderManager.GuiScale, whose two inputs
+            // (Screen.dpi, Screen.height) are both meaningless in a browser -
+            // see GuiScale's R10 note for the arithmetic. The checks below are
+            // pure geometry: no fight, no career, no yields inside the forced
+            // window, so the forcing cannot leak into another frame's OnGUI.
+            //
+            // The phone is the tester's: 932 x 430 CSS points landscape. The
+            // WebGL template's fit() makes the drawing buffer innerWidth and
+            // innerHeight times min(devicePixelRatio, 2), so ForceBrowser
+            // builds Screen.width/height the same way.
+            const float EPS = 0.01f;
+            float dockFloorCss = 14f;   // MobileBuilderUI.DesktopFontUnits' own text floor
+            // The landscape iPhone this was measured on: a 47 CSS px notch
+            // and a 21 CSS px home indicator. Posed, not read - the CSS probe
+            // SafeAreaWeb uses only answers in a browser.
+            const float notchCss = 47f, homeCss = 21f;
+            foreach (float dpr in new[] { 1f, 2f, 3f })
+            {
+                BuilderManager.ForceBrowser(932f, 430f, dpr);
+                float uw = FightManager.HudUnitsW, uh = FightManager.HudUnitsH;
+                // (a) THE UNIT SPACE IS THE CSS VIEWPORT, WHATEVER THE DPR.
+                // This is the invariant the whole fix rests on: a fixed
+                // 1010-unit HUD box can only be reasoned about if the screen's
+                // size in units is a property of the PHONE and not of its
+                // pixel density. Before the fix the same phone measured 932,
+                // 1035.6 and 1553 units wide at dpr 1, 2 and 3.
+                Check(Mathf.Abs(uw - 932f) < 1f && Mathf.Abs(uh - 430f) < 1f,
+                      "dpr " + dpr + ": the HUD viewport is the CSS viewport ("
+                      + uw.ToString("0.0") + "x" + uh.ToString("0.0") + " units)");
+                // (b) the three layout thresholds pick the phone's branches
+                Check(uw < 1030f, "...narrow fires (the 1010-unit HUD box does not fit)");
+                Check(uh < 560f, "...shortH fires (the tall debrief does not fit - iOS QA 2026-09-05)");
+                // (c) type lands in a physical band a person can read. The
+                // floor is the dock's own: DesktopFontUnits holds every piece
+                // of dock text to max(14, pt*1.1) CSS px. The ceiling is the
+                // tall-window clamp, 2.2 css per unit, which a 430-tall phone
+                // can never reach - so on this screen the band is one number
+                // and the assertion is tight, not generous.
+                float tiny = FightManager.UnitsToCss(FightManager.HUD_TINY_UNITS);
+                float name = FightManager.UnitsToCss(FightManager.HUD_NAME_UNITS);
+                Check(tiny >= dockFloorCss - EPS && tiny <= FightManager.HUD_TINY_UNITS * 2.2f + EPS,
+                      "...the kJ readout is " + tiny.ToString("0.0") + " CSS px (was 7.0 at dpr 2)");
+                Check(name >= FightManager.HUD_NAME_UNITS - EPS && name <= FightManager.HUD_NAME_UNITS * 2.2f + EPS,
+                      "...the name/HP line is " + name.ToString("0.0") + " CSS px (was 9.0 at dpr 2)");
+                // (d) QUIT is the only touch exit from a running fight.
+                Rect q = FightManager.QuitButtonRect();
+                float qw = FightManager.UnitsToCss(q.width), qh = FightManager.UnitsToCss(q.height);
+                Check(qh >= 44f - EPS && qw >= 44f - EPS,
+                      "...QUIT is at least a 44 pt touch row (" + qw.ToString("0") + "x" + qh.ToString("0")
+                      + " CSS px, was 44x18 at dpr 2)");
+                // (e) THE NOTCH, posed with SafeAreaWeb's forcing seam rather
+                // than estimated. Values are FRAMEBUFFER pixels, so a 47 CSS
+                // px cut-out is 47*dpr of them - which is the whole reason
+                // this is forced in the units the property returns and
+                // asserted in the units a finger works in.
+                SafeAreaWeb.forcedLeft = notchCss * dpr;
+                SafeAreaWeb.forcedBottom = homeCss * dpr;
+                Rect qn = FightManager.QuitButtonRect();
+                Check(FightManager.UnitsToCss(qn.x) >= notchCss - EPS,
+                      "...with a " + notchCss + " CSS px notch, QUIT starts clear of it at "
+                      + FightManager.UnitsToCss(qn.x).ToString("0") + " CSS px (was 9)");
+                // ...and the Quick debrief's two exit buttons clear the home
+                // indicator. They were pinned 8 units off the raw bottom edge,
+                // which on a landscape iPhone is inside it.
+                foreach (bool stacked in new[] { false, true })
+                    Check(FightManager.QuickFooterBottom(stacked) <= FightManager.HudSafeBottom + EPS,
+                          "...and the " + (stacked ? "stacked" : "side-by-side")
+                          + " debrief buttons end above the home indicator ("
+                          + FightManager.UnitsToCss(FightManager.HudUnitsH - FightManager.QuickFooterBottom(stacked)).ToString("0")
+                          + " CSS px of clearance, floor " + homeCss + ")");
+                // ...and both screens' exit buttons are a touch row tall. The
+                // Quick pair were a flat 48 units, which the old arbitrary
+                // scale rendered at 43.2 CSS px; the career row's 46 clears 44
+                // only by arithmetic nobody chose.
+                Check(FightManager.UnitsToCss(FightManager.QuickButtonH) >= 44f - EPS
+                      && FightManager.UnitsToCss(FightManager.ResultsButtonH(true)) >= 44f - EPS,
+                      "...and both results screens' exit buttons are a touch row tall ("
+                      + FightManager.UnitsToCss(FightManager.QuickButtonH).ToString("0") + " and "
+                      + FightManager.UnitsToCss(FightManager.ResultsButtonH(true)).ToString("0") + " CSS px)");
+                // (f) A PHONE WITH NO CUT-OUT AND A WORKING PROBE PAYS NOTHING.
+                // Until SafeAreaWeb grew `Measured` this state and the one
+                // below were the same reading, and the fallback had to fire for
+                // both: a notch-less phone was handed 47 px it did not need in
+                // order to protect a notched one whose probe had failed. These
+                // two checks are here because they used to be one.
+                SafeAreaWeb.forcedLeft = 0f; SafeAreaWeb.forcedBottom = 0f;
+                Check(Mathf.Abs(FightManager.QuitButtonRect().x - 10f) < EPS
+                      && Mathf.Abs(FightManager.QuickFooterBottom(false) - (FightManager.HudUnitsH - 8f)) < EPS,
+                      "...a phone that MEASURES no cut-out pays nothing for one");
+                SafeAreaWeb.forcedLeft = -1f; SafeAreaWeb.forcedBottom = -1f;
+                // (g) A PHONE WHOSE PROBE NEVER ANSWERED gets the constant.
+                // Posed with SafeAreaWeb.forcedMeasured, which exists because
+                // this state is otherwise UNREACHABLE from any bench: off the
+                // web Read takes its native leg and sets Measured true, and
+                // forcing an inset sets it true too, so the fallback branch was
+                // code no measurement had ever entered.
+                SafeAreaWeb.forcedMeasured = false;
+                Check(Mathf.Abs(FightManager.UnitsToCss(FightManager.QuitButtonRect().x) - (10f + notchCss)) < 1f
+                      && FightManager.UnitsToCss(FightManager.HudUnitsH - FightManager.QuickFooterBottom(false)) >= homeCss - EPS,
+                      "...a phone whose probe NEVER ANSWERED falls back to the posed cut-out (QUIT at "
+                      + FightManager.UnitsToCss(FightManager.QuitButtonRect().x).ToString("0") + " CSS px)");
+                float keepN = FightManager.NOTCH_FALLBACK_CSS, keepH = FightManager.HOME_FALLBACK_CSS;
+                FightManager.NOTCH_FALLBACK_CSS = 0f; FightManager.HOME_FALLBACK_CSS = 0f;
+                Check(Mathf.Abs(FightManager.QuitButtonRect().x - 10f) < EPS
+                      && Mathf.Abs(FightManager.QuickFooterBottom(false) - (FightManager.HudUnitsH - 8f)) < EPS,
+                      "...and zeroing the two constants removes even that");
+                FightManager.NOTCH_FALLBACK_CSS = keepN; FightManager.HOME_FALLBACK_CSS = keepH;
+                SafeAreaWeb.forcedMeasured = null;   // null is the shipped behaviour
+            }
+            // (h) a PORTRAIT phone is the narrow case the Quick debrief stacks
+            // its two buttons for. 430 css wide is the same phone turned round.
+            BuilderManager.ForceBrowser(430f, 932f, 3f);
+            Check(FightManager.HudUnitsW < 620f && FightManager.HudUnitsH >= 560f,
+                  "portrait 430x932 css: stacked fires, shortH does not ("
+                  + FightManager.HudUnitsW.ToString("0") + "x" + FightManager.HudUnitsH.ToString("0") + " units)");
+            // (i) THE CONTROL LEG, and it is the point of the whole change: a
+            // DESKTOP browser must be left where it was. 1920x950 at dpr 1
+            // scored clamp(950/900) = 1.0556 under the old rule and has to
+            // score it still, with no notch inset and no oversized QUIT.
+            BuilderManager.ForceBrowser(1920f, 950f, 1f);
+            Check(Mathf.Abs(BuilderManager.GuiScale - 950f / 900f) < 0.001f,
+                  "desktop 1920x950 dpr 1: the scale is unchanged at "
+                  + BuilderManager.GuiScale.ToString("0.000"));
+            Check(Mathf.Abs(FightManager.SafeLeftUnits) < EPS && FightManager.HudUnitsW >= 1030f,
+                  "...no cut-out and the desktop HUD branch, as before");
+            Check(Mathf.Abs(FightManager.UnitsToCss(FightManager.QuitButtonRect().height) - 44f) < 0.5f,
+                  "...QUIT is still exactly one touch row, not a phone-sized one");
+            // (j) and NOTHING is forced any more: the native rule, untouched.
+            BuilderManager.ClearForcedBrowser();
+            float nDpi = Screen.dpi > 250f ? Mathf.Min(2.5f, Screen.dpi / 160f) : 1f;
+            float nH = Mathf.Clamp(Screen.height / 900f, 1f, 2.2f);
+            Check(Mathf.Abs(BuilderManager.GuiScale - Mathf.Max(nDpi, nH)) < 0.0001f,
+                  "off the web the old rule still decides the scale ("
+                  + BuilderManager.GuiScale.ToString("0.000") + " at dpi " + Screen.dpi
+                  + ", " + Screen.width + "x" + Screen.height + ")");
 
             // ---- restore ---------------------------------------------------------
             Career.Data = savedData;

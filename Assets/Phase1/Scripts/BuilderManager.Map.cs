@@ -83,6 +83,20 @@ public partial class BuilderManager
 
     // ------------------------------------------------------------ seams (benches)
     public bool YardCardShown { get { return mode == Mode.Map && yardCard; } }
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+    /// <summary>Test seam: post a yard toast, the way opening a crate does
+    /// (see the crate path, which sets these same two fields for 3.5 s).
+    ///
+    /// A bench needs the toast LIVE at the moment it measures, and driving a
+    /// real crate gives it a 3.5-second fuse - long enough to lose to one
+    /// network wait, which is exactly what the board's fetch is. The shipped
+    /// game also posts a toast with no crate involved at all: Career.SaveNotice
+    /// is force-pushed into it (HudModel) whenever a save has failed, so "a
+    /// toast is up while a modal is open" is an ordinary state, not a contrived
+    /// one.</summary>
+    public void TestYardToast(string text, float seconds)
+    { yardToast = text == null ? "" : text; yardToastT = seconds; }
+#endif
     public int  YardCratesLeft { get { int n = 0; foreach (var c in chunks.Values) foreach (var g in c.crates) if (g != null) n++; return n; } }
     public CompoundRobot YardParked { get { return cardBot != null ? cardBot : NearestEnemy(testRobot != null ? testRobot.rb.position : homePos); } }
 #if UNITY_EDITOR || DEVELOPMENT_BUILD

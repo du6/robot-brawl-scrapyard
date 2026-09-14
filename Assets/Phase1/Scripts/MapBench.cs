@@ -44,6 +44,121 @@ namespace RobotBrawl.Phase0
         }
         static bool OnGround(BuilderManager bm, Vector3 p) { return Mathf.Abs(p.y - bm.TerrainHeight(p.x, p.z)) < 2.5f; }
 
+        // ---- the map HUD's sizing (section 4b) ---------------------------------
+
+        /// <summary>The smallest label anywhere in the HUD, hidden panels
+        /// included - a panel nobody has opened yet is still shipped.</summary>
+        static int SmallestLabel(GameObject hud, out string who)
+        {
+            who = ""; int worst = int.MaxValue;
+            if (hud == null) return 0;
+            foreach (var t in hud.GetComponentsInChildren<Text>(true))
+            {
+                if (t.fontSize >= worst) continue;
+                worst = t.fontSize; who = t.transform.parent != null ? t.transform.parent.name + "/" + t.name : t.name;
+            }
+            return worst == int.MaxValue ? 0 : worst;
+        }
+
+        /// <summary>Every control a finger is asked to hit, shorter than one
+        /// touch row. Walks the live subtree rather than a named list: a named
+        /// list is how the dock's 44 pt check ended up covering six controls
+        /// and missing four whole tabs (CLAUDE.md).</summary>
+        static string ShortControls(RectTransform panel, float row)
+        {
+            if (panel == null) return "no panel";
+            var bad = new List<string>();
+            foreach (var s in panel.GetComponentsInChildren<Selectable>(true))
+            {
+                var rt = s.GetComponent<RectTransform>();
+                if (rt == null || rt.rect.height < 1f) continue;
+                if (rt.rect.height < row - 1f) bad.Add(rt.name + " " + rt.rect.height.ToString("0") + "u");
+            }
+            return bad.Count == 0 ? "" : string.Join(", ", bad.ToArray());
+        }
+
+        /// <summary>A child's box in an ancestor's own space. Includes the
+        /// child's descendants, deliberately - a label running out of its panel
+        /// is what a player sees.</summary>
+        static Rect In(RectTransform outer, RectTransform inner)
+        {
+            var b = RectTransformUtility.CalculateRelativeRectTransformBounds(outer, inner);
+            return new Rect(b.min.x, b.min.y, b.size.x, b.size.y);
+        }
+
+        static bool Overlap(Rect a, Rect b)
+        {
+            float w = Mathf.Min(a.xMax, b.xMax) - Mathf.Max(a.xMin, b.xMin);
+            float h = Mathf.Min(a.yMax, b.yMax) - Mathf.Max(a.yMin, b.yMin);
+            return w > 1f && h > 1f;
+        }
+
+        /// <summary>Finding 5: the encounter card's sub-line inside its card.
+        ///
+        /// ⚠ Text.preferredWidth is the UNWRAPPED width - Unity forces Overflow
+        /// inside GetPreferredWidth - so comparing it to the box and calling a
+        /// smaller number a pass would be measuring the wrong thing. The honest
+        /// invariant is "either it wraps, or it fits on one line", and that is
+        /// exactly what failed: Overflow, 485 units of text in a 404-unit box.
+        /// preferredHeight IS taken at the rect's width with wrapping on, so it
+        /// is the right number for "did the card grow to hold it".</summary>
+        static void CardWraps(MapHudUI hud, string tag)
+        {
+            var subRt = hud.CardSubRect; var cardRt = hud.CardRect;
+            if (subRt == null || cardRt == null) { Check(false, "card sub-line " + tag + ": no card"); return; }
+            float oneLine = hud.CardSubWidthUnits, box = subRt.rect.width, drawn = hud.CardSubHeightUnits;
+            Check(hud.CardSubWraps || oneLine <= box + 1f,
+                  "card sub-line, " + tag + ": it wraps, or it fits on one line (one line is "
+                  + oneLine.ToString("0") + " units in a " + box.ToString("0") + "-unit box, wraps=" + hud.CardSubWraps + ")");
+            Check(drawn <= subRt.rect.height + 1f,
+                  "...and the card grew for the wrapped text (" + drawn.ToString("0")
+                  + " of " + subRt.rect.height.ToString("0") + " units)");
+            var chR = In(cardRt, hud.ChallengeButton.GetComponent<RectTransform>());
+            var sR = In(cardRt, subRt);
+            Check(sR.yMin >= chR.yMax - 1f, "...and it stays clear of CHALLENGE ("
+                  + sR.yMin.ToString("0.0") + " vs " + chR.yMax.ToString("0.0") + ")");
+        }
+
+        /// <summary>The three invariants findings 2-4 broke, measured off the
+        /// live rects at whatever metrics are in force.</summary>
+        static void HudSizing(MapHudUI hud, GameObject hudGo, string tag)
+        {
+            if (hud == null || hudGo == null) { Check(false, "map HUD sizing " + tag + ": no HUD"); return; }
+            float row = hud.RowUnits;
+            int floor = hud.TypeFloorUnits;
+            string tiny; int small = SmallestLabel(hudGo, out tiny);
+            // FINDING 2. The floor is the dock's own: DesktopFontUnits clamps at
+            // 14 CSS px, and TypeFloorUnits is that clamp in this canvas's units.
+            Check(small >= floor, "map HUD type, " + tag + ": every label is at or above the dock's floor ("
+                  + small + " units at " + tiny + ", floor " + floor + ")");
+            // FINDING 3. The sign-in fields and the board's buttons were built
+            // once from the ROW literal and never re-sized.
+            string shortSign = ShortControls(hud.SignInPanel, row);
+            Check(shortSign == "", "map HUD sign-in, " + tag + ": every control is a full touch row ("
+                  + row.ToString("0") + " units)" + (shortSign == "" ? "" : " - " + shortSign));
+            string shortBoard = ShortControls(hud.BoardPanel, row);
+            Check(shortBoard == "", "map HUD board, " + tag + ": every control is a full touch row ("
+                  + row.ToString("0") + " units)" + (shortBoard == "" ? "" : " - " + shortBoard));
+            // ...and a panel that grows with the row must still fit the screen,
+            // or the fix for finding 3 would trade a small button for a
+            // SIGN IN button below the bottom edge.
+            var safe = hud.SafeRoot;
+            var signR = In(safe, hud.SignInPanel); var boardR = In(safe, hud.BoardPanel);
+            var safeR = safe.rect;
+            Check(signR.height <= safeR.height + 1f && signR.width <= safeR.width + 1f,
+                  "...and the sign-in panel still fits the safe area (" + signR.width.ToString("0") + "x" + signR.height.ToString("0")
+                  + " in " + safeR.width.ToString("0") + "x" + safeR.height.ToString("0") + ")");
+            Check(boardR.height <= safeR.height + 1f && boardR.width <= safeR.width + 1f,
+                  "...and so does the board (" + boardR.width.ToString("0") + "x" + boardR.height.ToString("0") + ")");
+            // FINDING 4. The objective's Y was the ROW literal while the bar's
+            // height was recomputed and can only grow, so at a higher reported
+            // pixel ratio the compass bar came down over the one line that tells
+            // a new player what to do.
+            var barR = In(safe, hud.BarRect); var objR = In(safe, hud.ObjectiveRect);
+            Check(objR.yMax <= barR.yMin + 0.5f, "map HUD objective, " + tag + ": the line clears the compass bar (top "
+                  + objR.yMax.ToString("0.0") + " vs bar bottom " + barR.yMin.ToString("0.0") + ")");
+        }
+
         IEnumerator Start()
         {
             var bm = Object.FindFirstObjectByType<BuilderManager>();
@@ -482,6 +597,269 @@ namespace RobotBrawl.Phase0
             Check(!MapHudUI.inst.BoardSignInShown, "signed in, the board does not ask again");
             MapHudUI.inst.HideBoard();
             LadderClient.Token = tokenHold;
+
+            // ---- 4b. THE HUD IS SIZED BY THE DOCK'S RULE, AND RE-SIZED -------------
+            //
+            // Four mobile defects reached a tester on 2026-09-13 and every check
+            // in this file stayed green through all of them, because three of
+            // the four are one mistake: the HUD's literals (ROW = 44 units, a
+            // fontSize per label) are REFERENCE numbers at 1280x720 and were
+            // written straight into the live UI. On a 932x430 CSS-pt landscape
+            // phone one canvas unit is 0.659 CSS px, so 44 units is 29 CSS px -
+            // 66% of the 44 pt touch floor - and the labels landed between 8.6
+            // and 12.5 CSS px against the dock's 14 px floor.
+            //
+            // CONTROL LEG, run 2026-09-13 rather than assumed: ApplyMetrics was
+            // temporarily replaced with the pre-fix sizing (the bar's row
+            // recomputed, everything else from the ROW literal and the literal
+            // fontSizes) and this bench went 176/0 -> 168/8. What failed:
+            //   type       13 units at card/sub against a floor of 25
+            //   sign-in    email/password/name/login/create/cancel all 44u,
+            //              needing 124u on this screen
+            //   board      close and board_signin both 44u
+            //   objective  top 357.7 against a bar bottom of 283.3 — the bar
+            //              came down 74 units OVER the line
+            //   re-apply   13 -> 13 units: the type never re-ran at all
+            // Two stayed green in the control and should have: the bar's own
+            // row WAS already recomputed (the half that worked), and the type
+            // floor under forced metrics is 8, which 13 clears.
+            //
+            // Measured on this headless screen (640x480, scaleFactor 0.577):
+            // the dock's row is 90 units against the literal ROW = 44, and its
+            // type floor is 25 units against literals of 13 to 22.
+            var hudGo = GameObject.Find("map_hud_canvas");
+            Check(hudGo != null, "the map HUD's canvas is up for the sizing checks");
+            HudSizing(MapHudUI.inst, hudGo, "at this screen's metrics");
+            string tinyBefore; int unitsBefore = SmallestLabel(hudGo, out tinyBefore);
+
+            // ...and again on owen's phone. The constants are the device's, not
+            // round numbers: 2532x1170 at 460 dpi against a 1280x720 reference
+            // at match 0.5 is scaleFactor 1.793, so TouchRow clamps to 110 units
+            // and FontUnits is pt * (460/163) / 1.793 = pt * 1.574. The phone is
+            // not really the point - the point is that NOTHING RE-RAN when the
+            // metrics moved, which is findings 2, 3 and 4 in one sentence.
+            try
+            {
+                MobileBuilderUI.forcedRowUnits = 110f;
+                MobileBuilderUI.forcedFontScale = 1.574f;
+                yield return null; yield return null;
+                Check(MapHudUI.inst.RowUnits > 109f, "the HUD picks up a changed touch row with no rebuild (" + MapHudUI.inst.RowUnits.ToString("0") + " units)");
+                string tinyAfter; int unitsAfter = SmallestLabel(hudGo, out tinyAfter);
+                // CHANGED, not larger. This check first read `>` and failed at
+                // 25 -> 20, and the check was the thing that was wrong: canvas
+                // units are not a size. The headless canvas is 640x480, so
+                // scaleFactor is 0.577 and one point is 1.73 units; the phone's
+                // is 1.793, so one point is 1.574 units. The phone's type is
+                // FEWER units and MORE millimetres. The invariant is that the
+                // HUD re-ran at all - a direction would be asserting which of
+                // two screens is bigger, which is not what broke.
+                Check(unitsAfter != unitsBefore, "...and re-applies the type with it (" + unitsBefore + " -> " + unitsAfter + " units)");
+                HudSizing(MapHudUI.inst, hudGo, "on owen's phone");
+            }
+            finally
+            {
+                MobileBuilderUI.ClearForcedMetrics();
+            }
+            yield return null; yield return null;
+            Check(Mathf.Abs(MapHudUI.inst.RowUnits - 110f) > 0.5f, "...and back to the real screen when the forcing is released (" + MapHudUI.inst.RowUnits.ToString("0") + " units)");
+
+            // CONTROL LEG for sections 4c-4f, run 2026-09-13 rather than
+            // assumed: the four fixes were backed out of MapHudUI together (the
+            // gate off, the sub-line back to Overflow with a literal card
+            // height, the board asking 20 while sized for 8 with "you:" back in
+            // the truncating body, and Screen.safeArea back in place). This
+            // bench went 200/0 -> 190/10. What failed, and it is every one of
+            // the four:
+            //   gate    objective and toast still shown behind BOTH modals
+            //   card    925 units of text in a 404-unit box (707 at phone
+            //           type), wraps=False - and note the type fix makes the
+            //           string WIDER, so the two fixes only work together
+            //   board   asked 20, fits 8; the "you:" line gone entirely;
+            //           9 lines drawn into a box that holds 8
+            //   notch   root not inset at all (1109 of 1109 units), GARAGE 228
+            //           units into the cut-out, CHALLENGE 83 below the floor
+            // TWO PASSED IN THE CONTROL AND SHOULD HAVE, which is worth knowing
+            // before anyone reads them as cover: "the card grew for the wrapped
+            // text" and "it stays clear of CHALLENGE" both pass against the OLD
+            // code, because with Overflow the preferred height IS one line.
+            // They guard the new mechanism; the wrap check is the one that
+            // catches the original defect.
+
+            // ---- 4c. THE MAP LINES ARE GATED BEHIND THE MODALS --------------------
+            //
+            // A REGRESSION THIS BENCH'S OWN FIX CAUSED, which is why the check
+            // is here. Growing the bar's row pushed the objective, toast and
+            // banner down into the two centred modals - measured by the phone
+            // bench: objective x board_panel 440 x 10.5 units, objective x
+            // signin 524 x 19.4, and with a live toast up 440 x 40.2 and
+            // 604.9 x 40.2. Both modals SetAsLastSibling, so they draw on top
+            // and slice the amber line mid-glyph, which reads as a z-order bug.
+            //
+            // ASSERT HIDDEN, NOT NON-OVERLAPPING. A non-overlap assertion is
+            // satisfied by nudging the objective twenty units, which leaves the
+            // toast exactly where it was and lets the next metrics change put
+            // it back. The three lines are hidden together or the gate is not
+            // a gate.
+            var hud2 = MapHudUI.inst;
+            bm.TestYardToast("TREASURE  ·  3 scrap  ·  a spike", 30f);
+            yield return null; yield return null;
+            Check(hud2.ToastShown, "a live toast is up on the open map (control: the gate below has something to hide)");
+            Check(hud2.ObjectiveShown, "...and so is the objective line");
+            hud2.BoardButton.onClick.Invoke(); yield return null; yield return null;   // the BUTTON, not the seam
+            Check(hud2.BoardShown, "BOARD opens over the map");
+            Check(!hud2.ObjectiveShown && !hud2.ToastShown && !hud2.BannerShown,
+                  "...and the objective, toast and banner are HIDDEN behind it, not moved (obj " + hud2.ObjectiveShown
+                  + " toast " + hud2.ToastShown + " banner " + hud2.BannerShown + ")");
+            hud2.HideBoard(); yield return null; yield return null;
+            Check(hud2.ObjectiveShown && hud2.ToastShown, "...and both come back when the board closes");
+            hud2.ShowSignIn(); yield return null; yield return null;
+            Check(hud2.SignInShown && !hud2.ObjectiveShown && !hud2.ToastShown && !hud2.BannerShown,
+                  "the sign-in panel hides all three the same way");
+            hud2.SignInCancelButton.onClick.Invoke(); yield return null; yield return null;
+            Check(hud2.ObjectiveShown && hud2.ToastShown, "...and NOT NOW brings them back");
+            bm.TestYardToast("", 0f); yield return null;
+
+            // ---- 4d. THE ENCOUNTER CARD'S SUB-LINE WRAPS INSIDE THE CARD ----------
+            //
+            // Finding 5. MkText defaults to HorizontalWrapMode.Overflow and the
+            // card never changed it, so "another player's machine · 30-second
+            // bout, you drive · points at the bell" (77 characters) measured
+            // ~485 units in a 404-unit box and spilled ~40 units past each edge
+            // of the dark panel onto lit terrain. Scaling the type up for
+            // finding 2 makes the same string WIDER, so the two fixes only work
+            // together - which is why this is measured at BOTH type scales.
+            // Destroy() is deferred to the end of the frame, so YardParked can
+            // still hand back a pool visitor that is on its way out. Let the
+            // unpark land before asking who is parked.
+            bm.TestUnparkPool();
+            for (int i = 0; i < 4; i++) yield return null;
+            var parkedC = bm.YardParked;
+            if (parkedC != null)
+            {
+                bm.TeleportPlayer(parkedC.rb.position + new Vector3(2.5f, 0f, 0f));
+                for (int i = 0; i < 6; i++) yield return null;
+                Check(hud2.CardShown, "the encounter card is up for the wrap checks");
+                CardWraps(hud2, "at this screen's metrics");
+                try
+                {
+                    MobileBuilderUI.forcedRowUnits = 110f;
+                    MobileBuilderUI.forcedFontScale = 1.574f;
+                    yield return null; yield return null;
+                    CardWraps(hud2, "on owen's phone");
+                }
+                finally { MobileBuilderUI.ClearForcedMetrics(); }
+                yield return null; yield return null;
+                // Stay AT the encounter: section 4f needs the card up to
+                // measure CHALLENGE against the home indicator. The first run
+                // of 4f did this check behind `if (CardShown)` from home, so it
+                // silently drew no conclusion and the total still read green -
+                // which is the "skipped is not passed" trap in CLAUDE.md.
+            }
+
+            // ---- 4e. THE BOARD ASKS FOR WHAT IT CAN SHOW, AND PINS YOUR ROW -------
+            //
+            // Finding 12, and it got worse before it got better: the panel was
+            // sized for exactly 8 body lines while ShowBoard asked for 20, and
+            // the body is verticalOverflow Truncate - so twelve rows were
+            // fetched and thrown away, and the "you: rank N" line, appended
+            // LAST to that same string, was the FIRST thing cut. On the one
+            // screen whose purpose is showing a player where they stand.
+            hud2.BoardButton.onClick.Invoke(); yield return null; yield return null;
+            // The 8 is not a product number any more - the product has none.
+            // It is here as a floor on THIS screen: whatever the derivation
+            // gives, it must not be worse than the eight the old literal drew.
+            Check(hud2.BoardRowsAsked == hud2.BoardRowsFit && hud2.BoardRowsFit >= 8,
+                  "the board asks for exactly what its body can draw, and no fewer than the old literal 8 (asked "
+                  + hud2.BoardRowsAsked + ", fits " + hud2.BoardRowsFit + ")");
+            var bodyRt = hud2.BoardPanel.Find("body") as RectTransform;
+            // Hand it MORE rows than fit, which is the case the server produces
+            // and the offline bench never reaches. RenderBoard is the only part
+            // a live server would have supplied; the panel, its buttons and its
+            // sizes all still came from the BOARD button above.
+            var many = new List<LadderClient.YardRow>();
+            for (int i = 1; i <= hud2.BoardRowsFit + 9; i++)
+                many.Add(new LadderClient.YardRow { rank = i, owner = "player" + i, points = 900 - i * 7, wins = i, bouts = i + 3 });
+            var mine = new LadderClient.YardRow { rank = 41, owner = "owen", points = 128, wins = 5, bouts = 9 };
+            // ⚠ WAIT FOR THE REAL REQUEST TO LAND FIRST. ShowBoard's own
+            // YardBoard coroutine is still in flight; offline it fails after a
+            // moment and calls RenderBoard(null, ...), which hides the me-row.
+            // Injecting before that lands leaves TWO writers on one panel and
+            // the loser is whichever the scheduler runs second - this check
+            // failed once with the right text and the row hidden, which is
+            // exactly that race and not a product fault.
+            float rdead = Time.realtimeSinceStartup + 8f;
+            while (Time.realtimeSinceStartup < rdead && hud2.BoardText == "reading the board...") yield return null;
+            yield return null; yield return null;
+            hud2.RenderBoard(many, mine, null);
+            yield return null;
+            // The list it DREW fits the box it drew into. preferredHeight for a
+            // wrapping label is taken at the rect's own width, so this is the
+            // real rendered height, not an arithmetic restatement of the
+            // row-count derivation - it fails if the panel ever draws more than
+            // it can hold, whatever the cause.
+            Check(bodyRt != null && hud2.BoardBodyHeightUnits <= bodyRt.rect.height + 1f,
+                  "...and the list it draws fits the body rect with nothing truncated ("
+                  + hud2.BoardBodyHeightUnits.ToString("0") + " of " + (bodyRt != null ? bodyRt.rect.height.ToString("0") : "-") + " units)");
+            Check(hud2.BoardMeShown && hud2.BoardMeText.Contains("rank 41"),
+                  "with more rows than fit, your own standing is still on screen (" + hud2.BoardMeText + ")");
+            var meRt = hud2.BoardMeLabel.rectTransform;
+            var panelR = hud2.BoardPanel.rect;
+            var meR = In(hud2.BoardPanel, meRt);
+            Check(meR.yMin >= panelR.yMin - 1f && meR.yMax <= panelR.yMax + 1f,
+                  "...pinned inside the panel, where a longer list cannot push it off (" + meR.yMin.ToString("0") + ".." + meR.yMax.ToString("0")
+                  + " in " + panelR.yMin.ToString("0") + ".." + panelR.yMax.ToString("0") + ")");
+            Check(bodyRt != null && !Overlap(In(hud2.BoardPanel, bodyRt), meR),
+                  "...and clear of the list above it");
+            int bodyLines = hud2.BoardText.Split('\n').Length - 1;
+            Check(bodyLines <= hud2.BoardRowsFit, "...and the list drew only the rows it has room for ("
+                  + bodyLines + " of " + many.Count + " offered, " + hud2.BoardRowsFit + " fit)");
+            hud2.HideBoard(); yield return null;
+
+            // ---- 4f. THE NOTCH ----------------------------------------------------
+            //
+            // This HUD read Screen.safeArea, which Unity reports as the WHOLE
+            // SCREEN in a WebGL build - the platform this game ships to phones.
+            // So the inset computed zero on every notched phone and no check
+            // anywhere could fail. SafeAreaWeb's forced* seams are the only way
+            // to pose a cut-out on a machine that has none.
+            try
+            {
+                // A landscape iPhone: 141 px bitten out of each side, 63 off the
+                // bottom (MobileBuilderUI's R9 note, measured on owen's phone).
+                SafeAreaWeb.forcedLeft = 141f; SafeAreaWeb.forcedRight = 141f;
+                SafeAreaWeb.forcedTop = 0f; SafeAreaWeb.forcedBottom = 63f;
+                yield return null; yield return null;
+                var canvasRt = GameObject.Find("map_hud_canvas").GetComponent<RectTransform>();
+                var full = canvasRt.rect;
+                // The cut-out in CANVAS units. Measuring the controls against
+                // the canvas rect instead would pass by construction - every
+                // control is a child of the inset root - and the thing that was
+                // broken is whether the root is inset at all.
+                float sfNow = Screen.width / Mathf.Max(1f, full.width);
+                float safeL = full.xMin + 141f / sfNow, safeR = full.xMax - 141f / sfNow, safeB = full.yMin + 63f / sfNow;
+                Check(hud2.SafeRoot.rect.width < full.width - 10f, "a posed notch actually reaches the map HUD's root ("
+                      + hud2.SafeRoot.rect.width.ToString("0") + " units inside a " + full.width.ToString("0") + "-unit canvas)");
+                var gR = In(canvasRt, hud2.GarageButton.GetComponent<RectTransform>());
+                Check(gR.xMax <= safeR + 1f && gR.xMin >= safeL - 1f,
+                      "GARAGE - the only way off the map - clears the cut-out (spans "
+                      + gR.xMin.ToString("0.0") + ".." + gR.xMax.ToString("0.0") + " inside a safe "
+                      + safeL.ToString("0.0") + ".." + safeR.ToString("0.0") + ")");
+                // Unconditional, deliberately: the first run of this section had
+                // it behind `if (CardShown)` from a position where the card was
+                // folded, so it drew no conclusion and the total still read
+                // green. A skip is missing cover, never a pass (CLAUDE.md).
+                Check(hud2.CardShown, "the encounter card is still up, so CHALLENGE can be measured at all");
+                var cR = In(canvasRt, hud2.ChallengeButton.GetComponent<RectTransform>());
+                Check(cR.yMin >= safeB - 1f, "...and CHALLENGE clears the home indicator ("
+                      + cR.yMin.ToString("0.0") + " against a safe floor of " + safeB.ToString("0.0") + ")");
+            }
+            finally
+            {
+                SafeAreaWeb.forcedLeft = SafeAreaWeb.forcedRight = SafeAreaWeb.forcedTop = SafeAreaWeb.forcedBottom = -1f;
+            }
+            yield return null; yield return null;
+            bm.TeleportPlayer(new Vector3(hp.x, 0f, hp.z));
+            for (int i = 0; i < 6; i++) yield return null;
 
             bm.TestUnparkPool();
             bm.TeleportPlayer(new Vector3(hp.x, 0f, hp.z)); for (int i = 0; i < 10; i++) yield return null;

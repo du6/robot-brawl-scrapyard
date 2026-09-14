@@ -195,16 +195,142 @@ public partial class BuilderManager : MonoBehaviour
     /// the SINGLE SOURCE OF TRUTH: the six duplicates are deleted and every
     /// call site reads GuiScale. Do not re-inline the expression anywhere.
     /// Call sites: ScoutHud, MobileTestHud, the dev/draft banner,
-    /// ModeSelect.OnGUI, FightManager.UIS, Phase5Mobile PerfHUD + S.</summary>
+    /// ModeSelect.OnGUI, FightManager.UIS, Phase5Mobile PerfHUD + S.
+    ///
+    /// ⚠ R10 (phone HUD, 2026-09-13) — IN A BROWSER **BOTH** INPUTS ABOVE ARE
+    /// MEANINGLESS, and the fight HUD is the thing they scale. Measured on a
+    /// 932x430 CSS-pt landscape phone: the WebGL template sets the drawing
+    /// buffer to innerWidth/innerHeight times min(devicePixelRatio, 2)
+    /// (Assets/WebGLTemplates/RobotBrawl/index.html, the `fit()` near :276), so
+    /// Screen.height is 430*dpr and at dpr 2 the height rule is
+    /// clamp(860/900, 1, 2.2) = **1.0 exactly** — it can never fire on a phone.
+    /// And Screen.dpi on WebGL is derived from devicePixelRatio, the very
+    /// number MobileBuilderUI.PhysicalTouchSizing refuses by name ("Browsers
+    /// expose CSS pixels; reported DPI is not physical DPI",
+    /// MobileBuilderUI.GarageUX.cs:47). So the same fight rendered at anywhere
+    /// from 50% to 90% of its intended physical size depending on a value with
+    /// no physical meaning — the HUD's 18-unit name style landing at 9.0 CSS px
+    /// on a dpr-2 phone, its 14-unit kJ readout at 7.0.
+    ///
+    /// THE WEB RULE: **one IMGUI unit is one CSS pixel**, upscaled on a tall
+    /// window by the SAME height rule measured in CSS pixels instead of
+    /// framebuffer pixels. GUI.matrix scales units to framebuffer pixels, so
+    /// css = units * GuiScale / dpr; setting GuiScale = dpr * k makes
+    /// css = units * k. k keeps the existing rule and the existing constant
+    /// (a 1656-css-tall window still gets 1.84x), and on a landscape phone
+    /// (430 css tall) k is 1, so the name style lands at 18 CSS px and the kJ
+    /// readout at 14 — which is exactly the floor MobileBuilderUI.
+    /// DesktopFontUnits already holds the dock's own type to (max(14, pt*1.1)
+    /// CSS px; its `pixels` are framebuffer pixels, so divide by pixelRatio).
+    ///
+    /// Two consequences worth knowing. (a) The unit space is now
+    /// dpr-INDEPENDENT — Screen.width/GuiScale is the CSS-pixel viewport at
+    /// dpr 1, 2 and 3 alike — which is what makes FightManager's fixed
+    /// 1010-unit HUD box a testable fit rather than a coin flip. (b) On a
+    /// DESKTOP browser this is very nearly a no-op, which is the point: a
+    /// 1920x950 css window at dpr 1 scored 1.056 before and scores 1.056 now;
+    /// a Retina laptop (1512x860 css, dpr 2, Screen.height 1720) scored 1.911
+    /// before and 2.000 now, 4.7% larger.
+    ///
+    /// NON-WEB PLATFORMS TAKE THE OLD PATH UNCHANGED, byte for byte. iOS ships
+    /// from the parent repo and this property has the six call sites listed
+    /// above. Covered by QuickFightBench section 4.</summary>
     public static float GuiScale
     {
         get
         {
+            float dpr = BrowserPixelRatio;
+            if (dpr > 0f) return dpr * Mathf.Clamp((ScreenPxH / dpr) / 900f, 1f, 2.2f);
             float dpiS = Screen.dpi > 250f ? Mathf.Min(2.5f, Screen.dpi / 160f) : 1f;
             float hS   = Mathf.Clamp(Screen.height / 900f, 1f, 2.2f);
             return Mathf.Max(dpiS, hS);
         }
     }
+
+#if UNITY_WEBGL && !UNITY_EDITOR
+    // The same jslib entry MobileBuilderUI reads (Assets/Plugins/WebGL/
+    // scrapyardui.jslib): canvas.width / getBoundingClientRect().width, i.e.
+    // framebuffer pixels per CSS pixel. Declared here rather than shared
+    // because MobileBuilderUI's copy is a private static that a fight with no
+    // dock must not depend on existing; two DllImports of one entry point are
+    // legal and resolve to the same symbol.
+    [System.Runtime.InteropServices.DllImport("__Internal")] static extern float ScrapyardUiPixelRatio();
+    static int pixelRatioFrame = -1;
+    static float pixelRatioCache = 1f;
+#endif
+
+    /// <summary>Framebuffer pixels per CSS pixel, or **0 when this is not a
+    /// browser** and nothing is pretending to be one — callers branch on
+    /// `> 0f`, so there is one test for "am I on the web" and it is a
+    /// measurement rather than a platform guess. Cached per frame: GuiScale is
+    /// read many times inside one OnGUI and this crosses into JS.</summary>
+    public static float BrowserPixelRatio
+    {
+        get
+        {
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            if (forcedPixelRatio > 0f) return forcedPixelRatio;
+#endif
+#if UNITY_WEBGL && !UNITY_EDITOR
+            if (pixelRatioFrame != Time.frameCount)
+            {
+                pixelRatioFrame = Time.frameCount;
+                pixelRatioCache = Mathf.Clamp(ScrapyardUiPixelRatio(), 0.25f, 4f);
+            }
+            return pixelRatioCache;
+#else
+            return 0f;
+#endif
+        }
+    }
+
+    /// <summary>The drawing buffer in PIXELS — Screen.width/height, except when
+    /// a bench has handed in a phone's. The headless screen is immovable (see
+    /// PhoneLayoutBench's header: Screen.SetResolution and -screen-width were
+    /// both tried and both left it at 640x480), so asking "what does a phone
+    /// get" on this Mac means passing the numbers in, not setting them.</summary>
+    public static float ScreenPxW
+    {
+        get
+        {
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            if (forcedScreenPxW > 0f) return forcedScreenPxW;
+#endif
+            return Screen.width;
+        }
+    }
+    public static float ScreenPxH
+    {
+        get
+        {
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            if (forcedScreenPxH > 0f) return forcedScreenPxH;
+#endif
+            return Screen.height;
+        }
+    }
+
+    /// <summary>The viewport in CSS pixels on the web; in framebuffer pixels
+    /// everywhere else, where CSS pixels do not exist and the two are the same
+    /// number by definition.</summary>
+    public static float CssW { get { float r = BrowserPixelRatio; return r > 0f ? ScreenPxW / r : ScreenPxW; } }
+    public static float CssH { get { float r = BrowserPixelRatio; return r > 0f ? ScreenPxH / r : ScreenPxH; } }
+
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+    /// <summary>Bench seam for the two above. Zero is "not forced"; forcing the
+    /// ratio also takes the WEB branch of GuiScale on a desktop editor, which
+    /// is the only way to exercise that branch without a browser.</summary>
+    public static float forcedPixelRatio, forcedScreenPxW, forcedScreenPxH;
+    /// <summary>Pretend to be a browser: a CSS-point viewport at a device pixel
+    /// ratio, framebuffer computed the way the WebGL template computes it.</summary>
+    public static void ForceBrowser(float cssW, float cssH, float dpr)
+    {
+        forcedPixelRatio = dpr;
+        forcedScreenPxW = Mathf.Floor(cssW * dpr);
+        forcedScreenPxH = Mathf.Floor(cssH * dpr);
+    }
+    public static void ClearForcedBrowser() { forcedPixelRatio = forcedScreenPxW = forcedScreenPxH = 0f; }
+#endif
     /// <summary>The panel's width in REAL pixels. Every mouse gate must use
     /// this, not PANEL_W, or the click-blocking region desyncs from the drawn
     /// panel by the scale factor.</summary>

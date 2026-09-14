@@ -890,6 +890,204 @@ public class FightManager : MonoBehaviour
     /// career panel next door scaled. One rule, one place.</summary>
     static float UIS { get { return BuilderManager.GuiScale; } }
 
+    /// <summary>THE HUD'S VIEWPORT IN HUD UNITS — the space every fixed-size box
+    /// on this screen is written in, and the space the three layout thresholds
+    /// below (narrow 1030, shortH 560, stacked 620) are compared against.
+    ///
+    /// ⚠ Those three ARE unit-space numbers on purpose, and the phone-HUD brief
+    /// that sent me here asked for them in CSS pixels instead. They should not
+    /// be. Each one is a FIT test — "does the 1010-unit box fit", "does the tall
+    /// debrief's ~560 units of stack fit" — against boxes measured in the same
+    /// units, and units are what GUI.matrix scales. A CONSTANT expressed in CSS
+    /// pixels breaks the moment GuiScale's tall-window rule leaves 1:1: a
+    /// 1100x1400 css window scores k = 1.55, so the screen is 709 units and the
+    /// 1010-unit box does NOT fit, while a constant 1030-CSS-px threshold sees
+    /// 1100 >= 1030 and picks the desktop branch that overflows. The thresholds
+    /// were never the defect. **The defect was entirely in GuiScale** — read its
+    /// R10 note — and with that fixed these comparisons say what they always
+    /// meant to say, because on a phone one unit IS one CSS pixel. Measured
+    /// after the fix on a 932x430 css phone at dpr 1, 2 and 3: 932 x 430 units
+    /// on all three, so narrow and shortH both fire, every time.</summary>
+    public static float HudUnitsW { get { return BuilderManager.ScreenPxW / Mathf.Max(0.01f, UIS); } }
+    public static float HudUnitsH { get { return BuilderManager.ScreenPxH / Mathf.Max(0.01f, UIS); } }
+
+    /// <summary>One 44 pt touch row, in HUD UNITS. The dock has had this for a
+    /// year (MobileBuilderUI.TouchRow: clamp(44/163 * dpi / scaleFactor, 34,
+    /// 110)); IMGUI never did, which is how the only touch exit from a running
+    /// fight shipped at 36 units.
+    ///
+    /// WEB: 44 CSS pixels, exactly — GuiScale is dpr * k, so 44 * dpr / UIS is
+    /// 44/k units and 44/k * k = 44 css. A CSS pixel is a point on iOS Safari,
+    /// so this is the 44 pt floor and not an approximation of it.
+    /// NATIVE: 44/163 inch at the reported dpi, 163 being the iOS reference dpi
+    /// the dock's own row is built from. FLOORED AT 44 UNITS because a dpi
+    /// report is not trustworthy off the web — CLAUDE.md records this one
+    /// editor reporting 72, 266 and 108 across four sessions — and the two
+    /// errors are not symmetric: an over-large QUIT on a mouse screen costs a
+    /// few pixels of arena, an under-size one on a phone costs the player the
+    /// only way out of the fight.</summary>
+    public static float TouchUnits
+    {
+        get
+        {
+            float uis = Mathf.Max(0.01f, UIS);
+            float dpr = BuilderManager.BrowserPixelRatio;
+            if (dpr > 0f) return 44f * dpr / uis;
+            float dpi = Screen.dpi > 1f ? Screen.dpi : 163f;
+            return Mathf.Max(44f, 44f / 163f * dpi / uis);
+        }
+    }
+
+    /// <summary>THE SCREEN'S CUT-OUTS, in HUD units.
+    ///
+    /// ⚠ `Screen.safeArea` IS THE WHOLE SCREEN IN A WEBGL BUILD, and this game
+    /// opts the canvas INTO the cut-out: the template sets `viewport-fit=cover`
+    /// (index.html:5) and lays the canvas out as `position: fixed; inset: 0`.
+    /// So the iOS QA's safe-area compensation on QUIT computed +0 on every web
+    /// build ever made, and QUIT sat from x=9 to x=88 CSS px - inside the
+    /// roughly 47 CSS px notch of a landscape iPhone, which is the only touch
+    /// exit from a running fight. SafeAreaWeb reads the real
+    /// `env(safe-area-inset-*)` through a CSS probe and returns FRAMEBUFFER
+    /// pixels, the same units as Screen.width, so dividing by UIS gives HUD
+    /// units exactly as `Screen.safeArea.x / UIS` always did. Off the web it
+    /// returns Unity's own safe area, so iOS is unchanged.
+    ///
+    /// THE MEASUREMENT WINS WHENEVER THE BROWSER ANSWERED, ZERO INCLUDED.
+    /// `SafeAreaWeb.Measured` is false only when there was no answer at all -
+    /// no probe element, no env(), not a browser - so a zero from a working
+    /// probe now means what it says, this phone has no cut-out, and the
+    /// constants below cover ONLY the genuinely unknown case. That distinction
+    /// is the whole reason they are still tolerable: before the flag existed
+    /// they had to fire on every zero, which handed a notch-less phone 47 px it
+    /// did not need in order to protect a notched one whose probe had failed.
+    ///
+    /// ⚠ `Measured` DESCRIBES THE LAST READ, NOT THE PROBE IN GENERAL - it is
+    /// assigned inside SafeAreaWeb.Read. Read the inset into a local and check
+    /// the flag immediately, with nothing in between; read Left then Bottom
+    /// then the flag and you are asking whether BOTTOM was measured. Both
+    /// properties below do it in that order on purpose.
+    ///
+    /// There is no RIGHT term because nothing in this file insets from the
+    /// right edge - the HUD box is centred. Set either constant to 0 to turn
+    /// its fallback off; nothing else reads them.</summary>
+    public static float NOTCH_FALLBACK_CSS = 47f, HOME_FALLBACK_CSS = 21f;
+
+    /// <summary>The inset to use, in framebuffer pixels: what the browser said
+    /// when it said anything, the posed constant when it said nothing. A bench
+    /// poses the second state with `SafeAreaWeb.forcedMeasured = false`, which
+    /// is where that seam belongs - the unknown state is a property of the
+    /// probe, not of this screen, and every consumer of it needs to be able to
+    /// reach it.</summary>
+    static float Inset(float measuredPx, bool measured, float fallbackCss)
+    {
+        if (measured) return measuredPx;             // an answer, and zero is an answer
+        float dpr = BuilderManager.BrowserPixelRatio;
+        if (dpr <= 0f) return 0f;                    // not a browser: Unity's own safe area is real
+        return fallbackCss * dpr;                    // no answer at all, and this IS a browser
+    }
+
+    public static float SafeLeftUnits
+    {
+        get
+        {
+            float px = SafeAreaWeb.Left;             // sets Measured - read it next, nothing between
+            return Inset(px, SafeAreaWeb.Measured, NOTCH_FALLBACK_CSS) / Mathf.Max(0.01f, UIS);
+        }
+    }
+    public static float SafeBottomUnits
+    {
+        get
+        {
+            float px = SafeAreaWeb.Bottom;           // ditto
+            return Inset(px, SafeAreaWeb.Measured, HOME_FALLBACK_CSS) / Mathf.Max(0.01f, UIS);
+        }
+    }
+
+    /// <summary>The lowest y a control may reach: the bottom edge less the home
+    /// indicator. Both results screens pin their exit buttons to the bottom,
+    /// and on a landscape iPhone the bottom edge is not where the screen ends.
+    /// </summary>
+    public static float HudSafeBottom { get { return HudUnitsH - SafeBottomUnits; } }
+
+    /// <summary>HUD units to the units a finger and an eye work in: CSS pixels
+    /// on the web (a point on iOS Safari), framebuffer pixels elsewhere. The
+    /// inverse of the GUI.matrix scale, which is the whole reason a "font size
+    /// 18" in this file says nothing on its own about what a player sees.</summary>
+    public static float UnitsToCss(float units)
+    {
+        float dpr = BuilderManager.BrowserPixelRatio;
+        return dpr > 0f ? units * UIS / dpr : units * UIS;
+    }
+
+    /// <summary>The fight HUD's biggest and smallest persistent type, in HUD
+    /// units - the name/HP line and the kJ readout. Named rather than inlined
+    /// in EnsureStyles so QuickFightBench can assert what they come out at
+    /// PHYSICALLY on a phone instead of re-typing the same two numbers and
+    /// proving only that it can copy.</summary>
+    public const int HUD_NAME_UNITS = 18, HUD_TINY_UNITS = 14;
+
+    /// <summary>The Quick debrief's footer - the FIT UPGRADES / next pair, the
+    /// only two ways off that screen. Public and pure for the same reason
+    /// QuitButtonRect is: a bench asking whether a finger can reach them has
+    /// to ask the expression the draw call uses, not a copy of it.
+    ///
+    /// 48 UNITS WAS A LITERAL AND IS NOW A FLOOR. It is still the design
+    /// height - nothing about this screen wanted to change - but it used to be
+    /// the ONLY thing deciding the button's physical size, which under the old
+    /// arbitrary scale made it 43.2 CSS px at UIS 1.8: under the 44 pt floor,
+    /// on the only two controls that leave this screen. With GuiScale fixed 48
+    /// units is 48 CSS px on a phone and already clears the floor - but it
+    /// clears it the way the 1010-unit HUD box used to fit the screen, by
+    /// arithmetic that happens to work out, and on a NATIVE build at 460 dpi a
+    /// touch row is 49.7 units and 48 is genuinely short. Max() makes the
+    /// guarantee structural instead of incidental, and costs nothing where the
+    /// literal was already enough.
+    ///
+    /// ⚠ AND BE HONEST ABOUT WHAT THE BENCH COVERS HERE. QuickFightBench's
+    /// touch-row check on these two buttons CANNOT FAIL on a web phone -
+    /// measured 2026-09-13 by putting both literals back and re-running: 65/65,
+    /// unchanged. On the web the button is max(48k, 44) CSS px, which is >= 44
+    /// for every k the scale can produce, so the literal was already safe once
+    /// GuiScale was fixed and the reported 43.2 CSS px was a symptom of the
+    /// scale, not of this number. The check is real cover for a NATIVE build
+    /// and for any future change to the scale; it is not evidence that this
+    /// line was the defect. What WAS a live defect on the web is the footer's
+    /// PIN, one screen down - the control leg for that one fails 9 checks.
+    ///
+    /// The band height is derived from the button rather than stated: 64 and
+    /// 116 were two more literals, and 116 was 4 units shy of what the stacked
+    /// pair actually needs, so the portrait debrief sat 4 units off the safe
+    /// bottom where the landscape one sat 8.</summary>
+    public const float QUICK_BUTTON_DESIGN_H = 48f;
+    public static float QuickButtonH { get { return Mathf.Max(QUICK_BUTTON_DESIGN_H, TouchUnits); } }
+    /// <summary>The stacked pair (a portrait phone) puts one above the other
+    /// with an 8-unit gap; both leave 8 units of breathing room top and bottom
+    /// inside the band.</summary>
+    public static float QuickFooterStackH(bool stacked)
+    {
+        float bh = QuickButtonH;
+        return stacked ? bh * 2f + 8f : bh;
+    }
+    public static float QuickFooterH(bool stacked) { return QuickFooterStackH(stacked) + 16f; }
+    public static float QuickFooterY(bool stacked) { return HudSafeBottom - QuickFooterH(stacked) + 8f; }
+    /// <summary>The y the lower button ends at - what must clear the home
+    /// indicator.</summary>
+    public static float QuickFooterBottom(bool stacked)
+    {
+        return QuickFooterY(stacked) + QuickFooterStackH(stacked);
+    }
+
+    /// <summary>The career/contest results row's button height - REMATCH, CLAIM
+    /// & UPGRADE, BACK TO THE ARENA. Same floor and same reason as
+    /// QuickButtonH: these are the only way off that screen too.</summary>
+    public static float ResultsButtonH(bool shortH) { return Mathf.Max(shortH ? 46f : 54f, TouchUnits); }
+
+    public static Rect QuitButtonRect()
+    {
+        float touch = TouchUnits;
+        return new Rect(10f + SafeLeftUnits, 8f, Mathf.Max(88f, touch), touch);
+    }
+
     /// <summary>ROUND-2-CRITIC FIX: the card is re-ordered and gains a third
     /// criterion.
     ///
@@ -1125,7 +1323,13 @@ public class FightManager : MonoBehaviour
         // Critic round 1 (mobile): no touch way to leave a running fight
         // (B is a keyboard key). Small corner button, far from the pads.
         if (MobileBuilderUI.Active && bm != null)
-            if (GUI.Button(new Rect(10f + Screen.safeArea.x / UIS, 8f, 88f, 36f), "QUIT"))   // clear the rounded corner / notch (iOS QA 2026-09-05)
+            // 88x36 UNITS was the size until 2026-09-13, and a unit is not a
+            // point: on a dpr-2 phone that drew a 44x18 CSS-px button, 41% of
+            // the touch floor, and at the scale the old GuiScale happened to
+            // pick on a dpr-1 phone it was 79x32. It is a touch row now, and
+            // inset clear of the cut-out the template opts into. See
+            // QuitButtonRect / TouchUnits / SafeLeftUnits.
+            if (GUI.Button(QuitButtonRect(), "QUIT"))
             {
                 // A LIVE LADDER MATCH cannot be torn down under MatchRunner's
                 // feet — and quitting one is conceding it locally. The REAL
@@ -1146,8 +1350,8 @@ public class FightManager : MonoBehaviour
         // left, the enemy's wheels off the right. The box now fits the screen
         // and, when it has to shrink, the side lines drop to name + HP (the
         // pip row still shows every part) and the banner narrows with it.
-        float screenW = Screen.width / UIS;
-        bool narrow = screenW < 1030f;
+        float screenW = HudUnitsW;
+        bool narrow = screenW < 1030f;   // a FIT test in HUD units - see HudUnitsW
         float w = narrow ? screenW - 20f : 1010f;
         lastHudW = w;
         float x = (screenW - w) * 0.5f;
@@ -1157,7 +1361,10 @@ public class FightManager : MonoBehaviour
         string cid = ContestHudLine();
         float dy = cid == null ? 0f : 22f;
         GUI.Box(new Rect(x, 8, w, 130 + dy), "");
-        float cidX = narrow && MobileBuilderUI.Active ? x + 92f : x;   // clear the QUIT button
+        // Clear the QUIT button. This was a hard-coded 92, which was the old
+        // 10+88 plus a 4-unit gap; QUIT is a touch row wide now and the notch
+        // inset moves it, so ask it where it ends rather than remembering.
+        float cidX = narrow && MobileBuilderUI.Active ? Mathf.Max(x, QuitButtonRect().xMax + 4f) : x;
         if (cid != null) GUI.Label(new Rect(cidX, 11, w - (cidX - x), 26), cid, hudIdStyle);
         int t = Mathf.Max(0, Mathf.CeilToInt(timer));
         GUI.Label(new Rect(x, 12 + dy, w, 26), string.Format("{0}:{1:00}", t / 60, t % 60), hudStyle);
@@ -1196,7 +1403,7 @@ public class FightManager : MonoBehaviour
         // Toasts start BELOW the armed banner (iOS QA 2026-09-05: on a 402 pt
         // phone 0.30H is 120, and "SCOUT COUNT-OUT: 8.8" printed straight over
         // "PROGRAM ARMED" at 142).
-        float ty = Mathf.Max(0.30f, programBannerNow ? (180f + dy) / (Screen.height / UIS) : 0f);
+        float ty = Mathf.Max(0.30f, programBannerNow ? (180f + dy) / HudUnitsH : 0f);
         // ROUND-1-IMPL FIX (critic CRITICAL 3, second half): the pack seam has
         // a voice now. The critic's point was that the ONE failure that ends a
         // match outright arrived with no signal whatsoever - the player watched
@@ -1302,7 +1509,7 @@ public class FightManager : MonoBehaviour
     {
         programBannerNow = false;   // P3c: the fight is over; so is the banner
         Color old = GUI.color;
-        float H = Screen.height / UIS, W = Screen.width / UIS;
+        float H = HudUnitsH, W = HudUnitsW;
         if (cIsQuick && !arenaLive) { DrawQuickResults(W, H); return; }
         // SHORT SCREEN (iOS QA 2026-09-05, iPhone landscape = ~402 pt): the
         // stat stack alone filled the height, the money lines sat under the
@@ -1310,7 +1517,7 @@ public class FightManager : MonoBehaviour
         // warm-up's debrief branch was dead on a phone. Below 560 pt the text
         // steps down, the money block is one line, and the buttons share a
         // single row pinned to the bottom edge.
-        bool shortH = H < 560f;
+        bool shortH = H < 560f;   // HUD units, a fit test - see HudUnitsW
         // Build-20 re-test on the simulator (2026-09-05): shrinking the stat
         // text alone was NOT enough - a wrapped cause line plus a "(pack
         // damaged)" third row still reached the bottom edge, and the clamp
@@ -1578,7 +1785,12 @@ public class FightManager : MonoBehaviour
         bool touch = MobileBuilderUI.Active;
         // Two buttons side by side need 548 units; a phone-width web viewport
         // (500 px, scale 1) has fewer. Shrink rather than spill.
-        float bw = Mathf.Min(264f, (W - 30f) * 0.5f), bh = shortH ? 46f : 54f;
+        // 46/54 are the design heights; the floor is the same one the Quick
+        // debrief's pair take, and for the same reason - these buttons are
+        // the only way off this screen. On a phone shortH fires and 46 units
+        // is 46 CSS px, which clears 44 by two pixels of arithmetic nobody
+        // chose; a native touch row at 460 dpi is 49.7 and does not.
+        float bw = Mathf.Min(264f, (W - 30f) * 0.5f), bh = ResultsButtonH(shortH);
         bool oneRow = shortH && cIsContest && !arenaLive;          // three buttons across
         if (oneRow) bw = Mathf.Min(bw, (W - 40f) / 3f);
         // The button follows the stats DOWN. It used to estimate where they
@@ -1605,7 +1817,10 @@ public class FightManager : MonoBehaviour
         // to the bottom edge outright (content above has been compacted; if it
         // still overruns, the buttons draw on top of it - they are drawn last).
         float stackH = (cIsContest && !arenaLive && !oneRow ? 2f * bh + 12f : bh) + 10f;
-        if (by + stackH > H) by = H - stackH;
+        // ...and pinned to the SAFE bottom, not the screen's - see
+        // HudSafeBottom. On the web this edge was always the raw edge.
+        float pinFloor = HudSafeBottom;
+        if (by + stackH > pinFloor) by = pinFloor - stackH;
         float cx = W * 0.5f;
         GUI.backgroundColor = new Color(0.30f, 0.62f, 0.88f);
         // A LIVE LADDER MATCH gets one centered button and no REMATCH — the
@@ -1719,7 +1934,7 @@ public class FightManager : MonoBehaviour
     void DrawQuickResults(float W, float H)
     {
         Color old = GUI.color, oldBackground = GUI.backgroundColor;
-        bool shortH = H < 560f, stacked = W < 620f;
+        bool shortH = H < 560f, stacked = W < 620f;   // HUD units, fit tests - see HudUnitsW
         float pad = SIDE_PAD(W), contentW = W - pad * 2f - 18f;
         Color accent = outcome == Outcome.PlayerWin ? new Color(0.35f, 1f, 0.45f)
                      : outcome == Outcome.PlayerLoss ? new Color(1f, 0.42f, 0.36f) : new Color(1f, 0.85f, 0.30f);
@@ -1739,8 +1954,14 @@ public class FightManager : MonoBehaviour
         float titleH = shortH ? 52f : 72f;
         GUI.Label(new Rect(pad, 8f, W - pad * 2f, titleH),
                   outcome == Outcome.PlayerWin ? "VICTORY" : outcome == Outcome.PlayerLoss ? "DEFEAT" : "DRAW", bigStyle);
-        float buttonH = 48f, footerH = stacked ? 116f : 64f;
-        float viewTop = titleH + 12f, viewH = Mathf.Max(50f, H - viewTop - footerH - 8f);
+        // The footer is a seam (QuickFooterY) because it is measured from the
+        // SAFE bottom, not the screen's: on a landscape iPhone these two
+        // buttons - the only way off this screen - ended 8 units above the
+        // bottom edge, i.e. inside the home indicator. H is still what the
+        // content above is laid out against; only the pin moved.
+        float buttonH = QuickButtonH, footerH = QuickFooterH(stacked);
+        float footerTop = QuickFooterY(stacked) - 8f;
+        float viewTop = titleH + 12f, viewH = Mathf.Max(50f, footerTop - viewTop - 8f);
         string summary = string.IsNullOrEmpty(resultSummary) ? causeLine : resultSummary;
         string tip = ResultTip();
         string reward = "+" + cPay + " SCRAP" + (string.IsNullOrEmpty(cQuickLine) ? "" : "  ·  " + cQuickLine);
@@ -1764,7 +1985,7 @@ public class FightManager : MonoBehaviour
         y += 48f;
         if (showResultDetails) GUI.Label(new Rect(0, y, contentW, detailsH), details, smallStyle);
         GUI.EndScrollView();
-        float footerY = H - footerH + 8f, buttonW = stacked ? W - pad * 2f : (W - pad * 2f - 12f) * 0.5f;
+        float footerY = QuickFooterY(stacked), buttonW = stacked ? W - pad * 2f : (W - pad * 2f - 12f) * 0.5f;
         GUI.backgroundColor = new Color(1f, 0.62f, 0.24f);
         bool upgrade = GUI.Button(new Rect(pad, footerY, buttonW, buttonH), "FIT UPGRADES >", btnStyle);
         GUI.backgroundColor = new Color(0.30f, 0.62f, 0.88f);
@@ -1848,11 +2069,11 @@ public class FightManager : MonoBehaviour
         // toast used sitting in the style, which is how "KO - enemy core
         // destroyed" came out amber on a VICTORY screen.
         Color keep = medStyle.normal.textColor;
-        float y = Screen.height / UIS * yFrac;
+        float y = HudUnitsH * yFrac;
         medStyle.normal.textColor = new Color(0f, 0f, 0f, 0.85f);
-        GUI.Label(new Rect(3f, y + 3f, Screen.width / UIS, 60f), text, medStyle);
+        GUI.Label(new Rect(3f, y + 3f, HudUnitsW, 60f), text, medStyle);
         medStyle.normal.textColor = c;
-        GUI.Label(new Rect(0f, y, Screen.width / UIS, 60f), text, medStyle);
+        GUI.Label(new Rect(0f, y, HudUnitsW, 60f), text, medStyle);
         medStyle.normal.textColor = keep;
     }
 
@@ -1860,7 +2081,7 @@ public class FightManager : MonoBehaviour
     {
         if (hudStyle != null) return;
         hudStyle = new GUIStyle(GUI.skin.label) { fontSize = 22, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
-        nameStyle = new GUIStyle(GUI.skin.label) { fontSize = 18, fontStyle = FontStyle.Bold };   // R5 finding 2
+        nameStyle = new GUIStyle(GUI.skin.label) { fontSize = HUD_NAME_UNITS, fontStyle = FontStyle.Bold };   // R5 finding 2
         bigStyle = new GUIStyle(GUI.skin.label) { fontSize = 64, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
         medStyle = new GUIStyle(GUI.skin.label) { fontSize = 26, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter, wordWrap = true };
         // wordWrap: a stat row longer than the screen used to be SLICED at both
@@ -1869,7 +2090,7 @@ public class FightManager : MonoBehaviour
         // for them and load-bearing for the two that overflow.
         smallStyle = new GUIStyle(GUI.skin.label) { fontSize = 22, alignment = TextAnchor.MiddleCenter, wordWrap = true };   // R5 finding 2: the two lines that answer "why did I lose" were the smallest text on the results screen
         btnStyle = new GUIStyle(GUI.skin.button) { fontSize = 17, fontStyle = FontStyle.Bold };
-        tinyStyle = new GUIStyle(GUI.skin.label) { fontSize = 14, fontStyle = FontStyle.Bold };   // R5 finding 2
+        tinyStyle = new GUIStyle(GUI.skin.label) { fontSize = HUD_TINY_UNITS, fontStyle = FontStyle.Bold };   // R5 finding 2
         // Round-3: the identity and money readouts get their OWN styles, so
         // nothing they draw shares a mutable style with the fight toasts.
         idStyle = new GUIStyle(GUI.skin.label) { fontSize = 21, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
