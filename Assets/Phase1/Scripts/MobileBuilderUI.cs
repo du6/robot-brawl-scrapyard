@@ -301,6 +301,36 @@ public partial class MobileBuilderUI : MonoBehaviour
     Button saveDlgOk;
     ScrollRect partScroll; GameObject partEdge;   // palette overflow affordance
     bool removeArmed; int clickHold; Button removeBtn;
+
+    // ---- TAP TO PREVIEW, THEN ATTACH (play-test 2026-09-14) ----------------
+    // "Tapping a marker locks the preview in place. The player lifts their
+    // finger, inspects it, then chooses Attach, Rotate, or Cancel."
+    //
+    // What it replaces: a tap COMMITTED. The ghost was drawn under the finger
+    // that was aiming it, so the one moment the player could have inspected the
+    // placement was the one moment their hand was covering it - and there was
+    // no way to adjust, because a drag past SwipeVsTapPx is an ORBIT, not a
+    // nudge. Aim, commit, discover, UNDO was the whole loop.
+    //
+    // The pointer was ALREADY frozen at the release point (see the tail of
+    // Pointers: with a part held, debugPointer stays true and debugMousePos
+    // keeps its last value, so the ghost persists after the finger lifts). The
+    // only thing this adds is that lifting no longer commits.
+    //
+    // ⚠ TOUCH ONLY. A mouse aims precisely and can see its own ghost, so a
+    // confirm step there is a tax and not a feature - previewEligible gates it.
+    bool previewArmed;
+    Vector2 previewAt;
+    bool previewAttachQueued;
+    bool pointerIsTouch;
+    RectTransform confirmRow;
+    Button attachBtn, previewRotBtn, previewCancelBtn;
+    Text previewWhy;
+    /// <summary>Is the thing driving the ghost a FINGER? A touch this session,
+    /// or a browser that says its pointer is coarse - the same signal the type
+    /// sizing already trusts, so there is one answer to "is this a phone" and
+    /// not two that can disagree.</summary>
+    bool PreviewEligible { get { return pointerIsTouch || browserCoarsePointer; } }
     bool moveArmed; Button moveBtn; bool moveGrabbing;   // MOVE-after-attach (owen 2026-08-14)
     public bool MoveArmed { get { return moveArmed; } }
     bool dragging; Vector2 lastP, downP; float moved; float pinchPrev = -1f;
@@ -727,6 +757,11 @@ public partial class MobileBuilderUI : MonoBehaviour
         handleRt.sizeDelta = new Vector2(300f, HANDLE_H);
         var hImg = dockHandle.GetComponent<UnityEngine.UI.Image>();
         if (hImg != null) hImg.color = new Color(0.11f, 0.12f, 0.15f, 0.96f);
+
+        // ATTACH / ROTATE / CANCEL — see MobileBuilderUI.Place.cs. Built beside
+        // the handle because it lives in the same band: outside the dock, above
+        // it, and therefore needing its own OverUI clause.
+        BuildConfirmRow();
 
         // tab buttons across the top of the dock. SHOP (C2) exists only in
         // career mode; LayoutTabs re-anchors whenever the career switch flips.
@@ -2933,6 +2968,7 @@ public partial class MobileBuilderUI : MonoBehaviour
         }
 
         LayoutGarageTools();
+        LayoutConfirmRow();
         PublishCover(dh + (handleRt != null ? HANDLE_H : 0f));
     }
 
@@ -5285,9 +5321,11 @@ public partial class MobileBuilderUI : MonoBehaviour
 #if ENABLE_INPUT_SYSTEM
         var ts = Touchscreen.current;
         if (ts != null) foreach (var t in ts.touches) if (t.press.isPressed) P.Add(t.position.ReadValue());
+        if (P.Count > 0) pointerIsTouch = true;   // sticky: one real touch settles it for the session
         if (P.Count == 0) { var m = Mouse.current; if (m != null && m.leftButton.isPressed) P.Add(m.position.ReadValue()); }
 #else
         for (int i = 0; i < Input.touchCount; i++) P.Add(Input.GetTouch(i).position);
+        if (P.Count > 0) pointerIsTouch = true;
         if (P.Count == 0 && Input.GetMouseButton(0)) P.Add(Input.mousePosition);
 #endif
     }
@@ -5298,6 +5336,11 @@ public partial class MobileBuilderUI : MonoBehaviour
         // a tap that misses the card places a part in the build room behind it.
         if (saveDlg != null && saveDlg.activeSelf) return true;
         if (GarageToolsHit(p)) return true;
+        // The confirm row floats over the build area while a preview is armed.
+        // Without this, ATTACH would also re-aim the ghost behind it - the same
+        // fall-through the dock handle needed its own clause for, three lines
+        // down, and for the same reason: it sits outside the dock band.
+        if (ConfirmRowHit(p)) return true;
         float sf = canvas != null ? canvas.scaleFactor : 1f;
         // R1 fix 2: NEVER re-introduce a literal here. The dock height is
         // per-tab; a stale 210 lets taps in the expanded panel fall through
@@ -5327,6 +5370,12 @@ public partial class MobileBuilderUI : MonoBehaviour
         ObserveNewParts();
         if (bm == null) { bm = Object.FindFirstObjectByType<BuilderManager>(); if (bm == null) return; }
         ConsumePendingTab();
+        // Before Pointers(), because the pointer block below returns early on
+        // every branch that has a finger in it - anything placed after it runs
+        // only when the screen is untouched, which is exactly the frames an
+        // armed preview does NOT need help on.
+        PumpPreview();
+        LayoutConfirmRow();
         RewardBox.Tick();            // hand over anything earned, one box at a time
         if (shopRefreshQueued && !PointerHeld())
         {
@@ -5626,6 +5675,11 @@ public partial class MobileBuilderUI : MonoBehaviour
             }
             if (bm.HasSelection || removeArmed)
             {
+                // Touching the robot again means "not there, HERE". Dropping the
+                // armed preview on finger-DOWN (rather than offering a separate
+                // re-aim control) is what makes adjusting and aiming the same
+                // gesture - there is no second thing to learn.
+                if (previewArmed) CancelPreview();
                 if (!dragging) { dragging = true; downP = p; moved = 0f; lastP = p; }
                 else
                 {
@@ -5675,7 +5729,16 @@ public partial class MobileBuilderUI : MonoBehaviour
                 removeArmed = false; clickHold = 4;
                 RefreshRemoveBtn();
             }
-            else if (bm.HasSelection) Phase0Input.DebugClick(0);
+            else if (bm.HasSelection)
+            {
+                // ⚠ THE ONE LINE THIS ROUND IS ABOUT. A tap used to commit. On a
+                // finger it now ARMS a preview instead: the ghost stays where
+                // the tap put it, the hand comes off it, and ATTACH commits.
+                // A mouse still places on the click, because a mouse can see
+                // what it is doing (MobileBuilderUI.Place.cs states the case).
+                if (PreviewEligible) ArmPreview(lastP);
+                else Phase0Input.DebugClick(0);
+            }
         }
         dragging = false;
         BuilderManager.uiPointerBlocked = false;
@@ -5697,7 +5760,7 @@ public partial class MobileBuilderUI : MonoBehaviour
         {
 #if ENABLE_INPUT_SYSTEM
             var hoverMouse = Mouse.current;
-            if (hoverMouse != null)
+            if (hoverMouse != null && !previewArmed)
             {
                 Vector2 hp = hoverMouse.position.ReadValue();
                 if (!OverUI(hp))
@@ -5708,7 +5771,7 @@ public partial class MobileBuilderUI : MonoBehaviour
             }
 #else
             Vector2 hp = Input.mousePosition;
-            if (!OverUI(hp))
+            if (!previewArmed && !OverUI(hp))
             {
                 Phase0Input.debugMousePos = new Vector3(hp.x, hp.y, 0f);
                 lastP = hp;
@@ -5717,7 +5780,8 @@ public partial class MobileBuilderUI : MonoBehaviour
         }
 
         if (clickHold > 0) { clickHold--; Phase0Input.debugPointer = true; }
-        else Phase0Input.debugPointer = bm.HasSelection || removeArmed;
+        else Phase0Input.debugPointer = bm.HasSelection || removeArmed || previewArmed
+                                     || previewCommitHold > 0;
     }
 
     /// <summary>R1 fix 8: this clause used to be written unconditionally, so

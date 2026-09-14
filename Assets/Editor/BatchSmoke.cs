@@ -22,6 +22,7 @@ namespace RobotBrawl.EditorTools
         public static void Map() { Arm("map"); }
         public static void Touch()  { Arm("touch"); }
         public static void Phone() { Arm("phone"); }
+        public static void Place() { Arm("place"); }
         public static void Journey() { Arm("journey"); }
         public static void ReviewPure()
         {
@@ -62,6 +63,7 @@ namespace RobotBrawl.EditorTools
         static RobotBrawl.Phase0.FightWorkerBench fw;
         static RobotBrawl.Phase0.MapBench mb;
         static RobotBrawl.Phase0.PhoneLayoutBench phone;
+        static RobotBrawl.Phase0.PlaceUxBench place;
         static BatchSmokeBoot()
         {
             which = SessionState.GetString("rb_smoke", "");
@@ -71,7 +73,8 @@ namespace RobotBrawl.EditorTools
         }
         static bool Finished()
         {
-            return which == "phone" ? (phone != null && phone.finished)
+            return which == "place" ? (place != null && place.finished)
+                                     : which == "phone" ? (phone != null && phone.finished)
                                      : which == "journey" ? RobotBrawl.Phase0.JourneyBench.finished
                                      : which == "quick" ? RobotBrawl.Phase0.QuickFightBench.finished
                                      : which == "fightworker" ? (fw != null && fw.finished)
@@ -109,7 +112,7 @@ namespace RobotBrawl.EditorTools
                 // -batchmode -nographics has no Device Simulator, so the editor's
                 // DeviceWantsTouch() says no and ModeSelect draws the desktop
                 // chooser forever. Take the exact path the touch button takes.
-                if ((which == "quick" || which == "map" || which == "phone") && Object.FindFirstObjectByType<RobotBrawl.Phase0.BuilderManager>() == null)
+                if ((which == "quick" || which == "map" || which == "phone" || which == "place") && Object.FindFirstObjectByType<RobotBrawl.Phase0.BuilderManager>() == null)
                     RobotBrawl.Phase0.ModeSelect.StartCareer(true);
                 // Every headless bench asserts against the workshop; MapBench flips this back to prove the boot.
                 RobotBrawl.Phase0.BuilderManager.bootToYard = false;
@@ -119,6 +122,7 @@ namespace RobotBrawl.EditorTools
                 else if (which == "quick") RobotBrawl.Phase0.QuickFightBench.Run();
                 else if (which == "map") mb = RobotBrawl.Phase0.MapBench.Run();
                 else if (which == "phone") phone = RobotBrawl.Phase0.PhoneLayoutBench.Run();
+                else if (which == "place") place = RobotBrawl.Phase0.PlaceUxBench.Run();
                 else if (which == "fightworker") { RobotBrawl.Phase0.FightWorkerBench.RunPure(); fw = RobotBrawl.Phase0.FightWorkerBench.Run(); }
                 else touch = RobotBrawl.Phase0.TouchSmoke.Run();
             }
@@ -126,7 +130,8 @@ namespace RobotBrawl.EditorTools
             {
                 Debug.Log("[BatchSmoke] " + which + " finished - see the bench's own summary lines above");
                 SessionState.SetString("rb_smoke", "");
-                int failures = which == "phone" ? (phone != null ? phone.failed : 0)
+                int failures = which == "place" ? (place != null ? place.failed : 0)
+                             : which == "phone" ? (phone != null ? phone.failed : 0)
                              : which == "map" ? RobotBrawl.Phase0.MapBench.failed
                              : which == "journey" ? RobotBrawl.Phase0.JourneyBench.failed
                              : which == "quick" ? RobotBrawl.Phase0.QuickFightBench.failed
