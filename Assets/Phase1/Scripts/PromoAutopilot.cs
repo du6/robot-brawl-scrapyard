@@ -65,6 +65,81 @@ public class PromoAutopilot : MonoBehaviour
         go.AddComponent<PromoAutopilot>();
     }
 
+    /// <summary>`tour=1` walks every screen a phone player meets and PAUSES on
+    /// each one long enough to be photographed, instead of playing the promo
+    /// route. The stage name goes into the document title, so a capture script
+    /// outside the browser knows which screen it is looking at.</summary>
+    public static bool TourWanted { get { return (Application.absoluteURL ?? "").Contains("tour=1"); } }
+
+    IEnumerator Tour()
+    {
+        yield return WaitRealtime(1.0f);
+        Stage = "map"; yield return WaitRealtime(2.5f);
+        var garage = Btn("GARAGE");
+        if (garage != null) { garage.onClick.Invoke(); yield return WaitRealtime(2.0f); }
+        Stage = "garage-build"; yield return WaitRealtime(2.5f);
+        var tile = Btn("Wedge") ?? Btn("Plate") ?? Btn("Beam");
+        if (tile != null) { tile.onClick.Invoke(); yield return WaitRealtime(1.5f); }
+        Stage = "garage-holding"; yield return WaitRealtime(2.5f);
+        var rotate = Btn("ROTATE"); if (rotate != null) rotate.onClick.Invoke();
+        yield return WaitRealtime(1.2f);
+        Stage = "garage-rotate"; yield return WaitRealtime(1.8f);
+        var doneBtn = Btn("DONE"); if (doneBtn != null) doneBtn.onClick.Invoke();
+        yield return WaitRealtime(1.2f);
+        var robots = Btn("ROBOTS");
+        if (robots != null) { robots.onClick.Invoke(); yield return WaitRealtime(1.8f); }
+        Stage = "garage-robots"; yield return WaitRealtime(2.5f);
+        var shop = Btn("SHOP");
+        if (shop != null) { shop.onClick.Invoke(); yield return WaitRealtime(1.8f); }
+        Stage = "garage-shop"; yield return WaitRealtime(2.5f);
+        var build = Btn("BUILD");
+        if (build != null) { build.onClick.Invoke(); yield return WaitRealtime(1.5f); }
+        if (MobileBuilderUI.inst != null) MobileBuilderUI.inst.OpenSaveDialog();
+        yield return WaitRealtime(1.5f);
+        Stage = "save-name"; yield return WaitRealtime(2.5f);
+        var cancel = Btn("CANCEL"); if (cancel != null) cancel.onClick.Invoke();
+        yield return WaitRealtime(1.2f);
+        if (MobileBuilderUI.inst != null) MobileBuilderUI.inst.OpenSaveConfirm();
+        yield return WaitRealtime(1.5f);
+        Stage = "save-confirm"; yield return WaitRealtime(2.5f);
+        cancel = Btn("CANCEL"); if (cancel != null) cancel.onClick.Invoke();
+        yield return WaitRealtime(1.2f);
+        var out_ = Btn("DRIVE OUT");
+        if (out_ != null) { out_.onClick.Invoke(); yield return WaitRealtime(2.0f); }
+        Stage = "map-again"; yield return WaitRealtime(2.0f);
+        var board = Btn("BOARD");
+        if (board != null) { board.onClick.Invoke(); yield return WaitRealtime(2.0f); }
+        Stage = "board"; yield return WaitRealtime(3.0f);
+        var close = Btn("CLOSE"); if (close != null) close.onClick.Invoke();
+        yield return WaitRealtime(1.2f);
+        target = bm.YardParked;
+        yield return DriveTo(() => target != null ? (Vector3?)target.rb.position : null, 2.8f, 20f, "to-robot");
+        if (target != null && bm.testRobot != null
+            && (target.rb.position - bm.testRobot.rb.position).magnitude > 3.2f)
+        {
+            Vector3 at = target.rb.position, from = bm.testRobot.rb.position;
+            Vector3 dir = from - at; dir.y = 0f;
+            if (dir.sqrMagnitude < 0.01f) dir = Vector3.forward; else dir.Normalize();
+            Vector3 spot = at + dir * 3.0f;
+            bm.TeleportPlayer(new Vector3(spot.x, 0f, spot.z),
+                              Quaternion.LookRotation(new Vector3(at.x - spot.x, 0f, at.z - spot.z)).eulerAngles.y);
+            yield return WaitRealtime(1.2f);
+        }
+        Stage = "encounter"; yield return WaitRealtime(3.0f);
+        for (int tries = 0; tries < 120 && bm.mode != BuilderManager.Mode.Fight; tries++)
+        { bm.ChallengeParked(); yield return null; }
+        Stage = "fight"; yield return WaitRealtime(6.0f);
+        Stage = "fight-late";
+        for (int f = 0; f < 40 * FPS && bm.mode == BuilderManager.Mode.Fight; f++)
+        {
+            Phase0Input.debugThrottle = 0.8f; Phase0Input.debugSteer = 0f;
+            yield return null;
+        }
+        Phase0Input.debugThrottle = 0f; Phase0Input.debugSteer = 0f;
+        Stage = "result"; yield return WaitRealtime(6.0f);
+        Stage = "done"; Done = true;
+    }
+
     IEnumerator Start()
     {
         Stage = "waiting";
@@ -77,6 +152,7 @@ public class PromoAutopilot : MonoBehaviour
         if (bm == null || bm.testRobot == null) { Stage = "no-map"; Done = true; yield break; }
 
         StartCoroutine(TendRewardBoxes());
+        if (TourWanted) { yield return Tour(); yield break; }
         yield return Hold(1.0f, 0f, 0f, "settle");
         // The workshop FIRST. Assembly and the bout are the two shots the video
         // actually needs; a chest that happens to be far away must never eat
