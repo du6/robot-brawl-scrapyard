@@ -292,6 +292,7 @@ public partial class MobileBuilderUI : MonoBehaviour
     // already exist - it asks for a name and makes one.
     GameObject saveDlg;
     RectTransform saveDlgCard;
+    Button saveDlgCancel;
     Text saveDlgTitle;
     Button saveDlgOver, saveDlgNew;
     bool saveDlgConfirm;
@@ -341,6 +342,55 @@ public partial class MobileBuilderUI : MonoBehaviour
     public bool StatsBandShown { get { return statsRt != null && statsRt.gameObject.activeSelf; } }
     public float TopCoverUnits { get { return TopInset(); } }
     public float SafeTopUnits { get { return safeT; } }
+    /// <summary>The worst vertical overlap between two visible rows of the save
+    /// card, and how far its content spills past its own edge. Both are zero in
+    /// a card that is laid out; both were large on owen's phone, which is what
+    /// "looks broken on mobile" looked like from the inside.
+    ///
+    /// Measured through CalculateRelativeRectTransformBounds, NOT from
+    /// anchoredPosition: these children carry four different pivots, and the
+    /// first version of this subtracted a height from a pivot that was already
+    /// the bottom edge - it reported 63 units of spill in a card that had none.</summary>
+    Bounds RowBounds(RectTransform child)
+    {
+        return RectTransformUtility.CalculateRelativeRectTransformBounds(saveDlgCard, child);
+    }
+    public float SaveDialogOverlapUnits
+    {
+        get
+        {
+            if (saveDlgCard == null) return 0f;
+            var rows = new System.Collections.Generic.List<Bounds>();
+            for (int i = 0; i < saveDlgCard.childCount; i++)
+            {
+                var c = saveDlgCard.GetChild(i) as RectTransform;
+                if (c != null && c.gameObject.activeSelf) rows.Add(RowBounds(c));
+            }
+            float worst = 0f;
+            for (int i = 0; i < rows.Count; i++)
+                for (int j = i + 1; j < rows.Count; j++)
+                    worst = Mathf.Max(worst, Mathf.Min(rows[i].max.y, rows[j].max.y)
+                                           - Mathf.Max(rows[i].min.y, rows[j].min.y));
+            return Mathf.Max(0f, worst);
+        }
+    }
+    public float SaveDialogOverflowUnits
+    {
+        get
+        {
+            if (saveDlgCard == null) return 0f;
+            float half = saveDlgCard.rect.height * 0.5f, spill = 0f;
+            for (int i = 0; i < saveDlgCard.childCount; i++)
+            {
+                var c = saveDlgCard.GetChild(i) as RectTransform;
+                if (c == null || !c.gameObject.activeSelf) continue;
+                var b = RowBounds(c);
+                spill = Mathf.Max(spill, Mathf.Max(b.max.y - half, -half - b.min.y));
+            }
+            return Mathf.Max(0f, spill);
+        }
+    }
+    public bool SaveDialogShown { get { return saveDlg != null && saveDlg.activeSelf; } }
     /// <summary>How tall the part shelf's window is, in canvas units. A tile is
     /// one touch row, so anything under two rows is the sliver owen could not
     /// hit.</summary>
@@ -738,7 +788,7 @@ public partial class MobileBuilderUI : MonoBehaviour
         ert.anchoredPosition = new Vector2(0f, -166f);
         saveDlgErr.color = new Color(0.95f, 0.72f, 0.30f);
 
-        var cancel = MkButton("savedlg_cancel", card.transform, "CANCEL", 16, () => CloseSaveDialog());
+        var cancel = saveDlgCancel = MkButton("savedlg_cancel", card.transform, "CANCEL", 16, () => CloseSaveDialog());
         var carrt = cancel.GetComponent<RectTransform>();
         carrt.anchorMin = new Vector2(1f, 0f); carrt.anchorMax = new Vector2(1f, 0f);
         carrt.pivot = new Vector2(1f, 0f); carrt.sizeDelta = new Vector2(120f, 42f);
@@ -832,9 +882,73 @@ public partial class MobileBuilderUI : MonoBehaviour
         if (saveDlgNew != null) saveDlgNew.gameObject.SetActive(saveDlgConfirm);
     }
 
+    /// <summary>Lay the card out as a STACK, sized from the touch row and from
+    /// the text's own measured height.
+    ///
+    /// owen's phone, 2026-09-13: "the save robot pop up window looks broken on
+    /// mobile" - and it was: a 560x250 card with every child pinned at a hard
+    /// pixel offset (-16, -58, -106, -166) and buttons at a fixed 42 units.
+    /// None of that scales, while the LABELS inside it are FontUnits-scaled, so
+    /// on a phone the note ran through the buttons and the buttons ran through
+    /// each other. Nothing here is a literal offset any more.</summary>
+    void LayoutSaveDialog()
+    {
+        if (saveDlgCard == null || canvas == null) return;
+        var canvasRt = canvas.GetComponent<RectTransform>();
+        if (canvasRt == null) return;
+        float R = TouchRow();
+        float pad = Mathf.Max(14f, R * 0.30f), gap = Mathf.Max(8f, R * 0.18f);
+
+        var group = saveDlgCard.GetComponent<VerticalLayoutGroup>();
+        if (group == null)
+        {
+            group = saveDlgCard.gameObject.AddComponent<VerticalLayoutGroup>();
+            var fitter = saveDlgCard.gameObject.AddComponent<ContentSizeFitter>();
+            fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+            fitter.horizontalFit = ContentSizeFitter.FitMode.Unconstrained;
+        }
+        group.padding = new RectOffset((int)pad, (int)pad, (int)pad, (int)pad);
+        group.spacing = gap;
+        group.childControlWidth = true;  group.childForceExpandWidth = true;
+        group.childControlHeight = true; group.childForceExpandHeight = false;
+
+        // As wide as the screen allows, because a phone has no width to waste.
+        float maxW = Mathf.Max(220f, canvasRt.rect.width - safeL - safeR - 2f * pad);
+        saveDlgCard.sizeDelta = new Vector2(Mathf.Min(560f, maxW), saveDlgCard.sizeDelta.y);
+
+        // Reading order top to bottom, and the same order in the hierarchy, so
+        // the stack cannot disagree with the sentence it is drawing.
+        Row(saveDlgTitle != null ? saveDlgTitle.rectTransform : null, 0, R * 0.8f, true);
+        Row(saveDlgNote != null ? saveDlgNote.rectTransform : null, 1, 0f, false);
+        Row(saveDlgName != null ? saveDlgName.GetComponent<RectTransform>() : null, 2, R, true);
+        Row(saveDlgErr != null ? saveDlgErr.rectTransform : null, 3, 0f, false);
+        Row(saveDlgOver != null ? saveDlgOver.GetComponent<RectTransform>() : null, 4, R, true);
+        Row(saveDlgNew != null ? saveDlgNew.GetComponent<RectTransform>() : null, 5, R, true);
+        Row(saveDlgOk != null ? saveDlgOk.GetComponent<RectTransform>() : null, 6, R, true);
+        Row(saveDlgCancel != null ? saveDlgCancel.GetComponent<RectTransform>() : null, 7, R, true);
+        SetFont(saveDlgCard, 15f);
+        if (saveDlgTitle != null) saveDlgTitle.fontSize = FontUnits(18f);
+        foreach (var t in new[] { saveDlgNote, saveDlgErr })
+            if (t != null) { t.horizontalOverflow = HorizontalWrapMode.Wrap; t.verticalOverflow = VerticalWrapMode.Overflow; }
+        LayoutRebuilder.ForceRebuildLayoutImmediate(saveDlgCard);
+    }
+
+    /// <summary>One row of the card: fixed height for a control, self-measured
+    /// height for a paragraph that has to be allowed to wrap.</summary>
+    void Row(RectTransform rt, int order, float height, bool fixedHeight)
+    {
+        if (rt == null) return;
+        rt.SetSiblingIndex(order);
+        var le = rt.GetComponent<LayoutElement>();
+        if (le == null) le = rt.gameObject.AddComponent<LayoutElement>();
+        if (fixedHeight) { le.preferredHeight = height; le.minHeight = height; le.flexibleHeight = 0f; }
+        else { le.preferredHeight = -1f; le.minHeight = -1f; le.flexibleHeight = 0f; }
+    }
+
     void CentreSaveDlgCard()
     {
         if (saveDlgCard == null) return;
+        LayoutSaveDialog();
         float dh = dockRt != null ? dockRt.sizeDelta.y : 0f;
         // ...but never above the screen: on a landscape phone the dock is most
         // of the height, so "half the dock up" pushed the card's title off the

@@ -557,6 +557,26 @@ public class TouchSmoke : MonoBehaviour
             Career.active = careerHold;
         }
 
+        // ---- THE SAVE CARD IS A STACK, NOT A PILE ------------------------
+        // owen's phone, 2026-09-13: "the save robot pop up window looks broken
+        // on mobile". Every child sat at a hard pixel offset while its label
+        // scaled with the touch font, so the note ran through the buttons and
+        // the buttons ran through each other.
+        {
+            ui.OpenSaveDialog();
+            yield return null; yield return null;
+            Check(ui.SaveDialogShown, "the save card opens");
+            Check(ui.SaveDialogOverlapUnits < 1f,
+                  "no two rows of the save card overlap (" + ui.SaveDialogOverlapUnits.ToString("0.0") + " units)");
+            Check(ui.SaveDialogOverflowUnits < 1f,
+                  "...and nothing spills past its edge (" + ui.SaveDialogOverflowUnits.ToString("0.0") + " units)");
+            var cancelBtn = Btn("CANCEL");
+            Check(cancelBtn != null, "...and CANCEL is there to close it");
+            if (cancelBtn != null) cancelBtn.onClick.Invoke();
+            yield return null;
+            Check(!ui.SaveDialogShown, "...and CANCEL closes it");
+        }
+
         // ---- SENSORS ARE GONE FROM THE GARAGE ----------------------------
         // owen, 2026-09-13: "given that there is no program in this version,
         // sensors are redundant - hide all sensors from garage, including both
