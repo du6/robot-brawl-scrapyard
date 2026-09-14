@@ -386,6 +386,40 @@ public partial class BuilderManager : MonoBehaviour
     readonly List<Material> snapDotMats = new List<Material>();
     readonly List<Vector2> snapDotOffs = new List<Vector2>();
     PlacedPart ghostTarget;
+    /// <summary>The mount face the ghost is HOLDING (see the hysteresis block
+    /// in UpdateGhost), and the pointer position it was last confirmed at.</summary>
+    PlacedPart faceLockPart;
+    Vector3 faceLockNormal;
+    Vector2 faceLockAt;
+    Vector3 faceLockView;
+
+    /// <summary>Where the camera is, as one comparable value. The face lock is
+    /// released when this changes, because an ORBIT moves the robot under a
+    /// stationary finger - the pointer has not travelled, but what it is
+    /// pointing at has, and holding the old face would stick the ghost to a
+    /// part that is no longer under the finger.</summary>
+    Vector3 ViewKey() { return new Vector3(orbitYaw, orbitPitch, orbitDist); }
+
+    /// <summary>How far the pointer must travel to CHANGE mount face, in screen
+    /// pixels. Sized against the screen rather than as a constant, because the
+    /// thing it is defending against is a finger's involuntary wander, which is
+    /// a physical size: ~1.3 mm, which is 1.8% of the short edge on the phones
+    /// this ships to. The 8 px floor keeps it meaningful on a tiny window where
+    /// the percentage would round to nothing.</summary>
+    public static float FaceSwitchPx
+    {
+        get { return Mathf.Max(8f, Mathf.Min(Screen.width, Screen.height) * 0.018f); }
+    }
+    /// <summary>The part the ghost is currently colliding with, or null. Set by
+    /// the overlap rule and read by the highlight - so the words in
+    /// `ghostReason` and the thing lit up in the world can never disagree.</summary>
+    PlacedPart ghostBlocker;
+    bool ghostNudged;
+    float ghostNudgeDist;
+    Vector3 ghostHalf = Vector3.one * 0.05f;
+    GameObject blockerOverlay;
+    Material blockerMat;
+    string blockerKey = "";
     Vector3 ghostPos, ghostNormal;
     GUIStyle headStyle, btnStyle, descStyle, bodyStyle, warnStyle, bigStyle, matStyle;
 
@@ -1091,6 +1125,72 @@ public partial class BuilderManager : MonoBehaviour
         return c;
     }
 
+    /// <summary>How far the blocked-socket search may reach for a free spot,
+    /// in metres along ONE tangent of the face. TWO STUDS.
+    ///
+    /// It is a reach and not "as far as it takes" on purpose: past this the
+    /// part lands somewhere the player was not pointing, and a placement you did
+    /// not ask for is worse than a refusal you can read. Three studs was the
+    /// first value and it is too far - the core's face is about 50 cm, so a
+    /// 45 cm reach can answer a blocked tap at the nose by mounting at the
+    /// tail. Two studs is two sockets, and because the search is NEAREST-FIRST
+    /// it only ever reaches that far when everything closer is occupied - at
+    /// which point one more socket out is unlikely to be what was meant either.</summary>
+    public const float NUDGE_REACH = 2f * STUD;
+
+    /// <summary>The first PLACED part a box at `p` would overlap, or null if
+    /// the spot is clear. The 0.92 shrink is the margin the placement rule has
+    /// always used (so wheels never phantom-clip their neighbours); this method
+    /// exists so the ghost rule and the nudge search cannot drift apart, which
+    /// is exactly how a "forgiving" search ends up offering illegal spots.</summary>
+    PlacedPart OverlapBlocker(Vector3 p, Vector3 half)
+    {
+        foreach (var c in Physics.OverlapBox(p, half * 0.92f, Quaternion.identity))
+        {
+            PlacedPart hit;
+            if (byCollider.TryGetValue(c, out hit)) return hit;
+        }
+        return null;
+    }
+
+    /// <summary>Name a part the way the PLAYER can find it: its label, plus a
+    /// side word when the label alone is ambiguous.
+    ///
+    /// ⚠ THE SIDE WORD IS SCREEN-RELATIVE, NOT BUILD-RELATIVE, AND THAT IS
+    /// DELIBERATE. "the left wheel" has to mean the one on the left of the
+    /// screen, because the player is looking at the robot, not at its local
+    /// axes — and the garage orbits, so a build-space "left" is wrong half the
+    /// time it is read. (This is the same trap as SensorBus.forwardLocal, which
+    /// is the BUILD's drive axis and is 90 degrees off transform.forward on an
+    /// X-drive build; the fix there was to use the right frame, and it is here
+    /// too — the frame just happens to be the camera's.)
+    ///
+    /// The word is only added when it disambiguates. One rubber wheel on the
+    /// machine is "the rubber wheel"; four of them need telling apart.</summary>
+    public string BlockerPhrase(PlacedPart p)
+    {
+        if (p == null || p.def == null) return "another part";
+        string label = p.def.label;
+        int sameLabel = 0;
+        foreach (var q in placed)
+            if (q != null && q.def != null && q.def.label == label) sameLabel++;
+        if (sameLabel < 2 || cam == null) return "the " + label;
+
+        Vector3 mid = Vector3.zero;
+        foreach (var q in placed) mid += q.pos;
+        if (placed.Count > 0) mid /= placed.Count;
+        Vector3 off = p.pos - mid;
+        float rx = Vector3.Dot(off, cam.transform.right);
+        float ry = Vector3.Dot(off, cam.transform.up);
+        // A tie is not a description. If neither axis separates this part from
+        // the middle of the machine by a stud, say nothing rather than guess.
+        if (Mathf.Abs(rx) < STUD * 0.5f && Mathf.Abs(ry) < STUD * 0.5f) return "the " + label;
+        string side = Mathf.Abs(rx) >= Mathf.Abs(ry)
+                    ? (rx < 0f ? "left" : "right")
+                    : (ry > 0f ? "top" : "bottom");
+        return "the " + side + " " + label;
+    }
+
     /// <summary>Per-face socket offsets of a PLACED part along tangent axis t.
     /// Wheels and weapons mate through a single center socket.</summary>
     static float[] PartFaceSockets(PlacedPart p, int t)
@@ -1426,7 +1526,7 @@ public partial class BuilderManager : MonoBehaviour
         // weapon, one they cannot see the point of. Reset on the transition
         // rather than in the palette button handler, so it is also right for
         // any other path that changes `selected`.
-        if (selected != lastSelected) { ghostYaw = 0; lastSelected = selected; }
+        if (selected != lastSelected) { ghostYaw = 0; lastSelected = selected; faceLockPart = null; }
 
         if (Phase0Input.RotateDown())
         {
@@ -2095,6 +2195,57 @@ public partial class BuilderManager : MonoBehaviour
     void HideSnapOverlay()
     {
         if (snapOverlay != null && snapOverlay.activeSelf) snapOverlay.SetActive(false);
+    }
+
+    void HideBlocker()
+    {
+        if (blockerOverlay != null && blockerOverlay.activeSelf) blockerOverlay.SetActive(false);
+    }
+
+    /// <summary>Outline the part the ghost is hitting. A red cage a little
+    /// larger than the part, pulsing, so "Hits the left wheel" has something to
+    /// point AT - the words alone still leave the player hunting for which of
+    /// four wheels is meant, and hunting is the thing the message was supposed
+    /// to end. Drawn as an overlay box rather than by tinting the part's own
+    /// materials, so nothing can leak into the build's appearance and survive
+    /// the highlight (the parts share materials by design).</summary>
+    void ShowBlocker(PlacedPart p)
+    {
+        if (p == null || p.go == null) { HideBlocker(); return; }
+        Vector3 size = p.Half() * 2f + Vector3.one * 0.02f;
+        string key = p.go.GetEntityId() + "|" + size.x.ToString("F2") + "x"
+                   + size.y.ToString("F2") + "x" + size.z.ToString("F2");
+        if (blockerOverlay == null || blockerKey != key)
+        {
+            if (blockerOverlay != null) Destroy(blockerOverlay);
+            blockerOverlay = new GameObject("blockerOverlay");
+            blockerMat = OverlayMat();
+            // Twelve thin bars, not a solid box: a solid one at this size
+            // swallows the part it is naming, and the player then cannot see
+            // WHY it is in the way.
+            float t = 0.012f;
+            for (int ax = 0; ax < 3; ax++)
+            {
+                int b1 = (ax + 1) % 3, b2 = (ax + 2) % 3;
+                for (int s1 = -1; s1 <= 1; s1 += 2)
+                    for (int s2 = -1; s2 <= 1; s2 += 2)
+                    {
+                        Vector3 bar = Vector3.one * t;
+                        bar[ax] = size[ax];
+                        Vector3 lp = Vector3.zero;
+                        lp[b1] = s1 * size[b1] * 0.5f;
+                        lp[b2] = s2 * size[b2] * 0.5f;
+                        PartVisualFactory.Deco(PrimitiveType.Cube, blockerOverlay.transform,
+                            lp, bar, Vector3.zero, blockerMat, "edge");
+                    }
+            }
+            blockerKey = key;
+        }
+        if (!blockerOverlay.activeSelf) blockerOverlay.SetActive(true);
+        blockerOverlay.transform.position = p.pos;
+        // Pulse so it reads as a callout and not as part of the machine.
+        float k = 0.55f + 0.45f * Mathf.Abs(Mathf.Sin(Time.unscaledTime * 5f));
+        Tint(blockerMat, new Color(1f, 0.22f, 0.16f), k * 1.6f);
     }
 
     static Material OverlayMat()
@@ -2833,6 +2984,10 @@ public partial class BuilderManager : MonoBehaviour
         // on. The authoritative rebuild happens once the face is resolved.
         EnsureGhostBuilt(def, isWheelSel, NeedsAxis(def) ? ghostNormal : Vector3.zero);
         ghost.SetActive(true);
+        // Every face this part can mount on, lit BEFORE the player aims at
+        // anything - the socket overlay below only ever answers about the face
+        // already under the pointer, which on a phone costs a tap to ask.
+        RefreshFaceGuide(def);
 
         Ray ray = cam.ScreenPointToRay(m);
         RaycastHit hit = default(RaycastHit);
@@ -2929,6 +3084,8 @@ public partial class BuilderManager : MonoBehaviour
             ghost.transform.position = p;
             RefreshGhostArc(null, Vector3.zero, Vector3.zero, 0, false);
             HideSnapOverlay();
+            HideBlocker();
+            HideDirArrow();
             TintGhost(false);
             return;
         }
@@ -2975,6 +3132,70 @@ public partial class BuilderManager : MonoBehaviour
             Vector3 derived = Vector3.zero;
             derived[ga] = off[ga] >= 0f ? 1f : -1f;
             ghostNormal = derived;
+        }
+
+        // FACE HYSTERESIS (play-test 2026-09-14: "avoid unexpectedly switching
+        // from a front face to the roof").
+        //
+        // Everything above re-derives the mount face from the raycast EVERY
+        // FRAME with nothing holding it steady, which is right for a mouse and
+        // wrong for a finger. A finger resting on a box edge wanders a couple
+        // of millimetres on its own, and a couple of millimetres at an edge is
+        // the difference between the nose and the roof - so the ghost, the
+        // rebuilt model, the snap grid and the socket overlay all flip back and
+        // forth under a hand that is holding still. The player reads that as
+        // the game being unable to make up its mind, and there is no way to aim
+        // out of it, because the input that causes it is involuntary.
+        //
+        // So a face CHANGE now has to be asked for: the pointer travels
+        // FaceSwitchPx since the face was last confirmed, or the camera moves,
+        // or the part the lock is on stops existing.
+        //
+        // ⚠ THE RELEASE CONDITION IS NOT "THE OLD PART LEFT THE RAY", WHICH IS
+        // WHAT THIS SAID FIRST AND WHAT THE BENCH REFUSED. The wobble that
+        // matters most is the one at a SILHOUETTE EDGE, where a millimetre
+        // takes the ray off one part and onto the next - and "the old part is
+        // no longer hit" is true on exactly that frame, so the lock released
+        // precisely when it was needed. (Measured: beam/XN -> core/ZN on a
+        // 5-pixel wobble, with the threshold at 8.6.) The two cases it was
+        // trying to cover are named directly instead: an ORBIT moves the world
+        // under a still finger, and a REMOVED part cannot be mounted on.
+        // Re-confirming as you travel is what keeps a slow, deliberate drag
+        // working - without it the anchor never moves and the face can never
+        // change at all, which is the failure mode on the other side of this.
+        //
+        // ⚠ A MOUSE PAYS FOR THIS and it is worth stating rather than hiding: a
+        // deliberate sub-threshold mouse move near a face boundary is ignored
+        // where it used to switch. At 1080p that is ~19 px on the face CHOICE
+        // only - the snap position within a face still tracks continuously -
+        // against an involuntary failure that a finger cannot avoid at all. One
+        // behaviour that is slightly loose beats two that disagree.
+        {
+            Vector2 mNow = new Vector2(m.x, m.y);
+            float thr = FaceSwitchPx;
+            bool samePick = faceLockPart == ghostTarget
+                         && AxisCode(faceLockNormal) == AxisCode(ghostNormal);
+            if (samePick)
+            {
+                // Re-anchor once the finger has genuinely travelled, so the
+                // next face change is measured from where it is NOW.
+                if ((mNow - faceLockAt).sqrMagnitude > thr * thr) faceLockAt = mNow;
+            }
+            else if (faceLockPart != null
+                     && (mNow - faceLockAt).sqrMagnitude <= thr * thr
+                     && placed.Contains(faceLockPart)
+                     && (faceLockView - ViewKey()).sqrMagnitude < 1e-6f)
+            {
+                ghostTarget = faceLockPart;
+                ghostNormal = faceLockNormal;
+            }
+            else
+            {
+                faceLockPart = ghostTarget;
+                faceLockNormal = ghostNormal;
+                faceLockAt = mNow;
+                faceLockView = ViewKey();
+            }
         }
 
         // ROUND-UP2 FIX A: the face is now known, so re-key the ghost on it.
@@ -3083,6 +3304,10 @@ public partial class BuilderManager : MonoBehaviour
 
         ghostValid = true;
         ghostReason = "";
+        ghostBlocker = null;
+        ghostNudged = false;
+        ghostNudgeDist = 0f;
+        ghostHalf = newHalf;
         // Both mating faces must actually carry a socket: SocketOffsets is
         // empty on faces under 0.15 m (plate edges = no socket). Wheels and
         // weapons keep their center-socket exemption on the NEW-part side.
@@ -3161,11 +3386,80 @@ public partial class BuilderManager : MonoBehaviour
 
         // Overlap check against existing parts (slightly shrunk, using the
         // ORIENTED effective extents so wheels never phantom-clip neighbors).
+        //
+        // PLAY-TEST 2026-09-14: this used to be four lines that threw away
+        // everything they knew. It had `byCollider[c]` — the actual part in the
+        // way — in its hand, and reported "Blocked by another part", which
+        // names neither the part nor a way out. Two things now come out of the
+        // same lookup:
+        //
+        //   1. IT LOOKS FOR SOMEWHERE ELSE ON THE FACE FIRST. The nearest
+        //      socket being occupied says nothing about the other eleven. This
+        //      is the same move the floor rule already makes thirty lines up
+        //      (2026-07-29: "hovering LOW on a side face picked a
+        //      floor-clipping candidate even when a valid socket sat higher on
+        //      the SAME face"), generalised from the floor to any obstruction —
+        //      a rule that refuses when a legal answer is one stud away was
+        //      always half a rule.
+        //   2. IF THERE IS GENUINELY NOWHERE, IT NAMES WHAT IS IN THE WAY and
+        //      lights it up. "Hits the rubber wheel", with that wheel outlined,
+        //      is a sentence the player can act on; "Blocked by another part"
+        //      is a sentence about the game's internals.
         if (ghostValid)
         {
-            foreach (var c in Physics.OverlapBox(pos, newHalf * 0.92f, Quaternion.identity))
-                if (byCollider.ContainsKey(c))
-                { ghostValid = false; ghostReason = "Blocked by another part"; break; }
+            var blocker = OverlapBlocker(pos, newHalf);
+            if (blocker != null)
+            {
+                // Search the socket grid outward from where the finger actually
+                // is. NEAREST-FIRST, so the forgiveness never reaches past a
+                // closer legal answer, and capped at NUDGE_REACH so a blocked
+                // nose never answers by mounting on the tail — a part that
+                // lands somewhere you were not pointing is worse than a refusal.
+                float wu = hit.point[t1] - ghostTarget.pos[t1];
+                float wv = hit.point[t2] - ghostTarget.pos[t2];
+                float floorMin = FloorPlane(isWheel) + newHalf.y - ghostTarget.pos[1];
+                int vAx = t1 == 1 ? 1 : t2 == 1 ? 2 : 0;   // which tangent is vertical, if either
+                float bu = 0f, bv = 0f, bErr = float.MaxValue;
+                foreach (float ta in tu)
+                    foreach (float na in nu)
+                    {
+                        float cu = ta - na;
+                        if (vAx == 1 && cu < floorMin - 1e-4f) continue;
+                        if (Mathf.Abs(cu - wu) > NUDGE_REACH) continue;
+                        foreach (float tb in tv)
+                            foreach (float nb in nv)
+                            {
+                                float cv = tb - nb;
+                                if (vAx == 2 && cv < floorMin - 1e-4f) continue;
+                                if (Mathf.Abs(cv - wv) > NUDGE_REACH) continue;
+                                float e = (cu - wu) * (cu - wu) + (cv - wv) * (cv - wv);
+                                if (e >= bErr) continue;   // already have a nearer answer
+                                Vector3 cand = pos;
+                                cand[t1] = ghostTarget.pos[t1] + cu;
+                                cand[t2] = ghostTarget.pos[t2] + cv;
+                                if (cand.y - newHalf.y < FloorPlane(isWheel) - 1e-4f) continue;
+                                if (OverlapBlocker(cand, newHalf) != null) continue;
+                                bErr = e; bu = cu; bv = cv;
+                            }
+                    }
+                if (bErr < float.MaxValue)
+                {
+                    ghostNudged = true;
+                    ghostNudgeDist = Mathf.Sqrt(bErr);
+                    du = bu; dv = bv;
+                    pos[t1] = ghostTarget.pos[t1] + du;
+                    pos[t2] = ghostTarget.pos[t2] + dv;
+                    ghostMated = MatedCount(tu, nu, du) * MatedCount(tv, nv, dv);
+                    ghostSockets = Mathf.Max(1, ghostMated);
+                    blocker = OverlapBlocker(pos, newHalf);
+                }
+                if (blocker != null)
+                {
+                    ghostValid = false;
+                    ghostReason = "Hits " + BlockerPhrase(blocker);
+                    ghostBlocker = blocker;
+                }
+            }
         }
 
         // ROTOR SWEEP (owen, 2026-08-05). Last of the placement rules, because
@@ -3197,6 +3491,8 @@ public partial class BuilderManager : MonoBehaviour
         // owen: show the swept window BEFORE the part is committed.
         RefreshGhostArc(def, pos, ghostNormal, ghostYaw, true);
         ShowSnapOverlay(ghostTarget, axis, sign, t1, t2, tu, tv, nu, nv, du, dv, ghostValid);
+        ShowBlocker(ghostBlocker);
+        RefreshDirArrow(def, pos, ghostNormal, ghostValid);
         TintGhost(ghostValid);
     }
 
@@ -3347,7 +3643,12 @@ public partial class BuilderManager : MonoBehaviour
         RefreshGhostArc(null, Vector3.zero, Vector3.zero, 0, false);
         if (ghost != null) ghost.SetActive(false);
         HideSnapOverlay();
-        ghostValid = false; ghostReason = ""; ghostSockets = 1; ghostMated = 1;
+        HideBlocker();
+        HideFaceGuide();
+        HideDirArrow();
+        faceLockPart = null;
+        ghostValid = false; ghostReason = ""; ghostSockets = 1; ghostMated = 1; ghostBlocker = null;
+        ghostNudged = false; ghostNudgeDist = 0f;
     }
 
     /// <summary>Round-2 critic fix 5/7: full deselect — clears the selection
@@ -3909,6 +4210,8 @@ public partial class BuilderManager : MonoBehaviour
         ghostSockets = 1;
         ghostMated = 1;
         if (snapOverlay != null) { Destroy(snapOverlay); snapOverlay = null; }
+        if (blockerOverlay != null) { Destroy(blockerOverlay); blockerOverlay = null; blockerKey = ""; }
+        DestroyPlaceGuides();
         snapKey = "";
         snapDotMats.Clear();
         snapDotOffs.Clear();
