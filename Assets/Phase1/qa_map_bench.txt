@@ -71,22 +71,24 @@ PASS  ...on the HUD, with a CHALLENGE button
 PASS  the card came up: the objective says tap CHALLENGE (NEXT  ·  tap CHALLENGE - you drive the bout)
 PASS  ...and the funnel hears `meet`
 PASS  drive away and the card folds - decline is free
-      trace: 11.9s err -3 steer -0.05 | 12.3s err 0 steer 0.02 | 12.8s err 1 steer 0.03 | 13.2s err 2 steer 0.06 | 13.6s err 2 steer 0.05 | 
-PASS  stick up for 2 s moves the machine (9.4 m)
-PASS  ...straight away from the camera (-0.1 deg off)
+      trace: 12.1s err -2 steer -0.05 | 12.5s err 0 steer 0.02 | 12.9s err 1 steer 0.02 | 13.3s err 1 steer 0.03 | 13.7s err 1 steer 0.02 | 
+PASS  stick up for 2 s moves the machine (9.5 m)
+PASS  ...straight away from the camera (0.0 deg off)
 PASS  ...the wobble reads as part of one stick vector, not a steer
-      turn trace: 0.0s yaw 92 err 0 st 0.03 thr 1.00 w 3 v 6.2 | 0.2s yaw 96 err 32 st 0.28 thr -0.25 w 39 v 5.8 | 0.3s yaw 103 err 25 st 0.22 thr -0.25 w 50 v 5.3 | 0.5s yaw 110 err 17 st 0.19 thr -0.25 w 42 v 4.7 | 0.6s yaw 116 err 11 st 0.11 thr 0.85 w 49 v 5.0 | 0.8s yaw 124 err 3 st 0.01 thr 0.96 w 48 v 5.8 | 0.9s yaw 131 err -3 st -0.03 thr 0.95 w 29 v 6.4 | 1.1s yaw 132 err -4 st 0.03 thr 0.94 w 3 v 6.7 | 1.2s yaw 131 err -4 st 0.04 thr 0.95 w -6 v 6.6 | 1.4s yaw 131 err -4 st 0.03 thr 0.95 w -4 v 6.4 | 1.5s yaw 130 err -3 st 0.06 thr 0.97 w -10 v 6.3 | 
-      40 deg hold: cam 92 want 127 yaw 129 -> 124 err 3
+      turn trace: 0.0s yaw 93 err 0 st 0.02 thr 1.00 w 2 v 6.2 | 0.2s yaw 96 err 32 st 0.28 thr -0.25 w 35 v 5.8 | 0.3s yaw 104 err 25 st 0.22 thr -0.25 w 47 v 5.2 | 0.5s yaw 110 err 18 st 0.19 thr -0.25 w 41 v 4.7 | 0.6s yaw 116 err 12 st 0.13 thr 0.84 w 45 v 4.7 | 0.8s yaw 123 err 5 st 0.06 thr 0.93 w 40 v 5.4 | 0.9s yaw 131 err -3 st -0.09 thr 0.96 w 52 v 6.2 | 1.1s yaw 135 err -7 st -0.05 thr 0.91 w 12 v 6.6 | 1.2s yaw 135 err -7 st -0.01 thr 0.91 w -5 v 6.6 | 1.4s yaw 134 err -6 st -0.03 thr 0.92 w 1 v 6.4 | 1.5s yaw 133 err -5 st -0.01 thr 0.93 w -9 v 6.3 | 
+      40 deg hold: cam 93 want 128 yaw 132 -> 125 err 3
 PASS  a held 40 deg stick turns the machine TO the heading, within 6 deg by 2.4 s (3 deg left)
-PASS  ...briskly, and without breaking grip into a spin (peak 54 deg/s; a spin measured 200-290)
-PASS  ...and stops turning once there, apart from the camera's slow recentre (-4 deg in 0.8 s)
-PASS  ...to the RIGHT of where the camera looked (37 deg)
+PASS  ...briskly, and without breaking grip into a spin (peak 53 deg/s; a spin measured 200-290)
+PASS  ...and stops turning once there, apart from the camera's slow recentre (-7 deg in 0.8 s)
+PASS  ...to the RIGHT of where the camera looked (39 deg)
 PASS  let go and the throttle is off (braking while rolling), the steer centred (-0.35, 0.00)
 PASS  ...a centred stick is zero (the touch layer's 0.001 sentinel included)
 PASS  released, the machine brakes to rest inside 6 s (0.3 m/s)
 PASS  stick straight back from rest = reverse
-PASS  ...and the machine backs up (-2.3 m along its nose)
-PASS  the stick is big and honest: the ring's edge is full lock (travel 140, ring 280), and it takes a mouse on every platform
+PASS  ...and the machine backs up (-2.2 m along its nose)
+PASS  the stick's ring stays inside its bounds (120 in [120..200])
+PASS  ...and never eats the screen it steers (42% of the short edge, was 65% on owen's phone)
+PASS  ...the ring's edge is still full lock, and it still takes a mouse on every platform
 PASS  the nearest place to home is a TRADING POST, under 80 m (TRADING POST 57)
 PASS  the next cell east is a ROBOT PARK
 PASS  the next cell north is an ARENA
@@ -107,7 +109,7 @@ PASS  leave the pad and return: the door works again
 PASS  by the stands the compass names the ARENA (ARENA)
 PASS  the arena holds two machines (2)
 PASS  ...each driven by an AIController aimed at the other, combat armed
-PASS  ...and they fight: a machine moved in 1.5 s (10.8 m, 8.4 m)
+PASS  ...and they fight: a machine moved in 1.5 s (10.7 m, 8.3 m)
 PASS  ...inside the ring
 PASS  the spectator is not in the fight
 PASS  the loaded world's places carry machines (2)
@@ -132,15 +134,15 @@ PASS  ...worded for the board, not for a challenge (SIGN IN TO GET ON THE BOARD)
 PASS  ...and NOT NOW puts you back on the board, not on the map
 PASS  signed in, the board does not ask again
 PASS  the map HUD's canvas is up for the sizing checks
-PASS  map HUD type, at this screen's metrics: every label is at or above the dock's floor (25 units at card/sub, floor 25)
+PASS  map HUD type, at this screen's metrics: every label is at or above the dock's floor (25 units at chip_0/dist, floor 25)
 PASS  map HUD sign-in, at this screen's metrics: every control is a full touch row (90 units)
 PASS  map HUD board, at this screen's metrics: every control is a full touch row (90 units)
 PASS  ...and the sign-in panel still fits the safe area (651x563 in 1109x831)
 PASS  ...and so does the board (440x815)
 PASS  map HUD objective, at this screen's metrics: the line clears the compass bar (top 311.6 vs bar bottom 317.6)
 PASS  the HUD picks up a changed touch row with no rebuild (110 units)
-PASS  ...and re-applies the type with it (25 -> 20 units)
-PASS  map HUD type, on owen's phone: every label is at or above the dock's floor (20 units at card/sub, floor 8)
+PASS  ...and re-applies the type with it (25 -> 19 units)
+PASS  map HUD type, on owen's phone: every label is at or above the dock's floor (19 units at chip_0/dist, floor 8)
 PASS  map HUD sign-in, on owen's phone: every control is a full touch row (110 units)
 PASS  map HUD board, on owen's phone: every control is a full touch row (110 units)
 PASS  ...and the sign-in panel still fits the safe area (540x615 in 1109x831)
@@ -168,7 +170,7 @@ PASS  ...pinned inside the panel, where a longer list cannot push it off (-300..
 PASS  ...and clear of the list above it
 PASS  ...and the list drew only the rows it has room for (13 of 22 offered, 13 fit)
 PASS  a posed notch actually reaches the map HUD's root (620 units inside a 1109-unit canvas)
-PASS  GARAGE - the only way off the map - clears the cut-out (spans 119.3..294.0 inside a safe -310.0..310.0)
+PASS  GARAGE - the only way off the map - clears the cut-out (spans 147.1..294.0 inside a safe -310.0..310.0)
 PASS  the encounter card is still up, so CHALLENGE can be measured at all
 PASS  ...and CHALLENGE clears the home indicator (-280.6 against a safe floor of -306.6)
 PASS  the card is up before CHALLENGE
@@ -191,8 +193,8 @@ PASS  ...and the funnel hears `challenge`
 PASS  ...the stick is up for the bout
 PASS  the bell rings (Fighting)
 PASS  ...and at the bell your machine is on the AI channel the stick feeds (AI)
-      fight trace: 0.00s src AI err 0 st 0.00 thr 0.00 w 0 v 0.0 up 1.00 enemy 8.0 m | 0.25s src AI err -71 st -0.18 thr 0.35 w -125 v 0.9 up 1.00 enemy 7.7 m | 0.50s src AI err -26 st 0.05 thr 0.66 w -129 v 1.9 up 1.00 enemy 6.7 m | 0.75s src AI err 0 st 0.20 thr 1.00 w -69 v 3.3 up 0.98 enemy 5.5 m | 1.00s src AI err 11 st 0.22 thr 0.86 w -4 v 4.7 up 0.98 enemy 4.3 m | 1.25s src AI err 6 st 0.11 thr 0.92 w 24 v 6.6 up 0.98 enemy 4.2 m | 
-PASS  a held stick drives your machine in the ring (6.2 m in 1.5 s)
+      fight trace: 0.00s src AI err 0 st 0.00 thr 0.00 w 0 v 0.0 up 1.00 enemy 8.0 m | 0.25s src AI err -71 st -0.19 thr 0.35 w -127 v 0.9 up 1.00 enemy 7.7 m | 0.50s src AI err -31 st 0.03 thr 0.59 w -139 v 1.8 up 1.00 enemy 6.8 m | 0.75s src AI err -1 st 0.19 thr 0.99 w -73 v 3.2 up 0.98 enemy 5.5 m | 1.00s src AI err 11 st 0.22 thr 0.85 w -7 v 4.6 up 0.98 enemy 4.3 m | 1.25s src AI err 7 st 0.12 thr 0.91 w 24 v 6.4 up 0.98 enemy 4.1 m | 
+PASS  a held stick drives your machine in the ring (5.9 m in 1.5 s)
 PASS  ...toward the stick's heading, camera-relative, as on the map (best 0 deg off in the last 0.75 s)
 PASS  the bout ended on its own
 PASS  ...and settled once (quickFights=2)

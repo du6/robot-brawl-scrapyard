@@ -24,6 +24,20 @@ public class MapHudUI : MonoBehaviour
     public static readonly Color BANNER = new Color(0.62f, 0.90f, 1f);
     /// <summary>The row at REFERENCE scale (1280x720), and nothing else. The
     /// live row comes from Row(); see ApplyMetrics.</summary>
+    // owen's phone, 2026-09-14: "the driver joy stick and font size looks too
+    // big on my phone". Fixing the map HUD's type (it had been rendering at
+    // 8.6-12.5 CSS px, below Apple's 11 pt floor) overshot: at the old nominal
+    // sizes the toast landed at 24.4 CSS px and the objective at 21.1 on a
+    // 430 px-tall screen, where mobile HUD chrome usually sits at 12-16.
+    // Every nominal size below came down one notch. The hierarchy is kept and
+    // the numbers are stated because they are the point: toast 20.4, objective
+    // 17.8, buttons 17.1, chip name 14.5, chip distance 14.5 CSS px - all above
+    // DesktopFontUnits' 14 px floor, which is itself above the 11 pt minimum.
+    //
+    // ⚠ The FLOOR now decides the two chip sizes, not their point values. That
+    // is deliberate, and it means dropping them further does nothing: to make
+    // the chips smaller than this, the floor is what has to move, and it is
+    // shared with the dock.
     public const float ROW = 44f;
 
     BuilderManager bm; Canvas canvas; RectTransform root, bar, chipsRow, card;
@@ -166,11 +180,11 @@ public class MapHudUI : MonoBehaviour
         var hl = chipsRow.GetComponent<HorizontalLayoutGroup>();
         hl.spacing = 8f; hl.childAlignment = TextAnchor.MiddleLeft; hl.childForceExpandWidth = false; hl.childForceExpandHeight = true; hl.childControlWidth = true; hl.childControlHeight = true;
         for (int i = 0; i < 4; i++) chips.Add(MkChip(i));
-        garage = MkButton("garage", bar, "GARAGE", 18, () => { if (bm != null) bm.LeaveMap(); });
+        garage = MkButton("garage", bar, "GARAGE", 15, () => { if (bm != null) bm.LeaveMap(); });
         var grt = garage.GetComponent<RectTransform>();
         grt.anchorMin = new Vector2(1f, 0f); grt.anchorMax = new Vector2(1f, 1f); grt.pivot = new Vector2(1f, 0.5f);
         grt.anchoredPosition = new Vector2(-8f, 0f); grt.sizeDelta = new Vector2(112f, 0f);
-        board = MkButton("board", bar, "BOARD", 18, () => ShowBoard());
+        board = MkButton("board", bar, "BOARD", 15, () => ShowBoard());
         if (BuilderManager.PortalBuild) board.gameObject.SetActive(false);   // no board on a portal build (no login there)
         var brt0 = board.GetComponent<RectTransform>();
         brt0.anchorMin = new Vector2(1f, 0f); brt0.anchorMax = new Vector2(1f, 1f); brt0.pivot = new Vector2(1f, 0.5f);
@@ -179,17 +193,17 @@ public class MapHudUI : MonoBehaviour
         BuildSignIn(); BuildBoard();
 
         // under the bar: the banner (a place) or the toast (a reward)
-        banner = MkText("banner", root, "", 17, TextAnchor.MiddleCenter);
+        banner = MkText("banner", root, "", 15, TextAnchor.MiddleCenter);
         banner.color = BANNER;
         var brt = banner.rectTransform; brt.anchorMin = new Vector2(0f, 1f); brt.anchorMax = new Vector2(1f, 1f); brt.pivot = new Vector2(0.5f, 1f);
         brt.anchoredPosition = new Vector2(0f, -8f - ROW - 6f); brt.sizeDelta = new Vector2(-32f, 28f);
-        toast = MkText("toast", root, "", 22, TextAnchor.MiddleCenter);
+        toast = MkText("toast", root, "", 18, TextAnchor.MiddleCenter);
         toast.fontStyle = FontStyle.Bold; toast.color = TOAST;
         var trt = toast.rectTransform; trt.anchorMin = new Vector2(0f, 1f); trt.anchorMax = new Vector2(1f, 1f); trt.pivot = new Vector2(0.5f, 1f);
         trt.anchoredPosition = new Vector2(0f, -8f - ROW - 6f); trt.sizeDelta = new Vector2(-32f, 32f);
         AddShadow(toast.gameObject); AddShadow(banner.gameObject);
         // the objective: what to do next, right under the bar (the first minute)
-        objective = MkText("objective", root, "", 19, TextAnchor.MiddleCenter);
+        objective = MkText("objective", root, "", 16, TextAnchor.MiddleCenter);
         objective.fontStyle = FontStyle.Bold; objective.color = AMBER;
         var ort = objective.rectTransform; ort.anchorMin = new Vector2(0f, 1f); ort.anchorMax = new Vector2(1f, 1f); ort.pivot = new Vector2(0.5f, 1f);
         ort.anchoredPosition = new Vector2(0f, -8f - ROW - 6f); ort.sizeDelta = new Vector2(-32f, 30f);
@@ -428,7 +442,7 @@ public class MapHudUI : MonoBehaviour
         var lr = c.label.rectTransform; lr.anchorMin = new Vector2(0f, 0.5f); lr.anchorMax = new Vector2(1f, 1f); lr.pivot = new Vector2(0f, 1f);
         lr.anchoredPosition = new Vector2(36f, -2f); lr.sizeDelta = new Vector2(-40f, 0f);
         c.label.horizontalOverflow = HorizontalWrapMode.Overflow;
-        c.dist = MkText("dist", c.go.transform, "", 14, TextAnchor.MiddleLeft); c.dist.color = new Color(0.78f, 0.82f, 0.90f);
+        c.dist = MkText("dist", c.go.transform, "", 12, TextAnchor.MiddleLeft); c.dist.color = new Color(0.78f, 0.82f, 0.90f);
         var dr = c.dist.rectTransform; dr.anchorMin = new Vector2(0f, 0f); dr.anchorMax = new Vector2(1f, 0.5f); dr.pivot = new Vector2(0f, 0f);
         dr.anchoredPosition = new Vector2(36f, 2f); dr.sizeDelta = new Vector2(-40f, 0f);
         c.go.SetActive(false);

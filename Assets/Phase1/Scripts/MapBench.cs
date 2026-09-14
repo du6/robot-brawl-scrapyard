@@ -450,8 +450,24 @@ namespace RobotBrawl.Phase0
             float backed = Vector3.Dot(bm.testRobot.rb.position - posR, fwdR.normalized);
             Check(backed < -0.5f, "...and the machine backs up (" + backed.ToString("0.0") + " m along its nose)");
             Phase0Input.debugThrottle = 0f; Phase0Input.debugSteer = 0f;
-            Check(TouchControls.RANGE >= 130f && Mathf.Approximately(TouchControls.RING, 2f * TouchControls.RANGE) && Mathf.Approximately(TouchControls.KNOB_TRAVEL, TouchControls.RANGE) && TouchControls.MouseAccepted,
-                  "the stick is big and honest: the ring's edge is full lock (travel " + TouchControls.RANGE + ", ring " + TouchControls.RING + "), and it takes a mouse on every platform");
+            // ⚠ THE OLD CHECK ASSERTED `RANGE >= 130`, A NUMBER IN A UNIT THAT
+            // NO LONGER MEANS WHAT IT DID. It was written when one unit was one
+            // framebuffer pixel; after GuiScale was fixed, one unit is one CSS
+            // pixel, so 130 units went from a sensible stick to a ring covering
+            // 60% of a phone. The check passed the whole way through, because it
+            // was measuring the number and not the thing. Assert the PHYSICAL
+            // size and the invariants instead.
+            float ringCss = TouchControls.RING;                       // GuiScale units == CSS px on the web
+            float shortEdge = Mathf.Min(Screen.width, Screen.height) / Mathf.Max(0.01f, BuilderManager.GuiScale);
+            Check(ringCss >= TouchControls.RING_MIN - 0.5f && ringCss <= TouchControls.RING_MAX + 0.5f,
+                  "the stick's ring stays inside its bounds (" + ringCss.ToString("0") + " in ["
+                  + TouchControls.RING_MIN + ".." + TouchControls.RING_MAX + "])");
+            Check(shortEdge < 1f || ringCss <= shortEdge * 0.42f,
+                  "...and never eats the screen it steers (" + (100f * ringCss / Mathf.Max(1f, shortEdge)).ToString("0")
+                  + "% of the short edge, was 65% on owen's phone)");
+            Check(Mathf.Approximately(TouchControls.RING, 2f * TouchControls.RANGE)
+                  && Mathf.Approximately(TouchControls.KNOB_TRAVEL, TouchControls.RANGE) && TouchControls.MouseAccepted,
+                  "...the ring's edge is still full lock, and it still takes a mouse on every platform");
             for (int i = 0; i < 30; i++) yield return null;
 
             // ---- 6. PLACES -----------------------------------------------------------

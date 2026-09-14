@@ -104,11 +104,46 @@ public class TouchControls : MonoBehaviour
     // ring's radius (110) was not the travel (175) - the old stick had the
     // same 0.62 ratio. THE RING'S EDGE IS FULL LOCK NOW: travel = ring radius,
     // and the knob is drawn out to it.
-    public static float RANGE = 140f;        // units of GuiScale to full deflection = the ring's radius
-    public static float RING = 280f;         // drawn ring, units (diameter)
-    public static float KNOB = 76f;          // drawn knob, units
-    public static float KNOB_TRAVEL = 140f;  // the knob reaches the ring's edge at full lock
-    public static float REST = 175f;         // resting spot from the bottom-left corner
+    // owen's phone, 2026-09-14: "the driver joy stick and font size looks too
+    // big on my phone", with a screenshot in which the ring covers roughly 60%
+    // of the canvas height.
+    //
+    // ⚠ THESE WERE LITERALS, AND THE UNIT UNDER THEM CHANGED. They were authored
+    // when GuiScale made one unit one FRAMEBUFFER pixel, so on a dpr-2 phone a
+    // 280-unit ring drew at 140 CSS px - about a third of a 430 px screen, which
+    // is right. Fixing GuiScale (one unit is now one CSS pixel, so the fight
+    // stopped rendering at half size) doubled every one of them: the same ring
+    // became 280 CSS px, 65% of the screen, sitting on top of the thing it
+    // steers. The constants were never wrong; the ground moved under them.
+    //
+    // So the stick is a FRACTION OF THE SHORT EDGE now, clamped, and every other
+    // number is a ratio of the ring. A future change to the scale cannot
+    // re-break it, because there is no longer a length in here that assumes one.
+    // The ratios are the ones that were measured by hand on the live page on
+    // 2026-09-10 and are deliberately unchanged: knob 0.27 of the ring, rest
+    // 0.62, and TRAVEL IS THE RING'S RADIUS so a push to the drawn edge is full
+    // lock (it used to be 0.62 of it, which read as a stick that would not
+    // commit - a push to the edge gave 60% throttle and 16 m in ten seconds).
+    public const float RING_OF_SHORT_EDGE = 0.33f, RING_MIN = 120f, RING_MAX = 200f;
+    public const float KNOB_OF_RING = 0.27f, REST_OF_RING = 0.62f;
+
+    /// <summary>The ring's diameter, in the units this class draws in — which
+    /// are CSS pixels on the web and points elsewhere, because that is what
+    /// GuiScale now means.</summary>
+    public static float RING
+    {
+        get
+        {
+            float s = Mathf.Max(0.01f, BuilderManager.GuiScale);
+            float shortEdge = Mathf.Min(Screen.width, Screen.height) / s;
+            if (shortEdge < 1f) return RING_MIN;
+            return Mathf.Clamp(shortEdge * RING_OF_SHORT_EDGE, RING_MIN, RING_MAX);
+        }
+    }
+    public static float RANGE { get { return RING * 0.5f; } }         // full deflection = the ring's radius
+    public static float KNOB { get { return RING * KNOB_OF_RING; } }
+    public static float KNOB_TRAVEL { get { return RANGE; } }         // the knob reaches the drawn edge
+    public static float REST { get { return RING * REST_OF_RING; } }  // resting centre from the bottom-left
     public static bool MouseAccepted = true;
     FightManager fm;   // results-card detection: pads hide while it is up
     static TouchControls inst;
