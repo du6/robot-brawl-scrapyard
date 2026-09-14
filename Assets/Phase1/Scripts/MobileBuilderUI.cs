@@ -5394,9 +5394,19 @@ public partial class MobileBuilderUI : MonoBehaviour
             // round found on the iPhone's 180° flip.
             float saSig = SafeAreaWeb.Left * 13f + SafeAreaWeb.Bottom * 29f
                         + SafeAreaWeb.Right * 3f + SafeAreaWeb.Top * 5f;
+            // ⚠ AND THE ROW ITSELF, not only the things the WEB path derives it
+            // from. This watched scaleFactor, canvas size, safe area, the
+            // interface-size preference and the browser pixel ratio - every
+            // input to DesktopRow() - and therefore re-laid-out correctly on the
+            // web and never on the DPI path, where the row comes from
+            // Screen.dpi instead. Measured: with the row pushed 69.3 -> 90.1 on
+            // the native path, a list row built beforehand stayed at 69.3 while
+            // the same test on the web followed. Watching the OUTPUT covers
+            // every input, including ones added later.
             float sig = canvas.scaleFactor * 1000f
                       + (crt0 != null ? crt0.rect.width + crt0.rect.height * 7f : 0f)
-                      + saSig + userUiScale * 100f + browserPixelRatio * 200f;
+                      + saSig + userUiScale * 100f + browserPixelRatio * 200f
+                      + TouchRow() * 37f;
             if (Mathf.Abs(sig - lastLayoutSig) > 0.5f)
             {
                 lastLayoutSig = sig;
