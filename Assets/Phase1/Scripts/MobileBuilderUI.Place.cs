@@ -65,6 +65,17 @@ public partial class MobileBuilderUI
         var alay = attachBtn.gameObject.AddComponent<LayoutElement>();
         alay.flexibleWidth = 1.6f;
 
+        // NEXT MOUNT (play-test 2026-09-14: "offer Next mount when several
+        // sockets are close together"). Sockets sit 15 cm apart and the machine
+        // can be small on screen, so the nearest one to a tap is not always the
+        // one meant. Rather than inflate hit areas - the tap does not hit a
+        // marker, it raycasts and then snaps, so there is no hit area to
+        // inflate - this steps the pin to the next candidate on the same face.
+        previewNextBtn = MkButton("cnext", bar.transform, "NEXT MOUNT", 15, () =>
+        {
+            if (previewArmed && previewVerb == Verb.Place && bm != null) bm.PinNextSocket();
+        });
+
         previewRotBtn = MkButton("crot", bar.transform, "ROTATE", 17, () =>
         {
             // Rotate re-computes the ghost at the SAME frozen point, so the
@@ -80,14 +91,40 @@ public partial class MobileBuilderUI
         confirmRow.gameObject.SetActive(false);
     }
 
-    /// <summary>Arm the preview at `where`. Called on the release edge of a tap
-    /// that would previously have placed the part.</summary>
-    void ArmPreview(Vector2 where)
+    /// <summary>Arm a preview for whatever verb the held part has.
+    ///
+    /// Returns false when there is nothing under the tap to preview - a tap that
+    /// missed the machine arms nothing, rather than popping a row whose only
+    /// working button is CANCEL.
+    ///
+    /// ⚠ TWO VERBS, NOT ONE. A weld kit is not a placement: it produces no ghost
+    /// at all, so the first version of this armed a placement preview that could
+    /// never resolve and left the weld kit unusable on a phone. The verb is
+    /// decided here, once, and everything downstream reads it.</summary>
+    bool ArmPreview(Vector2 where)
     {
-        previewArmed = true;
         previewAt = where;
         Phase0Input.debugPointer = true;
         Phase0Input.debugMousePos = new Vector3(where.x, where.y, 0f);
+        if (bm == null || !bm.HasSelection) return false;
+
+        if (bm.SelectedIsApplique)
+        {
+            BuilderManager.PlacedPart wp; int wb;
+            if (!bm.WeldAim(out wp, out wb)) return false;
+            weldPart = wp; weldBit = wb;
+            previewVerb = Verb.Weld;
+            previewArmed = true;
+            return true;
+        }
+
+        // A PLACEMENT PIN, NOT A PIXEL. See BuilderManager.PinGhost - the mount
+        // and an aim point in the part's own frame, so the camera is free.
+        if (!bm.PinGhost()) return false;
+        weldPart = null;
+        previewVerb = Verb.Place;
+        previewArmed = true;
+        return true;
     }
 
     void CancelPreview()
@@ -95,8 +132,15 @@ public partial class MobileBuilderUI
         if (!previewArmed) return;
         previewArmed = false;
         previewAttachQueued = false;
+        weldPart = null;
+        if (bm != null) { bm.UnpinGhost(); bm.HideWeldTarget(); }
         if (confirmRow != null) confirmRow.gameObject.SetActive(false);
     }
+
+    enum Verb { Place, Weld }
+    Verb previewVerb = Verb.Place;
+    BuilderManager.PlacedPart weldPart;
+    int weldBit = -1;
 
     /// <summary>Frames left re-asserting the click's preconditions. See
     /// PumpPreview.</summary>
@@ -128,6 +172,24 @@ public partial class MobileBuilderUI
         if (confirmRow.gameObject.activeSelf != show) confirmRow.gameObject.SetActive(show);
         if (!show) return;
 
+        // A weld has no orientation and no second socket, so it shows neither
+        // ROTATE nor NEXT MOUNT. A button that does nothing is worse than a
+        // missing one - it invites a tap and answers with silence.
+        bool place = previewVerb == Verb.Place;
+        if (attachBtn != null)
+        {
+            var at = attachBtn.GetComponentInChildren<Text>();
+            if (at != null) at.text = place ? "ATTACH" : "APPLY WELD";
+        }
+        if (previewRotBtn != null && previewRotBtn.gameObject.activeSelf != place)
+            previewRotBtn.gameObject.SetActive(place);
+        if (previewNextBtn != null)
+        {
+            bool showNext = place && bm != null && bm.PinSocketCount > 1;
+            if (previewNextBtn.gameObject.activeSelf != showNext)
+                previewNextBtn.gameObject.SetActive(showNext);
+        }
+
         float row = TouchRow();
         float px = !PhysicalTouchSizing
                  ? browserPixelRatio * userUiScale / Mathf.Max(0.01f, canvas.scaleFactor)
@@ -158,35 +220,38 @@ public partial class MobileBuilderUI
     void PumpPreview()
     {
         if (bm == null) return;
-        // Losing the part, the tab or the mode ends the preview — an armed
-        // confirm row for a placement that can no longer happen is a button
-        // that lies.
         if (previewArmed && (!bm.HasSelection || tab != 0
                              || bm.mode != BuilderManager.Mode.Build || bm.Scouting))
             CancelPreview();
 
         if (previewArmed)
         {
-            // Hold the pointer where the tap left it, every frame: UpdateGhost
-            // reads Phase0Input.MousePos() and nothing else, so this IS the
-            // preview. Re-asserted rather than set once because the hover branch
-            // and the touch branch both write the same field.
-            Phase0Input.debugPointer = true;
-            Phase0Input.debugMousePos = new Vector3(previewAt.x, previewAt.y, 0f);
-
+            // ⚠ NOTHING HERE TOUCHES debugMousePos ANY MORE. The first version
+            // re-asserted a screen pixel every frame, which is only correct
+            // while the camera holds still: orbit or pinch and the world slides
+            // under the pixel, so a "locked" preview quietly became a placement
+            // somewhere else. The mount is pinned in the builder now, in the
+            // target part's own frame, so the camera is free.
+            bool ok;
+            string why;
+            if (previewVerb == Verb.Weld)
+            {
+                why = bm.WeldRefusal(weldPart, weldBit);
+                ok = why == null;
+                bm.ShowWeldTarget(weldPart);
+            }
+            else
+            {
+                ok = bm.TestGhostValid;
+                why = bm.TestGhostReason;
+            }
             if (previewWhy != null)
             {
-                // The SAME seam the benches read. A refusal the player is shown
-                // and a refusal a bench asserts on cannot drift apart if there
-                // is only one of them.
-                bool ok = bm.TestGhostValid;
-                string why = bm.TestGhostReason;
-                previewWhy.text = ok ? "" : why;
+                previewWhy.text = ok ? "" : (why ?? "");
                 previewWhy.color = new Color(1f, 0.72f, 0.35f);
             }
             if (attachBtn != null)
             {
-                bool ok = bm.TestGhostValid;
                 attachBtn.interactable = ok;
                 attachBtn.GetComponent<Image>().color = ok
                     ? new Color(0.16f, 0.50f, 0.30f, 0.98f)
@@ -194,35 +259,51 @@ public partial class MobileBuilderUI
             }
         }
 
-        // ⚠ SCRIPT EXECUTION ORDER BETWEEN THIS Update AND BuilderManager's IS
-        // UNDEFINED, so a click raised here may not be consumed until the NEXT
-        // frame — and by then the finger is up, the preview is disarmed, and
-        // every piece of state the click depends on would have been rewritten by
-        // whoever got there first. So the three facts the click needs (block
-        // off, pointer on, position frozen) are re-asserted for a few frames
-        // rather than set once. This is the same defence `clickHold` already
-        // gives the REMOVE button, which is where the pattern comes from.
         if (previewCommitHold > 0)
         {
             previewCommitHold--;
             BuilderManager.uiPointerBlocked = false;
             Phase0Input.debugPointer = true;
-            Phase0Input.debugMousePos = new Vector3(previewAt.x, previewAt.y, 0f);
         }
 
         if (previewAttachQueued)
         {
             previewAttachQueued = false;
-            BuilderManager.uiPointerBlocked = false;
-            Phase0Input.debugPointer = true;
-            Phase0Input.debugMousePos = new Vector3(previewAt.x, previewAt.y, 0f);
-            Phase0Input.DebugClick(0);
-            previewCommitHold = 3;
-            clickHold = 3;
-            previewArmed = false;
-            if (confirmRow != null) confirmRow.gameObject.SetActive(false);
+            if (previewVerb == Verb.Weld)
+            {
+                // The weld is a direct call, not a synthesised click: it has its
+                // own verb and its own validation, so routing it back through
+                // the pointer would only re-introduce the gates that broke it.
+                var wp = weldPart; int wb = weldBit;
+                CancelPreview();
+                if (wp != null) bm.WeldApply(wp, wb);
+            }
+            else
+            {
+                // ⚠ SCRIPT EXECUTION ORDER BETWEEN THIS Update AND
+                // BuilderManager's IS UNDEFINED, so a click raised here may not
+                // be consumed until the NEXT frame. The pin holds the placement
+                // across that gap on its own - which is the other thing the pin
+                // bought: the commit no longer depends on a pixel surviving.
+                BuilderManager.uiPointerBlocked = false;
+                Phase0Input.debugPointer = true;
+                Phase0Input.DebugClick(0);
+                previewCommitHold = 3;
+                clickHold = 3;
+                previewArmed = false;
+                if (confirmRow != null) confirmRow.gameObject.SetActive(false);
+                // The pin is released AFTER the click is consumed, not now -
+                // see PumpPreviewLate.
+                previewUnpinIn = 3;
+            }
+        }
+        else if (previewUnpinIn > 0 && --previewUnpinIn == 0)
+        {
+            bm.UnpinGhost();
         }
     }
+
+    int previewUnpinIn;
 
     // ---- TEST SEAM ---------------------------------------------------------
     // The confirm row is UI BEHAVIOUR, and this project's standing rule is that
@@ -243,6 +324,17 @@ public partial class MobileBuilderUI
     /// (docs/Mobile_Round_2026-09-13.md).</summary>
     public void TestForceTouchPointer(bool v) { pointerIsTouch = v; }
     public void TestArmPreview(Vector2 at) { ArmPreview(at); }
+    /// <summary>Arm and report whether it took - a tap that finds nothing to
+    /// preview must not arm, and a bench has to be able to see the difference.</summary>
+    public bool TestArmPreviewAt(Vector2 at) { return ArmPreview(at); }
+    public string TestPreviewVerb() { return previewVerb.ToString(); }
+    public string TestAttachLabel()
+    {
+        if (attachBtn == null) return "";
+        var t = attachBtn.GetComponentInChildren<Text>();
+        return t != null ? t.text : "";
+    }
+    public Button TestPreviewNextBtn { get { return previewNextBtn; } }
     public float TestTouchRow() { return TouchRow(); }
     /// <summary>Does the confirm row clear the dock and the collapse handle?
     /// Asked of the LIVE rects rather than of the constants that produced them -

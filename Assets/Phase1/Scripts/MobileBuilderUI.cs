@@ -324,7 +324,7 @@ public partial class MobileBuilderUI : MonoBehaviour
     bool previewAttachQueued;
     bool pointerIsTouch;
     RectTransform confirmRow;
-    Button attachBtn, previewRotBtn, previewCancelBtn;
+    Button attachBtn, previewRotBtn, previewNextBtn, previewCancelBtn;
     Text previewWhy;
     /// <summary>Is the thing driving the ghost a FINGER? A touch this session,
     /// or a browser that says its pointer is coarse - the same signal the type
@@ -5736,8 +5736,10 @@ public partial class MobileBuilderUI : MonoBehaviour
                 // the tap put it, the hand comes off it, and ATTACH commits.
                 // A mouse still places on the click, because a mouse can see
                 // what it is doing (MobileBuilderUI.Place.cs states the case).
-                if (PreviewEligible) ArmPreview(lastP);
-                else Phase0Input.DebugClick(0);
+                // A tap that arms nothing falls through to the old behaviour,
+                // so a miss still does what a miss always did rather than
+                // opening a row with nothing in it.
+                if (!PreviewEligible || !ArmPreview(lastP)) Phase0Input.DebugClick(0);
             }
         }
         dragging = false;

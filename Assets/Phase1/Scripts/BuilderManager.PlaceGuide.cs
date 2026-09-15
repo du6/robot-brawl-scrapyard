@@ -71,6 +71,19 @@ public partial class BuilderManager
     /// than the thing the hysteresis is applied to - and a control leg that
     /// cannot see the uncontrolled value is not a control leg.</summary>
     public void TestClearFaceLock() { faceLockPart = null; }
+    /// <summary>Welded faces across the whole machine - the weld verb's only
+    /// externally visible effect, so it is what a bench must count.</summary>
+    public int TestWeldedFaceCount
+    {
+        get
+        {
+            int n = 0;
+            foreach (var q in placed)
+                if (q != null)
+                    for (int b = 0; b < 6; b++) if (((q.gussetFaces >> b) & 1) != 0) n++;
+            return n;
+        }
+    }
     /// <summary>The face a normal resolves to, as the builder names it. Exposed
     /// so a bench compares faces the same way the hysteresis does, rather than
     /// by its own float comparison that could call two different normals equal.</summary>

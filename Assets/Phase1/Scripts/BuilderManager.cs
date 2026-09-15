@@ -388,6 +388,17 @@ public partial class BuilderManager : MonoBehaviour
     PlacedPart ghostTarget;
     /// <summary>The mount face the ghost is HOLDING (see the hysteresis block
     /// in UpdateGhost), and the pointer position it was last confirmed at.</summary>
+    /// <summary>THE PINNED PREVIEW. While a touch preview is armed the ghost is
+    /// held on a MOUNT (part + face) and an aim point expressed IN THAT PART'S
+    /// FRAME - never a screen pixel. So orbiting, pinching or moving the part
+    /// all leave the preview on the socket the player chose, and the camera is
+    /// free to be used for what it is for: looking at the thing before you
+    /// commit it.</summary>
+    Vector3 ghostAim;
+    PlacedPart pinPart;
+    Vector3 pinNormal, pinLocalAim;
+    bool ghostPinned;
+
     PlacedPart faceLockPart;
     Vector3 faceLockNormal;
     Vector2 faceLockAt;
@@ -1758,6 +1769,48 @@ public partial class BuilderManager : MonoBehaviour
         if (faceNormal.sqrMagnitude < 0.5f) { ApplyGusset(hit); return; }
         ApplyGussetFace(hit, FaceBitFromDelta(faceNormal));
     }
+    /// <summary>Why this weld cannot happen, or null if it can.
+    ///
+    /// ⚠ THIS EXISTS BECAUSE A WELD IS NOT A PLACEMENT, and on 2026-09-14 the
+    /// touch UI forgot that. The confirm preview arms on any held part, and
+    /// UpdateGhost bails on an applique with ghostValid=false and an EMPTY
+    /// reason - so tapping with a weld kit gave a dead ATTACH button, no words,
+    /// and no way to weld anything at all. The weld kit was unusable on a phone
+    /// in the shipped build. The fix is not to make an applique produce a ghost;
+    /// it is to give the weld its own verb with its own validation, which is
+    /// what this pair is. Two readers, one rule: the button that offers APPLY
+    /// WELD and the apply itself cannot disagree about what is legal.</summary>
+    public string WeldRefusal(PlacedPart hit, int bit)
+    {
+        if (hit == null) return "Tap a surface on the robot to weld it";
+        if (bit < 0 || bit > 5) return "Tap a surface on the robot to weld it";
+        if (((hit.gussetFaces >> bit) & 1) != 0)
+            return "This surface is already welded — a second gusset adds nothing (measured).";
+        if (!CareerAllows(selected)) return "No Gusset left — buy one in the SHOP.";
+        return null;
+    }
+
+    /// <summary>What the pointer is aiming a weld at right now. False when it is
+    /// not on the machine, so a caller can decline to arm a preview of nothing.</summary>
+    public bool WeldAim(out PlacedPart part, out int bit)
+    {
+        Vector3 tap, norm;
+        part = PartUnderMouse(out tap, out norm);
+        bit = (part != null && norm.sqrMagnitude >= 0.5f) ? FaceBitFromDelta(norm) : -1;
+        if (part != null && bit < 0)
+        {
+            // No usable normal: fall back the way the tap-less overload does -
+            // the lowest un-welded face - so the preview shows what would
+            // actually happen rather than refusing on a technicality.
+            for (int b = 0; b < 6; b++)
+                if (((part.gussetFaces >> b) & 1) == 0) { bit = b; break; }
+            if (bit < 0) bit = 0;
+        }
+        return part != null;
+    }
+
+    public void WeldApply(PlacedPart part, int bit) { ApplyGussetFace(part, bit); }
+
     void ApplyGussetFace(PlacedPart hit, int bit)
     {
         // Double-fire debounce FIRST and SILENT (regression pass 2026-09-03:
@@ -1768,16 +1821,8 @@ public partial class BuilderManager : MonoBehaviour
         // 50 ms, not 300: the measured duplicate arrived within a frame or two;
         // 300 ms also swallowed CareerSmoke's deliberate second weld.
         if (Time.unscaledTime - lastWeldAt < 0.05f) return;
-        if (((hit.gussetFaces >> bit) & 1) != 0)
-        {
-            message = "This surface is already welded — a second gusset adds nothing (measured).";
-            SfxSynth.Deny(); return;
-        }
-        if (!CareerAllows(selected))
-        {
-            message = "No Gusset left — buy one in the SHOP.";
-            SfxSynth.Deny(); return;
-        }
+        string why = WeldRefusal(hit, bit);
+        if (why != null) { message = why; SfxSynth.Deny(); return; }
         lastWeldAt = Time.unscaledTime;
         PushUndo();
         hit.gussetFaces |= 1 << bit;
@@ -2209,7 +2254,15 @@ public partial class BuilderManager : MonoBehaviour
     /// to end. Drawn as an overlay box rather than by tinting the part's own
     /// materials, so nothing can leak into the build's appearance and survive
     /// the highlight (the parts share materials by design).</summary>
-    void ShowBlocker(PlacedPart p)
+    void ShowBlocker(PlacedPart p) { ShowCage(p, new Color(1f, 0.22f, 0.16f), 5f); }
+
+    /// <summary>Outline a part. Red says "this is what you are hitting"; gold
+    /// says "this is what you are about to weld". Same geometry, because the
+    /// job is the same - point at a part the words have just named.</summary>
+    public void ShowWeldTarget(PlacedPart p) { ShowCage(p, new Color(1f, 0.78f, 0.25f), 3f); }
+    public void HideWeldTarget() { HideBlocker(); }
+
+    void ShowCage(PlacedPart p, Color tint, float pulseHz)
     {
         if (p == null || p.go == null) { HideBlocker(); return; }
         Vector3 size = p.Half() * 2f + Vector3.one * 0.02f;
@@ -2244,8 +2297,8 @@ public partial class BuilderManager : MonoBehaviour
         if (!blockerOverlay.activeSelf) blockerOverlay.SetActive(true);
         blockerOverlay.transform.position = p.pos;
         // Pulse so it reads as a callout and not as part of the machine.
-        float k = 0.55f + 0.45f * Mathf.Abs(Mathf.Sin(Time.unscaledTime * 5f));
-        Tint(blockerMat, new Color(1f, 0.22f, 0.16f), k * 1.6f);
+        float k = 0.55f + 0.45f * Mathf.Abs(Mathf.Sin(Time.unscaledTime * pulseHz));
+        Tint(blockerMat, tint, k * 1.6f);
     }
 
     static Material OverlayMat()
@@ -2966,6 +3019,113 @@ public partial class BuilderManager : MonoBehaviour
         }
     }
 
+    /// <summary>Freeze the ghost on the mount it is resolved to right now.
+    /// Returns false when there is nothing to pin (the pointer was not on the
+    /// machine), so the caller can decline to arm a preview that would have
+    /// nothing in it.</summary>
+    public bool PinGhost()
+    {
+        if (ghostTarget == null) { ghostPinned = false; return false; }
+        pinPart = ghostTarget;
+        pinNormal = ghostNormal;
+        pinLocalAim = ghostAim - ghostTarget.pos;   // in the PART's frame, not the world's
+        ghostPinned = true;
+        return true;
+    }
+
+    public void UnpinGhost() { ghostPinned = false; pinPart = null; }
+
+    /// <summary>Every socket alignment on the pinned FACE, nearest the pinned
+    /// aim first. This is the same candidate set the snap chooses from, asked
+    /// the same way - NEXT MOUNT steps through the answers the snap already
+    /// considered, rather than inventing a second idea of where a part can go.</summary>
+    List<Vector2> PinCandidates()
+    {
+        var outp = new List<Vector2>();
+        if (!ghostPinned || pinPart == null || selected < 0) return outp;
+        var def = palette[selected];
+        bool oriented = NeedsAxis(def) || def.sensor;
+        int axis = 0;
+        float b = Mathf.Abs(pinNormal.x);
+        if (Mathf.Abs(pinNormal.y) > b) { axis = 1; b = Mathf.Abs(pinNormal.y); }
+        if (Mathf.Abs(pinNormal.z) > b) axis = 2;
+        int t1 = (axis + 1) % 3, t2 = (axis + 2) % 3;
+        Vector3 tHalf = pinPart.Half();
+        Vector3 newHalf = new PlacedPart { def = def, yaw = ghostYaw,
+                                           wheelAxis = oriented ? pinNormal : Vector3.zero }.Half();
+        float[] tu = FaceSockets(tHalf[t1] * 2f), tv = FaceSockets(tHalf[t2] * 2f);
+        float[] nu = oriented ? CenterSocket : FaceSockets(newHalf[t1] * 2f);
+        float[] nv = oriented ? CenterSocket : FaceSockets(newHalf[t2] * 2f);
+        float sign = pinNormal[axis] >= 0f ? 1f : -1f;
+        float wantU = pinLocalAim[t1], wantV = pinLocalAim[t2];
+        var seen = new List<Vector2>();
+        foreach (float ta in tu) foreach (float na in nu)
+            foreach (float tb in tv) foreach (float nb in nv)
+            {
+                var c = new Vector2(ta - na, tb - nb);
+                bool dup = false;
+                foreach (var q in seen) if ((q - c).sqrMagnitude < 1e-6f) { dup = true; break; }
+                if (dup) continue;
+                Vector3 pos = pinPart.pos;
+                pos[axis] = pinPart.pos[axis] + sign * (tHalf[axis] + newHalf[axis]);
+                pos[t1] = pinPart.pos[t1] + c.x;
+                pos[t2] = pinPart.pos[t2] + c.y;
+                if (pos.y - newHalf.y < FloorPlane(def.category == P1Category.Mobility) - 1e-4f) continue;
+                if (OverlapBlocker(pos, newHalf) != null) continue;
+                seen.Add(c);
+            }
+        seen.Sort((x, y) =>
+        {
+            float dx = (x - new Vector2(wantU, wantV)).sqrMagnitude;
+            float dy = (y - new Vector2(wantU, wantV)).sqrMagnitude;
+            return dx.CompareTo(dy);
+        });
+        return seen;
+    }
+
+    /// <summary>How many legal sockets the pinned face offers. The row hides
+    /// NEXT MOUNT below two, because a button with one answer is a button that
+    /// does nothing.</summary>
+    public int PinSocketCount { get { return PinCandidates().Count; } }
+
+    /// <summary>Step the pin to the next legal socket on the same face, wrapping.</summary>
+    public void PinNextSocket()
+    {
+        var cand = PinCandidates();
+        if (cand.Count < 2) return;
+        int axis = 0;
+        float b = Mathf.Abs(pinNormal.x);
+        if (Mathf.Abs(pinNormal.y) > b) { axis = 1; b = Mathf.Abs(pinNormal.y); }
+        if (Mathf.Abs(pinNormal.z) > b) axis = 2;
+        int t1 = (axis + 1) % 3, t2 = (axis + 2) % 3;
+        // Where the pin sits now, in the candidate list.
+        int at = 0;
+        float bestD = float.MaxValue;
+        var now = new Vector2(pinLocalAim[t1], pinLocalAim[t2]);
+        for (int i = 0; i < cand.Count; i++)
+        {
+            float d = (cand[i] - now).sqrMagnitude;
+            if (d < bestD) { bestD = d; at = i; }
+        }
+        var next = cand[(at + 1) % cand.Count];
+        Vector3 aim = pinLocalAim;
+        aim[t1] = next.x; aim[t2] = next.y;
+        pinLocalAim = aim;
+        // Deliberately silent: stepping a preview is not a commit, and the
+        // builder's only short cue (Place) is the sound of a part going ON.
+        // Borrowing it here would teach the wrong thing about what just happened.
+    }
+    public bool GhostPinned { get { return ghostPinned; } }
+    /// <summary>The mount a pinned preview is standing on, for a bench.</summary>
+    public string TestPinKey
+    {
+        get
+        {
+            return !ghostPinned || pinPart == null || pinPart.go == null
+                 ? "none" : pinPart.go.GetEntityId() + "/" + AxisCode(pinNormal);
+        }
+    }
+
     void UpdateGhost()
     {
         if (selected < 0) { HideGhost(); return; }
@@ -2976,6 +3136,23 @@ public partial class BuilderManager : MonoBehaviour
         // "placement, refused" — the wrong sentence.
         if (def.applique) { HideGhost(); ghostValid = false; ghostReason = ""; return; }
         bool isWheelSel = def.category == P1Category.Mobility;
+
+        // PINNED: the mount is already chosen, so nothing here may look at the
+        // pointer. Re-resolving every frame rather than caching the result is
+        // deliberate - ROTATE, a MOVE, a part removed next to it, all have to
+        // change the answer, and re-running the same body is what guarantees a
+        // pinned placement obeys exactly the rules a pointed one does.
+        if (ghostPinned)
+        {
+            if (pinPart == null || !placed.Contains(pinPart)) { UnpinGhost(); HideGhost(); return; }
+            EnsureGhostBuilt(def, isWheelSel, NeedsAxis(def) ? pinNormal : Vector3.zero);
+            ghost.SetActive(true);
+            RefreshFaceGuide(def);
+            ghostTarget = pinPart;
+            ghostNormal = pinNormal;
+            ResolveGhost(def, isWheelSel, pinPart.pos + pinLocalAim);
+            return;
+        }
 
         Vector3 m = Phase0Input.MousePos();
         if (uiPointerBlocked || (!MobileBuilderUI.Active && m.x < PanelPixelW)) { HideGhost(); return; }   // Phase 5. R2: scaled width.
@@ -3198,6 +3375,25 @@ public partial class BuilderManager : MonoBehaviour
             }
         }
 
+        ResolveGhost(def, isWheelSel, hit.point);
+    }
+
+    /// <summary>Turn a chosen MOUNT (ghostTarget + ghostNormal) and an AIM POINT
+    /// on it into the actual placement: face axis, socket snap, every rule, the
+    /// overlays. Split out of UpdateGhost on 2026-09-14 so there is exactly one
+    /// body and two callers - the pointer, which raycasts to find the mount, and
+    /// the PINNED PREVIEW, which already knows it.
+    ///
+    /// ⚠ THE PIN IS WHY THIS EXISTS. A preview that remembers a SCREEN PIXEL is
+    /// only correct while the camera holds still: orbit or pinch and the world
+    /// slides under the pixel, so the "locked" preview quietly becomes a
+    /// placement somewhere else. Remembering the mount and an aim point ON THE
+    /// PART instead makes the preview survive any camera move, and follow the
+    /// part if it is moved. Two callers, one body, so the pinned placement and
+    /// the pointed one cannot disagree about what a socket is.</summary>
+    void ResolveGhost(P1PartDef def, bool isWheelSel, Vector3 aimPoint)
+    {
+        ghostAim = aimPoint;
         // ROUND-UP2 FIX A: the face is now known, so re-key the ghost on it.
         // EnsureGhostBuilt early-outs when the key is unchanged, so this costs
         // one rebuild per FACE CHANGE, not one per frame.
@@ -3264,8 +3460,8 @@ public partial class BuilderManager : MonoBehaviour
         // Wheels/spinners/spikes mate through a single center socket.
         float[] nu = oriented ? CenterSocket : FaceSockets(newHalf[t1] * 2f);
         float[] nv = oriented ? CenterSocket : FaceSockets(newHalf[t2] * 2f);
-        float du = SnapAlong(tu, nu, hit.point[t1] - ghostTarget.pos[t1], tHalf[t1]);
-        float dv = SnapAlong(tv, nv, hit.point[t2] - ghostTarget.pos[t2], tHalf[t2]);
+        float du = SnapAlong(tu, nu, aimPoint[t1] - ghostTarget.pos[t1], tHalf[t1]);
+        float dv = SnapAlong(tv, nv, aimPoint[t2] - ghostTarget.pos[t2], tHalf[t2]);
         pos[t1] = ghostTarget.pos[t1] + du;
         pos[t2] = ghostTarget.pos[t2] + dv;
         ghostMated = MatedCount(tu, nu, du) * MatedCount(tv, nv, dv);
@@ -3282,7 +3478,7 @@ public partial class BuilderManager : MonoBehaviour
             float minD = FloorPlane(isWheel) + newHalf.y - ghostTarget.pos[1];
             float[] tt = vt == 1 ? tu : tv;
             float[] nn = vt == 1 ? nu : nv;
-            float wantV = hit.point[1] - ghostTarget.pos[1];
+            float wantV = aimPoint[1] - ghostTarget.pos[1];
             float bestD = float.NaN; float bErr = float.MaxValue;
             foreach (float toff in tt)
                 foreach (float noff in nn)
@@ -3358,7 +3554,7 @@ public partial class BuilderManager : MonoBehaviour
             {
                 ghostAutoOrienting = true;
                 ghostYaw = fixYaw;
-                UpdateGhost();
+                ResolveGhost(def, isWheelSel, aimPoint);
                 ghostAutoOrienting = false;
                 return;
             }
@@ -3415,8 +3611,8 @@ public partial class BuilderManager : MonoBehaviour
                 // closer legal answer, and capped at NUDGE_REACH so a blocked
                 // nose never answers by mounting on the tail — a part that
                 // lands somewhere you were not pointing is worse than a refusal.
-                float wu = hit.point[t1] - ghostTarget.pos[t1];
-                float wv = hit.point[t2] - ghostTarget.pos[t2];
+                float wu = aimPoint[t1] - ghostTarget.pos[t1];
+                float wv = aimPoint[t2] - ghostTarget.pos[t2];
                 float floorMin = FloorPlane(isWheel) + newHalf.y - ghostTarget.pos[1];
                 int vAx = t1 == 1 ? 1 : t2 == 1 ? 2 : 0;   // which tangent is vertical, if either
                 float bu = 0f, bv = 0f, bErr = float.MaxValue;
@@ -3647,6 +3843,7 @@ public partial class BuilderManager : MonoBehaviour
         HideFaceGuide();
         HideDirArrow();
         faceLockPart = null;
+        ghostPinned = false; pinPart = null;
         ghostValid = false; ghostReason = ""; ghostSockets = 1; ghostMated = 1; ghostBlocker = null;
         ghostNudged = false; ghostNudgeDist = 0f;
     }
@@ -4160,6 +4357,11 @@ public partial class BuilderManager : MonoBehaviour
         selected = (selected == i) ? -1 : i;
     }
     public int SelectedPart { get { return selected; } }
+    /// <summary>Is the held part a tool rather than a part - i.e. does a tap on
+    /// the robot APPLY it rather than PLACE it? The touch confirm row branches
+    /// on this; nothing else should have to know what "applique" means.</summary>
+    public bool SelectedIsApplique
+    { get { return selected >= 0 && selected < PaletteCount && palette[selected].applique; } }
     public bool HasSelection { get { return selected >= 0; } }
     public string ActiveMatKey { get { return activeMat; } set { if (MatDB.Has(value)) activeMat = value; } }
     public int BuildMassInt { get { int m = 0; foreach (var p in placed) m += Mathf.RoundToInt(p.Mass()); return m; } }

@@ -450,6 +450,113 @@ public class PlaceUxBench : MonoBehaviour
         bm.FitGarageView();
         yield return null; yield return null;
 
+        // The touch UI, acquired HERE because the palette sweep below needs it
+        // and it is the sweep that matters most - section E reuses it.
+        float uiT0 = Time.realtimeSinceStartup;
+        while (!MobileBuilderUI.Active && Time.realtimeSinceStartup - uiT0 < 8f) yield return null;
+        var ui = MobileBuilderUI.inst;
+        Check(ui != null, "the touch UI is up to test the confirm row against");
+        if (ui != null)
+        {
+            ui.TestForceTouchPointer(true);
+            if (!ui.DockOpen) { ui.SetDockOpen(true); yield return null; }
+            ui.ShowTab(0);
+            yield return null;
+        }
+
+        // ================= C2. EVERY PART IN THE PALETTE ===================
+        // ⚠ THE CHECK THIS BENCH WAS MISSING, AND IT COST A SHIPPED DEFECT.
+        // Every section above holds Beam, Plate, Wheel or Spike - FOUR NAMED
+        // PARTS out of twenty-five. The weld kit is the one palette entry whose
+        // tap takes a different branch through UpdateBuild (it APPLIES, it does
+        // not PLACE), and it was the one the bench never held. So when the touch
+        // release edge started arming a placement preview for everything with a
+        // selection, the weld kit armed a preview that could never resolve -
+        // dead ATTACH, blank reason, no way to weld - and this bench went 36/0
+        // over it. Live on the web and submitted to CrazyGames before a human
+        // reading the code found it.
+        //
+        // CLAUDE.md house rule 1 is "measure over EVERYTHING rather than over a
+        // named list", and it was written for product code. It applies to the
+        // bench, and a bench that breaks it is worse than the product it is
+        // checking, because it reports that nothing is wrong.
+        //
+        // So: hold EVERY palette entry in turn, tap the machine the way a finger
+        // does, and assert the two things that must be true whatever the part is
+        // - the tap does something, and if it opens a row that row can be acted
+        // on. What "something" means is per-verb; that nothing at all happens is
+        // never right.
+        int swept = 0, dead = 0;
+        var deadNames = new List<string>();
+        Vector2 tapAt = bm.TestCam.WorldToScreenPoint(front);
+        for (int pi = 0; pi < bm.PaletteCount; pi++)
+        {
+            if (bm.PartHiddenInGarage(pi)) continue;
+            if (bm.PartId(pi) == "core") continue;          // one core per machine, by rule
+            ui = MobileBuilderUI.inst;
+            if (ui == null) break;
+            ui.TestForceTouchPointer(true);
+            Hold(pi);
+            yield return null;
+            if (!bm.HasSelection) continue;                  // career stock may be empty
+            swept++;
+            bm.TestClearFaceLock();
+            yield return AimScreen(tapAt);
+            int had = bm.PlacedCount;
+            bool armed = ui.TestArmPreviewAt(tapAt);
+            yield return null; yield return null;
+            if (!armed)
+            {
+                // Not armed is fine ONLY if the old direct path still acts.
+                Phase0Input.debugPointer = true;
+                Phase0Input.debugMousePos = new Vector3(tapAt.x, tapAt.y, 0f);
+                Phase0Input.DebugClick(0);
+                yield return null; yield return null;
+                if (bm.PlacedCount == had && bm.TestGhostReason.Length == 0)
+                { dead++; deadNames.Add(bm.PartLabel(pi) + " (no preview, no act, no reason)"); }
+                continue;
+            }
+            // Armed: the row must be actionable - either ATTACH/APPLY works, or
+            // it is disabled WITH WORDS saying why. A dead button and a blank
+            // line is the defect this section exists for.
+            bool actionable = ui.TestAttachBtn.interactable || ui.TestPreviewWhy.Length > 0;
+            if (!actionable)
+            { dead++; deadNames.Add(bm.PartLabel(pi) + " (armed, dead button, no reason)"); }
+            ui.TestPreviewCancelBtn.onClick.Invoke();
+            yield return null;
+        }
+        Check(swept >= 8, "the palette sweep actually held parts (" + swept + " of " + bm.PaletteCount + ")");
+        Check(dead == 0, "every part in the palette does SOMETHING when you tap the robot"
+              + (deadNames.Count > 0 ? " - dead: " + string.Join("; ", deadNames.ToArray()) : ""));
+
+        // The weld kit specifically, end to end, because it is the one verb that
+        // is not a placement and the one that broke.
+        int gus = -1;
+        for (int i = 0; i < bm.PaletteCount; i++)
+            if (bm.PartId(i) == "gusset") gus = i;
+        if (gus >= 0 && ui != null)
+        {
+            Hold(gus);
+            yield return null;
+            bm.TestClearFaceLock();
+            yield return AimScreen(tapAt);
+            Check(ui.TestArmPreviewAt(tapAt), "a weld kit tap arms a preview");
+            yield return null; yield return null;
+            Check(ui.TestPreviewVerb() == "Weld", "...as a WELD, not a placement ("
+                  + ui.TestPreviewVerb() + ")");
+            Check(ui.TestAttachLabel() == "APPLY WELD",
+                  "...and the button says APPLY WELD (" + ui.TestAttachLabel() + ")");
+            Check(ui.TestAttachBtn.interactable, "...and it is pressable on a fresh surface");
+            int weldsBefore = bm.TestWeldedFaceCount;
+            ui.TestAttachBtn.onClick.Invoke();
+            yield return null; yield return null; yield return null;
+            Check(bm.TestWeldedFaceCount == weldsBefore + 1,
+                  "pressing it actually welds the surface (" + weldsBefore + " -> "
+                  + bm.TestWeldedFaceCount + ")");
+            Check(!ui.TestPreviewArmed, "...and the row goes away");
+        }
+        else Check(false, "the palette offers a weld kit to test");
+
         // ================= D. DIRECTION ARROW ==============================
         if (spike >= 0)
         {
@@ -466,10 +573,6 @@ public class PlaceUxBench : MonoBehaviour
         }
 
         // ================= E. THE CONFIRM ROW ==============================
-        float t0 = Time.realtimeSinceStartup;
-        while (!MobileBuilderUI.Active && Time.realtimeSinceStartup - t0 < 8f) yield return null;
-        var ui = MobileBuilderUI.inst;
-        Check(ui != null, "the touch UI is up to test the confirm row against");
         if (ui != null)
         {
             ui.TestForceTouchPointer(true);
