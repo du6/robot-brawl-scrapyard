@@ -94,6 +94,7 @@ namespace RobotBrawl.Editor
         {
             string outDir = Arg("-rbOutDir") ?? OUT_DIR;
             string priorDefines = PlayerSettings.GetScriptingDefineSymbols(NamedBuildTarget.WebGL);
+            definesBeforeBuild = priorDefines;
             if (Portal && !priorDefines.Contains("RB_PORTAL"))
                 PlayerSettings.SetScriptingDefineSymbols(NamedBuildTarget.WebGL,
                     string.IsNullOrEmpty(priorDefines) ? "RB_PORTAL" : priorDefines + ";RB_PORTAL");
@@ -259,8 +260,17 @@ namespace RobotBrawl.Editor
             // emits .unityweb; with it OFF (the portal build) it emits .br. This
             // was hardcoded to .unityweb and threw FileNotFoundException on the
             // first portal build, AFTER a green build - measured 2026-09-08.
-            var dataFiles = Directory.GetFiles(Path.Combine(outDir, "Build"), "webgl.data.*");
-            if (dataFiles.Length == 0) { Fail("no webgl.data.* in " + outDir + "/Build"); return; }
+            // ⚠ AND THE PREFIX IS NOT "webgl" EITHER - IT IS THE OUTPUT FOLDER'S
+            // NAME. Unity names the payload after the build folder, so
+            // -rbOutDir build/portal emits portal.data.br, not webgl.data.br.
+            // This looked for "webgl.data.*" and failed AFTER a green player
+            // build (measured 2026-09-14) - the same shape as the .unityweb vs
+            // .br note above, one level out: two things vary here, the
+            // extension and the stem, and only one of them was known to.
+            var dataFiles = Directory.GetFiles(Path.Combine(outDir, "Build"), "*.data.*");
+            if (dataFiles.Length == 0) { Fail("no *.data.* in " + outDir + "/Build"); return; }
+            string stem = Path.GetFileName(dataFiles[0]);
+            stem = stem.Substring(0, stem.IndexOf(".data."));
             string stamp;
             using (var md5 = System.Security.Cryptography.MD5.Create())
             using (var fs = File.OpenRead(dataFiles[0]))
@@ -272,8 +282,8 @@ namespace RobotBrawl.Editor
             // clever - a double-applied replace here ships a broken URL.
             string html = File.ReadAllText(index);
             string ext = Path.GetExtension(dataFiles[0]);   // ".unityweb" or ".br"
-            foreach (var name in new[] { "webgl.data" + ext, "webgl.wasm" + ext,
-                                         "webgl.framework.js" + ext, "webgl.loader.js" })
+            foreach (var name in new[] { stem + ".data" + ext, stem + ".wasm" + ext,
+                                         stem + ".framework.js" + ext, stem + ".loader.js" })
                 html = html.Replace("/" + name + "\"", "/" + name + "?v=" + stamp + "\"");
             File.WriteAllText(index, html);
             Debug.Log("[BuildWebGL] payload URLs stamped ?v=" + stamp
@@ -314,9 +324,22 @@ namespace RobotBrawl.Editor
             return null;
         }
 
+        /// <summary>What the defines were before this build touched them, kept
+        /// statically so Fail() can put them back.</summary>
+        static string definesBeforeBuild;
+
         static void Fail(string why)
         {
             Debug.LogError("[BuildWebGL] " + why);
+            // ⚠ RESTORE BEFORE Done(), NOT IN THE finally. Done() calls
+            // EditorApplication.Exit in batchmode and Exit NEVER RETURNS, so the
+            // finally below the try CANNOT run on this path either - the same
+            // asymmetry the success path has a comment about, and the failure
+            // path did not. MEASURED 2026-09-14: a portal build that failed
+            // after the player was written left RB_PORTAL in ProjectSettings,
+            // which is exactly the leak the 2026-09-08 note says "happened
+            // exactly once". It has now happened twice, for the other reason.
+            RestoreDefines(definesBeforeBuild);
             Done(1);
         }
 
