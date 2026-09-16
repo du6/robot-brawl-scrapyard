@@ -65,6 +65,14 @@ public partial class BuilderManager
     int poolFailures;
     void FetchPoolOnce()
     {
+#if RB_NO_EXTERNAL
+        // A build made with -rbNoExternal contacts nothing at all. The yard runs
+        // on roster machines, which is already this method's documented fallback
+        // for "offline or in the editor with no dev API" - so the world is
+        // populated exactly as it is on any failed fetch, without the request.
+        poolFetched = true;
+        return;
+#else
         if (poolFetched || poolFetching || Time.unscaledTime < nextPoolAttempt) return;
         poolFetching = true;
         StartCoroutine(LadderClient.Pool(null, 12, (rows, err) =>
@@ -73,6 +81,7 @@ public partial class BuilderManager
             if (rows != null) { pool.Clear(); pool.AddRange(rows); poolFailures = 0; }
             else { poolFailures++; nextPoolAttempt = Time.unscaledTime + Mathf.Min(60f, 5f * Mathf.Pow(2f, Mathf.Min(poolFailures, 4))); }
         }));
+#endif
     }
 
     /// <summary>A snapshot's build text as parts, the way LoadSnapshot reads it

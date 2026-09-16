@@ -81,6 +81,41 @@ namespace RobotBrawl.Editor
         }
         /// <summary>`-rbClean` on the command line: a clean build, whose log lists every asset by size.</summary>
         static bool Clean { get { return System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "-rbClean") >= 0; } }
+
+        /// <summary>`-rbNoExternal`: emit a page that makes NO request to anything
+        /// but itself and carries NO outbound link.
+        ///
+        /// Several portals forbid exactly these two things, in their own words:
+        ///   * Kongregate rejects a game that "includes links that take players
+        ///     outside of Kongregate", and lists external links as grounds for
+        ///     UNPUBLISHING an already-accepted game.
+        ///   * Coolmath Games: "The game must not contain any sort of stats
+        ///     counter that will report back to you" and no external links.
+        ///   * Newgrounds requires a notice and an opt-out at game start for any
+        ///     call to a third-party server.
+        ///
+        /// ⚠ THIS IS A SEPARATE FLAG FROM `Portal`, DELIBERATELY. The CrazyGames
+        /// submission DECLARES the milestone beacon and links the privacy policy
+        /// from the loading screen - their reviewer was told about both, and
+        /// stripping them there would ship something other than what was
+        /// declared. "Which portal" and "may this page talk to us" are two
+        /// different questions and must not share one switch.</summary>
+        static bool NoExternal { get { return System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "-rbNoExternal") >= 0; } }
+
+        /// <summary>Replace exactly once, and FAIL THE BUILD if the text is not
+        /// there. A silent no-op replace against a template that has since been
+        /// edited would ship the very thing the flag exists to remove, and it
+        /// would look like a clean build - which is the shape of defect this
+        /// project keeps paying for. Loud is the whole point.</summary>
+        static string CutOnce(string html, string find, string replace, string what)
+        {
+            int at = html.IndexOf(find, System.StringComparison.Ordinal);
+            if (at < 0) { Fail("-rbNoExternal could not find " + what + " in the template - it has been edited; update BuildWebGL before shipping a build that claims to have no external calls"); return html; }
+            if (html.IndexOf(find, at + find.Length, System.StringComparison.Ordinal) >= 0)
+            { Fail("-rbNoExternal found " + what + " MORE THAN ONCE - cutting one leaves the other"); return html; }
+            Debug.Log("[BuildWebGL] -rbNoExternal: removed " + what);
+            return html.Substring(0, at) + replace + html.Substring(at + find.Length);
+        }
         public static void BuildPortal() { Portal = true; Build(); }
         /// <summary>A DEVELOPMENT build, for capturing promo footage only. It
         /// compiles PromoAutopilot in (a release build does not contain it at
@@ -95,9 +130,27 @@ namespace RobotBrawl.Editor
             string outDir = Arg("-rbOutDir") ?? OUT_DIR;
             string priorDefines = PlayerSettings.GetScriptingDefineSymbols(NamedBuildTarget.WebGL);
             definesBeforeBuild = priorDefines;
-            if (Portal && !priorDefines.Contains("RB_PORTAL"))
-                PlayerSettings.SetScriptingDefineSymbols(NamedBuildTarget.WebGL,
-                    string.IsNullOrEmpty(priorDefines) ? "RB_PORTAL" : priorDefines + ";RB_PORTAL");
+            {
+                // Both defines go on in one write, and RestoreDefines/Fail put
+                // the whole string back - see the note on Fail().
+                string want = priorDefines ?? "";
+                if (Portal && !want.Contains("RB_PORTAL"))
+                    want = string.IsNullOrEmpty(want) ? "RB_PORTAL" : want + ";RB_PORTAL";
+                // ⚠ THE PAGE IS NOT THE ONLY THING THAT TALKS. Cutting the
+                // beacon out of index.html makes the PAGE silent, but the wasm
+                // still asks GET /v1/pool for other players' machines - a real
+                // request to our server, from a portal's origin, that the HTML
+                // edits cannot see. A flag called -rbNoExternal that leaves it
+                // running is a flag that lies, so it carries a define too and
+                // the game skips the fetch. Nothing is lost visually: the yard
+                // already falls back to roster machines when the pool is
+                // unreachable, which is exactly what portals have been getting
+                // anyway (see the CORS note in server/Program.cs).
+                if (NoExternal && !want.Contains("RB_NO_EXTERNAL"))
+                    want = string.IsNullOrEmpty(want) ? "RB_NO_EXTERNAL" : want + ";RB_NO_EXTERNAL";
+                if (want != priorDefines)
+                    PlayerSettings.SetScriptingDefineSymbols(NamedBuildTarget.WebGL, want);
+            }
             try
             {
 
@@ -285,6 +338,33 @@ namespace RobotBrawl.Editor
             foreach (var name in new[] { stem + ".data" + ext, stem + ".wasm" + ext,
                                          stem + ".framework.js" + ext, stem + ".loader.js" })
                 html = html.Replace("/" + name + "\"", "/" + name + "?v=" + stamp + "\"");
+            if (NoExternal)
+            {
+                // The beacon: neutered at its single choke point rather than by
+                // deleting its callers, so every call site stays valid and the
+                // page keeps behaving identically in every other respect.
+                // ⚠ THE WHOLE BODY GOES, AND THE URL WITH IT - not a `return`
+                // at the top. A short-circuited function still CONTAINS the
+                // fetch and our API's address, and the rules these builds are
+                // for are read by a human with the source open: Coolmath's is
+                // "must not CONTAIN any sort of stats counter". Dead code that
+                // still names an endpoint is a conversation nobody needs.
+                html = CutOnce(html,
+                    "    function beacon(ev, extra) {\n      try {\n        fetch(BEACON + \"?e=\" + encodeURIComponent(ev) + \"&i=\" + RBID + (extra || \"\"),\n              { mode: \"no-cors\", keepalive: true, cache: \"no-store\", credentials: \"omit\" })\n          .catch(function () { /* offline counting must not become a JS error */ });\n      } catch (e) { /* counting must never break the game */ }\n    }",
+                    "    function beacon(ev, extra) { /* -rbNoExternal: this build contacts nothing */ }",
+                    "the milestone beacon");
+                html = CutOnce(html,
+                    "    var BEACON = \"https://rb-api-902243335343.us-central1.run.app/v1/beacon/scrapyard-play\";",
+                    "    var BEACON = \"\";   // -rbNoExternal",
+                    "the beacon endpoint URL");
+                // The outbound privacy link becomes plain text. The NOTICE stays -
+                // it is true either way, and a portal that forbids the link does
+                // not forbid telling the player what the game does.
+                html = CutOnce(html,
+                    "<a href=\"https://cyberduck.club/privacy/\" target=\"_blank\" rel=\"noopener\">privacy</a>",
+                    "<span>no data leaves this page</span>",
+                    "the outbound privacy link");
+            }
             File.WriteAllText(index, html);
             Debug.Log("[BuildWebGL] payload URLs stamped ?v=" + stamp
                       + "  (stale-cache crash guard)");
@@ -310,7 +390,7 @@ namespace RobotBrawl.Editor
 
         static void RestoreDefines(string priorDefines)
         {
-            if (!Portal) return;
+            if (!Portal && !NoExternal) return;
             if (PlayerSettings.GetScriptingDefineSymbols(NamedBuildTarget.WebGL) == priorDefines) return;
             PlayerSettings.SetScriptingDefineSymbols(NamedBuildTarget.WebGL, priorDefines);
             AssetDatabase.SaveAssets();
