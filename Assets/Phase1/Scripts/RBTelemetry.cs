@@ -90,6 +90,17 @@ namespace RobotBrawl.Phase0
         public const string STREAK = "streak";   // first 5-win streak (a crown)
         // SCRAPYARD (design §6): the yard's funnel
         public const string MAP       = "map";        // drove out
+        // ⚠ THE TWO EVENTS BETWEEN "THE WORLD LOADED" AND "DID SOMETHING".
+        // Added 2026-09-17 after the funnel could not answer the only question
+        // that mattered. MAP fires AUTOMATICALLY from PumpBootToYard - it means
+        // the game booted, not that a player did anything - and the next event
+        // was CRATE, which needs a chest physically driven into. So a session
+        // that loaded and left looked identical to one that drove around and
+        // never found a chest, and "the controls do not work" was
+        // indistinguishable from "the map does not invite exploring".
+        // MOVED = the stick or WASD moved at all. ROAM = ten metres travelled.
+        public const string MOVED     = "moved";      // first real drive input
+        public const string ROAM      = "roam";       // ROAM_METRES actually travelled
         public const string CRATE     = "crate";      // opened one
         public const string MEET      = "meet";       // an encounter card shown
         public const string CHALLENGE = "challenge";  // accepted one

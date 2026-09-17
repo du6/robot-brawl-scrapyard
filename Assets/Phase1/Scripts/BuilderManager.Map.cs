@@ -33,6 +33,14 @@ public partial class BuilderManager
     public const float CHUNK = 48f;          // metres per chunk side
     public const int   CHUNK_RES = 24;       // quads per side (2 m) -> 625 verts, 1152 tris
     public const int   VIEW_CHUNKS = 2;      // load radius: (2*2+1)^2 = 25 chunks around you
+    /// <summary>How far a player must actually travel before the funnel counts
+    /// them as having driven. Ten metres is a bit further than the first chest
+    /// (nine, dead ahead on a fresh save), so ROAM means "went somewhere",
+    /// not "twitched the stick".</summary>
+    public const float ROAM_METRES = 10f;
+    float roamMetres;
+    Vector3 roamLast;
+
     public const float CRATE_REACH = 1.6f;   // drive into it
     public const float CARD_REACH = 4f;      // the encounter card slides up
     public const string YARD_BOT = "scout";  // the spawn chunk's guaranteed first enemy
@@ -490,6 +498,8 @@ public partial class BuilderManager
         followCam.SnapNow();
         AddHeadlight(testRobot, driveDir);
 
+        roamMetres = 0f;
+        roamLast = testRobot != null ? testRobot.rb.position : Vector3.zero;
         MapHudUI.Ensure(this);
         FetchPoolOnce();
         FlushPendingToast();
@@ -604,6 +614,7 @@ public partial class BuilderManager
         if (yardToastT > 0f) yardToastT -= Time.deltaTime;
 
         Vector3 me = testRobot.rb.position;
+        PumpRoam(me);
         PumpExpeditionSave();
         FetchPoolOnce();
         PumpChunks(me);
@@ -665,6 +676,24 @@ public partial class BuilderManager
     /// <summary>Stick and keys -> the drive's AI inputs, shaped for a world
     /// rather than a ring. Public seam so a bench can read the result.</summary>
     public float MapSteerNow { get { return testDrive != null ? testDrive.aiSteer : 0f; } }
+    /// <summary>The funnel's missing middle: did they touch the controls, and
+    /// did they go anywhere. Both are Once() so they cost one beacon each per
+    /// page load. Distance is accumulated rather than measured from spawn - a
+    /// player circling the home pad HAS driven, and should count as such.</summary>
+    void PumpRoam(Vector3 me)
+    {
+        if (StickNow() != Vector2.zero) RBTelemetry.Once(RBTelemetry.MOVED);
+        Vector3 step = me - roamLast; step.y = 0f;
+        // Ignore the teleport-sized jump a respawn or a fight exit produces;
+        // it is not distance the player drove.
+        if (step.sqrMagnitude < 25f) roamMetres += step.magnitude;
+        roamLast = me;
+        if (roamMetres >= ROAM_METRES) RBTelemetry.Once(RBTelemetry.ROAM);
+    }
+
+    /// <summary>Metres travelled this expedition, for a bench.</summary>
+    public float TestRoamMetres { get { return roamMetres; } }
+
     void MapSteer()
     {
         // point where you want to go (BuilderManager.Drive.cs)

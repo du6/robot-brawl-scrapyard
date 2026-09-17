@@ -198,6 +198,26 @@ namespace RobotBrawl.Phase0
             bm.EnterMap(); yield return null; yield return null;
             Check(bm.mode == BuilderManager.Mode.Map, "DRIVE OUT enters the yard");
             Check(RBTelemetry.Has(RBTelemetry.MAP), "...and the funnel hears `map`");
+
+            // ---- 1b. THE FUNNEL'S MISSING MIDDLE -------------------------------
+            // ⚠ `map` FIRES ON BOOT, NOT ON AN ACTION (PumpBootToYard), and the
+            // next event needed a chest driven into. So the live funnel could not
+            // tell "never touched the controls" from "drove and found nothing" -
+            // the two answers that would have led to completely different fixes.
+            // The CONTROL LEG is the point of this block: `moved` and `roam` must
+            // be ABSENT before anyone drives, or they are measuring the boot and
+            // would read 100% forever.
+            Check(!RBTelemetry.Has(RBTelemetry.MOVED),
+                  "arriving in the world is NOT `moved` — nobody has touched the stick yet");
+            Check(!RBTelemetry.Has(RBTelemetry.ROAM),
+                  "...nor `roam` — nobody has travelled yet");
+            Check(bm.TestRoamMetres < 0.5f,
+                  "...and the odometer starts at zero (" + bm.TestRoamMetres.ToString("0.0") + " m)");
+
+            // The positive half is asserted after the bench drives to a crate
+            // below - it rides the real gameplay path rather than a drive staged
+            // for the test, and driving here would open the first chest and
+            // invalidate the five checks that follow about a pristine world.
             // ---- the HUD is UGUI, in the dock's style (MapHudUI) ---------------------
             yield return null;
             var hud = MapHudUI.inst;
@@ -450,6 +470,20 @@ namespace RobotBrawl.Phase0
             float backed = Vector3.Dot(bm.testRobot.rb.position - posR, fwdR.normalized);
             Check(backed < -0.5f, "...and the machine backs up (" + backed.ToString("0.0") + " m along its nose)");
             Phase0Input.debugThrottle = 0f; Phase0Input.debugSteer = 0f;
+
+            // ---- the funnel's missing middle, measured on a REAL drive --------
+            // ⚠ THIS BELONGS HERE AND NOWHERE EARLIER. The crate section
+            // TELEPORTS the machine onto a chest (TeleportPlayer), so it drives
+            // nothing: asserting there read 0.0 m and failed, correctly. The
+            // odometer deliberately ignores teleport-sized jumps, because a
+            // respawn is not distance a player drove. By this line the bench has
+            // held the stick up for two seconds, turned, and reversed.
+            Check(RBTelemetry.Has(RBTelemetry.MOVED), "a real drive fires `moved`");
+            Check(bm.TestRoamMetres >= BuilderManager.ROAM_METRES,
+                  "...and the odometer counts only driven metres (" + bm.TestRoamMetres.ToString("0.0")
+                  + " m, threshold " + BuilderManager.ROAM_METRES + ")");
+            Check(RBTelemetry.Has(RBTelemetry.ROAM), "...so `roam` fires once the machine has gone somewhere");
+
             // ⚠ THE OLD CHECK ASSERTED `RANGE >= 130`, A NUMBER IN A UNIT THAT
             // NO LONGER MEANS WHAT IT DID. It was written when one unit was one
             // framebuffer pixel; after GuiScale was fixed, one unit is one CSS
