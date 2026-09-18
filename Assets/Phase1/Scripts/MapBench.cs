@@ -214,6 +214,29 @@ namespace RobotBrawl.Phase0
             Check(bm.TestRoamMetres < 0.5f,
                   "...and the odometer starts at zero (" + bm.TestRoamMetres.ToString("0.0") + " m)");
 
+            // THE KEYBOARD HINT, BOTH LEGS. A desktop visitor was handed a phone
+            // joystick and no word that WASD drives - 5 of the 8 desktop sessions
+            // that reached the world on 2026-09-17 never touched a control. The
+            // hint answers that, and it must answer it ONLY there: on a finger it
+            // is noise over the one control that does work.
+            // Forced metrics come in PAIRS - forcedCoarsePointer is only read
+            // when forcedPixelRatio is set (ReadBrowserMetrics) - so a bench that
+            // sets one and not the other silently measures the default.
+            TouchControls.TestResetDriven();
+            MobileBuilderUI.forcedPixelRatio = 1f;
+            MobileBuilderUI.forcedCoarsePointer = false;
+            Check(TouchControls.KeyHintWanted,
+                  "a fine pointer that has never driven is offered the keys");
+            MobileBuilderUI.forcedCoarsePointer = true;
+            Check(!TouchControls.KeyHintWanted,
+                  "...and a finger is not - the stick is already the answer there");
+            MobileBuilderUI.forcedCoarsePointer = false;
+            TouchControls.everDriven = true;
+            Check(!TouchControls.KeyHintWanted,
+                  "...nor is a desktop player who has already driven once");
+            TouchControls.TestResetDriven();
+            MobileBuilderUI.ClearForcedMetrics();
+
             // The positive half is asserted after the bench drives to a crate
             // below - it rides the real gameplay path rather than a drive staged
             // for the test, and driving here would open the first chest and
@@ -483,6 +506,9 @@ namespace RobotBrawl.Phase0
                   "...and the odometer counts only driven metres (" + bm.TestRoamMetres.ToString("0.0")
                   + " m, threshold " + BuilderManager.ROAM_METRES + ")");
             Check(RBTelemetry.Has(RBTelemetry.ROAM), "...so `roam` fires once the machine has gone somewhere");
+            // The hint retires off the SAME line that raises `moved`, so these two
+            // can never disagree about what counts as driving.
+            Check(TouchControls.everDriven, "...and that same drive retires the keyboard hint");
 
             // ⚠ THE OLD CHECK ASSERTED `RANGE >= 130`, A NUMBER IN A UNIT THAT
             // NO LONGER MEANS WHAT IT DID. It was written when one unit was one

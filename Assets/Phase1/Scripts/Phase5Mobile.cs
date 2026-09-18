@@ -145,6 +145,25 @@ public class TouchControls : MonoBehaviour
     public static float KNOB_TRAVEL { get { return RANGE; } }         // the knob reaches the drawn edge
     public static float REST { get { return RING * REST_OF_RING; } }  // resting centre from the bottom-left
     public static bool MouseAccepted = true;
+    /// <summary>Has this player driven, by any means, since the page loaded?
+    /// Set at the one site that already asks the question - PumpRoam's
+    /// `StickNow() != Vector2.zero`, which is also what raises the `moved`
+    /// beacon - so the hint and the telemetry can never disagree about what
+    /// counts as driving. Static on purpose: once you have driven you know how,
+    /// and coming out of a fight must not re-teach you.</summary>
+    public static bool everDriven;
+    public static void TestResetDriven() { everDriven = false; }
+    /// <summary>Should the WASD cluster be on screen? Named rather than left
+    /// inline in OnGUI so a bench measures THE EXPRESSION THE DRAW ACTUALLY
+    /// USES - the WATCH-button lesson (CLAUDE.md): a seam that restates a
+    /// predicate proves only that the restatement is correct.
+    /// `stickHeld` is deliberately NOT in here: that is a frame-by-frame draw
+    /// suppression while a mouse drags the ring, not a statement about whether
+    /// this player needs the hint.</summary>
+    public static bool KeyHintWanted
+    {
+        get { return !everDriven && !MobileBuilderUI.HasCoarsePointer; }
+    }
     FightManager fm;   // results-card detection: pads hide while it is up
     static TouchControls inst;
 
@@ -292,6 +311,54 @@ public class TouchControls : MonoBehaviour
         return t;
     }
 
+    static GUIStyle keyLbl, keyCap;
+
+    /// <summary>A WASD cluster drawn where the stick rests, captioned. Sized off
+    /// RING so it tracks the stick at every screen size instead of carrying its
+    /// own literals - the 640x480 label sweep exists because of literals.</summary>
+    void DrawKeyHint(Vector2 a)
+    {
+        if (keyLbl == null)
+        {
+            keyLbl = new GUIStyle(GUI.skin.label);
+            keyLbl.alignment = TextAnchor.MiddleCenter;
+            keyLbl.fontStyle = FontStyle.Bold;
+        }
+        if (keyCap == null)
+        {
+            keyCap = new GUIStyle(GUI.skin.label);
+            keyCap.alignment = TextAnchor.MiddleCenter;
+            keyCap.fontStyle = FontStyle.Bold;
+        }
+        float K = Mathf.Max(26f, RING * 0.30f);          // one key cap
+        float G = K * 0.13f;                              // the gap between caps
+        keyLbl.fontSize = Mathf.RoundToInt(K * 0.46f);
+        keyCap.fontSize = Mathf.RoundToInt(K * 0.38f);
+        float cy = a.y - (K + G) * 0.5f;                  // two rows, centred on the ring
+        Color saved = GUI.color;
+        float pulse = 0.72f + 0.20f * Mathf.Sin(Time.unscaledTime * 2.6f);
+        Cap(new Rect(a.x - K * 0.5f,     cy - K - G, K, K), "W", pulse);
+        Cap(new Rect(a.x - K * 1.5f - G, cy,         K, K), "A", pulse);
+        Cap(new Rect(a.x - K * 0.5f,     cy,         K, K), "S", pulse);
+        Cap(new Rect(a.x + K * 0.5f + G, cy,         K, K), "D", pulse);
+        keyCap.normal.textColor = new Color(1f, 1f, 1f, 0.78f);
+        GUI.Label(new Rect(a.x - RING, cy + K + G * 2f, RING * 2f, K), "or ARROWS to drive", keyCap);
+        GUI.color = saved;
+    }
+
+    void Cap(Rect r, string letter, float pulse)
+    {
+        GUI.color = new Color(0.86f, 0.92f, 1f, pulse);            // the cap edge
+        GUI.DrawTexture(r, Texture2D.whiteTexture);
+        float b = Mathf.Max(2f, r.width * 0.075f);
+        GUI.color = new Color(0.05f, 0.07f, 0.11f, 0.90f);         // the well
+        GUI.DrawTexture(new Rect(r.x + b, r.y + b, r.width - b * 2f, r.height - b * 2f),
+                        Texture2D.whiteTexture);
+        GUI.color = Color.white;
+        keyLbl.normal.textColor = new Color(0.94f, 0.97f, 1f, Mathf.Min(1f, pulse + 0.18f));
+        GUI.Label(r, letter, keyLbl);
+    }
+
     void OnGUI()
     {
         if (!fightActive || (!HasTouch && !mouseTest && !MouseAccepted)) return;
@@ -330,6 +397,12 @@ public class TouchControls : MonoBehaviour
         GUI.DrawTexture(new Rect(k.x - KNOB * 0.5f, k.y - KNOB * 0.5f, KNOB, KNOB), discTex);
         GUI.color = saved;
         if (!stickHeld) GUI.Label(baseR, "DRIVE", padLbl);
+
+        // A MOUSE IS NOT A FINGER. On a coarse pointer the ring above is the
+        // whole story; on a fine one it is a phone affordance the player has no
+        // reason to grab, and WASD - which has always worked - was advertised
+        // nowhere at all. Show the keys until the player drives once.
+        if (KeyHintWanted && !stickHeld) DrawKeyHint(a);
 
         // FIRE: red disc, flashes brighter while held. Hidden for weaponless builds.
         if (hasFire)

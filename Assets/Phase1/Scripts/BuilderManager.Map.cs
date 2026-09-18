@@ -682,7 +682,11 @@ public partial class BuilderManager
     /// player circling the home pad HAS driven, and should count as such.</summary>
     void PumpRoam(Vector3 me)
     {
-        if (StickNow() != Vector2.zero) RBTelemetry.Once(RBTelemetry.MOVED);
+        if (StickNow() != Vector2.zero)
+        {
+            RBTelemetry.Once(RBTelemetry.MOVED);
+            TouchControls.everDriven = true;   // and the keyboard hint retires
+        }
         Vector3 step = me - roamLast; step.y = 0f;
         // Ignore the teleport-sized jump a respawn or a fight exit produces;
         // it is not distance the player drove.

@@ -47,6 +47,39 @@ public partial class MobileBuilderUI
 #endif
     }
 
+    /// <summary>Does the pointer driving this session report itself COARSE - a
+    /// finger rather than a mouse? The browser's own answer, via
+    /// `matchMedia('(pointer: coarse)')`, which is the only honest source: a
+    /// WebGL player reports isMobilePlatform=false and deviceType=Desktop even
+    /// in a phone browser, and DeviceWantsTouch() therefore hands EVERY web
+    /// visitor the touch UI on purpose (see its header - the alternative was
+    /// handing strangers the legacy dev builder).
+    ///
+    /// That decision is about which BUILDER to show. It was never meant to
+    /// decide which CONTROLS to advertise, and it silently did: a desktop
+    /// visitor got a phone joystick, a "TAP THE BOX TO OPEN" prompt and no
+    /// keyboard hint anywhere - while WASD and the arrows drove the whole time
+    /// (Phase0Input.Steer/Throttle read them). Measured 2026-09-17, the first
+    /// clean day of the `moved` event: 8 of the 26 sessions that reached the
+    /// world were desktop, and 5 of those 8 never touched a control.
+    ///
+    /// WARNING: in a bench this follows MobileBuilderUI.forcedCoarsePointer,
+    /// but ONLY when forcedPixelRatio is set too - ReadBrowserMetrics reads the
+    /// pair together. Outside WebGL and outside a forced bench it answers
+    /// false, which is right for the editor and for a desktop player.</summary>
+    public static bool HasCoarsePointer
+    {
+        get
+        {
+#if UNITY_IOS || UNITY_ANDROID
+            return true;                    // a real handheld; there is no browser to ask
+#else
+            ReadBrowserMetrics();
+            return browserCoarsePointer;
+#endif
+        }
+    }
+
     static bool PhysicalTouchSizing
     {
         get
